@@ -429,26 +429,14 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
       // Create auth account
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), pw);
       const uid = cred.user.uid;
+      // For owner, the shopId IS the owner's uid
+      if (isOwner) shopId = uid;
 
-      // For owner: create new shop document
-      if (isOwner) {
-        shopId = uid;
-        await setDoc(doc(db, "shops", shopId), {
-          companyName: companyName.trim(),
-          ownerName: personName.trim(),
-          ownerUid: uid,
-          country,
-          area: area.trim(),
-          mobile: mobile.trim(),
-          email: email.trim(),
-          inviteCode: generateInviteCode(),
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      // Create user profile
+      // ⚠️ CRITICAL: Create user profile FIRST.
+      // If this fails, the rest also fails — preventing orphan shops.
+      // Other Rules check users/{uid} so users doc must exist before shops/orders/companies are usable.
       const countryObj = COUNTRIES.find(c => c.code === country);
-      await setDoc(doc(db, "users", uid), {
+      const userPayload = {
         uid,
         role: isOwner ? "owner" : "salesman",
         shopId,
@@ -460,10 +448,48 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
         area: area.trim(),
         createdAt: serverTimestamp(),
         ...(isOwner ? { companyName: companyName.trim() } : { joinedShopName: shopData?.companyName || "" }),
-      });
+      };
+
+      let userCreated = false;
+      try {
+        await setDoc(doc(db, "users", uid), userPayload);
+        userCreated = true;
+      } catch (e) {
+        console.error("User profile creation failed:", e);
+        // Auth account exists but profile failed — try to clean up so user can retry
+        try { await cred.user.delete(); } catch {}
+        throw { code: "profile/create-failed", message: e.message };
+      }
+
+      // Create shop document (only for owner — salesman uses existing shop)
+      if (isOwner) {
+        try {
+          await setDoc(doc(db, "shops", shopId), {
+            companyName: companyName.trim(),
+            ownerName: personName.trim(),
+            ownerUid: uid,
+            country,
+            area: area.trim(),
+            mobile: mobile.trim(),
+            email: email.trim(),
+            inviteCode: generateInviteCode(),
+            createdAt: serverTimestamp(),
+          });
+        } catch (e) {
+          console.error("Shop creation failed:", e);
+          // Roll back: delete the user profile we just created
+          if (userCreated) {
+            try { await deleteDoc(doc(db, "users", uid)); } catch {}
+          }
+          try { await cred.user.delete(); } catch {}
+          throw { code: "shop/create-failed", message: e.message };
+        }
+      }
 
       // Send verification email
-      await sendEmailVerification(cred.user);
+      try { await sendEmailVerification(cred.user); } catch (e) {
+        console.warn("Verification email failed but account created:", e);
+      }
       toast(t.n9);
     } catch (err) {
       toast(friendlyAuthError(err, lang), "err");
