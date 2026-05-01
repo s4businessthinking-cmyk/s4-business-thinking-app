@@ -835,34 +835,47 @@ useEffect(() => {
           {orders.length > 0 && <>
             <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
             {orders.map(o => (
-              <div key={o.id} style={s.card}>
-                <div style={s.oHdr}>
-                  <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
-                  <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>{t.status[o.overall]}</span>
-                </div>
-                {o.items.map((it, x) => (
-                  <div key={x} style={s.iSum}>
-                    <div style={{ flex: 1, minWidth: 120 }}>
-                      <div style={s.iName}>{it.name}</div>
-                      {(it.code || it.brand) && (
-                        <div style={s.iMeta}>
-                          {it.code && <span>📋 {it.code}</span>}
-                          {it.code && it.brand && <span> · </span>}
-                          {it.brand && <span>🏷️ {it.brand}</span>}
-                        </div>
-                      )}
-                    </div>
-                    <span style={s.iQty}>{it.qty} {it.unit}</span>
-                    {it.price && <span style={s.iPrice}>{t.cur} {it.price}</span>}
-                    <span style={{ fontSize: 11, fontWeight: 700, color: SC[it.status]?.color }}>{t.status[it.status]}</span>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </>}
-        </div>
-      )}
+  <div key={o.id} style={s.card}>
 
+    <div style={s.oHdr}>
+      <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
+      <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>
+        {t.status[o.overall]}
+      </span>
+    </div>
+
+    {o.items.map((it, x) => (
+      <div key={x} style={s.iSum}>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <div style={s.iName}>{it.name}</div>
+          {(it.code || it.brand) && (
+            <div style={s.iMeta}>
+              {it.code && <span>📋 {it.code}</span>}
+              {it.code && it.brand && <span> · </span>}
+              {it.brand && <span>🏷️ {it.brand}</span>}
+            </div>
+          )}
+        </div>
+        <span style={s.iQty}>{it.qty} {it.unit}</span>
+        {it.price && <span style={s.iPrice}>{t.cur} {it.price}</span>}
+        <span style={{ fontSize: 11, fontWeight: 700, color: SC[it.status]?.color }}>
+          {t.status[it.status]}
+        </span>
+      </div>
+    ))}
+
+    {/* 🔥 DELETE BUTTON (এখানে বসাও) */}
+    {o.canDelete && (
+      <button
+        onClick={() => deleteOrder(o.id)}
+        style={{ marginTop: 10 }}
+      >
+        Delete
+      </button>
+    )}
+
+  </div>
+))}
       {/* OWNER */}
       {isOwner && tab === "owner" && (
         <div style={s.panel}>
