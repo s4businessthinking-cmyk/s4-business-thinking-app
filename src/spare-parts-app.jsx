@@ -678,30 +678,64 @@ const addItem = () => setItems(prev => [...prev, newItem()]);
 const delItem = (id) => setItems(prev => prev.filter(it => it.id !== id));
 const updItem = (id, f, v) => setItems(prev => prev.map(it => it.id === id ? { ...it, [f]: v } : it));
 
-const canEditOrder = (order) => {
-  if (!order?.createdAt) return false;
+const editOrder = async (id) => {
+  const order = orders.find(o => o.id === id);
+  if (!order) return;
 
-  const created =
-    order.createdAt?.toDate?.() || new Date(order.createdAt);
+  if (!canEditOrder(order)) {
+    return toast("সময় শেষ (60 min)", "err");
+  }
 
-  const now = new Date();
+  const input = prompt(
+    "Edit items (JSON format):",
+    JSON.stringify(order.items, null, 2)
+  );
 
-  const diffMinutes = (now - created) / (1000 * 60);
+  if (!input) return;
 
-  return diffMinutes <= 60;
+  let parsed;
+  try {
+    parsed = JSON.parse(input);
+  } catch {
+    return toast("Invalid JSON", "err");
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return toast("Invalid items", "err");
+  }
+
+  const valid = parsed.every(it =>
+    typeof it.name === "string" &&
+    it.name.trim() &&
+    Number(it.qty) > 0
+  );
+
+  if (!valid) {
+    return toast("Name & Qty required", "err");
+  }
+
+  const sanitized = parsed.map((it, i) => ({
+    name: it.name.trim(),
+    code: it.code || "",
+    brand: it.brand || "",
+    qty: Number(it.qty),
+    unit: it.unit || "Pcs",
+
+    // preserve existing
+    price: order.items[i]?.price || "",
+    status: order.items[i]?.status || "pending",
+    co: order.items[i]?.co || null
+  }));
+
+  try {
+    await updateDoc(doc(db, "orders", id), {
+      items: sanitized
+    });
+    toast("Updated");
+  } catch (e) {
+    handleErr(e);
+  }
 };
-
-// 🔥 এইটা নতুন
-const editOrder = (id) => {
-  alert("Edit clicked: " + id);
-};
-
-const toggleDeleteSetting = async () => {
-  await updateDoc(doc(db, "shops", shopId), {
-    allowDelete: !shopData?.allowDelete,
-  });
-};
-  
   const sendOrder = async () => { 
     const valid = items.filter(it => it.name.trim());
     if (!valid.length) return toast(t.e1, "err");
