@@ -925,32 +925,40 @@ const editOrder = async (id) => {
     <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
 
     {orders.map(o => {
-      console.log("EDIT?", canEditOrder(o), o.createdAt);
+  console.log("EDIT?", canEditOrder(o), o.createdAt);
 
-      return (
-        <div key={o.id} style={s.card}>
+  return (
+    <div key={o.id} style={s.card}>
 
-          {/* HEADER */}
-          <div style={s.oHdr}>
-            <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
-            <span style={{
-              ...s.sBadge,
-              color: SC[o.overall]?.color,
-              background: SC[o.overall]?.bg
-            }}>
-              {t.status[o.overall]}
-            </span>
-          </div>
+      <div style={s.oHdr}>
+        <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
+        <span style={{
+          ...s.sBadge,
+          color: SC[o.overall]?.color,
+          background: SC[o.overall]?.bg
+        }}>
+          {t.status[o.overall]}
+        </span>
+      </div>
 
-          {/* ITEMS */}
-          {o.items.map((it, x) => (
-            <div key={x} style={s.iSum}>
-              <div style={{ flex: 1 }}>
-                <div style={s.iName}>{it.name}</div>
-              </div>
-              <span>{it.qty} {it.unit}</span>
-            </div>
-          ))}
+      {/* ITEMS */}
+      {o.items.map((it, x) => (
+        <div key={x} style={s.iSum}>
+          <div>{it.name}</div>
+          <div>{it.qty} {it.unit}</div>
+        </div>
+      ))}
+
+      {/* EDIT */}
+      {o.createdBy === user.uid && canEditOrder(o) && (
+        <button onClick={() => editOrder(o.id)}>
+          Edit
+        </button>
+      )}
+
+    </div>
+  );
+})}
 
           {/* EDIT BUTTON */}
           {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
