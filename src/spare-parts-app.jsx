@@ -874,6 +874,7 @@ const editOrder = async (id) => {
   const visibleTabs = isOwner
     ? [["owner", t.tabOwner], ["companies", t.tabCompany], ["settings", t.tabSettings]]
     : [["shop", t.tabShop], ["settings", t.tabSettings]];
+  console.log("DEBUG:", isOwner, tab);
 
   return (
     <div style={s.root}>
@@ -888,7 +889,7 @@ const editOrder = async (id) => {
         </div>
       </Header>
       
-      console.log("DEBUG:", isOwner, tab);
+      
       
       {/* SHOP (salesman) */}
       {!isOwner && tab === "shop" && (
@@ -918,93 +919,84 @@ const editOrder = async (id) => {
             <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
           </div>
 
-          {orders.length > 0 && (
+          
+    {orders.length > 0 && (
   <>
     <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
 
-    {orders.map(o => (
-      <div key={o.id} style={s.card}>
-        
+    {orders.map(o => {
+      console.log("EDIT?", canEditOrder(o), o.createdAt);
 
-        <div style={s.oHdr}>
-          <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
-          <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>
-            {t.status[o.overall]}
-          </span>
-        </div>
+      return (
+        <div key={o.id} style={s.card}>
 
-        {o.items.map((it, x) => (
-          <div key={x} style={s.iSum}>
-            <div style={{ flex: 1, minWidth: 120 }}>
-              <div style={s.iName}>{it.name}</div>
-              {(it.code || it.brand) && (
-                <div style={s.iMeta}>
-                  {it.code && <span>📋 {it.code}</span>}
-                  {it.code && it.brand && <span> · </span>}
-                  {it.brand && <span>🏷️ {it.brand}</span>}
-                </div>
-              )}
-            </div>
-            <span style={s.iQty}>{it.qty} {it.unit}</span>
-            {it.price && <span style={s.iPrice}>{t.cur} {it.price}</span>}
-            <span style={{ fontSize: 11, fontWeight: 700, color: SC[it.status]?.color }}>
-              {t.status[it.status]}
+          {/* HEADER */}
+          <div style={s.oHdr}>
+            <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
+            <span style={{
+              ...s.sBadge,
+              color: SC[o.overall]?.color,
+              background: SC[o.overall]?.bg
+            }}>
+              {t.status[o.overall]}
             </span>
           </div>
-        ))}
-        
-        {canEditOrder(o) && (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-           <button
-            onClick={() => editOrder(o.id)}
-            style={{
-              padding: "6px 12px",
-              background: "#3b82f6",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600
-            }}
-          >
-            Edit
-          </button>
+
+          {/* ITEMS */}
+          {o.items.map((it, x) => (
+            <div key={x} style={s.iSum}>
+              <div style={{ flex: 1 }}>
+                <div style={s.iName}>{it.name}</div>
+              </div>
+              <span>{it.qty} {it.unit}</span>
+            </div>
+          ))}
+
+          {/* EDIT BUTTON */}
+          {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+              <button
+                onClick={() => editOrder(o.id)}
+                style={{
+                  padding: "6px 12px",
+                  background: "#3b82f6",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6
+                }}
+              >
+                Edit
+              </button>
+            </div>
+          )}
+
+          {/* DELETE BUTTON */}
+          {shopData?.allowDelete && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+              <button
+                onClick={() => {
+                  if (confirm("Delete this order?")) {
+                    deleteOrder(o.id);
+                  }
+                }}
+                style={{
+                  padding: "6px 12px",
+                  background: "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 6
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+
         </div>
-      )}
-
-        {shopData?.allowDelete && (
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-            <button
-              onClick={() => {
-                if (confirm("Delete this order?")) {
-                  deleteOrder(o.id);
-                }
-              }}
-              style={{
-                padding: "6px 12px",
-                background: "#ef4444",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: 600
-              }}
-            >
-              Delete
-            </button>
-          </div>
-        )}
-
-      </div>  // 🔥 order card end
-    ))}
-
+      );
+    })}
   </>
 )}
-
-</div>   // 🔥 panel end
-)}       // 🔥 shop end
       {/* OWNER */}
 {isOwner && tab === "owner" && (
   <div style={s.panel}>
