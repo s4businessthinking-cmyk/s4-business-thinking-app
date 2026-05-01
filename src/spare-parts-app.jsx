@@ -666,6 +666,7 @@ useEffect(() => {
         shopId,
         createdBy: user.uid,
         createdByName: profile.personName,
+        canDelete: false, // 🔥 শুধু এইটা নতুন
         items: valid.map(it => ({
           name: it.name, code: it.code || "", brand: it.brand || "",
           qty: it.qty || "", unit: it.unit || "Pcs",
