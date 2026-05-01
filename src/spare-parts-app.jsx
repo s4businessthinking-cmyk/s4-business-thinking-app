@@ -864,18 +864,29 @@ useEffect(() => {
       </div>
     ))}
 
-    {/* 🔥 DELETE BUTTON (এখানে বসাও) */}
     {o.canDelete && (
-      <button
-        onClick={() => deleteOrder(o.id)}
-        style={{ marginTop: 10 }}
-      >
-        Delete
-      </button>
-    )}
-
+  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+    <button
+      onClick={() => {
+        if (confirm("Delete this order?")) {
+          deleteOrder(o.id);
+        }
+      }}
+      style={{
+        padding: "6px 12px",
+        background: "#ef4444",
+        color: "#fff",
+        border: "none",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 600
+      }}
+    >
+      Delete
+    </button>
   </div>
-))}
+)}
       {/* OWNER */}
       {isOwner && tab === "owner" && (
         <div style={s.panel}>
