@@ -655,14 +655,17 @@ useEffect(() => {
   }, [shopId]);
   
 
-  // 🔥 এখানে বসাও
-  console.log("SHOP DATA:", shopData);
-  console.log("ALLOW DELETE:", shopData?.allowDelete);
+  // 🔥 SHOP DATA SUBSCRIBE
 useEffect(() => {
   if (!shopId) return;
 
   const unsub = onSnapshot(doc(db, "shops", shopId), (snap) => {
-    setShopData(snap.data());
+    const data = snap.data();
+    setShopData(data);
+
+    // ✅ debug এখানে (inside effect)
+    console.log("SHOP DATA:", data);
+    console.log("ALLOW DELETE:", data?.allowDelete);
   });
 
   return () => unsub();
@@ -704,20 +707,26 @@ const toggleDeleteSetting = async () => {
     if (!valid.length) return toast(t.e1, "err");
     try {
       await addDoc(collection(db, "orders"), {
-        shopId,
-        createdBy: user.uid,
-        createdByName: profile.personName,
-        canDelete: false, // 🔥 শুধু এইটা নতুন
-        items: valid.map(it => ({
-          name: it.name, code: it.code || "", brand: it.brand || "",
-          qty: it.qty || "", unit: it.unit || "Pcs",
-          price: "", status: "pending", co: null,
-        })),
-        note: note || "",
-        createdAt: serverTimestamp(),
-        overall: "pending",
-        read: false,
-      });
+  shopId,
+  createdBy: user.uid,
+  createdByName: profile.personName,
+
+  items: valid.map(it => ({
+    name: it.name,
+    code: it.code || "",
+    brand: it.brand || "",
+    qty: it.qty || "",
+    unit: it.unit || "Pcs",
+    price: "",
+    status: "pending",
+    co: null,
+  })),
+
+  note: note || "",
+  createdAt: serverTimestamp(),
+  overall: "pending",
+  read: false,
+});
       setItems([newItem()]);
       setNote("");
       toast(t.n1);
