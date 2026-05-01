@@ -474,6 +474,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
             email: email.trim(),
             inviteCode: generateInviteCode(),
             createdAt: serverTimestamp(),
+            allowDelete: false, // 🔥 এইটা ADD করো (IMPORTANT)
           });
         } catch (e) {
           console.error("Shop creation failed:", e);
@@ -596,6 +597,7 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
 
   const [tab, setTab] = useState(isOwner ? "owner" : "shop");
   const [orders, setOrders] = useState([]);
+  const [shopData, setShopData] = useState(null);
   const [cos, setCos] = useState([]);
   const [team, setTeam] = useState([]);
   const [syncState, setSyncState] = useState("connecting");
@@ -652,6 +654,18 @@ useEffect(() => {
     return () => unsub();
   }, [shopId]);
 
+  
+useEffect(() => {
+  if (!shopId) return;
+
+  const unsub = onSnapshot(doc(db, "shops", shopId), (snap) => {
+    setShopData(snap.data());
+  });
+
+  return () => unsub();
+}, [shopId]);
+
+  
   const handleErr = (e) => { console.error(e); toast(e.message || String(e), "err"); };
 
   const addItem = () => setItems(prev => [...prev, newItem()]);
@@ -864,7 +878,7 @@ useEffect(() => {
       </div>
     ))}
 
-    {o.canDelete && (
+    {shopData?.allowDelete && (
   <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
     <button
       onClick={() => {
