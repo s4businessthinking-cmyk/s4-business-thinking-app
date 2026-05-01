@@ -613,8 +613,11 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
   const [showAdd, setShowAdd] = useState(false);
   const [copyState, setCopyState] = useState(false);
 
-  // ---- Real-time data subscriptions (scoped to shopId) ----
-  useEffect(() => {
+  // 🔥 এখানে বসাও
+console.log("SHOP ID:", shopId);
+
+// ---- Real-time data subscriptions (scoped to shopId) ----
+useEffect(() => {
     const q = query(collection(db, "orders"), where("shopId", "==", shopId), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q,
       (snap) => {
@@ -629,7 +632,8 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
     return () => unsub();
   }, [shopId]);
 
-  useEffect(() => {
+// ---- Real-time data subscriptions (scoped to shopId) ----
+useEffect(() => {
     const q = query(collection(db, "companies"), where("shopId", "==", shopId), orderBy("name"));
     const unsub = onSnapshot(q,
       (snap) => setCos(snap.docs.map(d => ({ ...d.data(), id: d.id }))),
@@ -638,7 +642,8 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
     return () => unsub();
   }, [shopId]);
 
-  useEffect(() => {
+  
+useEffect(() => {
     const q = query(collection(db, "users"), where("shopId", "==", shopId));
     const unsub = onSnapshot(q,
       (snap) => setTeam(snap.docs.map(d => ({ ...d.data(), id: d.id }))),
