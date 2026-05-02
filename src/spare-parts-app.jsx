@@ -125,6 +125,14 @@ const TRANSLATIONS = {
     n11: "📤 যাচাই ইমেইল আবার পাঠানো হয়েছে।",
     e1: "অন্তত একটা আইটেম দিন!", e2: "নাম খালি রাখা যাবে না!", e3: "নাম দিন!",
     delConfirm: "এই অর্ডারটি মুছে ফেলবেন?",
+    tabManager: "🔑 ম্যানেজার",
+    managerOrders: "📋 সব অর্ডার",
+    assignRole: "ভূমিকা দিন",
+    removeRole: "ভূমিকা সরান",
+    roleAssigned: "✅ ভূমিকা দেওয়া হয়েছে!",
+    roleRemoved: "ভূমিকা সরানো হয়েছে।",
+    noRole: "সেলসম্যান",
+    yourRole: "আপনার ভূমিকা",
   },
   en: {
     appSub: "Parts Order Management",
@@ -215,6 +223,14 @@ const TRANSLATIONS = {
     n11: "📤 Verification email resent.",
     e1: "Add at least one item!", e2: "Name cannot be empty!", e3: "Please enter a name!",
     delConfirm: "Delete this order?",
+    tabManager: "🔑 Manager",
+    managerOrders: "📋 All Orders",
+    assignRole: "Assign Role",
+    removeRole: "Remove Role",
+    roleAssigned: "✅ Role assigned!",
+    roleRemoved: "Role removed.",
+    noRole: "Salesman",
+    yourRole: "Your Role",
   },
 };
 
@@ -230,6 +246,8 @@ const loadLang = () => { try { return localStorage.getItem(LANG_KEY) || "bn"; } 
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY, l); } catch {} };
 
 const newItem = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: "", code: "", brand: "", qty: "", unit: "Pcs" });
+
+const SHOP_ROLES = ["Senior Salesman", "Team Leader", "Supervisor", "Coordinator", "In-Charge"];
 
 // ============================================================
 // HEADER
@@ -593,9 +611,10 @@ function VerifyGate({ t, lang, setLang, user, toast, onLogout }) {
 // ============================================================
 function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
   const isOwner = profile.role === "owner";
+  const isManager = !isOwner && !!profile.shopRole;
   const shopId = profile.shopId;
 
-  const [tab, setTab] = useState(isOwner ? "owner" : "shop");
+  const [tab, setTab] = useState(isOwner ? "owner" : isManager ? "manager" : "shop");
   const [orders, setOrders] = useState([]);
   const [shopData, setShopData] = useState(null);
   const [cos, setCos] = useState([]);
@@ -850,6 +869,13 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
     return `https://wa.me/${phone}?text=${txt}`;
   };
 
+  const assignRole = async (memberId, role) => {
+    try {
+      await updateDoc(doc(db, "users", memberId), { shopRole: role || null });
+      toast(role ? t.roleAssigned : t.roleRemoved);
+    } catch (e) { handleErr(e); }
+  };
+
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
     try { await signOut(auth); } catch (e) { handleErr(e); }
@@ -873,6 +899,8 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
   const unread = orders.filter(o => o.overall === "pending" && !o.read).length;
   const visibleTabs = isOwner
     ? [["owner", t.tabOwner], ["companies", t.tabCompany], ["settings", t.tabSettings]]
+    : isManager
+    ? [["shop", t.tabShop], ["manager", t.tabManager], ["settings", t.tabSettings]]
     : [["shop", t.tabShop], ["settings", t.tabSettings]];
   console.log("DEBUG:", isOwner, tab);
 
@@ -883,7 +911,7 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
           {visibleTabs.map(([k, label]) => (
             <button key={k} style={{ ...s.tab, ...(tab === k ? s.tabA : {}) }} onClick={() => setTab(k)}>
               {label}
-              {k === "owner" && unread > 0 && <span style={s.badge}>{unread}</span>}
+              {(k === "owner" || k === "manager") && unread > 0 && <span style={s.badge}>{unread}</span>}
             </button>
           ))}
         </div>
@@ -1088,6 +1116,79 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
         </div>
       )}
 
+      {/* MANAGER TAB */}
+      {isManager && tab === "manager" && (
+        <div style={s.panel}>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ fontSize: 12, color: "#a1a1aa" }}>{t.yourRole}: </span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>🔑 {profile.shopRole}</span>
+          </div>
+
+          {orders.length === 0 && <div style={s.empty}><div style={{ fontSize: 42 }}>📭</div><div>{t.noOrders}</div></div>}
+          {orders.map(order => (
+            <div key={order.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => { markRead(order.id); setSelOrder(selOrder === order.id ? null : order.id); }}>
+              <div style={s.oHdr}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={s.oId}>Order #{shortOrderId(order.id)}</span>
+                  {!order.read && <span style={s.nBadge}>{t.newTag}</span>}
+                </div>
+                <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+                  <span style={{ color: "#6b7280", fontSize: 11 }}>{order.createdAt.toLocaleTimeString()}</span>
+                  <span style={{ ...s.sBadge, color: SC[order.overall]?.color, background: SC[order.overall]?.bg }}>{t.status[order.overall]}</span>
+                </div>
+              </div>
+              <div style={{ fontSize: 12, color: "#71717a" }}>
+                {order.items.length}{t.items}
+                {order.createdByName && ` · 👨‍💼 ${order.createdByName}`}
+                {order.note && ` · ${order.note}`}
+              </div>
+
+              {selOrder === order.id && (
+                <div onClick={e => e.stopPropagation()} style={{ cursor: "default" }}>
+                  <div style={s.div} />
+                  {order.items.map((item, idx) => {
+                    const selCo = cos.find(c => c.id === item.co);
+                    return (
+                      <div key={idx} style={s.oiCard}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f4f5" }}>{item.name}</span>
+                          <span style={{ fontSize: 13, color: "#f97316", fontWeight: 700 }}>{item.qty} {item.unit}</span>
+                        </div>
+                        {(item.code || item.brand) && (
+                          <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                            {item.code && <span>📋 {item.code}</span>}
+                            {item.brand && <span>🏷️ {item.brand}</span>}
+                          </div>
+                        )}
+                        <div style={s.row}>
+                          <select style={s.sel} value={item.co || ""} onChange={e => setCo(order.id, idx, e.target.value)}>
+                            <option value="">{t.selectCo}</option>
+                            {cos.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                          </select>
+                          {selCo && <a href={waLink(selCo.phone, order, item)} target="_blank" rel="noreferrer" style={s.waBtn} onClick={e => e.stopPropagation()}>💬 WA</a>}
+                        </div>
+                        <div style={s.row}>
+                          <input style={{ ...s.inp, flex: 1 }} placeholder={t.price} value={prices[`${order.id}-${idx}`] ?? item.price ?? ""} onChange={e => setPrices(p => ({ ...p, [`${order.id}-${idx}`]: e.target.value }))} />
+                          <button style={s.savBtn} onClick={() => savePrice(order.id, idx)}>{t.save}</button>
+                        </div>
+                        <div style={s.sRow}>
+                          <button style={{ ...s.stBtn, ...(item.status === "confirmed" ? s.stBtnC : {}) }} onClick={() => setStatus(order.id, idx, "confirmed")}>{t.confirmed}</button>
+                          <button style={{ ...s.stBtn, ...(item.status === "no_stock" ? s.stBtnN : {}) }} onClick={() => setStatus(order.id, idx, "no_stock")}>{t.noStock}</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {order.overall === "confirmed" && <button style={s.delBtn} onClick={() => deliver(order.id)}>{t.deliver}</button>}
+                  {shopData?.allowDelete && (
+                    <button style={s.delOrderBtn} onClick={() => delOrder(order.id)}>{t.delOrder}</button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* COMPANIES */}
       {isOwner && tab === "companies" && (
         <div style={s.panel}>
@@ -1183,16 +1284,43 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
               {team.map((m, idx) => (
-                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: idx > 0 ? "1px solid #27272a" : "none" }}>
-                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#27272a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {m.role === "owner" ? "🏢" : "👨‍💼"}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f4f5" }}>
-                      {m.personName} {m.uid === user.uid && <span style={{ color: "#f97316", fontSize: 11 }}>({t.youLabel})</span>}
+                <div key={m.id} style={{ padding: "10px 0", borderTop: idx > 0 ? "1px solid #27272a" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#27272a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
+                      {m.role === "owner" ? "🏢" : m.shopRole ? "🔑" : "👨‍💼"}
                     </div>
-                    <div style={{ fontSize: 11, color: "#71717a" }}>{m.role === "owner" ? t.ownerLabel : t.salesmanLabel} · {m.email}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f4f5" }}>
+                        {m.personName} {m.uid === user.uid && <span style={{ color: "#f97316", fontSize: 11 }}>({t.youLabel})</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: m.shopRole ? "#f97316" : "#71717a" }}>
+                        {m.role === "owner" ? `👑 ${t.ownerLabel}` : m.shopRole ? `🔑 ${m.shopRole}` : `👨‍💼 ${t.salesmanLabel}`} · {m.email}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Role assignment dropdown — only owner can see, only for non-owner members */}
+                  {isOwner && m.role !== "owner" && (
+                    <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                      <select
+                        value={m.shopRole || ""}
+                        onChange={e => assignRole(m.id, e.target.value || null)}
+                        style={{ ...s.sel, flex: 1, fontSize: 12 }}
+                      >
+                        <option value="">👨‍💼 {t.salesmanLabel}</option>
+                        {SHOP_ROLES.map(r => (
+                          <option key={r} value={r}>🔑 {r}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Non-owner sees own role label */}
+                  {!isOwner && m.uid === user.uid && m.shopRole && (
+                    <div style={{ fontSize: 11, color: "#f97316", marginTop: 4 }}>
+                      {t.yourRole}: 🔑 {m.shopRole}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
