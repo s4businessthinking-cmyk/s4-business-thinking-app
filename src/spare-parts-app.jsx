@@ -678,6 +678,12 @@ const addItem = () => setItems(prev => [...prev, newItem()]);
 const delItem = (id) => setItems(prev => prev.filter(it => it.id !== id));
 const updItem = (id, f, v) => setItems(prev => prev.map(it => it.id === id ? { ...it, [f]: v } : it));
 
+const canEditOrder = (order) => {
+  if (!order.createdAt) return false;
+  const diffMs = Date.now() - order.createdAt.getTime();
+  return diffMs < 60 * 60 * 1000; // 60 minutes window
+};
+
 const editOrder = async (id) => {
   const order = orders.find(o => o.id === id);
   if (!order) return;
@@ -862,6 +868,13 @@ const editOrder = async (id) => {
     try { await signOut(auth); } catch (e) { handleErr(e); }
   };
 
+  const toggleDeleteSetting = async () => {
+    if (!shopId) return;
+    try {
+      await updateDoc(doc(db, "shops", shopId), { allowDelete: !shopData?.allowDelete });
+    } catch (e) { handleErr(e); }
+  };
+
   const copyInviteCode = async () => {
     try {
       await navigator.clipboard.writeText(shop.inviteCode);
@@ -919,122 +932,61 @@ const editOrder = async (id) => {
             <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
           </div>
 
-          
-    {orders.length > 0 && (
-  <>
-    <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
 
-    {orders.map(o => {
-  console.log("EDIT?", canEditOrder(o), o.createdAt);
-
-  return (
-    <div key={o.id} style={s.card}>
-
-      <div style={s.oHdr}>
-        <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
-        <span style={{
-          ...s.sBadge,
-          color: SC[o.overall]?.color,
-          background: SC[o.overall]?.bg
-        }}>
-          {t.status[o.overall]}
-        </span>
-      </div>
-
-      {/* ITEMS */}
-      {o.items.map((it, x) => (
-        <div key={x} style={s.iSum}>
-          <div>{it.name}</div>
-          <div>{it.qty} {it.unit}</div>
+          {orders.length > 0 && (
+            <>
+              <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
+              {orders.map(o => (
+                <div key={o.id} style={s.card}>
+                  <div style={s.oHdr}>
+                    <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
+                    <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>
+                      {t.status[o.overall]}
+                    </span>
+                  </div>
+                  {o.items.map((it, x) => (
+                    <div key={x} style={s.iSum}>
+                      <div>{it.name}</div>
+                      <div>{it.qty} {it.unit}</div>
+                    </div>
+                  ))}
+                  {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+                      <button onClick={() => editOrder(o.id)} style={{ padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>✏️ Edit</button>
+                    </div>
+                  )}
+                  {shopData?.allowDelete && (
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
+                      <button onClick={() => { if (confirm("Delete this order?")) { delOrder(o.id); } }} style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>🗑️ Delete</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </>
+          )}
         </div>
-      ))}
-
-      {/* EDIT */}
-      {o.createdBy === user.uid && canEditOrder(o) && (
-        <button onClick={() => editOrder(o.id)}>
-          Edit
-        </button>
       )}
 
-    </div>
-  );
-})}
-
-          {/* EDIT BUTTON */}
-          {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-              <button
-                onClick={() => editOrder(o.id)}
-                style={{
-                  padding: "6px 12px",
-                  background: "#3b82f6",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6
-                }}
-              >
-                Edit
-              </button>
-            </div>
-          )}
-
-          {/* DELETE BUTTON */}
-          {shopData?.allowDelete && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-              <button
-                onClick={() => {
-                  if (confirm("Delete this order?")) {
-                    deleteOrder(o.id);
-                  }
-                }}
-                style={{
-                  padding: "6px 12px",
-                  background: "#ef4444",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 6
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          )}
-
-        </div>
-      );
-    })}
-  </>
-)}
       {/* OWNER */}
-{isOwner && tab === "owner" && (
-  <div style={s.panel}>
+      {isOwner && tab === "owner" && (
+        <div style={s.panel}>
+          <div style={{ marginBottom: 12 }}>
+            <button
+              onClick={toggleDeleteSetting}
+              style={{
+                padding: "8px 14px",
+                background: shopData?.allowDelete ? "#22c55e" : "#64748b",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontWeight: 600
+              }}
+            >
+              {shopData?.allowDelete ? "🗑️ Delete Enabled" : "🔒 Delete Disabled"}
+            </button>
+          </div>
 
-    {/* 🔥 SETTINGS BUTTON এখানে */}
-    <div style={{ marginBottom: 12 }}>
-      <button
-        onClick={toggleDeleteSetting}
-        style={{
-          padding: "8px 14px",
-          background: shopData?.allowDelete ? "#22c55e" : "#64748b",
-          color: "#fff",
-          border: "none",
-          borderRadius: 6,
-          cursor: "pointer",
-          fontWeight: 600
-        }}
-      >
-        {shopData?.allowDelete ? "Delete Enabled" : "Delete Disabled"}
-      </button>
-    </div>
-
-    {orders.map(order => (
-      <div key={order.id}>
-        ...
-      </div>
-    ))}
-
-  </div>
-)}
           {orders.length === 0 && <div style={s.empty}><div style={{ fontSize: 42 }}>📭</div><div>{t.noOrders}</div></div>}
           {orders.map(order => (
             <div key={order.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => { markRead(order.id); setSelOrder(selOrder === order.id ? null : order.id); }}>
@@ -1091,10 +1043,10 @@ const editOrder = async (id) => {
                   })}
                   {order.overall === "confirmed" && <button style={s.delBtn} onClick={() => deliver(order.id)}>{t.deliver}</button>}
                   {shopData?.allowDelete && (
-                   <button style={s.delOrderBtn} onClick={() => delOrder(order.id)}>
-                    {t.delOrder}
-                  </button>
-                )}
+                    <button style={s.delOrderBtn} onClick={() => delOrder(order.id)}>
+                      {t.delOrder}
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -1382,6 +1334,7 @@ export default function App() {
 }
 
 const s = {
+  welcomeWrap: { maxWidth: 440, margin: "0 auto", padding: "40px 18px 60px", textAlign: "center" },
   root:    { minHeight: "100vh", background: "#09090b", color: "#e4e4e7", fontFamily: "'Segoe UI', system-ui, sans-serif" },
   notif:   { position: "fixed", top: 16, right: 16, zIndex: 999, padding: "12px 20px", borderRadius: 10, border: "1px solid", fontSize: 13, fontWeight: 600, maxWidth: 320, boxShadow: "0 4px 20px rgba(0,0,0,0.5)" },
   hdr:     { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid #27272a", background: "#18181b", position: "sticky", top: 0, zIndex: 10, flexWrap: "wrap", gap: 8 },
