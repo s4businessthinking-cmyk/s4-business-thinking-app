@@ -614,6 +614,8 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
   const [newPh, setNewPh] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [copyState, setCopyState] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState(null);
+  const [editItems, setEditItems] = useState([]);
 
   // 🔥 এখানে বসাও
 console.log("SHOP ID:", shopId);
@@ -684,64 +686,49 @@ const canEditOrder = (order) => {
   return diffMs < 60 * 60 * 1000; // 60 minutes window
 };
 
-const editOrder = async (id) => {
-  const order = orders.find(o => o.id === id);
+const openEditOrder = (order) => {
+  if (!canEditOrder(order)) return toast(lang === "bn" ? "সময় শেষ (৬০ মিনিট)" : "Edit time expired (60 min)", "err");
+  setEditItems(order.items.map(it => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    name: it.name || "",
+    code: it.code || "",
+    brand: it.brand || "",
+    qty: String(it.qty || ""),
+    unit: it.unit || "Pcs",
+    price: it.price || "",
+    status: it.status || "pending",
+    co: it.co || null,
+  })));
+  setEditingOrderId(order.id);
+};
+
+const cancelEditOrder = () => { setEditingOrderId(null); setEditItems([]); };
+
+const saveEditOrder = async (orderId) => {
+  const order = orders.find(o => o.id === orderId);
   if (!order) return;
-
-  if (!canEditOrder(order)) {
-    return toast("সময় শেষ (60 min)", "err");
-  }
-
-  const input = prompt(
-    "Edit items (JSON format):",
-    JSON.stringify(order.items, null, 2)
-  );
-
-  if (!input) return;
-
-  let parsed;
-  try {
-    parsed = JSON.parse(input);
-  } catch {
-    return toast("Invalid JSON", "err");
-  }
-
-  if (!Array.isArray(parsed) || parsed.length === 0) {
-    return toast("Invalid items", "err");
-  }
-
-  const valid = parsed.every(it =>
-    typeof it.name === "string" &&
-    it.name.trim() &&
-    Number(it.qty) > 0
-  );
-
-  if (!valid) {
-    return toast("Name & Qty required", "err");
-  }
-
-  const sanitized = parsed.map((it, i) => ({
+  const valid = editItems.filter(it => it.name.trim());
+  if (!valid.length) return toast(t.e1, "err");
+  const sanitized = valid.map((it, i) => ({
     name: it.name.trim(),
     code: it.code || "",
     brand: it.brand || "",
-    qty: Number(it.qty),
+    qty: it.qty || "",
     unit: it.unit || "Pcs",
-
-    // preserve existing
-    price: order.items[i]?.price || "",
+    price: order.items[i]?.price || it.price || "",
     status: order.items[i]?.status || "pending",
-    co: order.items[i]?.co || null
+    co: order.items[i]?.co || it.co || null,
   }));
-
   try {
-    await updateDoc(doc(db, "orders", id), {
-      items: sanitized
-    });
-    toast("Updated");
-  } catch (e) {
-    handleErr(e);
-  }
+    await updateDoc(doc(db, "orders", orderId), { items: sanitized });
+    toast(lang === "bn" ? "✅ অর্ডার আপডেট হয়েছে!" : "✅ Order updated!");
+    cancelEditOrder();
+  } catch (e) { handleErr(e); }
 };
+
+const updEditItem = (id, field, val) => setEditItems(prev => prev.map(it => it.id === id ? { ...it, [field]: val } : it));
+const addEditItem = () => setEditItems(prev => [...prev, newItem()]);
+const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id));
   const sendOrder = async () => { 
     const valid = items.filter(it => it.name.trim());
     if (!valid.length) return toast(t.e1, "err");
@@ -938,27 +925,74 @@ const editOrder = async (id) => {
               <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
               {orders.map(o => (
                 <div key={o.id} style={s.card}>
-                  <div style={s.oHdr}>
-                    <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
-                    <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>
-                      {t.status[o.overall]}
-                    </span>
-                  </div>
-                  {o.items.map((it, x) => (
-                    <div key={x} style={s.iSum}>
-                      <div>{it.name}</div>
-                      <div>{it.qty} {it.unit}</div>
-                    </div>
-                  ))}
-                  {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-                      <button onClick={() => editOrder(o.id)} style={{ padding: "6px 12px", background: "#3b82f6", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>✏️ Edit</button>
-                    </div>
-                  )}
-                  {shopData?.allowDelete && (
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
-                      <button onClick={() => { if (confirm("Delete this order?")) { delOrder(o.id); } }} style={{ padding: "6px 12px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer" }}>🗑️ Delete</button>
-                    </div>
+                  {editingOrderId === o.id ? (
+                    /* ── EDIT MODE ── */
+                    <>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>
+                          ✏️ {lang === "bn" ? "অর্ডার এডিট" : "Edit Order"} #{shortOrderId(o.id)}
+                        </span>
+                        <button onClick={cancelEditOrder} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #3f3f46", background: "transparent", color: "#a1a1aa", cursor: "pointer", fontSize: 12 }}>
+                          ✕ {t.cancel}
+                        </button>
+                      </div>
+                      {editItems.map((item, i) => (
+                        <div key={item.id} style={s.itemBlock}>
+                          <div style={s.itemHead}>
+                            <div style={s.iNum}>{i + 1}</div>
+                            <input style={{ ...s.inp, flex: 1 }} placeholder={t.itemName} value={item.name} onChange={e => updEditItem(item.id, "name", e.target.value)} />
+                            {editItems.length > 1 && <button style={s.rmBtn} onClick={() => delEditItem(item.id)}>✕</button>}
+                          </div>
+                          <input style={{ ...s.inp, marginTop: 6 }} placeholder={t.code} value={item.code} onChange={e => updEditItem(item.id, "code", e.target.value)} />
+                          <input style={{ ...s.inp, marginTop: 6 }} placeholder={t.brand} value={item.brand} onChange={e => updEditItem(item.id, "brand", e.target.value)} />
+                          <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
+                            <input style={{ ...s.inp, flex: 2 }} placeholder={t.qty} inputMode="numeric" value={item.qty} onChange={e => updEditItem(item.id, "qty", e.target.value)} />
+                            <select style={{ ...s.sel, flex: 1 }} value={item.unit} onChange={e => updEditItem(item.id, "unit", e.target.value)}>
+                              <option value="Pcs">{t.unitPcs}</option>
+                              <option value="Set">{t.unitSet}</option>
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                      <button style={s.addBtn} onClick={addEditItem}>{t.addItem}</button>
+                      <button style={{ ...s.sendBtn, marginTop: 4 }} onClick={() => saveEditOrder(o.id)}>
+                        {lang === "bn" ? "💾 আপডেট করুন" : "💾 Save Changes"}
+                      </button>
+                    </>
+                  ) : (
+                    /* ── VIEW MODE ── */
+                    <>
+                      <div style={s.oHdr}>
+                        <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
+                        <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>
+                          {t.status[o.overall]}
+                        </span>
+                      </div>
+                      {o.items.map((it, x) => (
+                        <div key={x} style={s.iSum}>
+                          <div style={s.iName}>{it.name}</div>
+                          <div style={s.iQty}>{it.qty} {it.unit}</div>
+                          {(it.code || it.brand) && (
+                            <div style={{ ...s.iMeta, width: "100%" }}>
+                              {it.code && <span>📋 {it.code}</span>}
+                              {it.brand && <span>🏷️ {it.brand}</span>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+                        {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
+                          <button onClick={() => openEditOrder(o)} style={{ padding: "7px 14px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                            ✏️ {lang === "bn" ? "এডিট" : "Edit"}
+                          </button>
+                        )}
+                        {shopData?.allowDelete && (
+                          <button onClick={() => { if (confirm(t.delConfirm)) { delOrder(o.id); } }} style={{ padding: "7px 14px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                            🗑️ {lang === "bn" ? "মুছুন" : "Delete"}
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               ))}
