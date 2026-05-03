@@ -205,7 +205,7 @@ const TRANSLATIONS = {
     waHint: "💡 Include country code without 0.",
     addBtn: "✅ Add", editTitle: "Edit Company",
     saveEdit: "✅ Save", noPhone: "No number", noCo: "No companies yet",
-    items: " items", newTag: "🔔 New", cur: "৳",
+    items: " items", newTag: "🔔 New", cur: "AED",
     status: { pending: "Pending", confirmed: "✅ Confirmed", no_stock: "❌ No Stock", delivered: "🚚 Delivered" },
     n1: "✅ Order sent!", n2: "Price saved ✅", n3: "🚚 Delivery completed!",
     n4: "Company added ✅", n5: "Company updated ✅",
