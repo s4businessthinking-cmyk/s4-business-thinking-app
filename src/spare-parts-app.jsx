@@ -34,6 +34,12 @@ import {
 const LOGO_URL = "https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/refs/heads/main/WhatsApp%20Image%202026-04-09%20at%2011.44.43%20AM.jpeg";
 const APP_NAME = "S4 Business Thinking";
 
+// ─── PRESET POSITIONS ────────────────────────────────────────
+const PRESET_POSITIONS = {
+  bn: ["সিনিয়র সেলসম্যান", "জুনিয়র সেলসম্যান", "ম্যানেজার", "ক্যাশিয়ার", "স্টোরকিপার", "ডেলিভারি ম্যান", "অ্যাকাউন্ট্যান্ট", "সুপারভাইজার"],
+  en: ["Senior Salesman", "Junior Salesman", "Manager", "Cashier", "Storekeeper", "Delivery Man", "Accountant", "Supervisor"],
+};
+
 // ─── PERMISSIONS ────────────────────────────────────────────
 const PERMISSIONS_LIST = [
   { key: "sendOrder",       bn: "অর্ডার দেওয়া",           en: "Send Orders" },
@@ -335,19 +341,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
   const [pw2,setPw2]=useState("");
   const [inviteCode,setInviteCode]=useState("");
   const [busy,setBusy]=useState(false);
-  const [shopPositions,setShopPositions]=useState([]);
-  const [position,setPosition]=useState("");
   const isOwner = role==="owner";
-
-  const fetchPositions = async (code) => {
-    if (!code||code.length<4) { setShopPositions([]); return; }
-    try {
-      const q = query(collection(db,"shops"), where("inviteCode","==",code.trim().toUpperCase()));
-      const snap = await getDocs(q);
-      if (!snap.empty) setShopPositions(snap.docs[0].data().positions||[]);
-      else setShopPositions([]);
-    } catch { setShopPositions([]); }
-  };
 
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -378,7 +372,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
         mobile:mobile.trim(), country,
         countryName:countryObj?.name||country, area:area.trim(),
         createdAt:serverTimestamp(),
-        position: isOwner ? "মালিক" : (position||"Salesman"),
+        position: isOwner ? "মালিক" : "Salesman",
         permissions: isOwner ? null : { ...DEFAULT_PERMISSIONS },
         ...(isOwner ? {companyName:companyName.trim()} : {joinedShopName:shopData?.companyName||""}),
       };
@@ -420,18 +414,8 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
                 placeholder="INVITE CODE"
                 value={inviteCode}
                 onChange={e=>setInviteCode(e.target.value.toUpperCase())}
-                onBlur={e=>fetchPositions(e.target.value)}
               />
               <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}>💡 {t.inviteCodeLbl}</div>
-              {/* position selector */}
-              <div style={{ marginBottom:10 }}>
-                <div style={{ fontSize:11, color:"#71717a", marginBottom:5 }}>{t.positionLbl}</div>
-                <select style={{ ...s.sel, width:"100%" }} value={position} onChange={e=>setPosition(e.target.value)}>
-                  <option value="">{t.selectPosition}</option>
-                  {shopPositions.map(p=><option key={p} value={p}>{p}</option>)}
-                  <option value="Salesman">{t.defaultPosition}</option>
-                </select>
-              </div>
             </>
           )}
           <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
@@ -959,6 +943,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </div>
               {showAddPos&&(
                 <div style={{ marginBottom:10 }}>
+                  {/* Preset list */}
+                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>
+                    {lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}
+                  </div>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
+                    {PRESET_POSITIONS[lang].map(p=>(
+                      <button key={p} onClick={()=>setNewPosition(p)}
+                        style={{ padding:"5px 11px", borderRadius:20, border:"1px solid #3f3f46", background:newPosition===p?"#f97316":"transparent", color:newPosition===p?"#fff":"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:600 }}>
+                        {p}
+                      </button>
+                    ))}
+                  </div>
                   <div style={s.row}>
                     <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP}
                       value={newPosition} onChange={e=>setNewPosition(e.target.value)}
@@ -1004,6 +1000,23 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   {/* permission toggles — owner only, non-owner members only */}
                   {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
                     <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                      {/* Position change */}
+                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>
+                          {t.positionLbl}
+                        </span>
+                        <select
+                          style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
+                          value={m.position||"Salesman"}
+                          onChange={async e=>{
+                            try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); }
+                            catch(err) { hErr(err); }
+                          }}>
+                          <option value="Salesman">{t.defaultPosition}</option>
+                          {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ height:1, background:"#1f1f23", marginBottom:8 }} />
                       <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
                         {t.permissionsTitle}
                       </div>
