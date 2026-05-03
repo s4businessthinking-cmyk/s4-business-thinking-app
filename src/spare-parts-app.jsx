@@ -98,7 +98,7 @@ const TRANSLATIONS = {
     code: "কোড / মডেল / সাইজ",
     brand: "ব্র্যান্ডের নাম",
     qty: "পরিমাণ",
-    unitPcs: "পিস", unitSet: "সেট", unitDoz: "ডজন", unitGram: "গ্রাম", unitCm: "সেমি", unitInch: "ইঞ্চি", unitFt: "ফুট", unitMtr: "মিটার", unitLtr: "লিটার", unitPkt: "প্যাকেট", unitBox: "বক্স"
+    unitPcs: "পিস", unitSet: "সেট", unitDoz: "ডজন", unitGram: "গ্রাম", unitCm: "সেমি", unitInch: "ইঞ্চি", unitFt: "ফুট", unitMtr: "মিটার", unitLtr: "লিটার", unitPkt: "প্যাকেট", unitBox: "বক্স",
     addItem: "+ আরো আইটেম",
     noteP: "বিশেষ নোট (ঐচ্ছিক)...",
     sendOrder: "📤 মালিকের কাছে অর্ডার পাঠান",
