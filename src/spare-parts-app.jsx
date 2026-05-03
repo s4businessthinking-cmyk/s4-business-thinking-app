@@ -815,9 +815,19 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
                 <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
                   <input style={{ ...s.inp, flex: 2 }} placeholder={t.qty} inputMode="numeric" value={item.qty} onChange={e => updItem(item.id, "qty", e.target.value)} />
                   <select style={{ ...s.sel, flex: 1 }} value={item.unit} onChange={e => updItem(item.id, "unit", e.target.value)}>
-                    <option value="Pcs">{t.unitPcs}</option>
-                    <option value="Set">{t.unitSet}</option>
-                  </select>
+  <option value="unitPcs">{t.unitPcs}</option>
+  <option value="unitSet">{t.unitSet}</option>
+  <option value="unitDoz">{t.unitDoz}</option>
+  <option value="unitGram">{t.unitGram}</option>
+  <option value="unitCm">{t.unitCm}</option>
+  <option value="unitInch">{t.unitInch}</option>
+  <option value="unitFt">{t.unitFt}</option>
+  <option value="unitMtr">{t.unitMtr}</option>
+  <option value="unitLtr">{t.unitLtr}</option>
+  <option value="unitPkt">{t.unitPkt}</option>
+  <option value="unitBox">{t.unitBox}</option>
+</select>
+
                 </div>
               </div>
             ))}
