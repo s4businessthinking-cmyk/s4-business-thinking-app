@@ -188,7 +188,7 @@ const TRANSLATIONS = {
     code: "Code / Model / Size",
     brand: "Brand Name",
     qty: "Quantity",
-    unitPcs: "পিস", unitSet: "সেট", unitDoz: "ডজন", unitGram: "গ্রাম", unitCm: "সেমি", unitInch: "ইঞ্চি", unitFt: "ফুট", unitMtr: "মিটার", unitLtr: "লিটার", unitPkt: "প্যাকেট", unitBox: "বক্স",
+    unitPcs: "Pcs", unitSet: "Set", unitDoz: "Doz", unitGram: "Gram", unitCm: "Cm", unitInch: "Inch", unitFt: "Ft", unitMtr: "Mtr", unitLtr: "Ltr", unitPkt: "Pkt", unitBox: "Box",
     addItem: "+ Add Item",
     noteP: "Special note (optional)...",
     sendOrder: "📤 Send Order to Owner",
