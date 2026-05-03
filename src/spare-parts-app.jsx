@@ -195,7 +195,7 @@ const TRANSLATIONS = {
     sentOrders: "📜 Sent Orders",
     noOrders: "No orders yet",
     selectCo: "Select Company",
-    price: "Company price (৳)", save: "Save",
+    price: "Company price (AED)", save: "Save",
     confirmed: "✅ Confirmed", noStock: "❌ No Stock",
     deliver: "🚚 Mark Delivered",
     delOrder: "🗑️ Delete Order",
