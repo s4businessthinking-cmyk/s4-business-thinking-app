@@ -97,9 +97,8 @@ const TR = {
     tabShop:"🏪 দোকান", tabOwner:"👤 অর্ডার", tabCompany:"🏢 কোম্পানি",
     newOrder:"📋 নতুন Purchase Order",
     itemName:"আইটেমের নাম", code:"কোড / মডেল / সাইজ", brand:"ব্র্যান্ডের নাম",
-    qty:"পরিমাণ", unitPcs: "পিস", unitSet: "সেট", unitDoz: "ডজন", unitGram: "গ্রাম", unitCm: "সেমি", unitInch: "ইঞ্চি", unitFt: "ফুট", unitMtr: "মিটার", unitLtr: "লিটার", unitPkt: "প্যাকেট", unitBox: "বক্স",
-    addItem: "+ আরো আইটেম",
-    noteP: "বিশেষ নোট (ঐচ্ছিক)...",
+    qty:"পরিমাণ", unitPcs:"পিস", unitSet:"সেট",
+    addItem:"+ আরো আইটেম", noteP:"বিশেষ নোট (ঐচ্ছিক)...",
     sendOrder:"📤 অর্ডার পাঠান", sentOrders:"📜 পাঠানো অর্ডারসমূহ",
     noOrders:"কোনো অর্ডার আসেনি এখনো",
     selectCo:"কোম্পানি বেছে নিন", price:"কোম্পানির দাম (৳)", save:"সেভ",
@@ -166,12 +165,11 @@ const TR = {
     tabShop:"🏪 Shop", tabOwner:"👤 Orders", tabCompany:"🏢 Companies",
     newOrder:"📋 New Purchase Order",
     itemName:"Item Name", code:"Code / Model / Size", brand:"Brand Name",
-    qty:"Quantity", unitPcs: "Pcs", unitSet: "Set", unitDoz: "Doz", unitGram: "Gram", unitCm: "Cm", unitInch: "Inch", unitFt: "Ft", unitMtr: "Mtr", unitLtr: "Ltr", unitPkt: "Pkt", unitBox: "Box",
-    addItem: "+ Add Item",
-    noteP: "Special note (optional)...",
+    qty:"Quantity", unitPcs:"Pcs", unitSet:"Set",
+    addItem:"+ Add Item", noteP:"Special note (optional)...",
     sendOrder:"📤 Send Order", sentOrders:"📜 Sent Orders",
     noOrders:"No orders yet",
-    selectCo:"Select Company", price:"Company price (AED)", save:"Save",
+    selectCo:"Select Company", price:"Company price (৳)", save:"Save",
     confirmed:"✅ Confirmed", noStock:"❌ No Stock",
     deliver:"🚚 Mark Delivered", delOrder:"🗑️ Delete Order",
     coList:"🏢 Company List", addNew:"+ New Company",
@@ -796,97 +794,44 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
       </Header>
 
       {/* ── SALESMAN SHOP TAB ── */}
-{!isOwner && tab === "shop" && (
-  <div style={s.panel}>
-    {can("sendOrder") && (
-      <>
-        <div style={s.secTitle}>{t.newOrder}</div>
-        <div style={s.card}>
-          {items.map((item, i) => (
-            <div key={item.id} style={s.itemBlock}>
-              <div style={s.itemHead}>
-                <div style={s.iNum}>{i + 1}</div>
-                <input 
-                  style={{ ...s.inp, flex: 1 }} 
-                  placeholder={t.itemName} 
-                  value={item.name} 
-                  onChange={e => updItem(item.id, "name", e.target.value)} 
-                />
-                {items.length > 1 && (
-                  <button style={s.rmBtn} onClick={() => delItem(item.id)}>✕</button>
-                )}
+      {!isOwner&&tab==="shop"&&(
+        <div style={s.panel}>
+          {can("sendOrder")&&(
+            <>
+              <div style={s.secTitle}>{t.newOrder}</div>
+              <div style={s.card}>
+                {items.map((item,i)=>(
+                  <div key={item.id} style={s.itemBlock}>
+                    <div style={s.itemHead}>
+                      <div style={s.iNum}>{i+1}</div>
+                      <input style={{ ...s.inp, flex:1 }} placeholder={t.itemName} value={item.name} onChange={e=>updIt(item.id,"name",e.target.value)} />
+                      {items.length>1&&<button style={s.rmBtn} onClick={()=>delIt(item.id)}>✕</button>}
+                    </div>
+                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.code} value={item.code} onChange={e=>updIt(item.id,"code",e.target.value)} />
+                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.brand} value={item.brand} onChange={e=>updIt(item.id,"brand",e.target.value)} />
+                    <div style={{ display:"flex", gap:7, marginTop:6 }}>
+                      <input style={{ ...s.inp, flex:2 }} placeholder={t.qty} inputMode="numeric" value={item.qty} onChange={e=>updIt(item.id,"qty",e.target.value)} />
+                      <select style={{ ...s.sel, flex:1 }} value={item.unit} onChange={e=>updIt(item.id,"unit",e.target.value)}>
+                        <option value="Pcs">{t.unitPcs}</option>
+                        <option value="Set">{t.unitSet}</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+                <button style={s.addBtn} onClick={addIt}>{t.addItem}</button>
+                <textarea style={s.ta} placeholder={t.noteP} value={note} onChange={e=>setNote(e.target.value)} rows={2} />
+                <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
               </div>
-              
-              <input 
-                style={{ ...s.inp, marginTop: 6 }} 
-                placeholder={t.code} 
-                value={item.code} 
-                onChange={e => updItem(item.id, "code", e.target.value)} 
-              />
-              
-              <input 
-                style={{ ...s.inp, marginTop: 6 }} 
-                placeholder={t.brand} 
-                value={item.brand} 
-                onChange={e => updItem(item.id, "brand", e.target.value)} 
-              />
-              
-              <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
-                <input 
-                  style={{ ...s.inp, flex: 2 }} 
-                  placeholder={t.qty} 
-                  inputMode="numeric" 
-                  value={item.qty} 
-                  onChange={e => updItem(item.id, "qty", e.target.value)} 
-                />
-                
-                <select 
-                  style={{ ...s.sel, flex: 1 }} 
-                  value={item.unit} 
-                  onChange={e => updItem(item.id, "unit", e.target.value)}
-                >
-                  <option value="Pcs">{t.unitPcs}</option>
-                  <option value="Set">{t.unitSet}</option>
-                  <option value="Doz">{t.unitDoz}</option>
-                  <option value="Gram">{t.unitGram}</option>
-                  <option value="Cm">{t.unitCm}</option>
-                  <option value="Inch">{t.unitInch}</option>
-                  <option value="Ft">{t.unitFt}</option>
-                  <option value="Mtr">{t.unitMtr}</option>
-                  <option value="Ltr">{t.unitLtr}</option>
-                  <option value="Pkt">{t.unitPkt}</option>
-                  <option value="Box">{t.unitBox}</option>
-                </select>
-              </div>
-            </div>
-          ))}
-          
-          <button style={s.addBtn} onClick={addItem}>{t.addItem}</button>
-          
-          <textarea 
-            style={s.ta} 
-            placeholder={t.noteP} 
-            value={note} 
-            onChange={e => setNote(e.target.value)} 
-            rows={2} 
-          />
-          
-          <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
+            </>
+          )}
+          {orders.length>0&&(
+            <>
+              <div style={{ ...s.secTitle, marginTop:18 }}>{t.sentOrders}</div>
+              {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
+            </>
+          )}
         </div>
-      </>
-    )}
-
-    {orders.length > 0 && (
-      <>
-        <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
-        {/* সার্চ বক্স চাইলে এখানে বসাতে পারেন */}
-        {orders.map(o => (
-          <OrderCard key={o.id} order={o} showSenderName={isOrderManager} />
-        ))}
-      </>
-    )}
-  </div>
-)}
+      )}
 
       {/* ── OWNER ORDERS TAB ── */}
       {isOwner&&tab==="owner"&&(
