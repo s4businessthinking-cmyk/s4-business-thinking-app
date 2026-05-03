@@ -125,14 +125,6 @@ const TRANSLATIONS = {
     n11: "📤 যাচাই ইমেইল আবার পাঠানো হয়েছে।",
     e1: "অন্তত একটা আইটেম দিন!", e2: "নাম খালি রাখা যাবে না!", e3: "নাম দিন!",
     delConfirm: "এই অর্ডারটি মুছে ফেলবেন?",
-    tabManager: "🔑 ম্যানেজার",
-    managerOrders: "📋 সব অর্ডার",
-    assignRole: "ভূমিকা দিন",
-    removeRole: "ভূমিকা সরান",
-    roleAssigned: "✅ ভূমিকা দেওয়া হয়েছে!",
-    roleRemoved: "ভূমিকা সরানো হয়েছে।",
-    noRole: "সেলসম্যান",
-    yourRole: "আপনার ভূমিকা",
   },
   en: {
     appSub: "Parts Order Management",
@@ -223,14 +215,6 @@ const TRANSLATIONS = {
     n11: "📤 Verification email resent.",
     e1: "Add at least one item!", e2: "Name cannot be empty!", e3: "Please enter a name!",
     delConfirm: "Delete this order?",
-    tabManager: "🔑 Manager",
-    managerOrders: "📋 All Orders",
-    assignRole: "Assign Role",
-    removeRole: "Remove Role",
-    roleAssigned: "✅ Role assigned!",
-    roleRemoved: "Role removed.",
-    noRole: "Salesman",
-    yourRole: "Your Role",
   },
 };
 
@@ -246,8 +230,6 @@ const loadLang = () => { try { return localStorage.getItem(LANG_KEY) || "bn"; } 
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY, l); } catch {} };
 
 const newItem = () => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, name: "", code: "", brand: "", qty: "", unit: "Pcs" });
-
-const SHOP_ROLES = ["Senior Salesman", "Team Leader", "Supervisor", "Coordinator", "In-Charge"];
 
 // ============================================================
 // HEADER
@@ -492,7 +474,6 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
             email: email.trim(),
             inviteCode: generateInviteCode(),
             createdAt: serverTimestamp(),
-            allowDelete: false, // 🔥 এইটা ADD করো (IMPORTANT)
           });
         } catch (e) {
           console.error("Shop creation failed:", e);
@@ -611,12 +592,10 @@ function VerifyGate({ t, lang, setLang, user, toast, onLogout }) {
 // ============================================================
 function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
   const isOwner = profile.role === "owner";
-  const isManager = !isOwner && !!profile.shopRole;
   const shopId = profile.shopId;
 
-  const [tab, setTab] = useState(isOwner ? "owner" : isManager ? "manager" : "shop");
+  const [tab, setTab] = useState(isOwner ? "owner" : "shop");
   const [orders, setOrders] = useState([]);
-  const [shopData, setShopData] = useState(null);
   const [cos, setCos] = useState([]);
   const [team, setTeam] = useState([]);
   const [syncState, setSyncState] = useState("connecting");
@@ -633,14 +612,9 @@ function MainApp({ t, lang, setLang, user, profile, shop, toast }) {
   const [newPh, setNewPh] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [copyState, setCopyState] = useState(false);
-  const [editingOrderId, setEditingOrderId] = useState(null);
-  const [editItems, setEditItems] = useState([]);
 
-  // 🔥 এখানে বসাও
-console.log("SHOP ID:", shopId);
-
-// ---- Real-time data subscriptions (scoped to shopId) ----
-useEffect(() => {
+  // ---- Real-time data subscriptions (scoped to shopId) ----
+  useEffect(() => {
     const q = query(collection(db, "orders"), where("shopId", "==", shopId), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q,
       (snap) => {
@@ -655,8 +629,7 @@ useEffect(() => {
     return () => unsub();
   }, [shopId]);
 
-// ---- Real-time data subscriptions (scoped to shopId) ----
-useEffect(() => {
+  useEffect(() => {
     const q = query(collection(db, "companies"), where("shopId", "==", shopId), orderBy("name"));
     const unsub = onSnapshot(q,
       (snap) => setCos(snap.docs.map(d => ({ ...d.data(), id: d.id }))),
@@ -665,8 +638,7 @@ useEffect(() => {
     return () => unsub();
   }, [shopId]);
 
-  
-useEffect(() => {
+  useEffect(() => {
     const q = query(collection(db, "users"), where("shopId", "==", shopId));
     const unsub = onSnapshot(q,
       (snap) => setTeam(snap.docs.map(d => ({ ...d.data(), id: d.id }))),
@@ -674,105 +646,31 @@ useEffect(() => {
     );
     return () => unsub();
   }, [shopId]);
-  
 
-  // 🔥 SHOP DATA SUBSCRIBE
-useEffect(() => {
-  if (!shopId) return;
-
-  const unsub = onSnapshot(doc(db, "shops", shopId), (snap) => {
-    const data = snap.data();
-    setShopData(data);
-
-    // ✅ debug এখানে (inside effect)
-    console.log("SHOP DATA:", data);
-    console.log("ALLOW DELETE:", data?.allowDelete);
-  });
-
-  return () => unsub();
-}, [shopId]);
-
-  
   const handleErr = (e) => { console.error(e); toast(e.message || String(e), "err"); };
 
-const addItem = () => setItems(prev => [...prev, newItem()]);
-const delItem = (id) => setItems(prev => prev.filter(it => it.id !== id));
-const updItem = (id, f, v) => setItems(prev => prev.map(it => it.id === id ? { ...it, [f]: v } : it));
+  const addItem = () => setItems(prev => [...prev, newItem()]);
+  const delItem = (id) => setItems(prev => prev.filter(it => it.id !== id));
+  const updItem = (id, f, v) => setItems(prev => prev.map(it => it.id === id ? { ...it, [f]: v } : it));
 
-const canEditOrder = (order) => {
-  if (!order.createdAt) return false;
-  const diffMs = Date.now() - order.createdAt.getTime();
-  return diffMs < 60 * 60 * 1000; // 60 minutes window
-};
-
-const openEditOrder = (order) => {
-  if (!canEditOrder(order)) return toast(lang === "bn" ? "সময় শেষ (৬০ মিনিট)" : "Edit time expired (60 min)", "err");
-  setEditItems(order.items.map(it => ({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-    name: it.name || "",
-    code: it.code || "",
-    brand: it.brand || "",
-    qty: String(it.qty || ""),
-    unit: it.unit || "Pcs",
-    price: it.price || "",
-    status: it.status || "pending",
-    co: it.co || null,
-  })));
-  setEditingOrderId(order.id);
-};
-
-const cancelEditOrder = () => { setEditingOrderId(null); setEditItems([]); };
-
-const saveEditOrder = async (orderId) => {
-  const order = orders.find(o => o.id === orderId);
-  if (!order) return;
-  const valid = editItems.filter(it => it.name.trim());
-  if (!valid.length) return toast(t.e1, "err");
-  const sanitized = valid.map((it, i) => ({
-    name: it.name.trim(),
-    code: it.code || "",
-    brand: it.brand || "",
-    qty: it.qty || "",
-    unit: it.unit || "Pcs",
-    price: order.items[i]?.price || it.price || "",
-    status: order.items[i]?.status || "pending",
-    co: order.items[i]?.co || it.co || null,
-  }));
-  try {
-    await updateDoc(doc(db, "orders", orderId), { items: sanitized });
-    toast(lang === "bn" ? "✅ অর্ডার আপডেট হয়েছে!" : "✅ Order updated!");
-    cancelEditOrder();
-  } catch (e) { handleErr(e); }
-};
-
-const updEditItem = (id, field, val) => setEditItems(prev => prev.map(it => it.id === id ? { ...it, [field]: val } : it));
-const addEditItem = () => setEditItems(prev => [...prev, newItem()]);
-const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id));
-  const sendOrder = async () => { 
+  const sendOrder = async () => {
     const valid = items.filter(it => it.name.trim());
     if (!valid.length) return toast(t.e1, "err");
     try {
       await addDoc(collection(db, "orders"), {
-  shopId,
-  createdBy: user.uid,
-  createdByName: profile.personName,
-
-  items: valid.map(it => ({
-    name: it.name,
-    code: it.code || "",
-    brand: it.brand || "",
-    qty: it.qty || "",
-    unit: it.unit || "Pcs",
-    price: "",
-    status: "pending",
-    co: null,
-  })),
-
-  note: note || "",
-  createdAt: serverTimestamp(),
-  overall: "pending",
-  read: false,
-});
+        shopId,
+        createdBy: user.uid,
+        createdByName: profile.personName,
+        items: valid.map(it => ({
+          name: it.name, code: it.code || "", brand: it.brand || "",
+          qty: it.qty || "", unit: it.unit || "Pcs",
+          price: "", status: "pending", co: null,
+        })),
+        note: note || "",
+        createdAt: serverTimestamp(),
+        overall: "pending",
+        read: false,
+      });
       setItems([newItem()]);
       setNote("");
       toast(t.n1);
@@ -869,23 +767,9 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
     return `https://wa.me/${phone}?text=${txt}`;
   };
 
-  const assignRole = async (memberId, role) => {
-    try {
-      await updateDoc(doc(db, "users", memberId), { shopRole: role || null });
-      toast(role ? t.roleAssigned : t.roleRemoved);
-    } catch (e) { handleErr(e); }
-  };
-
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
     try { await signOut(auth); } catch (e) { handleErr(e); }
-  };
-
-  const toggleDeleteSetting = async () => {
-    if (!shopId) return;
-    try {
-      await updateDoc(doc(db, "shops", shopId), { allowDelete: !shopData?.allowDelete });
-    } catch (e) { handleErr(e); }
   };
 
   const copyInviteCode = async () => {
@@ -899,10 +783,7 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
   const unread = orders.filter(o => o.overall === "pending" && !o.read).length;
   const visibleTabs = isOwner
     ? [["owner", t.tabOwner], ["companies", t.tabCompany], ["settings", t.tabSettings]]
-    : isManager
-    ? [["shop", t.tabShop], ["manager", t.tabManager], ["settings", t.tabSettings]]
     : [["shop", t.tabShop], ["settings", t.tabSettings]];
-  console.log("DEBUG:", isOwner, tab);
 
   return (
     <div style={s.root}>
@@ -911,14 +792,12 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
           {visibleTabs.map(([k, label]) => (
             <button key={k} style={{ ...s.tab, ...(tab === k ? s.tabA : {}) }} onClick={() => setTab(k)}>
               {label}
-              {(k === "owner" || k === "manager") && unread > 0 && <span style={s.badge}>{unread}</span>}
+              {k === "owner" && unread > 0 && <span style={s.badge}>{unread}</span>}
             </button>
           ))}
         </div>
       </Header>
-      
-      
-      
+
       {/* SHOP (salesman) */}
       {!isOwner && tab === "shop" && (
         <div style={s.panel}>
@@ -947,108 +826,40 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
             <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
           </div>
 
-
-          {orders.length > 0 && (
-            <>
-              <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
-              {orders.map(o => (
-                <div key={o.id} style={s.card}>
-                  {editingOrderId === o.id ? (
-                    /* ── EDIT MODE ── */
-                    <>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>
-                          ✏️ {lang === "bn" ? "অর্ডার এডিট" : "Edit Order"} #{shortOrderId(o.id)}
-                        </span>
-                        <button onClick={cancelEditOrder} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #3f3f46", background: "transparent", color: "#a1a1aa", cursor: "pointer", fontSize: 12 }}>
-                          ✕ {t.cancel}
-                        </button>
-                      </div>
-                      {editItems.map((item, i) => (
-                        <div key={item.id} style={s.itemBlock}>
-                          <div style={s.itemHead}>
-                            <div style={s.iNum}>{i + 1}</div>
-                            <input style={{ ...s.inp, flex: 1 }} placeholder={t.itemName} value={item.name} onChange={e => updEditItem(item.id, "name", e.target.value)} />
-                            {editItems.length > 1 && <button style={s.rmBtn} onClick={() => delEditItem(item.id)}>✕</button>}
-                          </div>
-                          <input style={{ ...s.inp, marginTop: 6 }} placeholder={t.code} value={item.code} onChange={e => updEditItem(item.id, "code", e.target.value)} />
-                          <input style={{ ...s.inp, marginTop: 6 }} placeholder={t.brand} value={item.brand} onChange={e => updEditItem(item.id, "brand", e.target.value)} />
-                          <div style={{ display: "flex", gap: 7, marginTop: 6 }}>
-                            <input style={{ ...s.inp, flex: 2 }} placeholder={t.qty} inputMode="numeric" value={item.qty} onChange={e => updEditItem(item.id, "qty", e.target.value)} />
-                            <select style={{ ...s.sel, flex: 1 }} value={item.unit} onChange={e => updEditItem(item.id, "unit", e.target.value)}>
-                              <option value="Pcs">{t.unitPcs}</option>
-                              <option value="Set">{t.unitSet}</option>
-                            </select>
-                          </div>
-                        </div>
-                      ))}
-                      <button style={s.addBtn} onClick={addEditItem}>{t.addItem}</button>
-                      <button style={{ ...s.sendBtn, marginTop: 4 }} onClick={() => saveEditOrder(o.id)}>
-                        {lang === "bn" ? "💾 আপডেট করুন" : "💾 Save Changes"}
-                      </button>
-                    </>
-                  ) : (
-                    /* ── VIEW MODE ── */
-                    <>
-                      <div style={s.oHdr}>
-                        <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
-                        <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>
-                          {t.status[o.overall]}
-                        </span>
-                      </div>
-                      {o.items.map((it, x) => (
-                        <div key={x} style={s.iSum}>
-                          <div style={s.iName}>{it.name}</div>
-                          <div style={s.iQty}>{it.qty} {it.unit}</div>
-                          {(it.code || it.brand) && (
-                            <div style={{ ...s.iMeta, width: "100%" }}>
-                              {it.code && <span>📋 {it.code}</span>}
-                              {it.brand && <span>🏷️ {it.brand}</span>}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                      <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
-                        {o.createdBy === user.uid && canEditOrder(o) && !shopData?.allowDelete && (
-                          <button onClick={() => openEditOrder(o)} style={{ padding: "7px 14px", background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                            ✏️ {lang === "bn" ? "এডিট" : "Edit"}
-                          </button>
-                        )}
-                        {shopData?.allowDelete && (
-                          <button onClick={() => { if (confirm(t.delConfirm)) { delOrder(o.id); } }} style={{ padding: "7px 14px", background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                            🗑️ {lang === "bn" ? "মুছুন" : "Delete"}
-                          </button>
-                        )}
-                      </div>
-                    </>
-                  )}
+          {orders.length > 0 && <>
+            <div style={{ ...s.secTitle, marginTop: 18 }}>{t.sentOrders}</div>
+            {orders.map(o => (
+              <div key={o.id} style={s.card}>
+                <div style={s.oHdr}>
+                  <span style={s.oId}>Order #{shortOrderId(o.id)}</span>
+                  <span style={{ ...s.sBadge, color: SC[o.overall]?.color, background: SC[o.overall]?.bg }}>{t.status[o.overall]}</span>
                 </div>
-              ))}
-            </>
-          )}
+                {o.items.map((it, x) => (
+                  <div key={x} style={s.iSum}>
+                    <div style={{ flex: 1, minWidth: 120 }}>
+                      <div style={s.iName}>{it.name}</div>
+                      {(it.code || it.brand) && (
+                        <div style={s.iMeta}>
+                          {it.code && <span>📋 {it.code}</span>}
+                          {it.code && it.brand && <span> · </span>}
+                          {it.brand && <span>🏷️ {it.brand}</span>}
+                        </div>
+                      )}
+                    </div>
+                    <span style={s.iQty}>{it.qty} {it.unit}</span>
+                    {it.price && <span style={s.iPrice}>{t.cur} {it.price}</span>}
+                    <span style={{ fontSize: 11, fontWeight: 700, color: SC[it.status]?.color }}>{t.status[it.status]}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </>}
         </div>
       )}
 
       {/* OWNER */}
       {isOwner && tab === "owner" && (
         <div style={s.panel}>
-          <div style={{ marginBottom: 12 }}>
-            <button
-              onClick={toggleDeleteSetting}
-              style={{
-                padding: "8px 14px",
-                background: shopData?.allowDelete ? "#22c55e" : "#64748b",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                cursor: "pointer",
-                fontWeight: 600
-              }}
-            >
-              {shopData?.allowDelete ? "🗑️ Delete Enabled" : "🔒 Delete Disabled"}
-            </button>
-          </div>
-
           {orders.length === 0 && <div style={s.empty}><div style={{ fontSize: 42 }}>📭</div><div>{t.noOrders}</div></div>}
           {orders.map(order => (
             <div key={order.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => { markRead(order.id); setSelOrder(selOrder === order.id ? null : order.id); }}>
@@ -1104,84 +915,7 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
                     );
                   })}
                   {order.overall === "confirmed" && <button style={s.delBtn} onClick={() => deliver(order.id)}>{t.deliver}</button>}
-                  {shopData?.allowDelete && (
-                    <button style={s.delOrderBtn} onClick={() => delOrder(order.id)}>
-                      {t.delOrder}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* MANAGER TAB */}
-      {isManager && tab === "manager" && (
-        <div style={s.panel}>
-          <div style={{ marginBottom: 12 }}>
-            <span style={{ fontSize: 12, color: "#a1a1aa" }}>{t.yourRole}: </span>
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#f97316" }}>🔑 {profile.shopRole}</span>
-          </div>
-
-          {orders.length === 0 && <div style={s.empty}><div style={{ fontSize: 42 }}>📭</div><div>{t.noOrders}</div></div>}
-          {orders.map(order => (
-            <div key={order.id} style={{ ...s.card, cursor: "pointer" }} onClick={() => { markRead(order.id); setSelOrder(selOrder === order.id ? null : order.id); }}>
-              <div style={s.oHdr}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <span style={s.oId}>Order #{shortOrderId(order.id)}</span>
-                  {!order.read && <span style={s.nBadge}>{t.newTag}</span>}
-                </div>
-                <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-                  <span style={{ color: "#6b7280", fontSize: 11 }}>{order.createdAt.toLocaleTimeString()}</span>
-                  <span style={{ ...s.sBadge, color: SC[order.overall]?.color, background: SC[order.overall]?.bg }}>{t.status[order.overall]}</span>
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: "#71717a" }}>
-                {order.items.length}{t.items}
-                {order.createdByName && ` · 👨‍💼 ${order.createdByName}`}
-                {order.note && ` · ${order.note}`}
-              </div>
-
-              {selOrder === order.id && (
-                <div onClick={e => e.stopPropagation()} style={{ cursor: "default" }}>
-                  <div style={s.div} />
-                  {order.items.map((item, idx) => {
-                    const selCo = cos.find(c => c.id === item.co);
-                    return (
-                      <div key={idx} style={s.oiCard}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f4f5" }}>{item.name}</span>
-                          <span style={{ fontSize: 13, color: "#f97316", fontWeight: 700 }}>{item.qty} {item.unit}</span>
-                        </div>
-                        {(item.code || item.brand) && (
-                          <div style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                            {item.code && <span>📋 {item.code}</span>}
-                            {item.brand && <span>🏷️ {item.brand}</span>}
-                          </div>
-                        )}
-                        <div style={s.row}>
-                          <select style={s.sel} value={item.co || ""} onChange={e => setCo(order.id, idx, e.target.value)}>
-                            <option value="">{t.selectCo}</option>
-                            {cos.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </select>
-                          {selCo && <a href={waLink(selCo.phone, order, item)} target="_blank" rel="noreferrer" style={s.waBtn} onClick={e => e.stopPropagation()}>💬 WA</a>}
-                        </div>
-                        <div style={s.row}>
-                          <input style={{ ...s.inp, flex: 1 }} placeholder={t.price} value={prices[`${order.id}-${idx}`] ?? item.price ?? ""} onChange={e => setPrices(p => ({ ...p, [`${order.id}-${idx}`]: e.target.value }))} />
-                          <button style={s.savBtn} onClick={() => savePrice(order.id, idx)}>{t.save}</button>
-                        </div>
-                        <div style={s.sRow}>
-                          <button style={{ ...s.stBtn, ...(item.status === "confirmed" ? s.stBtnC : {}) }} onClick={() => setStatus(order.id, idx, "confirmed")}>{t.confirmed}</button>
-                          <button style={{ ...s.stBtn, ...(item.status === "no_stock" ? s.stBtnN : {}) }} onClick={() => setStatus(order.id, idx, "no_stock")}>{t.noStock}</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {order.overall === "confirmed" && <button style={s.delBtn} onClick={() => deliver(order.id)}>{t.deliver}</button>}
-                  {shopData?.allowDelete && (
-                    <button style={s.delOrderBtn} onClick={() => delOrder(order.id)}>{t.delOrder}</button>
-                  )}
+                  <button style={s.delOrderBtn} onClick={() => delOrder(order.id)}>{t.delOrder}</button>
                 </div>
               )}
             </div>
@@ -1284,43 +1018,16 @@ const delEditItem = (id) => setEditItems(prev => prev.filter(it => it.id !== id)
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
               {team.map((m, idx) => (
-                <div key={m.id} style={{ padding: "10px 0", borderTop: idx > 0 ? "1px solid #27272a" : "none" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#27272a", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>
-                      {m.role === "owner" ? "🏢" : m.shopRole ? "🔑" : "👨‍💼"}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f4f5" }}>
-                        {m.personName} {m.uid === user.uid && <span style={{ color: "#f97316", fontSize: 11 }}>({t.youLabel})</span>}
-                      </div>
-                      <div style={{ fontSize: 11, color: m.shopRole ? "#f97316" : "#71717a" }}>
-                        {m.role === "owner" ? `👑 ${t.ownerLabel}` : m.shopRole ? `🔑 ${m.shopRole}` : `👨‍💼 ${t.salesmanLabel}`} · {m.email}
-                      </div>
-                    </div>
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderTop: idx > 0 ? "1px solid #27272a" : "none" }}>
+                  <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#27272a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {m.role === "owner" ? "🏢" : "👨‍💼"}
                   </div>
-
-                  {/* Role assignment dropdown — only owner can see, only for non-owner members */}
-                  {isOwner && m.role !== "owner" && (
-                    <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                      <select
-                        value={m.shopRole || ""}
-                        onChange={e => assignRole(m.id, e.target.value || null)}
-                        style={{ ...s.sel, flex: 1, fontSize: 12 }}
-                      >
-                        <option value="">👨‍💼 {t.salesmanLabel}</option>
-                        {SHOP_ROLES.map(r => (
-                          <option key={r} value={r}>🔑 {r}</option>
-                        ))}
-                      </select>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f4f4f5" }}>
+                      {m.personName} {m.uid === user.uid && <span style={{ color: "#f97316", fontSize: 11 }}>({t.youLabel})</span>}
                     </div>
-                  )}
-
-                  {/* Non-owner sees own role label */}
-                  {!isOwner && m.uid === user.uid && m.shopRole && (
-                    <div style={{ fontSize: 11, color: "#f97316", marginTop: 4 }}>
-                      {t.yourRole}: 🔑 {m.shopRole}
-                    </div>
-                  )}
+                    <div style={{ fontSize: 11, color: "#71717a" }}>{m.role === "owner" ? t.ownerLabel : t.salesmanLabel} · {m.email}</div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1496,7 +1203,6 @@ export default function App() {
 }
 
 const s = {
-  welcomeWrap: { maxWidth: 440, margin: "0 auto", padding: "40px 18px 60px", textAlign: "center" },
   root:    { minHeight: "100vh", background: "#09090b", color: "#e4e4e7", fontFamily: "'Segoe UI', system-ui, sans-serif" },
   notif:   { position: "fixed", top: 16, right: 16, zIndex: 999, padding: "12px 20px", borderRadius: 10, border: "1px solid", fontSize: 13, fontWeight: 600, maxWidth: 320, boxShadow: "0 4px 20px rgba(0,0,0,0.5)" },
   hdr:     { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid #27272a", background: "#18181b", position: "sticky", top: 0, zIndex: 10, flexWrap: "wrap", gap: 8 },
