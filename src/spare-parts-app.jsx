@@ -784,35 +784,35 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </div>
             )}
 
-            {/* Step 4: Waiting for delivery (from out of stock) */}
-            {st==="out_of_stock" && (
+            {/* Step 4: After in_stock OR out_of_stock → "মাল আসার অপেক্ষায়" */}
+            {(st==="in_stock"||st==="out_of_stock") && (
               <button style={{ ...s.flowBtn, background:"#431407", color:"#f97316", border:"1px solid #f97316" }}
                 onClick={()=>setOrderStatus(order.id,"waiting_delivery")}>
                 ⏳ {lang==="bn"?"মাল আসার অপেক্ষায়":"Waiting for Delivery"}
               </button>
             )}
 
-            {/* Step 5: Arrived at main shop (from in_stock or waiting_delivery) */}
-            {(st==="in_stock"||st==="waiting_delivery") && (
+            {/* Step 5: waiting_delivery → "মেইন শপে এসেছে" */}
+            {st==="waiting_delivery" && (
               <button style={{ ...s.flowBtn, background:"#2e1065", color:"#a855f7", border:"1px solid #a855f7" }}
                 onClick={()=>setOrderStatus(order.id,"arrived_main_shop")}>
                 🏪 {lang==="bn"?"মেইন শপে এসেছে":"Arrived at Main Shop"}
               </button>
             )}
 
-            {/* Step 6: Out for delivery to branch */}
+            {/* Step 6: arrived_main_shop → "ব্রাঞ্চে পাঠানো হচ্ছে" */}
             {st==="arrived_main_shop" && (
               <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
                 onClick={()=>setOrderStatus(order.id,"out_for_branch")}>
-                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Out for Delivery to Branch"}
+                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Out for Branch"}
               </button>
             )}
 
-            {/* Waiting for salesman to confirm */}
+            {/* Step 7: out_for_branch → wait for salesman */}
             {st==="out_for_branch" && (
               <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
                 {lang==="bn"
-                  ? "⏳ সেলসম্যান রিসিভ করলে ডেলিভারি সম্পন্ন হবে"
+                  ? "⏳ সেলসম্যান মাল বুঝে পাওয়ার পর ডেলিভারি সম্পন্ন হবে"
                   : "⏳ Waiting for salesman to confirm receipt"}
               </div>
             )}
