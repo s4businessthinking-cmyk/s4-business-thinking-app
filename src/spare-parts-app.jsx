@@ -800,7 +800,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         {/* ── SALESMAN: Mark Delivered (only when in_stock or waiting_delivery) ── */}
         {!isOwner && isSalesmanOrder && (st==="in_stock"||st==="waiting_delivery") && (
           <button style={{ ...s.delBtn, marginTop:10 }}
-            onClick={()=>setOrderStatus(order.id,"delivered")}>
+            onClick={async()=>{
+              const updatedItems = order.items.map(it=>({...it, status:"delivered"}));
+              try {
+                await updateDoc(doc(db,"orders",order.id),{ overall:"delivered", items:updatedItems });
+              } catch(e) { hErr(e); }
+            }}>
             🚚 {lang==="bn"?"ডেলিভারি নিশ্চিত করুন (Mark Delivered)":"Confirm Delivery (Mark Delivered)"}
           </button>
         )}
@@ -853,7 +858,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
             <span style={s.iQty}>{it.qty} {it.unit}</span>
             {it.price&&<span style={s.iPrice}>{t.cur} {it.price}</span>}
-            <span style={{ fontSize:11, fontWeight:700, color:SC[it.status]?.color }}>{t.status[it.status]}</span>
+            <span style={{ fontSize:11, fontWeight:700, color:SC[it.status]?.color||SC[order.overall]?.color }}>{t.status[it.status]||t.status[order.overall]}</span>
           </div>
         ))}
         {/* Cancel button — only order creator, only pending */}
