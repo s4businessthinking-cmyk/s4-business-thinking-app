@@ -606,8 +606,10 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
   const cancelOrder = async (oId) => {
     if (!window.confirm(lang==="bn"?"এই অর্ডারটি বাতিল করবেন?":"Cancel this order?")) return;
+    const order = orders.find(o=>o.id===oId); if (!order) return;
+    const cancelledItems = order.items.map(it=>({...it, status:"cancelled"}));
     try {
-      await updateDoc(doc(db,"orders",oId),{ overall:"cancelled" });
+      await updateDoc(doc(db,"orders",oId),{ overall:"cancelled", items:cancelledItems });
       toast(t.n8,"err");
     } catch(e) { hErr(e); }
   };
