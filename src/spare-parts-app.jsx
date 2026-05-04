@@ -111,10 +111,10 @@ const TR = {
     addBtn:"✅ যোগ করুন", editTitle:"এডিট করুন", saveEdit:"✅ সেভ করুন",
     noPhone:"নম্বর নেই", noCo:"কোনো কোম্পানি নেই",
     items:"টি আইটেম", newTag:"🔔 নতুন", cur:"৳",
-    status:{ pending:"অপেক্ষায়", confirmed:"✅ কনফার্মড", no_stock:"❌ স্টক নেই", delivered:"🚚 ডেলিভারি হয়েছে" },
+    status:{ pending:"অপেক্ষায়", confirmed:"✅ কনফার্মড", no_stock:"❌ স্টক নেই", delivered:"🚚 ডেলিভারি হয়েছে", cancelled:"🚫 বাতিল" },
     n1:"✅ অর্ডার পাঠানো হয়েছে!", n2:"দাম সেভ হয়েছে ✅", n3:"🚚 ডেলিভারি সম্পন্ন!",
     n4:"কোম্পানি যোগ হয়েছে ✅", n5:"কোম্পানি আপডেট হয়েছে ✅",
-    n6:"কোম্পানি মুছে ফেলা হয়েছে।", n7:"অর্ডার মুছে ফেলা হয়েছে।",
+    n6:"কোম্পানি মুছে ফেলা হয়েছে।", n7:"অর্ডার মুছে ফেলা হয়েছে।", n8:"🚫 অর্ডার বাতিল হয়েছে।",
     n9:"অ্যাকাউন্ট তৈরি হয়েছে! ইমেইল যাচাই করুন।",
     n10:"✅ ইমেইল যাচাই সম্পন্ন!", n11:"📤 যাচাই ইমেইল আবার পাঠানো হয়েছে।",
     e1:"অন্তত একটা আইটেম দিন!", e2:"নাম খালি রাখা যাবে না!", e3:"নাম দিন!",
@@ -179,10 +179,10 @@ const TR = {
     addBtn:"✅ Add", editTitle:"Edit Company", saveEdit:"✅ Save",
     noPhone:"No number", noCo:"No companies yet",
     items:" items", newTag:"🔔 New", cur:"৳",
-    status:{ pending:"Pending", confirmed:"✅ Confirmed", no_stock:"❌ No Stock", delivered:"🚚 Delivered" },
+    status:{ pending:"Pending", confirmed:"✅ Confirmed", no_stock:"❌ No Stock", delivered:"🚚 Delivered", cancelled:"🚫 Cancelled" },
     n1:"✅ Order sent!", n2:"Price saved ✅", n3:"🚚 Delivery completed!",
     n4:"Company added ✅", n5:"Company updated ✅",
-    n6:"Company deleted.", n7:"Order deleted.",
+    n6:"Company deleted.", n7:"Order deleted.", n8:"🚫 Order cancelled.",
     n9:"Account created! Please verify your email.",
     n10:"✅ Email verified successfully!", n11:"📤 Verification email resent.",
     e1:"Add at least one item!", e2:"Name cannot be empty!", e3:"Please enter a name!",
@@ -204,6 +204,7 @@ const SC = {
   confirmed: { color:"#22c55e", bg:"#052e16" },
   no_stock:  { color:"#ef4444", bg:"#450a0a" },
   delivered: { color:"#818cf8", bg:"#1e1b4b" },
+  cancelled: { color:"#71717a", bg:"#18181b" },
 };
 
 const LANG_KEY = "sparetrack-lang";
@@ -603,6 +604,14 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     } catch(e) { hErr(e); }
   };
 
+  const cancelOrder = async (oId) => {
+    if (!window.confirm(lang==="bn"?"এই অর্ডারটি বাতিল করবেন?":"Cancel this order?")) return;
+    try {
+      await updateDoc(doc(db,"orders",oId),{ overall:"cancelled" });
+      toast(t.n8,"err");
+    } catch(e) { hErr(e); }
+  };
+
   const setCo = async (oId,iIdx,coId) => {
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
@@ -736,49 +745,63 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const canExpand = isOwner||isOrderManager||can("deleteOrder");
 
   // ── ORDER CARD ─────────────────────────────────────────────
-  const OrderCard = ({ order, showSenderName }) => (
-    <div style={{ ...s.card, cursor:canExpand?"pointer":"default" }}
-      onClick={() => { if (!canExpand) return; markRead(order.id); setSelOrder(selOrder===order.id?null:order.id); }}>
-      <div style={s.oHdr}>
-        <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-          <span style={s.oId}>Order #{shortId(order.id)}</span>
-          {!order.read&&(isOwner||isOrderManager)&&<span style={s.nBadge}>{t.newTag}</span>}
-        </div>
-        <div style={{ display:"flex", gap:7, alignItems:"center" }}>
-          <span style={{ color:"#6b7280", fontSize:11 }}>{order.createdAt.toLocaleTimeString()}</span>
-          <span style={{ ...s.sBadge, color:SC[order.overall]?.color, background:SC[order.overall]?.bg }}>{t.status[order.overall]}</span>
-        </div>
-      </div>
-      <div style={{ fontSize:12, color:"#71717a" }}>
-        {order.items.length}{t.items}
-        {showSenderName&&order.createdByName&&` · 👨‍💼 ${order.createdByName}`}
-        {order.note&&` · ${order.note}`}
-      </div>
-      {order.items.map((it,x)=>(
-        <div key={x} style={s.iSum}>
-          <div style={{ flex:1, minWidth:120 }}>
-            <div style={s.iName}>{it.name}</div>
-            {(it.code||it.brand)&&(
-              <div style={s.iMeta}>
-                {it.code&&<span>📋 {it.code}</span>}
-                {it.code&&it.brand&&<span> · </span>}
-                {it.brand&&<span>🏷️ {it.brand}</span>}
-              </div>
-            )}
+  const OrderCard = ({ order, showSenderName }) => {
+    const isMyOrder = order.createdBy === user.uid;
+    const isCancelled = order.overall === "cancelled";
+    const canCancel = isMyOrder && !isCancelled && order.overall === "pending";
+    const canExpandThis = !isCancelled && canExpand;
+    return (
+      <div style={{ ...s.card, cursor:canExpandThis?"pointer":"default", opacity:isCancelled?0.6:1 }}
+        onClick={() => { if (!canExpandThis) return; markRead(order.id); setSelOrder(selOrder===order.id?null:order.id); }}>
+        <div style={s.oHdr}>
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            <span style={s.oId}>Order #{shortId(order.id)}</span>
+            {!order.read&&(isOwner||isOrderManager)&&<span style={s.nBadge}>{t.newTag}</span>}
           </div>
-          <span style={s.iQty}>{it.qty} {it.unit}</span>
-          {it.price&&<span style={s.iPrice}>{t.cur} {it.price}</span>}
-          <span style={{ fontSize:11, fontWeight:700, color:SC[it.status]?.color }}>{t.status[it.status]}</span>
+          <div style={{ display:"flex", gap:7, alignItems:"center" }}>
+            <span style={{ color:"#6b7280", fontSize:11 }}>{order.createdAt.toLocaleTimeString()}</span>
+            <span style={{ ...s.sBadge, color:SC[order.overall]?.color||"#71717a", background:SC[order.overall]?.bg||"#18181b" }}>{t.status[order.overall]}</span>
+          </div>
         </div>
-      ))}
-      {selOrder===order.id&&canExpand&&(
-        <div onClick={e=>e.stopPropagation()} style={{ cursor:"default" }}>
-          <div style={s.div} />
-          {renderOrderItems(order)}
+        <div style={{ fontSize:12, color:"#71717a" }}>
+          {order.items.length}{t.items}
+          {showSenderName&&order.createdByName&&` · 👨‍💼 ${order.createdByName}`}
+          {order.note&&` · ${order.note}`}
         </div>
-      )}
-    </div>
-  );
+        {order.items.map((it,x)=>(
+          <div key={x} style={s.iSum}>
+            <div style={{ flex:1, minWidth:120 }}>
+              <div style={s.iName}>{it.name}</div>
+              {(it.code||it.brand)&&(
+                <div style={s.iMeta}>
+                  {it.code&&<span>📋 {it.code}</span>}
+                  {it.code&&it.brand&&<span> · </span>}
+                  {it.brand&&<span>🏷️ {it.brand}</span>}
+                </div>
+              )}
+            </div>
+            <span style={s.iQty}>{it.qty} {it.unit}</span>
+            {it.price&&<span style={s.iPrice}>{t.cur} {it.price}</span>}
+            <span style={{ fontSize:11, fontWeight:700, color:SC[it.status]?.color }}>{t.status[it.status]}</span>
+          </div>
+        ))}
+        {/* Cancel button — only order creator, only pending */}
+        {canCancel&&(
+          <button
+            style={{ ...s.delOrderBtn, marginTop:8, borderColor:"#713f12", color:"#f59e0b" }}
+            onClick={e=>{ e.stopPropagation(); cancelOrder(order.id); }}>
+            🚫 {lang==="bn"?"অর্ডার বাতিল করুন":"Cancel Order"}
+          </button>
+        )}
+        {selOrder===order.id&&canExpandThis&&(
+          <div onClick={e=>e.stopPropagation()} style={{ cursor:"default" }}>
+            <div style={s.div} />
+            {renderOrderItems(order)}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={s.root}>
@@ -829,6 +852,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <div style={{ ...s.secTitle, marginTop:18 }}>{t.sentOrders}</div>
               {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
             </>
+          )}
+          {orders.length===0&&!can("sendOrder")&&(
+            <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
           )}
         </div>
       )}
