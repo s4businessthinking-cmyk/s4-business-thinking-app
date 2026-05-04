@@ -111,7 +111,16 @@ const TR = {
     addBtn:"✅ যোগ করুন", editTitle:"এডিট করুন", saveEdit:"✅ সেভ করুন",
     noPhone:"নম্বর নেই", noCo:"কোনো কোম্পানি নেই",
     items:"টি আইটেম", newTag:"🔔 নতুন", cur:"৳",
-    status:{ pending:"অপেক্ষায়", confirmed:"✅ কনফার্মড", no_stock:"❌ স্টক নেই", delivered:"🚚 ডেলিভারি হয়েছে", cancelled:"🚫 বাতিল" },
+    status:{
+      pending:          "⏳ অপেক্ষায়",
+      order_confirmed:  "✅ অর্ডার গ্রহণ",
+      ordered_supplier: "📦 কোম্পানিকে জানানো",
+      in_stock:         "✅ স্টকে আছে",
+      out_of_stock:     "❌ স্টকে নেই",
+      waiting_delivery: "⏳ মাল আসার অপেক্ষায়",
+      delivered:        "🚚 ডেলিভারি হয়েছে",
+      cancelled:        "🚫 বাতিল",
+    },
     n1:"✅ অর্ডার পাঠানো হয়েছে!", n2:"দাম সেভ হয়েছে ✅", n3:"🚚 ডেলিভারি সম্পন্ন!",
     n4:"কোম্পানি যোগ হয়েছে ✅", n5:"কোম্পানি আপডেট হয়েছে ✅",
     n6:"কোম্পানি মুছে ফেলা হয়েছে।", n7:"অর্ডার মুছে ফেলা হয়েছে।", n8:"🚫 অর্ডার বাতিল হয়েছে।",
@@ -179,7 +188,16 @@ const TR = {
     addBtn:"✅ Add", editTitle:"Edit Company", saveEdit:"✅ Save",
     noPhone:"No number", noCo:"No companies yet",
     items:" items", newTag:"🔔 New", cur:"৳",
-    status:{ pending:"Pending", confirmed:"✅ Confirmed", no_stock:"❌ No Stock", delivered:"🚚 Delivered", cancelled:"🚫 Cancelled" },
+    status:{
+      pending:          "⏳ Pending",
+      order_confirmed:  "✅ Order Confirmed",
+      ordered_supplier: "📦 Ordered to Supplier",
+      in_stock:         "✅ In Stock",
+      out_of_stock:     "❌ Out of Stock",
+      waiting_delivery: "⏳ Waiting for Delivery",
+      delivered:        "🚚 Delivered",
+      cancelled:        "🚫 Cancelled",
+    },
     n1:"✅ Order sent!", n2:"Price saved ✅", n3:"🚚 Delivery completed!",
     n4:"Company added ✅", n5:"Company updated ✅",
     n6:"Company deleted.", n7:"Order deleted.", n8:"🚫 Order cancelled.",
@@ -200,11 +218,14 @@ const TR = {
 };
 
 const SC = {
-  pending:   { color:"#f59e0b", bg:"#451a03" },
-  confirmed: { color:"#22c55e", bg:"#052e16" },
-  no_stock:  { color:"#ef4444", bg:"#450a0a" },
-  delivered: { color:"#818cf8", bg:"#1e1b4b" },
-  cancelled: { color:"#71717a", bg:"#18181b" },
+  pending:          { color:"#f59e0b", bg:"#451a03" },
+  order_confirmed:  { color:"#22c55e", bg:"#052e16" },
+  ordered_supplier: { color:"#06b6d4", bg:"#083344" },
+  in_stock:         { color:"#22c55e", bg:"#052e16" },
+  out_of_stock:     { color:"#ef4444", bg:"#450a0a" },
+  waiting_delivery: { color:"#f97316", bg:"#431407" },
+  delivered:        { color:"#818cf8", bg:"#1e1b4b" },
+  cancelled:        { color:"#71717a", bg:"#27272a" },
 };
 
 const LANG_KEY = "sparetrack-lang";
@@ -692,57 +713,105 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         ["settings",t.tabSettings],
       ];
 
-  // ── SHARED ORDER ITEMS RENDERER ────────────────────────────
-  const renderOrderItems = (order) => (
-    <>
-      {order.items.map((item,idx) => {
-        const selCo = cos.find(c=>c.id===item.co);
-        return (
+  // ── ORDER STATUS FLOW (owner controls steps 1-4, salesman controls step 5) ──
+  const setOrderStatus = async (oId, newStatus) => {
+    try { await updateDoc(doc(db,"orders",oId),{ overall: newStatus }); }
+    catch(e) { hErr(e); }
+  };
+
+  const renderOrderItems = (order) => {
+    const st = order.overall;
+    const isSalesmanOrder = order.createdBy === user.uid;
+
+    return (
+      <div>
+        {/* Item list — read only summary */}
+        {order.items.map((item,idx)=>(
           <div key={idx} style={s.oiCard}>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+            <div style={{ display:"flex", justifyContent:"space-between" }}>
               <span style={{ fontSize:14, fontWeight:700, color:"#f4f4f5" }}>{item.name}</span>
               <span style={{ fontSize:13, color:"#f97316", fontWeight:700 }}>{item.qty} {item.unit}</span>
             </div>
-            {(item.code||item.brand) && (
-              <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:10, display:"flex", gap:10, flexWrap:"wrap" }}>
+            {(item.code||item.brand)&&(
+              <div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, display:"flex", gap:10, flexWrap:"wrap" }}>
                 {item.code&&<span>📋 {item.code}</span>}
                 {item.brand&&<span>🏷️ {item.brand}</span>}
               </div>
             )}
-            {can("manageCompanies") && (
-              <div style={s.row}>
-                <select style={s.sel} value={item.co||""} onChange={e=>setCo(order.id,idx,e.target.value)}>
-                  <option value="">{t.selectCo}</option>
-                  {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                {selCo&&<a href={waLink(selCo.phone,order,item)} target="_blank" rel="noreferrer" style={s.waBtn} onClick={e=>e.stopPropagation()}>💬 WA</a>}
-              </div>
+          </div>
+        ))}
+
+        {/* ── OWNER STATUS FLOW BUTTONS ── */}
+        {isOwner && st !== "cancelled" && st !== "delivered" && (
+          <div style={{ marginTop:10 }}>
+            <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
+              {lang==="bn"?"স্ট্যাটাস আপডেট করুন":"Update Status"}
+            </div>
+
+            {/* Step 1: Confirm order */}
+            {st==="pending" && (
+              <button style={{ ...s.flowBtn, background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" }}
+                onClick={()=>setOrderStatus(order.id,"order_confirmed")}>
+                ✅ {lang==="bn"?"অর্ডার গ্রহণ করুন":"Confirm Order"}
+              </button>
             )}
-            {can("setPrices") && (
-              <div style={s.row}>
-                <input style={{ ...s.inp, flex:1 }} placeholder={t.price}
-                  value={prices[`${order.id}-${idx}`]??item.price??""}
-                  onChange={e=>setPrices(p=>({...p,[`${order.id}-${idx}`]:e.target.value}))} />
-                <button style={s.savBtn} onClick={()=>savePrice(order.id,idx)}>{t.save}</button>
-              </div>
+
+            {/* Step 2: Ordered to supplier */}
+            {st==="order_confirmed" && (
+              <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
+                onClick={()=>setOrderStatus(order.id,"ordered_supplier")}>
+                📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
+              </button>
             )}
-            {can("setStatus") && (
+
+            {/* Step 3: In Stock or Out of Stock */}
+            {st==="ordered_supplier" && (
               <div style={s.sRow}>
-                <button style={{ ...s.stBtn, ...(item.status==="confirmed"?s.stBtnC:{}) }} onClick={()=>setStatus(order.id,idx,"confirmed")}>{t.confirmed}</button>
-                <button style={{ ...s.stBtn, ...(item.status==="no_stock"?s.stBtnN:{}) }} onClick={()=>setStatus(order.id,idx,"no_stock")}>{t.noStock}</button>
+                <button style={{ ...s.flowBtn, flex:1, background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" }}
+                  onClick={()=>setOrderStatus(order.id,"in_stock")}>
+                  ✅ {lang==="bn"?"স্টকে আছে":"In Stock"}
+                </button>
+                <button style={{ ...s.flowBtn, flex:1, background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" }}
+                  onClick={()=>setOrderStatus(order.id,"out_of_stock")}>
+                  ❌ {lang==="bn"?"স্টকে নেই":"Out of Stock"}
+                </button>
+              </div>
+            )}
+
+            {/* Step 4: Waiting for delivery (from out of stock) */}
+            {st==="out_of_stock" && (
+              <button style={{ ...s.flowBtn, background:"#431407", color:"#f97316", border:"1px solid #f97316" }}
+                onClick={()=>setOrderStatus(order.id,"waiting_delivery")}>
+                ⏳ {lang==="bn"?"মাল আসার অপেক্ষায়":"Waiting for Delivery"}
+              </button>
+            )}
+
+            {/* From waiting or in_stock → can go back to ordered_supplier if needed */}
+            {(st==="waiting_delivery"||st==="in_stock") && (
+              <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
+                {lang==="bn"
+                  ? "⏳ সেলসম্যান ডেলিভারি নিশ্চিত করলে সম্পন্ন হবে"
+                  : "⏳ Waiting for salesman to confirm delivery"}
               </div>
             )}
           </div>
-        );
-      })}
-      {can("markDelivery")&&order.overall==="confirmed"&&(
-        <button style={s.delBtn} onClick={()=>deliver(order.id)}>{t.deliver}</button>
-      )}
-      {can("deleteOrder")&&(
-        <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>{t.delOrder}</button>
-      )}
-    </>
-  );
+        )}
+
+        {/* ── SALESMAN: Mark Delivered (only when in_stock or waiting_delivery) ── */}
+        {!isOwner && isSalesmanOrder && (st==="in_stock"||st==="waiting_delivery") && (
+          <button style={{ ...s.delBtn, marginTop:10 }}
+            onClick={()=>setOrderStatus(order.id,"delivered")}>
+            🚚 {lang==="bn"?"ডেলিভারি নিশ্চিত করুন (Mark Delivered)":"Confirm Delivery (Mark Delivered)"}
+          </button>
+        )}
+
+        {/* Delete order button */}
+        {can("deleteOrder") && st !== "delivered" && (
+          <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>{t.delOrder}</button>
+        )}
+      </div>
+    );
+  };
 
   const canExpand = isOwner||isOrderManager||can("deleteOrder");
 
@@ -1241,6 +1310,7 @@ const s = {
   stBtnN:  { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
   delBtn:  { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#4f46e5,#7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
   delOrderBtn:{ width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
+  flowBtn:    { width:"100%", padding:"11px", borderRadius:10, border:"none", fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:7, display:"block" },
   addCoBtn:{ padding:"7px 14px", borderRadius:8, border:"1px solid #f97316", background:"transparent", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700 },
   coIcon:  { width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
   edBtn:   { padding:"6px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#27272a", color:"#e4e4e7", cursor:"pointer", fontSize:13 },
