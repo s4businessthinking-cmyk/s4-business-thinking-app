@@ -191,14 +191,16 @@ const TR = {
     noPhone:"No number", noCo:"No companies yet",
     items:" items", newTag:"🔔 New", cur:"৳",
     status:{
-      pending:          "⏳ Pending",
-      order_confirmed:  "✅ Order Confirmed",
-      ordered_supplier: "📦 Ordered to Supplier",
-      in_stock:         "✅ In Stock",
-      out_of_stock:     "❌ Out of Stock",
-      waiting_delivery: "⏳ Waiting for Delivery",
-      delivered:        "🚚 Delivered",
-      cancelled:        "🚫 Cancelled",
+      pending:            "⏳ Pending",
+      order_confirmed:    "✅ Order Confirmed",
+      ordered_supplier:   "📦 Ordered to Supplier",
+      in_stock:           "✅ In Stock",
+      out_of_stock:       "❌ Out of Stock",
+      waiting_delivery:   "⏳ Waiting for Delivery",
+      arrived_main_shop:  "🏪 Arrived at Main Shop",
+      out_for_branch:     "🚚 Out for Delivery to Branch",
+      delivered:          "✅ Delivered",
+      cancelled:          "🚫 Cancelled",
     },
     n1:"✅ Order sent!", n2:"Price saved ✅", n3:"🚚 Delivery completed!",
     n4:"Company added ✅", n5:"Company updated ✅",
@@ -790,19 +792,35 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </button>
             )}
 
-            {/* From waiting or in_stock → can go back to ordered_supplier if needed */}
-            {(st==="waiting_delivery"||st==="in_stock") && (
+            {/* Step 5: Arrived at main shop (from in_stock or waiting_delivery) */}
+            {(st==="in_stock"||st==="waiting_delivery") && (
+              <button style={{ ...s.flowBtn, background:"#2e1065", color:"#a855f7", border:"1px solid #a855f7" }}
+                onClick={()=>setOrderStatus(order.id,"arrived_main_shop")}>
+                🏪 {lang==="bn"?"মেইন শপে এসেছে":"Arrived at Main Shop"}
+              </button>
+            )}
+
+            {/* Step 6: Out for delivery to branch */}
+            {st==="arrived_main_shop" && (
+              <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
+                onClick={()=>setOrderStatus(order.id,"out_for_branch")}>
+                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Out for Delivery to Branch"}
+              </button>
+            )}
+
+            {/* Waiting for salesman to confirm */}
+            {st==="out_for_branch" && (
               <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
                 {lang==="bn"
-                  ? "⏳ সেলসম্যান ডেলিভারি নিশ্চিত করলে সম্পন্ন হবে"
-                  : "⏳ Waiting for salesman to confirm delivery"}
+                  ? "⏳ সেলসম্যান রিসিভ করলে ডেলিভারি সম্পন্ন হবে"
+                  : "⏳ Waiting for salesman to confirm receipt"}
               </div>
             )}
           </div>
         )}
 
-        {/* ── SALESMAN: Mark Delivered (only when in_stock or waiting_delivery) ── */}
-        {!isOwner && isSalesmanOrder && (st==="in_stock"||st==="waiting_delivery") && (
+        {/* ── SALESMAN: Mark Delivered (only when out_for_branch) ── */}
+        {!isOwner && isSalesmanOrder && st==="out_for_branch" && (
           <button style={{ ...s.delBtn, marginTop:10 }}
             onClick={async()=>{
               const updatedItems = order.items.map(it=>({...it, status:"delivered"}));
@@ -810,7 +828,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 await updateDoc(doc(db,"orders",order.id),{ overall:"delivered", items:updatedItems });
               } catch(e) { hErr(e); }
             }}>
-            🚚 {lang==="bn"?"ডেলিভারি নিশ্চিত করুন (Mark Delivered)":"Confirm Delivery (Mark Delivered)"}
+            ✅ {lang==="bn"?"মাল বুঝে পেয়েছি — ডেলিভারি সম্পন্ন":"Received — Mark as Delivered"}
           </button>
         )}
 
