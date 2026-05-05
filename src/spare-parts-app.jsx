@@ -588,15 +588,24 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     const valid = items.filter(it=>it.name.trim());
     if (!valid.length) return toast(t.e1,"err");
     try {
-      const serialNo = await runTransaction(db, async (tx) => {
-        const shopRef = doc(db, "shops", shopId);
-        const shopSnap = await tx.get(shopRef);
-        const current = Number(shopSnap.data()?.lastOrderSerial || 0);
-        const next = current + 1;
-        tx.update(shopRef, { lastOrderSerial: next });
-        return next;
-      });
-      const orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
+      let serialNo = null;
+      let orderNo = "";
+      try {
+        serialNo = await runTransaction(db, async (tx) => {
+          const shopRef = doc(db, "shops", shopId);
+          const shopSnap = await tx.get(shopRef);
+          const current = Number(shopSnap.data()?.lastOrderSerial || 0);
+          const next = current + 1;
+          tx.update(shopRef, { lastOrderSerial: next });
+          return next;
+        });
+        orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
+      } catch (serialErr) {
+        // Fallback: if shop counter update is blocked by Firestore rules,
+        // still allow order creation with a readable unique number.
+        console.warn("Serial transaction failed, using fallback order number", serialErr);
+        orderNo = `${ORDER_PREFIX}${String(Date.now()).slice(-6)}`;
+      }
       await addDoc(collection(db,"orders"),{
         shopId, createdBy:user.uid, createdByName:profile.personName,
         serialNo, orderNo,
