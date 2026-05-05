@@ -735,7 +735,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         {order.items.map((item, idx) => {
           const selectedCo = cos.find(c => c.id === item.co);
           const showCoOptions = isOwner || can("manageCompanies") || can("setPrices");
-          const itemKey = `${order.id}-${idx}`; // ইউনিক কী ব্যবহারের জন্য
+          const itemKey = `${order.id}-${idx}`;
 
           return (
             <div key={idx} style={s.oiCard}>
@@ -751,7 +751,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 </div>
               )}
 
-              {/* কোম্পানি select + WhatsApp button (owner / authorized salesman) */}
+              {/* কোম্পানি select + WhatsApp button */}
               {showCoOptions && (
                 <div style={{ marginTop: 8 }}>
                   <div style={s.row}>
@@ -765,7 +765,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                       ))}
                     </select>
                     
-                    {/* WhatsApp Button - সঠিকভাবে ফিক্স করা হয়েছে */}
                     {selectedCo && selectedCo.phone && (
                       <a
                         href={waLink(selectedCo.phone, order, item)}
@@ -777,7 +776,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     )}
                   </div>
 
-                  {/* দাম সেভ (যদি permission থাকে) */}
+                  {/* দাম সেভ */}
                   {can("setPrices") && (
                     <div style={{ ...s.row, marginTop: 6 }}>
                       <input
@@ -807,7 +806,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               {lang === "bn" ? "স্ট্যাটাস আপডেট করুন" : "Update Status"}
             </div>
 
-            {/* Step 1: Confirm order */}
             {st === "pending" && (
               <button style={{ ...s.flowBtn, background: "#052e16", color: "#22c55e", border: "1px solid #22c55e" }}
                 onClick={() => setOrderStatus(order.id, "order_confirmed")}>
@@ -815,7 +813,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </button>
             )}
 
-            {/* Step 2: Ordered to supplier */}
             {st === "order_confirmed" && (
               <button style={{ ...s.flowBtn, background: "#083344", color: "#06b6d4", border: "1px solid #06b6d4" }}
                 onClick={() => setOrderStatus(order.id, "ordered_supplier")}>
@@ -823,7 +820,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </button>
             )}
 
-            {/* Step 3: In Stock or Out of Stock */}
             {st === "ordered_supplier" && (
               <div style={s.sRow}>
                 <button style={{ ...s.flowBtn, flex: 1, background: "#052e16", color: "#22c55e", border: "1px solid #22c55e" }}
@@ -837,7 +833,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </div>
             )}
 
-            {/* Step 4: After in_stock OR out_of_stock → "মাল আসার অপেক্ষায়" */}
             {(st === "in_stock" || st === "out_of_stock") && (
               <button style={{ ...s.flowBtn, background: "#431407", color: "#f97316", border: "1px solid #f97316" }}
                 onClick={() => setOrderStatus(order.id, "waiting_delivery")}>
@@ -845,7 +840,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </button>
             )}
 
-            {/* Step 5: waiting_delivery → "মেইন শপে এসেছে" */}
             {st === "waiting_delivery" && (
               <button style={{ ...s.flowBtn, background: "#2e1065", color: "#a855f7", border: "1px solid #a855f7" }}
                 onClick={() => setOrderStatus(order.id, "arrived_main_shop")}>
@@ -853,7 +847,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </button>
             )}
 
-            {/* Step 6: arrived_main_shop → "ব্রাঞ্চে পাঠানো হচ্ছে" */}
             {st === "arrived_main_shop" && (
               <button style={{ ...s.flowBtn, background: "#083344", color: "#06b6d4", border: "1px solid #06b6d4" }}
                 onClick={() => setOrderStatus(order.id, "out_for_branch")}>
@@ -861,7 +854,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </button>
             )}
 
-            {/* Step 7: out_for_branch → wait for salesman */}
             {st === "out_for_branch" && (
               <div style={{ fontSize: 12, color: "#71717a", textAlign: "center", padding: "10px 0" }}>
                 {lang === "bn"
