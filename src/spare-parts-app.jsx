@@ -610,15 +610,15 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setStatus = async (oId,iIdx,status) => {
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
-    const allNoStock = upd.every(it=>it.status==="no_stock");
-    const allHandled = upd.every(it=>it.status==="confirmed"||it.status==="no_stock");
-    const overall = allNoStock?"no_stock":allHandled?"confirmed":"pending";
+    const allNoStock = upd.every(it=>it.status==="out_of_stock");
+    const allHandled = upd.every(it=>it.status==="order_confirmed"||it.status==="out_of_stock");
+    const overall = allNoStock?"out_of_stock":allHandled?"order_confirmed":"pending";
     try { await updateDoc(doc(db,"orders",oId),{items:upd,overall}); } catch(e) { hErr(e); }
   };
 
   const deliver = async (oId) => {
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    const upd = order.items.map(it=>({...it,status:it.status==="no_stock"?"no_stock":"delivered"}));
+    const upd = order.items.map(it=>({...it,status:it.status==="out_of_stock"?"out_of_stock":"delivered"}));
     try { await updateDoc(doc(db,"orders",oId),{overall:"delivered",items:upd}); toast(t.n3); } catch(e) { hErr(e); }
   };
 
@@ -720,110 +720,91 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
       ];
 
   // ── ORDER STATUS FLOW ──
-const setOrderStatus = async (oId, newStatus) => {
-  try {
-    await updateDoc(doc(db, "orders", oId), { overall: newStatus });
-  } catch (e) {
-    hErr(e);
-  }
-};
+  const setOrderStatus = async (oId, newStatus) => {
+    try { await updateDoc(doc(db,"orders",oId),{overall:newStatus}); }
+    catch(e) { hErr(e); }
+  };
 
-const OrderCard = ({ order }) => {
-  const st = order.overall;
-  const isSalesmanOrder = order.createdBy === user.uid;
-  const isCancelled = st === "cancelled";
-  const canExpandThis = !isCancelled && (isOwner || isOrderManager || can("deleteOrder"));
+  const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
-  return (
-    <div
-      style={{
-        ...s.card,
-        cursor: canExpandThis ? "pointer" : "default",
-        opacity: isCancelled ? 0.6 : 1
-      }}
-      onClick={() => {
-        if (!canExpandThis) return;
-        markRead(order.id);
-        setSelOrder(selOrder === order.id ? null : order.id);
-      }}
-    >
-      {/* ── HEADER ── */}
-      <div style={s.oHdr}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <span style={s.oId}>Order #{shortId(order.id)}</span>
-          {!order.read && (isOwner || isOrderManager) && (
-            <span style={s.nBadge}>{t.newTag}</span>
-          )}
-        </div>
-
-        <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
-          <span style={{ color: "#6b7280", fontSize: 11 }}>
-            {order.createdAt.toLocaleTimeString()}
-          </span>
-          <span
-            style={{
-              ...s.sBadge,
-              color: SC[st]?.color || "#71717a",
-              background: SC[st]?.bg || "#18181b"
-            }}
-          >
-            {t.status[st]}
-          </span>
-        </div>
-      </div>
-
-      {/* ── SUMMARY ── */}
-      <div style={{ fontSize: 12, color: "#71717a" }}>
-        {order.items.length} {t.items}
-        {order.createdByName && ` · 👨‍💼 ${order.createdByName}`}
-        {order.note && ` · ${order.note}`}
-      </div>
-
-      {order.items.map((it, x) => (
-        <div key={x} style={s.iSum}>
-          <div style={{ flex: 1, minWidth: 120 }}>
-            <div style={s.iName}>{it.name}</div>
-
-            {(it.code || it.brand) && (
-              <div style={s.iMeta}>
-                {it.code && <span>📋 {it.code}</span>}
-                {it.code && it.brand && <span> · </span>}
-                {it.brand && <span>🏷️ {it.brand}</span>}
-              </div>
-            )}
+  // ── RENDER ORDER ITEMS (expanded detail) ──────────────────
+  const renderOrderItems = (order) => (
+    <>
+      {order.items.map((it,iIdx)=>(
+        <div key={iIdx} style={s.oiCard}>
+          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:6 }}>
+            {iIdx+1}. {it.name}
+            {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>📋 {it.code}</span>}
+            {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
+            <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
           </div>
-
-          <span style={s.iQty}>{it.qty} {it.unit}</span>
-
-          {it.price && (
-            <span style={s.iPrice}>
-              {t.cur} {it.price}
-            </span>
+          {(isOwner||can("manageCompanies"))&&(
+            <div style={s.row}>
+              <select style={s.sel} value={it.co||""} onChange={e=>setCo(order.id,iIdx,e.target.value)}>
+                <option value="">{t.selectCo}</option>
+                {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {it.co&&cos.find(c=>c.id===it.co)?.phone&&(
+                <a href={waLink(cos.find(c=>c.id===it.co).phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
+              )}
+            </div>
           )}
-
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: SC[it.status]?.color || SC[st]?.color
-            }}
-          >
-            {t.status[it.status] || t.status[st]}
-          </span>
+          {can("setPrices")&&(
+            <div style={s.row}>
+              <input style={s.inp} placeholder={t.price} inputMode="numeric"
+                value={prices[`${order.id}-${iIdx}`]??it.price??""} 
+                onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
+              <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
+            </div>
+          )}
+          {can("setStatus")&&(
+            <div style={s.sRow}>
+              <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
+                onClick={()=>setStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
+              <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
+                onClick={()=>setStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
+            </div>
+          )}
         </div>
       ))}
-
-      {/* 🔥 EXPAND DETAILS */}
-      {selOrder === order.id && (
-        <div>
-          {renderOrderItems(order)}
-        </div>
-      )}
-    </div>
+      <div style={{ marginTop:4 }}>
+        {can("markDelivery")&&order.overall!=="delivered"&&order.overall!=="cancelled"&&(
+          <button style={{ ...s.delBtn, marginBottom:7 }} onClick={()=>deliver(order.id)}>🚚 {t.deliver}</button>
+        )}
+        {isOwner&&order.overall!=="delivered"&&order.overall!=="cancelled"&&(
+          <>
+            {order.overall==="pending"&&(
+              <button style={{ ...s.flowBtn, background:"#1d4ed8", color:"#fff" }}
+                onClick={()=>setOrderStatus(order.id,"ordered_supplier")}>
+                📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Mark: Ordered to Supplier"}
+              </button>
+            )}
+            {order.overall==="ordered_supplier"&&(
+              <button style={{ ...s.flowBtn, background:"#0e7490", color:"#fff" }}
+                onClick={()=>setOrderStatus(order.id,"waiting_delivery")}>
+                ⏳ {lang==="bn"?"মাল আসার অপেক্ষায়":"Mark: Waiting for Delivery"}
+              </button>
+            )}
+            {order.overall==="waiting_delivery"&&(
+              <button style={{ ...s.flowBtn, background:"#7e22ce", color:"#fff" }}
+                onClick={()=>setOrderStatus(order.id,"arrived_main_shop")}>
+                🏪 {lang==="bn"?"মেইন শপে এসেছে":"Mark: Arrived at Main Shop"}
+              </button>
+            )}
+            {order.overall==="arrived_main_shop"&&(
+              <button style={{ ...s.flowBtn, background:"#0891b2", color:"#fff" }}
+                onClick={()=>setOrderStatus(order.id,"out_for_branch")}>
+                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Mark: Out for Branch Delivery"}
+              </button>
+            )}
+          </>
+        )}
+        {can("deleteOrder")&&(
+          <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>🗑️ {t.delOrder}</button>
+        )}
+      </div>
+    </>
   );
-};
-
-const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
   // ── ORDER CARD ─────────────────────────────────────────────
   const OrderCard = ({ order, showSenderName }) => {
