@@ -619,6 +619,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const savePrice = async (oId,iIdx) => {
     if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
+    if (["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)) return;
     const p = prices[`${oId}-${iIdx}`]??"";
     const upd = order.items.map((it,x)=>x===iIdx?{...it,price:p}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); toast(t.n2); } catch(e) { hErr(e); }
@@ -627,6 +628,13 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setItemStatus = async (oId,iIdx,status) => {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
+    if (order.overall==="delivered"||order.overall==="cancelled") return;
+    const current = order.items[iIdx];
+    if (!current || current.status==="delivered"||current.status==="cancelled") return;
+    const flowLocked = ["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall);
+    // After supplier order starts, only recheck is allowed (out_of_stock -> order_confirmed)
+    if (flowLocked && !(current.status==="out_of_stock" && status==="order_confirmed")) return;
+
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
   };
@@ -668,6 +676,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setCo = async (oId,iIdx,coId) => {
     if (!isOwner&&!can("manageCompanies")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
+    if (["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
   };
@@ -751,6 +760,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setOrderStatus = async (oId, newStatus) => {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
+    if (order.overall==="delivered"||order.overall==="cancelled") return;
+    if (newStatus==="ordered_supplier") {
+      const missingPrice = order.items.some(it => it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered" && !String(it.price||"").trim());
+      if (missingPrice) return toast(lang==="bn" ? "আগে সব প্রোডাক্টের দাম সেট করুন" : "Set price for all products before ordering supplier", "err");
+    }
     const updatable = new Set(["order_confirmed","ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
     const newItems = updatable.has(newStatus)
       ? order.items.map(it => (it.status==="out_of_stock"||it.status==="delivered"||it.status==="cancelled") ? it : { ...it, status:newStatus })
@@ -780,7 +794,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               {/* কোম্পানি select + WhatsApp */}
               {(isOwner||can("manageCompanies"))&&(
                 <div style={s.row}>
-                  <select style={s.sel} value={it.co||""} onChange={e=>setCo(order.id,iIdx,e.target.value)}>
+                  <select
+                    style={s.sel}
+                    value={it.co||""}
+                    disabled={["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)}
+                    onChange={e=>setCo(order.id,iIdx,e.target.value)}>
                     <option value="">{t.selectCo}</option>
                     {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
@@ -794,20 +812,27 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               {(isOwner||can("setPrices"))&&(
                 <div style={s.row}>
                   <input style={s.inp} placeholder={t.price} inputMode="numeric"
+                    disabled={["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)}
                     value={prices[`${order.id}-${iIdx}`]??it.price??""}
                     onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
-                  <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
+                  {!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
+                    <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
+                  )}
                 </div>
               )}
 
               {/* Item-level status (Confirmed / No Stock / Recheck) */}
               {(isOwner||can("setStatus"))&&(
                 <div style={s.sRow}>
-                  <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
-                    onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
-                  <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
-                    onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
-                  {it.status==="out_of_stock"&&(
+                  {!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
+                    <>
+                      <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
+                        onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
+                      <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
+                        onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
+                    </>
+                  )}
+                  {it.status==="out_of_stock" && order.overall!=="delivered" && order.overall!=="cancelled"&&(
                     <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
                       onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
                       {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
