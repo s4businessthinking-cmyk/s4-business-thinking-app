@@ -732,20 +732,68 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     return (
       <div>
         {/* Item list — read only summary */}
-        {order.items.map((item,idx)=>(
-          <div key={idx} style={s.oiCard}>
-            <div style={{ display:"flex", justifyContent:"space-between" }}>
-              <span style={{ fontSize:14, fontWeight:700, color:"#f4f4f5" }}>{item.name}</span>
-              <span style={{ fontSize:13, color:"#f97316", fontWeight:700 }}>{item.qty} {item.unit}</span>
-            </div>
-            {(item.code||item.brand)&&(
-              <div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, display:"flex", gap:10, flexWrap:"wrap" }}>
-                {item.code&&<span>📋 {item.code}</span>}
-                {item.brand&&<span>🏷️ {item.brand}</span>}
+        {order.items.map((item,idx)=>{
+          const selectedCo = cos.find(c=>c.id===item.co);
+          const showCoOptions = isOwner || can("manageCompanies") || can("setPrices");
+          return (
+            <div key={idx} style={s.oiCard}>
+              <div style={{ display:"flex", justifyContent:"space-between" }}>
+                <span style={{ fontSize:14, fontWeight:700, color:"#f4f4f5" }}>{item.name}</span>
+                <span style={{ fontSize:13, color:"#f97316", fontWeight:700 }}>{item.qty} {item.unit}</span>
               </div>
-            )}
-          </div>
-        ))}
+              {(item.code||item.brand)&&(
+                <div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, display:"flex", gap:10, flexWrap:"wrap" }}>
+                  {item.code&&<span>📋 {item.code}</span>}
+                  {item.brand&&<span>🏷️ {item.brand}</span>}
+                </div>
+              )}
+
+              {/* কোম্পানি select + WhatsApp button (owner / authorized salesman) */}
+              {showCoOptions && (
+                <div style={{ marginTop:8 }}>
+                  <div style={s.row}>
+                    <select
+                      style={{ ...s.sel, flex:1 }}
+                      value={item.co || ""}
+                      onChange={e=>setCo(order.id, idx, e.target.value)}>
+                      <option value="">{t.selectCo}</option>
+                      {cos.map(c=>(
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    {selectedCo && selectedCo.phone && (
+                      
+                        href={waLink(selectedCo.phone, order, item)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={s.waBtn}>
+                        💬 WhatsApp
+                      </a>
+                    )}
+                  </div>
+
+                  {/* দাম সেভ (যদি permission থাকে) */}
+                  {can("setPrices") && (
+                    <div style={{ ...s.row, marginTop:6 }}>
+                      <input
+                        style={{ ...s.inp, flex:1 }}
+                        placeholder={t.price}
+                        inputMode="numeric"
+                        value={prices[`${order.id}-${idx}`] ?? item.price ?? ""}
+                        onChange={e=>setPrices(p=>({ ...p, [`${order.id}-${idx}`]: e.target.value }))}
+                      />
+                      <button
+                        style={s.savBtn}
+                        onClick={()=>savePrice(order.id, idx)}>
+                        {t.save}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {/* ── OWNER STATUS FLOW BUTTONS ── */}
         {isOwner && st !== "cancelled" && st !== "delivered" && (
