@@ -131,7 +131,6 @@ const TR = {
     n10:"✅ ইমেইল যাচাই সম্পন্ন!", n11:"📤 যাচাই ইমেইল আবার পাঠানো হয়েছে।",
     e1:"অন্তত একটা আইটেম দিন!", e2:"নাম খালি রাখা যাবে না!", e3:"নাম দিন!",
     delConfirm:"এই অর্ডারটি মুছে ফেলবেন?",
-    // positions & permissions
     positionLbl:"পদবী", selectPosition:"পদবী বেছে নিন",
     managePositionsTitle:"📋 পদবী ম্যানেজ", addPositionBtn:"+ পদবী যোগ করুন",
     positionNameP:"পদবীর নাম (যেমন: Manager, Cashier)",
@@ -210,7 +209,6 @@ const TR = {
     n10:"✅ Email verified successfully!", n11:"📤 Verification email resent.",
     e1:"Add at least one item!", e2:"Name cannot be empty!", e3:"Please enter a name!",
     delConfirm:"Delete this order?",
-    // positions & permissions
     positionLbl:"Position", selectPosition:"Select Position",
     managePositionsTitle:"📋 Manage Positions", addPositionBtn:"+ Add Position",
     positionNameP:"Position name (e.g. Manager, Cashier)",
@@ -415,7 +413,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
             companyName:companyName.trim(), ownerName:personName.trim(), ownerUid:uid,
             country, area:area.trim(), mobile:mobile.trim(), email:email.trim(),
             inviteCode:generateInviteCode(),
-            positions:[], // empty — owner will add positions later
+            positions:[],
             createdAt:serverTimestamp(),
           });
         } catch(e) {
@@ -524,7 +522,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const shopId  = profile.shopId;
   const perms   = profile.permissions||DEFAULT_PERMISSIONS;
   const can     = (key) => isOwner||perms[key]===true;
-  // non-owner with management permissions sees all orders (not just their own)
   const isOrderManager = !isOwner&&(can("setStatus")||can("setPrices")||can("markDelivery")||can("deleteOrder"));
 
   const [orders,setOrders]=useState([]);
@@ -545,11 +542,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
 
-  // positions
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
 
-  // real-time shop (catches position changes live)
   useEffect(() => {
     if (!shopId) return;
     return onSnapshot(doc(db,"shops",shopId),
@@ -558,7 +553,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   },[shopId]);
 
-  // orders
   useEffect(() => {
     const q = (isOwner||isOrderManager)
       ? query(collection(db,"orders"), where("shopId","==",shopId), orderBy("createdAt","desc"))
@@ -614,38 +608,36 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const savePrice = async (oId,iIdx) => {
-    if (!isOwner) return;
+    if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const p = prices[`${oId}-${iIdx}`]??"";
     const upd = order.items.map((it,x)=>x===iIdx?{...it,price:p}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); toast(t.n2); } catch(e) { hErr(e); }
   };
 
-  const setStatus = async (oId,iIdx,status) => {
-    if (!isOwner) return;
+  const setItemStatus = async (oId,iIdx,status) => {
+    if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
-    const allNoStock = upd.every(it=>it.status==="out_of_stock");
-    const allHandled = upd.every(it=>it.status==="order_confirmed"||it.status==="out_of_stock");
-    const overall = allNoStock?"out_of_stock":allHandled?"order_confirmed":"pending";
-    try { await updateDoc(doc(db,"orders",oId),{items:upd,overall}); } catch(e) { hErr(e); }
+    try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
   };
 
   const deliverItem = async (oId,iIdx) => {
-    if (!isSalesman) return;
+    if (!isSalesman&&!can("markDelivery")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    if (order.createdBy!==user.uid) return;
+    if (isSalesman&&!can("markDelivery")&&order.createdBy!==user.uid) return;
     const target = order.items[iIdx];
     if (!target || target.status!=="out_for_branch") return;
 
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status:"delivered"}:it);
-    const nonOut = upd.filter(it=>it.status!=="out_of_stock");
+    const nonOut = upd.filter(it=>it.status!=="out_of_stock"&&it.status!=="cancelled");
     const allDelivered = nonOut.length>0 && nonOut.every(it=>it.status==="delivered");
     const overall = allDelivered?"delivered":order.overall;
     try { await updateDoc(doc(db,"orders",oId),{overall,items:upd}); toast(t.n3); } catch(e) { hErr(e); }
   };
 
   const delOrder = async (oId) => {
+    if (!can("deleteOrder")) return;
     if (!window.confirm(t.delConfirm)) return;
     try {
       await deleteDoc(doc(db,"orders",oId));
@@ -665,7 +657,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const setCo = async (oId,iIdx,coId) => {
-    if (!isOwner) return;
+    if (!isOwner&&!can("manageCompanies")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
@@ -693,7 +685,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     } catch(e) { hErr(e); }
   };
 
-  // ── POSITIONS ──────────────────────────────────────────────
   const addPosition = async () => {
     if (!newPosition.trim()) return;
     const positions=[...(localShop?.positions||[]),newPosition.trim()];
@@ -706,7 +697,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     catch(e) { hErr(e); }
   };
 
-  // ── PERMISSIONS ────────────────────────────────────────────
   const savePermissions = async (memberId, newPerms) => {
     try { await updateDoc(doc(db,"users",memberId),{permissions:newPerms}); toast(t.permSaved); }
     catch(e) { hErr(e); }
@@ -748,108 +738,146 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         ["settings",t.tabSettings],
       ];
 
-  // ── ORDER STATUS FLOW ──
+  // ── ORDER STATUS FLOW (overall) ──
   const setOrderStatus = async (oId, newStatus) => {
-    if (!isOwner) return;
+    if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    const updatable = new Set(["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
-    const items = updatable.has(newStatus)
+    const updatable = new Set(["order_confirmed","ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
+    const newItems = updatable.has(newStatus)
       ? order.items.map(it => (it.status==="out_of_stock"||it.status==="delivered"||it.status==="cancelled") ? it : { ...it, status:newStatus })
       : order.items;
-    try { await updateDoc(doc(db,"orders",oId),{overall:newStatus,items}); }
+    try { await updateDoc(doc(db,"orders",oId),{overall:newStatus,items:newItems}); }
     catch(e) { hErr(e); }
   };
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
-  // ── RENDER ORDER ITEMS (expanded detail) ──────────────────
-  const renderOrderItems = (order) => (
-    <>
-      {order.items.map((it,iIdx)=>(
-        <div key={iIdx} style={s.oiCard}>
-          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:6 }}>
-            {iIdx+1}. {it.name}
-            {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>📋 {it.code}</span>}
-            {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
-            <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
-          </div>
-          {isOwner&&(
-            <div style={s.row}>
-              <select style={s.sel} value={it.co||""} onChange={e=>setCo(order.id,iIdx,e.target.value)}>
-                <option value="">{t.selectCo}</option>
-                {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              {it.co&&cos.find(c=>c.id===it.co)?.phone&&(
-                <a href={waLink(cos.find(c=>c.id===it.co).phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
+  // ── RENDER ORDER ITEMS (expanded detail view) ──
+  const renderOrderItems = (order) => {
+    const showItemControls = isOwner || can("manageCompanies") || can("setPrices") || can("setStatus");
+    return (
+      <>
+        {order.items.map((it,iIdx)=>{
+          const selectedCo = cos.find(c=>c.id===it.co);
+          return (
+            <div key={iIdx} style={s.oiCard}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:6 }}>
+                {iIdx+1}. {it.name}
+                {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>📋 {it.code}</span>}
+                {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
+                <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
+              </div>
+
+              {/* কোম্পানি select + WhatsApp */}
+              {(isOwner||can("manageCompanies"))&&(
+                <div style={s.row}>
+                  <select style={s.sel} value={it.co||""} onChange={e=>setCo(order.id,iIdx,e.target.value)}>
+                    <option value="">{t.selectCo}</option>
+                    {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                  {selectedCo&&selectedCo.phone&&(
+                    <a href={waLink(selectedCo.phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
+                  )}
+                </div>
+              )}
+
+              {/* দাম সেভ */}
+              {(isOwner||can("setPrices"))&&(
+                <div style={s.row}>
+                  <input style={s.inp} placeholder={t.price} inputMode="numeric"
+                    value={prices[`${order.id}-${iIdx}`]??it.price??""}
+                    onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
+                  <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
+                </div>
+              )}
+
+              {/* Item-level status (Confirmed / No Stock / Recheck) */}
+              {(isOwner||can("setStatus"))&&(
+                <div style={s.sRow}>
+                  <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
+                    onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
+                  <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
+                    onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
+                  {it.status==="out_of_stock"&&(
+                    <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
+                      onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
+                      {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Salesman / authorized: Mark Delivered for items in out_for_branch */}
+              {(isSalesman&&order.createdBy===user.uid&&it.status==="out_for_branch")&&(
+                <div style={{ marginTop:8 }}>
+                  <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
+                </div>
+              )}
+              {(isSalesman&&can("markDelivery")&&order.createdBy!==user.uid&&it.status==="out_for_branch")&&(
+                <div style={{ marginTop:8 }}>
+                  <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
+                </div>
               )}
             </div>
-          )}
-          {isOwner&&(
-            <div style={s.row}>
-              <input style={s.inp} placeholder={t.price} inputMode="numeric"
-                value={prices[`${order.id}-${iIdx}`]??it.price??""} 
-                onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
-              <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
+          );
+        })}
+
+        {/* OWNER STATUS FLOW BUTTONS */}
+        {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&order.overall!=="delivered"&&(
+          <div style={{ marginTop:10 }}>
+            <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
+              {lang==="bn"?"স্ট্যাটাস আপডেট করুন":"Update Status"}
             </div>
-          )}
-          {isOwner&&(
-            <div style={s.sRow}>
-              <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
-                onClick={()=>setStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
-              <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
-                onClick={()=>setStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
-              {it.status==="out_of_stock"&&(
-                <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
-                  onClick={()=>setStatus(order.id,iIdx,"order_confirmed")}>
-                  {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
-                </button>
-              )}
-            </div>
-          )}
-          {isSalesman&&order.createdBy===user.uid&&it.status==="out_for_branch"&&(
-            <div style={{ marginTop:8 }}>
-              <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
-            </div>
-          )}
-        </div>
-      ))}
-      <div style={{ marginTop:4 }}>
-        {isOwner&&order.overall!=="delivered"&&order.overall!=="cancelled"&&(
-          <>
+
             {order.overall==="pending"&&(
-              <button style={{ ...s.flowBtn, background:"#1d4ed8", color:"#fff" }}
+              <button style={{ ...s.flowBtn, background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" }}
+                onClick={()=>setOrderStatus(order.id,"order_confirmed")}>
+                ✅ {lang==="bn"?"অর্ডার গ্রহণ করুন":"Confirm Order"}
+              </button>
+            )}
+            {order.overall==="order_confirmed"&&(
+              <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
                 onClick={()=>setOrderStatus(order.id,"ordered_supplier")}>
-                📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Mark: Ordered to Supplier"}
+                📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
               </button>
             )}
             {order.overall==="ordered_supplier"&&(
-              <button style={{ ...s.flowBtn, background:"#0e7490", color:"#fff" }}
+              <button style={{ ...s.flowBtn, background:"#431407", color:"#f97316", border:"1px solid #f97316" }}
                 onClick={()=>setOrderStatus(order.id,"waiting_delivery")}>
-                ⏳ {lang==="bn"?"মাল আসার অপেক্ষায়":"Mark: Waiting for Delivery"}
+                ⏳ {lang==="bn"?"মাল আসার অপেক্ষায়":"Waiting for Delivery"}
               </button>
             )}
             {order.overall==="waiting_delivery"&&(
-              <button style={{ ...s.flowBtn, background:"#7e22ce", color:"#fff" }}
+              <button style={{ ...s.flowBtn, background:"#2e1065", color:"#a855f7", border:"1px solid #a855f7" }}
                 onClick={()=>setOrderStatus(order.id,"arrived_main_shop")}>
-                🏪 {lang==="bn"?"মেইন শপে এসেছে":"Mark: Arrived at Main Shop"}
+                🏪 {lang==="bn"?"মেইন শপে এসেছে":"Arrived at Main Shop"}
               </button>
             )}
             {order.overall==="arrived_main_shop"&&(
-              <button style={{ ...s.flowBtn, background:"#0891b2", color:"#fff" }}
+              <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
                 onClick={()=>setOrderStatus(order.id,"out_for_branch")}>
-                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Mark: Out for Branch Delivery"}
+                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Out for Branch"}
               </button>
             )}
-          </>
+            {order.overall==="out_for_branch"&&(
+              <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
+                {lang==="bn"
+                  ? "⏳ সেলসম্যান মাল বুঝে পাওয়ার পর ডেলিভারি সম্পন্ন হবে"
+                  : "⏳ Waiting for salesman to confirm receipt"}
+              </div>
+            )}
+          </div>
         )}
+
+        {/* Delete order button */}
         {can("deleteOrder")&&(
           <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>🗑️ {t.delOrder}</button>
         )}
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
-  // ── ORDER CARD ─────────────────────────────────────────────
+  // ── ORDER CARD ──
   const OrderCard = ({ order, showSenderName }) => {
     const isMyOrder = order.createdBy === user.uid;
     const isCancelled = order.overall === "cancelled";
@@ -890,7 +918,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             <span style={{ fontSize:11, fontWeight:700, color:SC[it.status]?.color||SC[order.overall]?.color }}>{t.status[it.status]||t.status[order.overall]}</span>
           </div>
         ))}
-        {/* Cancel button — only order creator, only pending */}
         {canCancel&&(
           <button
             style={{ ...s.delOrderBtn, marginTop:8, borderColor:"#713f12", color:"#f59e0b" }}
@@ -1028,7 +1055,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         <div style={s.panel}>
           <div style={s.secTitle}>{t.settingsTitle}</div>
 
-          {/* Profile card */}
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.profileTitle}</div>
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
@@ -1043,7 +1069,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           </div>
 
-          {/* Shop info */}
           {localShop&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
@@ -1053,7 +1078,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           )}
 
-          {/* Invite code (owner only) */}
           {isOwner&&localShop?.inviteCode&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
               <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
@@ -1063,7 +1087,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           )}
 
-          {/* ── POSITIONS MANAGEMENT (owner only) ── */}
           {isOwner&&(
             <div style={s.card}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
@@ -1074,7 +1097,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </div>
               {showAddPos&&(
                 <div style={{ marginBottom:10 }}>
-                  {/* Preset list */}
                   <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>
                     {lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}
                   </div>
@@ -1106,13 +1128,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           )}
 
-          {/* ── TEAM MEMBERS + PERMISSIONS (owner sees toggles) ── */}
           {team.length>0&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
               {team.map((m,idx)=>(
                 <div key={m.id} style={{ padding:"10px 0", borderTop:idx>0?"1px solid #27272a":"none" }}>
-                  {/* member header */}
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&m.uid!==user.uid?10:0 }}>
                     <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
                       {m.role==="owner"?"🏢":"👨‍💼"}
@@ -1128,10 +1148,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     </div>
                   </div>
 
-                  {/* permission toggles — owner only, non-owner members only */}
                   {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
                     <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
-                      {/* Position change */}
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                         <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>
                           {t.positionLbl}
@@ -1171,7 +1189,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           )}
 
-          {/* Language */}
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.languageLbl}</div>
             <div style={s.langSw}>
@@ -1180,7 +1197,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           </div>
 
-          {/* Sync status */}
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.syncStatus}</div>
             <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
@@ -1298,6 +1314,74 @@ export default function App() {
 
 // ─── STYLES ──────────────────────────────────────────────────
 const s = {
-  root:    { minHeight:"100vh", background:"#09090b", color:"#e4e4e7", fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:   { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.5)" },
-  hdr:     { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid #27272a
+  root:        { minHeight:"100vh", background:"#09090b", color:"#e4e4e7", fontFamily:"'Segoe UI', system-ui, sans-serif" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.5)" },
+  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid #27272a", background:"#18181b", position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
+  hLeft:       { display:"flex", alignItems:"center", gap:10 },
+  title:       { fontSize:14, fontWeight:800, color:"#f97316", lineHeight:1.1 },
+  sub:         { fontSize:10, color:"#71717a" },
+  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:"1px solid #3f3f46" },
+  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:700 },
+  lBtnA:       { background:"#f97316", color:"#fff" },
+  tabs:        { display:"flex", gap:5 },
+  tab:         { padding:"7px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
+  tabA:        { background:"#f97316", color:"#fff", border:"1px solid #f97316" },
+  badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
+  panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
+  secTitle:    { fontSize:14, fontWeight:700, color:"#f97316", marginBottom:10 },
+  card:        { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:14, marginBottom:10 },
+  itemBlock:   { background:"#0f0f12", border:"1px solid #27272a", borderRadius:10, padding:10, marginBottom:10 },
+  itemHead:    { display:"flex", alignItems:"center", gap:8 },
+  iNum:        { width:22, height:22, borderRadius:"50%", background:"#27272a", color:"#f97316", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
+  inp:         { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
+  rmBtn:       { padding:"7px 9px", borderRadius:8, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, flexShrink:0 },
+  addBtn:      { width:"100%", padding:"8px", borderRadius:8, border:"1px dashed #3f3f46", background:"transparent", color:"#71717a", cursor:"pointer", fontSize:12, marginBottom:8 },
+  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
+  sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
+  oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
+  oId:         { fontSize:14, fontWeight:800, color:"#f4f4f5" },
+  sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
+  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:"1px solid #27272a", flexWrap:"wrap" },
+  iName:       { fontSize:13, color:"#d4d4d8", fontWeight:600 },
+  iMeta:       { fontSize:10, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
+  iQty:        { fontSize:12, color:"#71717a" },
+  iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
+  empty:       { textAlign:"center", padding:"50px 20px", color:"#52525b", fontSize:14 },
+  nBadge:      { fontSize:10, background:"#451a03", color:"#f97316", padding:"2px 7px", borderRadius:10, fontWeight:700 },
+  div:         { height:1, background:"#27272a", margin:"10px 0" },
+  oiCard:      { background:"#09090b", borderRadius:10, padding:12, marginBottom:8, border:"1px solid #27272a" },
+  row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
+  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#e4e4e7", fontSize:14, outline:"none", fontFamily:"inherit" },
+  waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
+  savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
+  sRow:        { display:"flex", gap:7, marginBottom:7 },
+  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#a1a1aa", fontSize:12, fontWeight:700, cursor:"pointer" },
+  stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
+  stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
+  delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
+  delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
+  flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
+  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:"1px solid #f97316", background:"transparent", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700 },
+  coIcon:      { width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
+  edBtn:       { padding:"6px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#27272a", color:"#e4e4e7", cursor:"pointer", fontSize:13 },
+  dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
+  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
+  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
+  authIcon:    { fontSize:48, marginBottom:8 },
+  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
+  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
+  authTitle:   { fontSize:24, fontWeight:800, color:"#f97316", marginBottom:6 },
+  authSub:     { fontSize:13, color:"#a1a1aa", marginBottom:20 },
+  authCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:16, textAlign:"left" },
+  authFooter:  { fontSize:12, color:"#a1a1aa", marginTop:16 },
+  linkBtn:     { background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
+  linkBtnInline:{ background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
+  roleCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:14, padding:"22px 18px", cursor:"pointer", color:"#e4e4e7", textAlign:"left", fontFamily:"inherit", transition:"border-color 0.2s" },
+  roleEmoji:   { fontSize:38, marginBottom:8 },
+  roleName:    { fontSize:16, fontWeight:700, color:"#f4f4f5", marginBottom:4 },
+  roleDesc:    { fontSize:12, color:"#a1a1aa" },
+  settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
+  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
+};
