@@ -13,6 +13,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   onSnapshot,
   addDoc,
   updateDoc,
@@ -234,7 +235,7 @@ const SC = {
 };
 
 const LANG_KEY = "sparetrack-lang";
-const ORDER_PREFIX = "S4";
+const ORDER_PREFIX = "S4-";
 const loadLang = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
 const newItem  = () => ({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name:"", code:"", brand:"", qty:"", unit:"Pcs" });
@@ -583,6 +584,15 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const addIt = () => setItems(p=>[...p,newItem()]);
   const delIt = (id) => setItems(p=>p.filter(it=>it.id!==id));
   const updIt = (id,f,v) => setItems(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
+  const handleEnterNextField = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const block = e.currentTarget.closest('[data-item-block="1"]');
+    if (!block) return;
+    const fields = block.querySelectorAll("input, select, textarea");
+    const idx = Array.from(fields).indexOf(e.currentTarget);
+    if (idx >= 0 && idx < fields.length - 1) fields[idx + 1].focus();
+  };
 
   const sendOrder = async () => {
     const valid = items.filter(it=>it.name.trim());
@@ -602,9 +612,22 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
       } catch (serialErr) {
         // Fallback: if shop counter update is blocked by Firestore rules,
-        // still allow order creation with a readable unique number.
+        // still allow order creation with sequential order number.
         console.warn("Serial transaction failed, using fallback order number", serialErr);
-        orderNo = `${ORDER_PREFIX}${String(Date.now()).slice(-6)}`;
+        const recentSnap = await getDocs(query(
+          collection(db, "orders"),
+          where("shopId", "==", shopId),
+          orderBy("createdAt", "desc"),
+          limit(25),
+        ));
+        const maxSerial = recentSnap.docs.reduce((mx, d) => {
+          const data = d.data() || {};
+          if (Number.isFinite(data.serialNo)) return Math.max(mx, data.serialNo);
+          const m = String(data.orderNo || "").match(/^S4-?(\d+)$/);
+          return m ? Math.max(mx, Number(m[1])) : mx;
+        }, 0);
+        serialNo = maxSerial + 1;
+        orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
       }
       await addDoc(collection(db,"orders"),{
         shopId, createdBy:user.uid, createdByName:profile.personName,
@@ -810,10 +833,13 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
               {/* দাম সেভ */}
               {(isOwner||can("setPrices"))&&(
-                <div style={s.row}>
+                <div style={s.row} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
                   <input style={s.inp} placeholder={t.price} inputMode="numeric"
                     disabled={["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)}
                     value={prices[`${order.id}-${iIdx}`]??it.price??""}
+                    onClick={e=>e.stopPropagation()}
+                    onFocus={e=>e.stopPropagation()}
+                    onMouseDown={e=>e.stopPropagation()}
                     onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
                   {!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
                     <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
@@ -990,17 +1016,46 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <div style={s.secTitle}>{t.newOrder}</div>
               <div style={s.card}>
                 {items.map((item,i)=>(
-                  <div key={item.id} style={s.itemBlock}>
+                  <div key={item.id} style={s.itemBlock} data-item-block="1">
                     <div style={s.itemHead}>
                       <div style={s.iNum}>{i+1}</div>
-                      <input style={{ ...s.inp, flex:1 }} placeholder={t.itemName} value={item.name} onChange={e=>updIt(item.id,"name",e.target.value)} />
+                      <input
+                        style={{ ...s.inp, flex:1 }}
+                        placeholder={t.itemName}
+                        value={item.name}
+                        onChange={e=>updIt(item.id,"name",e.target.value)}
+                        onKeyDown={handleEnterNextField}
+                      />
                       {items.length>1&&<button style={s.rmBtn} onClick={()=>delIt(item.id)}>✕</button>}
                     </div>
-                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.code} value={item.code} onChange={e=>updIt(item.id,"code",e.target.value)} />
-                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.brand} value={item.brand} onChange={e=>updIt(item.id,"brand",e.target.value)} />
+                    <input
+                      style={{ ...s.inp, marginTop:6 }}
+                      placeholder={t.code}
+                      value={item.code}
+                      onChange={e=>updIt(item.id,"code",e.target.value)}
+                      onKeyDown={handleEnterNextField}
+                    />
+                    <input
+                      style={{ ...s.inp, marginTop:6 }}
+                      placeholder={t.brand}
+                      value={item.brand}
+                      onChange={e=>updIt(item.id,"brand",e.target.value)}
+                      onKeyDown={handleEnterNextField}
+                    />
                     <div style={{ display:"flex", gap:7, marginTop:6 }}>
-                      <input style={{ ...s.inp, flex:2 }} placeholder={t.qty} inputMode="numeric" value={item.qty} onChange={e=>updIt(item.id,"qty",e.target.value)} />
-                      <select style={{ ...s.sel, flex:1 }} value={item.unit} onChange={e=>updIt(item.id,"unit",e.target.value)}>
+                      <input
+                        style={{ ...s.inp, flex:2 }}
+                        placeholder={t.qty}
+                        inputMode="numeric"
+                        value={item.qty}
+                        onChange={e=>updIt(item.id,"qty",e.target.value)}
+                        onKeyDown={handleEnterNextField}
+                      />
+                      <select
+                        style={{ ...s.sel, flex:1 }}
+                        value={item.unit}
+                        onChange={e=>updIt(item.id,"unit",e.target.value)}
+                        onKeyDown={handleEnterNextField}>
                         <option value="Pcs">{t.unitPcs}</option>
                         <option value="Set">{t.unitSet}</option>
                       </select>
