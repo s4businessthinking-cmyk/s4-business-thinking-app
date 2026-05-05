@@ -769,7 +769,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     catch { toast("Copy failed","err"); }
   };
 
-  const unread = orders.filter(o=>o.overall==="pending"&&!o.read).length;
+  const unread = isOwner || isOrderManager
+    ? orders.filter(o=>o.overall==="pending"&&!o.read).length
+    : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
 
   const visibleTabs = isOwner
     ? [["owner",t.tabOwner],["companies",t.tabCompany],["settings",t.tabSettings]]
@@ -825,7 +827,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     <option value="">{t.selectCo}</option>
                     {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  {selectedCo&&selectedCo.phone&&(
+                  {selectedCo&&selectedCo.phone&&!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
                     <a href={waLink(selectedCo.phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
                   )}
                 </div>
@@ -833,13 +835,20 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
               {/* দাম সেভ */}
               {(isOwner||can("setPrices"))&&(
-                <div style={s.row} onClick={e=>e.stopPropagation()} onMouseDown={e=>e.stopPropagation()}>
+                <div
+                  style={s.row}
+                  onClick={e=>e.stopPropagation()}
+                  onMouseDown={e=>e.stopPropagation()}
+                  onPointerDown={e=>e.stopPropagation()}
+                  onTouchStart={e=>e.stopPropagation()}>
                   <input style={s.inp} placeholder={t.price} inputMode="numeric"
                     disabled={["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)}
                     value={prices[`${order.id}-${iIdx}`]??it.price??""}
                     onClick={e=>e.stopPropagation()}
                     onFocus={e=>e.stopPropagation()}
                     onMouseDown={e=>e.stopPropagation()}
+                    onPointerDown={e=>e.stopPropagation()}
+                    onTouchStart={e=>e.stopPropagation()}
                     onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
                   {!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
                     <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
@@ -950,6 +959,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
             <span style={s.oId}>Order #{getOrderDisplayNo(order)}</span>
             {!order.read&&(isOwner||isOrderManager)&&<span style={s.nBadge}>{t.newTag}</span>}
+            {isSalesman&&order.items?.some(it=>it.status==="out_for_branch")&&<span style={s.nBadge}>{t.newTag}</span>}
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
             <span style={{ color:"#6b7280", fontSize:11 }}>{order.createdAt.toLocaleTimeString()}</span>
@@ -986,7 +996,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
           </button>
         )}
         {selOrder===order.id&&canExpandThis&&(
-          <div onClick={e=>e.stopPropagation()} style={{ cursor:"default" }}>
+          <div
+            onClick={e=>e.stopPropagation()}
+            onMouseDown={e=>e.stopPropagation()}
+            onPointerDown={e=>e.stopPropagation()}
+            onTouchStart={e=>e.stopPropagation()}
+            style={{ cursor:"default" }}>
             <div style={s.div} />
             {renderOrderItems(order)}
           </div>
