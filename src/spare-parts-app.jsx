@@ -20,6 +20,7 @@ import {
   setDoc,
   getDoc,
   getDocs,
+  runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
 import {
@@ -235,6 +236,7 @@ const SC = {
 };
 
 const LANG_KEY = "sparetrack-lang";
+const ORDER_PREFIX = "S4";
 const loadLang = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
 const newItem  = () => ({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name:"", code:"", brand:"", qty:"", unit:"Pcs" });
@@ -518,6 +520,7 @@ function PermToggle({ isOn, onToggle }) {
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const isOwner = profile.role==="owner";
+  const isSalesman = !isOwner;
   const shopId  = profile.shopId;
   const perms   = profile.permissions||DEFAULT_PERMISSIONS;
   const can     = (key) => isOwner||perms[key]===true;
@@ -591,8 +594,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     const valid = items.filter(it=>it.name.trim());
     if (!valid.length) return toast(t.e1,"err");
     try {
+      const serialNo = await runTransaction(db, async (tx) => {
+        const shopRef = doc(db, "shops", shopId);
+        const shopSnap = await tx.get(shopRef);
+        const current = Number(shopSnap.data()?.lastOrderSerial || 0);
+        const next = current + 1;
+        tx.update(shopRef, { lastOrderSerial: next });
+        return next;
+      });
+      const orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
       await addDoc(collection(db,"orders"),{
         shopId, createdBy:user.uid, createdByName:profile.personName,
+        serialNo, orderNo,
         items:valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
         note:note||"", createdAt:serverTimestamp(), overall:"pending", read:false,
       });
@@ -601,6 +614,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const savePrice = async (oId,iIdx) => {
+    if (!isOwner) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const p = prices[`${oId}-${iIdx}`]??"";
     const upd = order.items.map((it,x)=>x===iIdx?{...it,price:p}:it);
@@ -608,6 +622,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const setStatus = async (oId,iIdx,status) => {
+    if (!isOwner) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
     const allNoStock = upd.every(it=>it.status==="out_of_stock");
@@ -616,10 +631,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     try { await updateDoc(doc(db,"orders",oId),{items:upd,overall}); } catch(e) { hErr(e); }
   };
 
-  const deliver = async (oId) => {
+  const deliverItem = async (oId,iIdx) => {
+    if (!isSalesman) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    const upd = order.items.map(it=>({...it,status:it.status==="out_of_stock"?"out_of_stock":"delivered"}));
-    try { await updateDoc(doc(db,"orders",oId),{overall:"delivered",items:upd}); toast(t.n3); } catch(e) { hErr(e); }
+    if (order.createdBy!==user.uid) return;
+    const target = order.items[iIdx];
+    if (!target || target.status!=="out_for_branch") return;
+
+    const upd = order.items.map((it,x)=>x===iIdx?{...it,status:"delivered"}:it);
+    const nonOut = upd.filter(it=>it.status!=="out_of_stock");
+    const allDelivered = nonOut.length>0 && nonOut.every(it=>it.status==="delivered");
+    const overall = allDelivered?"delivered":order.overall;
+    try { await updateDoc(doc(db,"orders",oId),{overall,items:upd}); toast(t.n3); } catch(e) { hErr(e); }
   };
 
   const delOrder = async (oId) => {
@@ -642,6 +665,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const setCo = async (oId,iIdx,coId) => {
+    if (!isOwner) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
@@ -689,12 +713,17 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const shortId  = (id) => id.slice(-6).toUpperCase();
+  const getOrderDisplayNo = (order) => {
+    if (order.orderNo) return order.orderNo;
+    if (Number.isFinite(order.serialNo)) return `${ORDER_PREFIX}${String(order.serialNo).padStart(4, "0")}`;
+    return shortId(order.id);
+  };
   const waLink   = (phone,order,item) => {
     const codeLine  = item.code  ? (lang==="bn"?`কোড/মডেল: ${item.code}\n`:`Code/Model: ${item.code}\n`) : "";
     const brandLine = item.brand ? (lang==="bn"?`ব্র্যান্ড: ${item.brand}\n`:`Brand: ${item.brand}\n`) : "";
     const txt = encodeURIComponent(lang==="bn"
-      ? `🔧 PO #${shortId(order.id)}\n\nআইটেম: ${item.name}\n${codeLine}${brandLine}পরিমাণ: ${item.qty} ${item.unit}\n\nদয়া করে দাম ও স্টক জানান।`
-      : `🔧 PO #${shortId(order.id)}\n\nItem: ${item.name}\n${codeLine}${brandLine}Qty: ${item.qty} ${item.unit}\n\nPlease share price and stock availability.`
+      ? `🔧 PO #${getOrderDisplayNo(order)}\n\nআইটেম: ${item.name}\n${codeLine}${brandLine}পরিমাণ: ${item.qty} ${item.unit}\n\nদয়া করে দাম ও স্টক জানান।`
+      : `🔧 PO #${getOrderDisplayNo(order)}\n\nItem: ${item.name}\n${codeLine}${brandLine}Qty: ${item.qty} ${item.unit}\n\nPlease share price and stock availability.`
     );
     return `https://wa.me/${phone}?text=${txt}`;
   };
@@ -721,7 +750,13 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
   // ── ORDER STATUS FLOW ──
   const setOrderStatus = async (oId, newStatus) => {
-    try { await updateDoc(doc(db,"orders",oId),{overall:newStatus}); }
+    if (!isOwner) return;
+    const order = orders.find(o=>o.id===oId); if (!order) return;
+    const updatable = new Set(["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
+    const items = updatable.has(newStatus)
+      ? order.items.map(it => (it.status==="out_of_stock"||it.status==="delivered"||it.status==="cancelled") ? it : { ...it, status:newStatus })
+      : order.items;
+    try { await updateDoc(doc(db,"orders",oId),{overall:newStatus,items}); }
     catch(e) { hErr(e); }
   };
 
@@ -738,7 +773,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
             <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
           </div>
-          {(isOwner||can("manageCompanies"))&&(
+          {isOwner&&(
             <div style={s.row}>
               <select style={s.sel} value={it.co||""} onChange={e=>setCo(order.id,iIdx,e.target.value)}>
                 <option value="">{t.selectCo}</option>
@@ -749,7 +784,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               )}
             </div>
           )}
-          {can("setPrices")&&(
+          {isOwner&&(
             <div style={s.row}>
               <input style={s.inp} placeholder={t.price} inputMode="numeric"
                 value={prices[`${order.id}-${iIdx}`]??it.price??""} 
@@ -757,20 +792,28 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
             </div>
           )}
-          {can("setStatus")&&(
+          {isOwner&&(
             <div style={s.sRow}>
               <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
                 onClick={()=>setStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
               <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
                 onClick={()=>setStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
+              {it.status==="out_of_stock"&&(
+                <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
+                  onClick={()=>setStatus(order.id,iIdx,"order_confirmed")}>
+                  {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
+                </button>
+              )}
+            </div>
+          )}
+          {isSalesman&&order.createdBy===user.uid&&it.status==="out_for_branch"&&(
+            <div style={{ marginTop:8 }}>
+              <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
             </div>
           )}
         </div>
       ))}
       <div style={{ marginTop:4 }}>
-        {can("markDelivery")&&order.overall!=="delivered"&&order.overall!=="cancelled"&&(
-          <button style={{ ...s.delBtn, marginBottom:7 }} onClick={()=>deliver(order.id)}>🚚 {t.deliver}</button>
-        )}
         {isOwner&&order.overall!=="delivered"&&order.overall!=="cancelled"&&(
           <>
             {order.overall==="pending"&&(
@@ -817,7 +860,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         onClick={() => { if (!canExpandThis) return; markRead(order.id); setSelOrder(selOrder===order.id?null:order.id); }}>
         <div style={s.oHdr}>
           <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-            <span style={s.oId}>Order #{shortId(order.id)}</span>
+            <span style={s.oId}>Order #{getOrderDisplayNo(order)}</span>
             {!order.read&&(isOwner||isOrderManager)&&<span style={s.nBadge}>{t.newTag}</span>}
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
@@ -1257,72 +1300,4 @@ export default function App() {
 const s = {
   root:    { minHeight:"100vh", background:"#09090b", color:"#e4e4e7", fontFamily:"'Segoe UI', system-ui, sans-serif" },
   notif:   { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.5)" },
-  hdr:     { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid #27272a", background:"#18181b", position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
-  hLeft:   { display:"flex", alignItems:"center", gap:10 },
-  title:   { fontSize:14, fontWeight:800, color:"#f97316", lineHeight:1.1 },
-  sub:     { fontSize:10, color:"#71717a" },
-  langSw:  { display:"flex", borderRadius:8, overflow:"hidden", border:"1px solid #3f3f46" },
-  lBtn:    { padding:"6px 12px", border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:700 },
-  lBtnA:   { background:"#f97316", color:"#fff" },
-  tabs:    { display:"flex", gap:5 },
-  tab:     { padding:"7px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
-  tabA:    { background:"#f97316", color:"#fff", border:"1px solid #f97316" },
-  badge:   { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
-  panel:   { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
-  secTitle:{ fontSize:14, fontWeight:700, color:"#f97316", marginBottom:10 },
-  card:    { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:14, marginBottom:10 },
-  itemBlock:{ background:"#0f0f12", border:"1px solid #27272a", borderRadius:10, padding:10, marginBottom:10 },
-  itemHead:{ display:"flex", alignItems:"center", gap:8 },
-  iNum:    { width:22, height:22, borderRadius:"50%", background:"#27272a", color:"#f97316", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
-  inp:     { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
-  rmBtn:   { padding:"7px 9px", borderRadius:8, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, flexShrink:0 },
-  addBtn:  { width:"100%", padding:"8px", borderRadius:8, border:"1px dashed #3f3f46", background:"transparent", color:"#71717a", cursor:"pointer", fontSize:12, marginBottom:8 },
-  ta:      { width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
-  sendBtn: { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
-  oHdr:    { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
-  oId:     { fontSize:14, fontWeight:800, color:"#f4f4f5" },
-  sBadge:  { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
-  iSum:    { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:"1px solid #27272a", flexWrap:"wrap" },
-  iName:   { fontSize:13, color:"#d4d4d8", fontWeight:600 },
-  iMeta:   { fontSize:10, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
-  iQty:    { fontSize:12, color:"#71717a" },
-  iPrice:  { fontSize:13, fontWeight:700, color:"#22c55e" },
-  empty:   { textAlign:"center", padding:"50px 20px", color:"#52525b", fontSize:14 },
-  nBadge:  { fontSize:10, background:"#451a03", color:"#f97316", padding:"2px 7px", borderRadius:10, fontWeight:700 },
-  div:     { height:1, background:"#27272a", margin:"10px 0" },
-  oiCard:  { background:"#09090b", borderRadius:10, padding:12, marginBottom:8, border:"1px solid #27272a" },
-  row:     { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
-  sel:     { flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#e4e4e7", fontSize:14, outline:"none", fontFamily:"inherit" },
-  waBtn:   { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
-  savBtn:  { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
-  sRow:    { display:"flex", gap:7 },
-  stBtn:   { flex:1, padding:"10px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#a1a1aa", fontSize:12, fontWeight:700, cursor:"pointer" },
-  stBtnC:  { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
-  stBtnN:  { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
-  delBtn:  { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#4f46e5,#7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
-  delOrderBtn:{ width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
-  flowBtn:    { width:"100%", padding:"11px", borderRadius:10, border:"none", fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:7, display:"block" },
-  addCoBtn:{ padding:"7px 14px", borderRadius:8, border:"1px solid #f97316", background:"transparent", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700 },
-  coIcon:  { width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
-  edBtn:   { padding:"6px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#27272a", color:"#e4e4e7", cursor:"pointer", fontSize:13 },
-  dlBtn:   { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
-  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
-  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
-  authIcon:    { fontSize:48, marginBottom:8 },
-  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
-  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
-  authTitle:   { fontSize:24, fontWeight:800, color:"#f97316", marginBottom:6 },
-  authSub:     { fontSize:13, color:"#a1a1aa", marginBottom:20 },
-  authCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:16, textAlign:"left" },
-  authFooter:  { fontSize:12, color:"#a1a1aa", marginTop:16 },
-  linkBtn:     { background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
-  linkBtnInline:{ background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
-  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
-  roleCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:14, padding:"22px 18px", cursor:"pointer", color:"#e4e4e7", textAlign:"left", fontFamily:"inherit" },
-  roleEmoji:   { fontSize:38, marginBottom:8 },
-  roleName:    { fontSize:16, fontWeight:700, color:"#f4f4f5", marginBottom:4 },
-  roleDesc:    { fontSize:12, color:"#a1a1aa" },
-  settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
-  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
-};
+  hdr:     { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid #27272a
