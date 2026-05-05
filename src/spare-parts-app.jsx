@@ -882,9 +882,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
         {/* Delete Order Button */}
             <button style={{...s.flowBtn, marginTop: 15, background: "#450a0a", color: "#ef4444", border: "1px solid #ef4444" }} 
-              onClick={() => delOrder(order.id)}>
-              🗑️ {t.delOrder}
-            </button>
+              onClick={() => delOrder(order.id)}>🗑️ {t.delOrder}</button>
           </div>
         )}
       </div>
