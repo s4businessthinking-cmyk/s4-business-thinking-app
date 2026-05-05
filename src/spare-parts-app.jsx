@@ -719,128 +719,111 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         ["settings",t.tabSettings],
       ];
 
-  // ── ORDER STATUS FLOW (owner controls steps 1-4, salesman controls step 5) ──
-  const setOrderStatus = async (oId, newStatus) => {
-    try { await updateDoc(doc(db,"orders",oId),{ overall: newStatus }); }
-    catch(e) { hErr(e); }
-  };
+  // ── ORDER STATUS FLOW ──
+const setOrderStatus = async (oId, newStatus) => {
+  try {
+    await updateDoc(doc(db, "orders", oId), { overall: newStatus });
+  } catch (e) {
+    hErr(e);
+  }
+};
 
-  const renderOrderItems = (order) => {
+const OrderCard = ({ order }) => {
   const st = order.overall;
   const isSalesmanOrder = order.createdBy === user.uid;
+  const isCancelled = st === "cancelled";
+  const canExpandThis = !isCancelled && (isOwner || isOrderManager || can("deleteOrder"));
 
   return (
-    <div>
-      {/* Item list */}
-      {order.items.map((item, idx) => {
-        const selectedCo = cos.find(c => c.id === item.co);
-        const showCoOptions = isOwner || can("manageCompanies") || can("setPrices");
-        const itemKey = `${order.id}-${idx}`;
+    <div
+      style={{
+        ...s.card,
+        cursor: canExpandThis ? "pointer" : "default",
+        opacity: isCancelled ? 0.6 : 1
+      }}
+      onClick={() => {
+        if (!canExpandThis) return;
+        markRead(order.id);
+        setSelOrder(selOrder === order.id ? null : order.id);
+      }}
+    >
+      {/* ── HEADER ── */}
+      <div style={s.oHdr}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span style={s.oId}>Order #{shortId(order.id)}</span>
+          {!order.read && (isOwner || isOrderManager) && (
+            <span style={s.nBadge}>{t.newTag}</span>
+          )}
+        </div>
 
-        return (
-          <div key={idx} style={s.oiCard}>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#f4f4f5" }}>{item.name}</span>
-              <span style={{ fontSize: 13, color: "#f97316", fontWeight: 700 }}>{item.qty} {item.unit}</span>
-            </div>
+        <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+          <span style={{ color: "#6b7280", fontSize: 11 }}>
+            {order.createdAt.toLocaleTimeString()}
+          </span>
+          <span
+            style={{
+              ...s.sBadge,
+              color: SC[st]?.color || "#71717a",
+              background: SC[st]?.bg || "#18181b"
+            }}
+          >
+            {t.status[st]}
+          </span>
+        </div>
+      </div>
 
-            {(item.code || item.brand) && (
-              <div style={{ fontSize: 11, color: "#a1a1aa", marginTop: 4, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                {item.code && <span>📋 {item.code}</span>}
-                {item.brand && <span>🏷️ {item.brand}</span>}
-              </div>
-            )}
+      {/* ── SUMMARY ── */}
+      <div style={{ fontSize: 12, color: "#71717a" }}>
+        {order.items.length} {t.items}
+        {order.createdByName && ` · 👨‍💼 ${order.createdByName}`}
+        {order.note && ` · ${order.note}`}
+      </div>
 
-            {showCoOptions && (
-              <div style={{ marginTop: 8 }}>
-                <div style={s.row}>
-                  <select
-                    style={{ ...s.sel, flex: 1 }}
-                    value={item.co || ""}
-                    onChange={e => setCo(order.id, idx, e.target.value)}
-                  >
-                    <option value="">{t.selectCo}</option>
-                    {cos.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+      {order.items.map((it, x) => (
+        <div key={x} style={s.iSum}>
+          <div style={{ flex: 1, minWidth: 120 }}>
+            <div style={s.iName}>{it.name}</div>
 
-                  {selectedCo && selectedCo.phone && (
-                    <a
-                      href={waLink(selectedCo.phone, order, item)}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={s.waBtn}
-                    >
-                      💬 WhatsApp
-                    </a>
-                  )}
-                </div>
-
-                {can("setPrices") && (
-                  <div style={{ ...s.row, marginTop: 6 }}>
-                    <input
-                      style={{ ...s.inp, flex: 1 }}
-                      placeholder={t.price}
-                      value={prices[itemKey] ?? item.price ?? ""}
-                      onChange={e => setPrices(p => ({ ...p, [itemKey]: e.target.value }))}
-                    />
-                    <button style={s.savBtn} onClick={() => savePrice(order.id, idx)}>
-                      {t.save}
-                    </button>
-                  </div>
-                )}
+            {(it.code || it.brand) && (
+              <div style={s.iMeta}>
+                {it.code && <span>📋 {it.code}</span>}
+                {it.code && it.brand && <span> · </span>}
+                {it.brand && <span>🏷️ {it.brand}</span>}
               </div>
             )}
           </div>
-        );
-      })}
 
-      {/* OWNER FLOW */}
-      {isOwner && st !== "cancelled" && st !== "delivered" && (
-        <div style={{ marginTop: 10 }}>
-          {/* ... (তোমার সব status buttons unchanged থাকবে) */}
+          <span style={s.iQty}>{it.qty} {it.unit}</span>
+
+          {it.price && (
+            <span style={s.iPrice}>
+              {t.cur} {it.price}
+            </span>
+          )}
+
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: SC[it.status]?.color || SC[st]?.color
+            }}
+          >
+            {t.status[it.status] || t.status[st]}
+          </span>
+        </div>
+      ))}
+
+      {/* 🔥 EXPAND DETAILS */}
+      {selOrder === order.id && (
+        <div>
+          {renderOrderItems(order)}
         </div>
       )}
-
-      {/* SALESMAN */}
-      {!isOwner && isSalesmanOrder && st === "out_for_branch" && (
-        <button
-          style={{ ...s.delBtn, marginTop: 10 }}
-          onClick={async () => {
-            const updatedItems = order.items.map(it => ({ ...it, status: "delivered" }));
-            try {
-              await updateDoc(doc(db, "orders", order.id), {
-                overall: "delivered",
-                items: updatedItems
-              });
-            } catch (e) {
-              hErr(e);
-            }
-          }}
-        >
-          ✅ {lang === "bn" ? "মাল বুঝে পেয়েছি — ডেলিভারি সম্পন্ন" : "Received — Mark as Delivered"}
-        </button>
-      )}
-
-      {/* DELETE BUTTON */}
-      <button
-        style={{
-          ...s.flowBtn,
-          marginTop: 15,
-          background: "#450a0a",
-          color: "#ef4444",
-          border: "1px solid #ef4444"
-        }}
-        onClick={() => delOrder(order.id)}
-      >
-        🗑️ {t.delOrder}
-      </button>
     </div>
   );
 };
 
-  const canExpand = isOwner||isOrderManager||can("deleteOrder");
+const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
   // ── ORDER CARD ─────────────────────────────────────────────
   const OrderCard = ({ order, showSenderName }) => {
