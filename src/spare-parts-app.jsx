@@ -620,7 +620,10 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
   const addIt = () => setItems(p=>[...p,newItem()]);
   const delIt = (id) => setItems(p=>p.filter(it=>it.id!==id));
-  const updIt = (id,f,v) => setItems(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
+  const updIt = (id,f,v) => {
+    const val = (f==="name" && typeof v==="string" && v.length>0) ? (v.charAt(0).toUpperCase()+v.slice(1)) : v;
+    setItems(p=>p.map(it=>it.id===id?{...it,[f]:val}:it));
+  };
   const handleEnterNextField = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -717,15 +720,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (!target || target.status!=="out_for_branch") return;
 
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status:"delivered"}:it);
-    // Only mark overall as "delivered" if ALL non-cancelled items are delivered.
-    // Items with status "out_of_stock" are intentionally excluded — they must remain
-    // re-orderable and must NEVER cause the overall order to lock as delivered.
-    const activeItems = upd.filter(it=>it.status!=="cancelled");
-    const hasNoStock  = activeItems.some(it=>it.status==="out_of_stock");
+    // Active items = অর্ডারের যেগুলো এখনো process হচ্ছে।
+    // cancelled + out_of_stock উভয়ই বাদ — কারণ no_stock item পরে recheck হলে আবার flow এ আসবে।
+    // সব deliverable item delivered হলে overall = "delivered" হবে।
+    const activeItems = upd.filter(it=>it.status!=="cancelled" && it.status!=="out_of_stock");
     const allDelivered = activeItems.length>0 && activeItems.every(it=>it.status==="delivered");
-    // If no-stock items still exist, keep overall as "out_for_branch" so the order
-    // remains in an unlocked state that allows re-ordering those items.
-    const overall = allDelivered ? "delivered" : hasNoStock ? "out_for_branch" : order.overall;
+    const overall = allDelivered ? "delivered" : order.overall;
     try { await updateDoc(doc(db,"orders",oId),{overall,items:upd}); toast(t.n3); } catch(e) { hErr(e); }
   };
 
