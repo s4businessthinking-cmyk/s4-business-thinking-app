@@ -251,6 +251,41 @@ function useWindowWidth() {
   return width;
 }
 
+// ─── PRICE CELL (standalone — own state so typing never loses focus) ──
+// এই component MainApp-এর বাইরে থাকায় re-render হলেও remount হবে না।
+function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }) {
+  const [val, setVal] = useState(initialValue ?? "");
+  const prevRef = useRef(initialValue);
+  useEffect(() => {
+    // শুধু বাইরে থেকে value আসলে sync করবে (অন্য user update করলে)
+    if (prevRef.current !== initialValue) {
+      prevRef.current = initialValue;
+      setVal(initialValue ?? "");
+    }
+  }, [initialValue]);
+  const stop = (e) => e.stopPropagation();
+  return (
+    <div style={{ display:"flex", gap:7, marginBottom:7, alignItems:"center" }}
+      onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}>
+      <input
+        style={s.inp}
+        placeholder={placeholder}
+        inputMode="numeric"
+        disabled={disabled}
+        value={val}
+        onClick={stop}
+        onMouseDown={stop}
+        onPointerDown={stop}
+        onTouchStart={stop}
+        onChange={e => setVal(e.target.value)}
+      />
+      {!disabled && (
+        <button style={s.savBtn} onClick={() => onSave(val)}>{saveBtnLabel}</button>
+      )}
+    </div>
+  );
+}
+
 // ─── HEADER ──────────────────────────────────────────────────
 function Header({ t, lang, setLang, children, isDesktop }) {
   return (
@@ -546,13 +581,16 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [items,setItems]=useState([newItem()]);
   const [note,setNote]=useState("");
   const [selOrder,setSelOrder]=useState(null);
-  const [prices,setPrices]=useState({});
+  
 
   const [editId,setEditId]=useState(null);
   const [editNm,setEditNm]=useState(""); const [editPh,setEditPh]=useState("");
   const [newNm,setNewNm]=useState(""); const [newPh,setNewPh]=useState("");
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
+
+  const windowWidth = useWindowWidth();
+  const isDesktop = windowWidth >= 768;
 
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
@@ -650,14 +688,13 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     } catch(e) { hErr(e); }
   };
 
-  const savePrice = async (oId,iIdx) => {
+  const savePrice = async (oId, iIdx, directVal) => {
     if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
     if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
-    const p = prices[`${oId}-${iIdx}`]??"";
-    const upd = order.items.map((it,x)=>x===iIdx?{...it,price:p}:it);
+    const upd = order.items.map((it,x)=>x===iIdx?{...it,price:String(directVal??"")}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); toast(t.n2); } catch(e) { hErr(e); }
   };
 
@@ -843,8 +880,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
-  const windowWidth = useWindowWidth();
-  const isDesktop = windowWidth >= 768;
 
   // ── RENDER ORDER ITEMS (expanded detail view) ──
   const renderOrderItems = (order) => {
@@ -881,45 +916,34 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 </div>
               )}
 
-              {/* দাম সেভ */}
+              {/* দাম সেভ — PriceCell নিজের state রাখে, focus কখনো হারাবে না */}
               {(isOwner||can("setPrices"))&&(
-                <div
-                  style={s.row}
-                  onClick={e=>e.stopPropagation()}
-                  onMouseDown={e=>e.stopPropagation()}
-                  onPointerDown={e=>e.stopPropagation()}
-                  onTouchStart={e=>e.stopPropagation()}>
-                  <input style={s.inp} placeholder={t.price} inputMode="numeric"
-                    disabled={!canEditProc}
-                    value={prices[`${order.id}-${iIdx}`]??it.price??""}
-                    onClick={e=>e.stopPropagation()}
-                    onFocus={e=>e.stopPropagation()}
-                    onMouseDown={e=>e.stopPropagation()}
-                    onPointerDown={e=>e.stopPropagation()}
-                    onTouchStart={e=>e.stopPropagation()}
-                    onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
-                  {canEditProc&&(
-                    <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
-                  )}
-                </div>
+                <PriceCell
+                  initialValue={it.price ?? ""}
+                  disabled={!canEditProc}
+                  placeholder={t.price}
+                  saveBtnLabel={t.save}
+                  onSave={(val) => savePrice(order.id, iIdx, val)}
+                />
               )}
 
               {/* Item-level status (Confirmed / No Stock / Recheck) */}
               {(isOwner||can("setStatus"))&&(
                 <div style={s.sRow}>
-                  {canEditProc&&(
+                  {/* out_of_stock হলে শুধু Recheck দেখাবে, Confirmed/NoStock লুকাবে */}
+                  {it.status==="out_of_stock" && !itemLocked && order.overall!=="cancelled" ? (
+                    <button
+                      style={{ ...s.stBtn, flex:1, background:"#1d4ed8", color:"#fff", border:"1px solid #1d4ed8" }}
+                      onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
+                      🔁 {lang==="bn"?"আবার চেক":"Recheck"}
+                    </button>
+                  ) : canEditProc && (
                     <>
                       <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
                         onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
                       <button style={{ ...s.stBtn, ...(it.status==="out_of_stock"?s.stBtnN:{}) }}
                         onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
                     </>
-                  )}
-                  {it.status==="out_of_stock" && order.overall!=="cancelled" && itemLocked===false&&(
-                    <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
-                      onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
-                      {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
-                    </button>
                   )}
                 </div>
               )}
@@ -1071,12 +1095,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   };
 
-  // ── TAB CONTENT RENDERER ──
-  const renderTabContent = () => (
+  // ── TAB CONTENT ──
+  const tabContent = (
     <>
-      {/* ── SALESMAN SHOP TAB ── */}
+      {/* SALESMAN SHOP TAB */}
       {!isOwner&&tab==="shop"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
           {can("sendOrder")&&(
             <>
               <div style={s.secTitle}>{t.newOrder}</div>
@@ -1085,43 +1109,19 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   <div key={item.id} style={s.itemBlock} data-item-block="1">
                     <div style={s.itemHead}>
                       <div style={s.iNum}>{i+1}</div>
-                      <input
-                        style={{ ...s.inp, flex:1 }}
-                        placeholder={t.itemName}
-                        value={item.name}
-                        onChange={e=>updIt(item.id,"name",e.target.value)}
-                        onKeyDown={handleEnterNextField}
-                      />
+                      <input style={{ ...s.inp, flex:1 }} placeholder={t.itemName} value={item.name}
+                        onChange={e=>updIt(item.id,"name",e.target.value)} onKeyDown={handleEnterNextField} />
                       {items.length>1&&<button style={s.rmBtn} onClick={()=>delIt(item.id)}>✕</button>}
                     </div>
-                    <input
-                      style={{ ...s.inp, marginTop:6 }}
-                      placeholder={t.code}
-                      value={item.code}
-                      onChange={e=>updIt(item.id,"code",e.target.value)}
-                      onKeyDown={handleEnterNextField}
-                    />
-                    <input
-                      style={{ ...s.inp, marginTop:6 }}
-                      placeholder={t.brand}
-                      value={item.brand}
-                      onChange={e=>updIt(item.id,"brand",e.target.value)}
-                      onKeyDown={handleEnterNextField}
-                    />
+                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.code} value={item.code}
+                      onChange={e=>updIt(item.id,"code",e.target.value)} onKeyDown={handleEnterNextField} />
+                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.brand} value={item.brand}
+                      onChange={e=>updIt(item.id,"brand",e.target.value)} onKeyDown={handleEnterNextField} />
                     <div style={{ display:"flex", gap:7, marginTop:6 }}>
-                      <input
-                        style={{ ...s.inp, flex:2 }}
-                        placeholder={t.qty}
-                        inputMode="numeric"
-                        value={item.qty}
-                        onChange={e=>updIt(item.id,"qty",e.target.value)}
-                        onKeyDown={handleEnterNextField}
-                      />
-                      <select
-                        style={{ ...s.sel, flex:1 }}
-                        value={item.unit}
-                        onChange={e=>updIt(item.id,"unit",e.target.value)}
-                        onKeyDown={handleEnterNextField}>
+                      <input style={{ ...s.inp, flex:2 }} placeholder={t.qty} inputMode="numeric" value={item.qty}
+                        onChange={e=>updIt(item.id,"qty",e.target.value)} onKeyDown={handleEnterNextField} />
+                      <select style={{ ...s.sel, flex:1 }} value={item.unit}
+                        onChange={e=>updIt(item.id,"unit",e.target.value)} onKeyDown={handleEnterNextField}>
                         <option value="Pcs">{t.unitPcs}</option>
                         <option value="Set">{t.unitSet}</option>
                       </select>
@@ -1146,17 +1146,17 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         </div>
       )}
 
-      {/* ── OWNER ORDERS TAB ── */}
+      {/* OWNER ORDERS TAB */}
       {isOwner&&tab==="owner"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
           {orders.length===0&&<div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>}
           {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
         </div>
       )}
 
-      {/* ── COMPANIES TAB ── */}
+      {/* COMPANIES TAB */}
       {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={s.secTitle}>{t.coList}</div>
             <button style={s.addCoBtn} onClick={()=>setShowAdd(!showAdd)}>{showAdd?`✕ ${t.cancel}`:t.addNew}</button>
@@ -1205,25 +1205,21 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         </div>
       )}
 
-      {/* ── SETTINGS TAB ── */}
+      {/* SETTINGS TAB */}
       {tab==="settings"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={s.secTitle}>{t.settingsTitle}</div>
-
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.profileTitle}</div>
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
               <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{profile.personName}</div>
-                <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>
-                  {profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}
-                </div>
+                <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
                 <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
               </div>
             </div>
           </div>
-
           {localShop&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
@@ -1232,7 +1228,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <div style={{ fontSize:12, color:"#71717a" }}>📱 {localShop.mobile} · {localShop.area}</div>
             </div>
           )}
-
           {isOwner&&localShop?.inviteCode&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
               <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
@@ -1241,7 +1236,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <button style={{ ...s.sendBtn, marginTop:10 }} onClick={copyCode}>{copyState?t.codeCopied:t.copyCode}</button>
             </div>
           )}
-
           {isOwner&&(
             <div style={s.card}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
@@ -1252,9 +1246,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </div>
               {showAddPos&&(
                 <div style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>
-                    {lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}
-                  </div>
+                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>{lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}</div>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
                     {PRESET_POSITIONS[lang].map(p=>(
                       <button key={p} onClick={()=>setNewPosition(p)}
@@ -1282,7 +1274,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               }
             </div>
           )}
-
           {team.length>0&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
@@ -1294,46 +1285,31 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     </div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>
-                        {m.personName}
-                        {m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}
+                        {m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}
                       </div>
-                      <div style={{ fontSize:11, color:"#71717a" }}>
-                        {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)} · {m.email}
-                      </div>
+                      <div style={{ fontSize:11, color:"#71717a" }}>{m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)} · {m.email}</div>
                     </div>
                   </div>
-
                   {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
                     <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>
-                          {t.positionLbl}
-                        </span>
-                        <select
-                          style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
+                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>{t.positionLbl}</span>
+                        <select style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
                           value={m.position||"Salesman"}
-                          onChange={async e=>{
-                            try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); }
-                            catch(err) { hErr(err); }
-                          }}>
+                          onChange={async e=>{ try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); } catch(err) { hErr(err); } }}>
                           <option value="Salesman">{t.defaultPosition}</option>
                           {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
                         </select>
                       </div>
                       <div style={{ height:1, background:"#1f1f23", marginBottom:8 }} />
-                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
-                        {t.permissionsTitle}
-                      </div>
+                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>{t.permissionsTitle}</div>
                       {PERMISSIONS_LIST.map((perm,pi)=>{
                         const mPerms = m.permissions||DEFAULT_PERMISSIONS;
                         const isOn   = mPerms[perm.key]===true;
                         return (
                           <div key={perm.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderTop:pi>0?"1px solid #1f1f23":"none" }}>
                             <span style={{ fontSize:12, color:"#d4d4d8" }}>{perm[lang]}</span>
-                            <PermToggle isOn={isOn} onToggle={()=>{
-                              const newPerms = { ...mPerms, [perm.key]:!isOn };
-                              savePermissions(m.id,newPerms);
-                            }} />
+                            <PermToggle isOn={isOn} onToggle={()=>{ savePermissions(m.id,{ ...mPerms, [perm.key]:!isOn }); }} />
                           </div>
                         );
                       })}
@@ -1343,7 +1319,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               ))}
             </div>
           )}
-
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.languageLbl}</div>
             <div style={s.langSw}>
@@ -1351,52 +1326,16 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
             </div>
           </div>
-
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.syncStatus}</div>
             <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
               {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
             </div>
           </div>
-
-          {!isDesktop&&(
-            <button style={s.logoutBtn} onClick={handleLogout}>🚪 {t.logout}</button>
-          )}
+          {!isDesktop&&<button style={s.logoutBtn} onClick={handleLogout}>🚪 {t.logout}</button>}
         </div>
       )}
     </>
-  );
-
-  // ── DESKTOP SIDEBAR ──
-  const renderSidebar = () => (
-    <div style={s.sidebar}>
-      <div style={s.sideProfile}>
-        <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
-        <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:2 }}>{profile.personName}</div>
-        <div style={{ fontSize:11, color:"#71717a" }}>{isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-        {localShop&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, fontWeight:600 }}>🏪 {localShop.companyName}</div>}
-      </div>
-
-      <div style={s.sideNav}>
-        {visibleTabs.map(([k,label])=>(
-          <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
-            <span style={{ flex:1, textAlign:"left" }}>{label}</span>
-            {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&(
-              <span style={s.sideBadge}>{unread}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ flex:1 }} />
-
-      <div style={{ padding:"8px 0" }}>
-        <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", marginBottom:12, textAlign:"center" }}>
-          {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
-        </div>
-        <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
-      </div>
-    </div>
   );
 
   return (
@@ -1414,16 +1353,35 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {isDesktop ? (
         <div style={s.desktopLayout}>
-          {renderSidebar()}
-          <div style={s.desktopContent}>
-            {renderTabContent()}
+          {/* SIDEBAR */}
+          <div style={s.sidebar}>
+            <div style={s.sideProfile}>
+              <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:2 }}>{profile.personName}</div>
+              <div style={{ fontSize:11, color:"#71717a" }}>{isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
+              {localShop&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, fontWeight:600 }}>🏪 {localShop.companyName}</div>}
+            </div>
+            <div style={s.sideNav}>
+              {visibleTabs.map(([k,label])=>(
+                <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
+                  <span style={{ flex:1, textAlign:"left" }}>{label}</span>
+                  {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.sideBadge}>{unread}</span>}
+                </button>
+              ))}
+            </div>
+            <div style={{ flex:1 }} />
+            <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
+              {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
+            </div>
+            <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
           </div>
+          {/* CONTENT */}
+          <div style={s.desktopContent}>{tabContent}</div>
         </div>
-      ) : renderTabContent()}
+      ) : tabContent}
     </div>
   );
 }
-
 // ─── ROOT ────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLangState]=useState(loadLang());
@@ -1598,17 +1556,15 @@ const s = {
   inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
   logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
 
-  // ── DESKTOP LAYOUT ──
+  // ── DESKTOP ──
   desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
   desktopContent: { flex:1, overflowY:"auto", background:"#09090b" },
   desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
-
-  // ── SIDEBAR ──
-  sidebar:     { width:230, minWidth:230, background:"#18181b", borderRight:"1px solid #27272a", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
-  sideProfile: { background:"#09090b", borderRadius:12, padding:"14px", marginBottom:16, textAlign:"center", border:"1px solid #27272a" },
-  sideNav:     { display:"flex", flexDirection:"column", gap:6 },
-  sideTab:     { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit", textAlign:"left", transition:"background 0.15s" },
-  sideTabA:    { background:"#f97316", color:"#fff" },
-  sideBadge:   { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
-  sideLogout:  { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
+  sidebar:        { width:230, minWidth:230, background:"#18181b", borderRight:"1px solid #27272a", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
+  sideProfile:    { background:"#09090b", borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:"1px solid #27272a" },
+  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
+  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
+  sideTabA:       { background:"#f97316", color:"#fff" },
+  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
+  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
 };
