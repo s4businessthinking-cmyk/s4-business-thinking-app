@@ -240,8 +240,19 @@ const loadLang = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } ca
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
 const newItem  = () => ({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name:"", code:"", brand:"", qty:"", unit:"Pcs" });
 
+// ─── RESPONSIVE HOOK ─────────────────────────────────────────
+function useWindowWidth() {
+  const [width, setWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
+  useEffect(() => {
+    const handler = () => setWidth(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return width;
+}
+
 // ─── HEADER ──────────────────────────────────────────────────
-function Header({ t, lang, setLang, children }) {
+function Header({ t, lang, setLang, children, isDesktop }) {
   return (
     <div style={s.hdr}>
       <div style={s.hLeft}>
@@ -253,7 +264,7 @@ function Header({ t, lang, setLang, children }) {
           <button style={{ ...s.lBtn, ...(lang==="bn"?s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
           <button style={{ ...s.lBtn, ...(lang==="en"?s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
         </div>
-        {children}
+        {!isDesktop && children}
       </div>
     </div>
   );
@@ -832,6 +843,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
+  const windowWidth = useWindowWidth();
+  const isDesktop = windowWidth >= 768;
 
   // ── RENDER ORDER ITEMS (expanded detail view) ──
   const renderOrderItems = (order) => {
@@ -1058,22 +1071,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   };
 
-  return (
-    <div style={s.root}>
-      <Header t={t} lang={lang} setLang={setLang}>
-        <div style={s.tabs}>
-          {visibleTabs.map(([k,label])=>(
-            <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
-              {label}
-              {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.badge}>{unread}</span>}
-            </button>
-          ))}
-        </div>
-      </Header>
-
+  // ── TAB CONTENT RENDERER ──
+  const renderTabContent = () => (
+    <>
       {/* ── SALESMAN SHOP TAB ── */}
       {!isOwner&&tab==="shop"&&(
-        <div style={s.panel}>
+        <div style={isDesktop ? s.desktopPanel : s.panel}>
           {can("sendOrder")&&(
             <>
               <div style={s.secTitle}>{t.newOrder}</div>
@@ -1145,7 +1148,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {/* ── OWNER ORDERS TAB ── */}
       {isOwner&&tab==="owner"&&(
-        <div style={s.panel}>
+        <div style={isDesktop ? s.desktopPanel : s.panel}>
           {orders.length===0&&<div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>}
           {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
         </div>
@@ -1153,7 +1156,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {/* ── COMPANIES TAB ── */}
       {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
-        <div style={s.panel}>
+        <div style={isDesktop ? s.desktopPanel : s.panel}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={s.secTitle}>{t.coList}</div>
             <button style={s.addCoBtn} onClick={()=>setShowAdd(!showAdd)}>{showAdd?`✕ ${t.cancel}`:t.addNew}</button>
@@ -1204,7 +1207,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {/* ── SETTINGS TAB ── */}
       {tab==="settings"&&(
-        <div style={s.panel}>
+        <div style={isDesktop ? s.desktopPanel : s.panel}>
           <div style={s.secTitle}>{t.settingsTitle}</div>
 
           <div style={s.card}>
@@ -1356,9 +1359,67 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           </div>
 
-          <button style={s.logoutBtn} onClick={handleLogout}>🚪 {t.logout}</button>
+          {!isDesktop&&(
+            <button style={s.logoutBtn} onClick={handleLogout}>🚪 {t.logout}</button>
+          )}
         </div>
       )}
+    </>
+  );
+
+  // ── DESKTOP SIDEBAR ──
+  const renderSidebar = () => (
+    <div style={s.sidebar}>
+      <div style={s.sideProfile}>
+        <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:2 }}>{profile.personName}</div>
+        <div style={{ fontSize:11, color:"#71717a" }}>{isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
+        {localShop&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, fontWeight:600 }}>🏪 {localShop.companyName}</div>}
+      </div>
+
+      <div style={s.sideNav}>
+        {visibleTabs.map(([k,label])=>(
+          <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
+            <span style={{ flex:1, textAlign:"left" }}>{label}</span>
+            {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&(
+              <span style={s.sideBadge}>{unread}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex:1 }} />
+
+      <div style={{ padding:"8px 0" }}>
+        <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", marginBottom:12, textAlign:"center" }}>
+          {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
+        </div>
+        <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={s.root}>
+      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop}>
+        <div style={s.tabs}>
+          {visibleTabs.map(([k,label])=>(
+            <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
+              {label}
+              {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.badge}>{unread}</span>}
+            </button>
+          ))}
+        </div>
+      </Header>
+
+      {isDesktop ? (
+        <div style={s.desktopLayout}>
+          {renderSidebar()}
+          <div style={s.desktopContent}>
+            {renderTabContent()}
+          </div>
+        </div>
+      ) : renderTabContent()}
     </div>
   );
 }
@@ -1536,4 +1597,18 @@ const s = {
   settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
   inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
   logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
+
+  // ── DESKTOP LAYOUT ──
+  desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
+  desktopContent: { flex:1, overflowY:"auto", background:"#09090b" },
+  desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
+
+  // ── SIDEBAR ──
+  sidebar:     { width:230, minWidth:230, background:"#18181b", borderRight:"1px solid #27272a", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
+  sideProfile: { background:"#09090b", borderRadius:12, padding:"14px", marginBottom:16, textAlign:"center", border:"1px solid #27272a" },
+  sideNav:     { display:"flex", flexDirection:"column", gap:6 },
+  sideTab:     { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit", textAlign:"left", transition:"background 0.15s" },
+  sideTabA:    { background:"#f97316", color:"#fff" },
+  sideBadge:   { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
+  sideLogout:  { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
 };
