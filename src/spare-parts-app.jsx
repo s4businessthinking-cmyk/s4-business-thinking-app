@@ -651,15 +651,24 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setItemStatus = async (oId,iIdx,status) => {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    if (order.overall==="delivered"||order.overall==="cancelled") return;
+    // A fully cancelled order is immutable. A fully delivered order only allows
+    // rechecking no-stock items — nothing else can change.
+    if (order.overall==="cancelled") return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered"||current.status==="cancelled") return;
     const flowLocked = ["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall);
-    // After supplier order starts, only recheck is allowed (out_of_stock -> order_confirmed)
-    if (flowLocked && !(current.status==="out_of_stock" && status==="order_confirmed")) return;
+    // Allow recheck (out_of_stock → order_confirmed) at ANY stage including delivered,
+    // because no-stock items must never be permanently locked.
+    const isRecheck = current.status==="out_of_stock" && status==="order_confirmed";
+    if (flowLocked && !isRecheck) return;
 
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
-    try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
+    // If this recheck moves an item out of out_of_stock and the overall was "delivered",
+    // reopen the overall status to "order_confirmed" so the re-ordered item can flow
+    // through the pipeline again.
+    let newOverall = order.overall;
+    if (isRecheck && order.overall==="delivered") newOverall = "order_confirmed";
+    try { await updateDoc(doc(db,"orders",oId),{overall:newOverall,items:upd}); } catch(e) { hErr(e); }
   };
 
   const deliverItem = async (oId,iIdx) => {
@@ -670,9 +679,15 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (!target || target.status!=="out_for_branch") return;
 
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status:"delivered"}:it);
-    const nonOut = upd.filter(it=>it.status!=="out_of_stock"&&it.status!=="cancelled");
-    const allDelivered = nonOut.length>0 && nonOut.every(it=>it.status==="delivered");
-    const overall = allDelivered?"delivered":order.overall;
+    // Only mark overall as "delivered" if ALL non-cancelled items are delivered.
+    // Items with status "out_of_stock" are intentionally excluded — they must remain
+    // re-orderable and must NEVER cause the overall order to lock as delivered.
+    const activeItems = upd.filter(it=>it.status!=="cancelled");
+    const hasNoStock  = activeItems.some(it=>it.status==="out_of_stock");
+    const allDelivered = activeItems.length>0 && activeItems.every(it=>it.status==="delivered");
+    // If no-stock items still exist, keep overall as "out_for_branch" so the order
+    // remains in an unlocked state that allows re-ordering those items.
+    const overall = allDelivered ? "delivered" : hasNoStock ? "out_for_branch" : order.overall;
     try { await updateDoc(doc(db,"orders",oId),{overall,items:upd}); toast(t.n3); } catch(e) { hErr(e); }
   };
 
@@ -785,14 +800,28 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setOrderStatus = async (oId, newStatus) => {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    if (order.overall==="delivered"||order.overall==="cancelled") return;
+    if (order.overall==="cancelled") return;
+    // After a recheck reopens a delivered order, allow it to flow forward again.
+    // But a fully-delivered order with no no-stock items cannot be moved.
+    const hasRecheckableItems = order.items.some(it=>it.status==="order_confirmed"||it.status==="pending");
+    if (order.overall==="delivered" && !hasRecheckableItems) return;
     if (newStatus==="ordered_supplier") {
-      const missingPrice = order.items.some(it => it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered" && !String(it.price||"").trim());
+      // Only validate price for items that are actually being re-ordered (not out_of_stock/delivered/cancelled)
+      const missingPrice = order.items.some(it =>
+        it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered" &&
+        !String(it.price||"").trim()
+      );
       if (missingPrice) return toast(lang==="bn" ? "আগে সব প্রোডাক্টের দাম সেট করুন" : "Set price for all products before ordering supplier", "err");
     }
+    // Only propagate the new status to items that are actively in-flow.
+    // Items with status "out_of_stock", "delivered", or "cancelled" are never touched.
     const updatable = new Set(["order_confirmed","ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
     const newItems = updatable.has(newStatus)
-      ? order.items.map(it => (it.status==="out_of_stock"||it.status==="delivered"||it.status==="cancelled") ? it : { ...it, status:newStatus })
+      ? order.items.map(it =>
+          (it.status==="out_of_stock"||it.status==="delivered"||it.status==="cancelled")
+            ? it
+            : { ...it, status:newStatus }
+        )
       : order.items;
     try { await updateDoc(doc(db,"orders",oId),{overall:newStatus,items:newItems}); }
     catch(e) { hErr(e); }
@@ -867,7 +896,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                         onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
                     </>
                   )}
-                  {it.status==="out_of_stock" && order.overall!=="delivered" && order.overall!=="cancelled"&&(
+                  {it.status==="out_of_stock" && order.overall!=="cancelled"&&(
                     <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
                       onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
                       {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
@@ -892,7 +921,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         })}
 
         {/* OWNER STATUS FLOW BUTTONS */}
-        {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&order.overall!=="delivered"&&(
+        {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&(
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
               {lang==="bn"?"স্ট্যাটাস আপডেট করুন":"Update Status"}
@@ -933,6 +962,19 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 {lang==="bn"
                   ? "⏳ সেলসম্যান মাল বুঝে পাওয়ার পর ডেলিভারি সম্পন্ন হবে"
                   : "⏳ Waiting for salesman to confirm receipt"}
+              </div>
+            )}
+            {/* When overall is "delivered" but some items were rechecked (out_of_stock → order_confirmed),
+                the order reopens and the owner must push those items through the flow again. */}
+            {order.overall==="delivered"&&order.items.some(it=>it.status==="order_confirmed")&&(
+              <div style={{ background:"#1c1917", border:"1px solid #f97316", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
+                <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:8 }}>
+                  🔁 {lang==="bn"?"No Stock আইটেম Recheck করা হয়েছে — আবার অর্ডার করুন":"No-stock items rechecked — re-order below"}
+                </div>
+                <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4", marginBottom:0 }}
+                  onClick={()=>setOrderStatus(order.id,"ordered_supplier")}>
+                  📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
+                </button>
               </div>
             )}
           </div>
