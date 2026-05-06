@@ -251,13 +251,11 @@ function useWindowWidth() {
   return width;
 }
 
-// ─── PRICE CELL (standalone — own state so typing never loses focus) ──
-// এই component MainApp-এর বাইরে থাকায় re-render হলেও remount হবে না।
+// ─── PRICE CELL — নিজের state রাখে, MainApp re-render হলেও focus হারাবে না ──
 function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }) {
   const [val, setVal] = useState(initialValue ?? "");
   const prevRef = useRef(initialValue);
   useEffect(() => {
-    // শুধু বাইরে থেকে value আসলে sync করবে (অন্য user update করলে)
     if (prevRef.current !== initialValue) {
       prevRef.current = initialValue;
       setVal(initialValue ?? "");
@@ -267,21 +265,11 @@ function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }
   return (
     <div style={{ display:"flex", gap:7, marginBottom:7, alignItems:"center" }}
       onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}>
-      <input
-        style={s.inp}
-        placeholder={placeholder}
-        inputMode="numeric"
-        disabled={disabled}
-        value={val}
-        onClick={stop}
-        onMouseDown={stop}
-        onPointerDown={stop}
-        onTouchStart={stop}
-        onChange={e => setVal(e.target.value)}
-      />
-      {!disabled && (
-        <button style={s.savBtn} onClick={() => onSave(val)}>{saveBtnLabel}</button>
-      )}
+      <input style={s.inp} placeholder={placeholder} inputMode="numeric"
+        disabled={disabled} value={val}
+        onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}
+        onChange={e => setVal(e.target.value)} />
+      {!disabled && <button style={s.savBtn} onClick={() => onSave(val)}>{saveBtnLabel}</button>}
     </div>
   );
 }
@@ -858,12 +846,26 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     const hasRecheckableItems = order.items.some(it=>it.status==="order_confirmed"||it.status==="pending");
     if (order.overall==="delivered" && !hasRecheckableItems) return;
     if (newStatus==="ordered_supplier") {
-      // Only validate price for items that are actually being re-ordered (not out_of_stock/delivered/cancelled)
-      const missingPrice = order.items.some(it =>
-        it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered" &&
-        !String(it.price||"").trim()
+      // Active items = যেগুলো এখনো process হচ্ছে (out_of_stock/delivered/cancelled বাদে)
+      const activeItems = order.items.filter(it =>
+        it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered"
       );
-      if (missingPrice) return toast(lang==="bn" ? "আগে সব প্রোডাক্টের দাম সেট করুন" : "Set price for all products before ordering supplier", "err");
+      // ১. Company check — প্রতিটা active item-এ company select থাকতে হবে
+      const missingCo = activeItems.some(it => !it.co);
+      if (missingCo) return toast(
+        lang==="bn"
+          ? "❌ সব আইটেমে কোম্পানি সিলেক্ট করুন, তারপর এগিয়ে যান"
+          : "❌ Select a company for every item before ordering supplier",
+        "err"
+      );
+      // ২. Price check — প্রতিটা active item-এ দাম দেওয়া থাকতে হবে
+      const missingPrice = activeItems.some(it => !String(it.price||"").trim());
+      if (missingPrice) return toast(
+        lang==="bn"
+          ? "❌ সব আইটেমের দাম সেট করুন, তারপর এগিয়ে যান"
+          : "❌ Set price for all items before ordering supplier",
+        "err"
+      );
     }
     // Only propagate the new status to items that are actively in-flow.
     // Items with status "out_of_stock", "delivered", or "cancelled" are never touched.
@@ -916,7 +918,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 </div>
               )}
 
-              {/* দাম সেভ — PriceCell নিজের state রাখে, focus কখনো হারাবে না */}
+              {/* দাম সেভ */}
               {(isOwner||can("setPrices"))&&(
                 <PriceCell
                   initialValue={it.price ?? ""}
@@ -927,13 +929,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 />
               )}
 
-              {/* Item-level status (Confirmed / No Stock / Recheck) */}
+              {/* Item-level status */}
               {(isOwner||can("setStatus"))&&(
                 <div style={s.sRow}>
-                  {/* out_of_stock হলে শুধু Recheck দেখাবে, Confirmed/NoStock লুকাবে */}
                   {it.status==="out_of_stock" && !itemLocked && order.overall!=="cancelled" ? (
-                    <button
-                      style={{ ...s.stBtn, flex:1, background:"#1d4ed8", color:"#fff", border:"1px solid #1d4ed8" }}
+                    <button style={{ ...s.stBtn, flex:1, background:"#1d4ed8", color:"#fff", border:"1px solid #1d4ed8" }}
                       onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
                       🔁 {lang==="bn"?"আবার চেক":"Recheck"}
                     </button>
@@ -1095,10 +1095,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   };
 
-  // ── TAB CONTENT ──
+  // ── TAB CONTENT (mobile + desktop উভয়ের জন্য একই) ──
   const tabContent = (
     <>
-      {/* SALESMAN SHOP TAB */}
       {!isOwner&&tab==="shop"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           {can("sendOrder")&&(
@@ -1134,19 +1133,16 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               </div>
             </>
           )}
-          {orders.length>0&&(
-            <>
-              <div style={{ ...s.secTitle, marginTop:18 }}>{t.sentOrders}</div>
-              {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
-            </>
-          )}
+          {orders.length>0&&(<>
+            <div style={{ ...s.secTitle, marginTop:18 }}>{t.sentOrders}</div>
+            {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
+          </>)}
           {orders.length===0&&!can("sendOrder")&&(
             <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
           )}
         </div>
       )}
 
-      {/* OWNER ORDERS TAB */}
       {isOwner&&tab==="owner"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           {orders.length===0&&<div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>}
@@ -1154,7 +1150,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         </div>
       )}
 
-      {/* COMPANIES TAB */}
       {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
@@ -1205,7 +1200,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         </div>
       )}
 
-      {/* SETTINGS TAB */}
       {tab==="settings"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={s.secTitle}>{t.settingsTitle}</div>
@@ -1240,9 +1234,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             <div style={s.card}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <div style={s.settingsLbl}>{t.managePositionsTitle}</div>
-                <button style={s.addCoBtn} onClick={()=>setShowAddPos(!showAddPos)}>
-                  {showAddPos?`✕ ${t.cancel}`:t.addPositionBtn}
-                </button>
+                <button style={s.addCoBtn} onClick={()=>setShowAddPos(!showAddPos)}>{showAddPos?`✕ ${t.cancel}`:t.addPositionBtn}</button>
               </div>
               {showAddPos&&(
                 <div style={{ marginBottom:10 }}>
@@ -1256,9 +1248,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     ))}
                   </div>
                   <div style={s.row}>
-                    <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP}
-                      value={newPosition} onChange={e=>setNewPosition(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&addPosition()} />
+                    <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP} value={newPosition}
+                      onChange={e=>setNewPosition(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPosition()} />
                     <button style={s.savBtn} onClick={addPosition}>{t.addBtn}</button>
                   </div>
                 </div>
@@ -1280,13 +1271,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               {team.map((m,idx)=>(
                 <div key={m.id} style={{ padding:"10px 0", borderTop:idx>0?"1px solid #27272a":"none" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&m.uid!==user.uid?10:0 }}>
-                    <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                      {m.role==="owner"?"🏢":"👨‍💼"}
-                    </div>
+                    <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"🏢":"👨‍💼"}</div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>
-                        {m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}
-                      </div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
                       <div style={{ fontSize:11, color:"#71717a" }}>{m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)} · {m.email}</div>
                     </div>
                   </div>
@@ -1353,7 +1340,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {isDesktop ? (
         <div style={s.desktopLayout}>
-          {/* SIDEBAR */}
           <div style={s.sidebar}>
             <div style={s.sideProfile}>
               <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
@@ -1375,7 +1361,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
             <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
           </div>
-          {/* CONTENT */}
           <div style={s.desktopContent}>{tabContent}</div>
         </div>
       ) : tabContent}
@@ -1555,8 +1540,6 @@ const s = {
   settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
   inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
   logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
-
-  // ── DESKTOP ──
   desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
   desktopContent: { flex:1, overflowY:"auto", background:"#09090b" },
   desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
