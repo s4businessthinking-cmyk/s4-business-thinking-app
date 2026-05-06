@@ -642,7 +642,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const savePrice = async (oId,iIdx) => {
     if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    if (["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)) return;
+    const current = order.items[iIdx];
+    if (!current || current.status==="delivered" || current.status==="cancelled") return;
+    if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
     const p = prices[`${oId}-${iIdx}`]??"";
     const upd = order.items.map((it,x)=>x===iIdx?{...it,price:p}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); toast(t.n2); } catch(e) { hErr(e); }
@@ -656,18 +658,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (order.overall==="cancelled") return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered"||current.status==="cancelled") return;
-    const flowLocked = ["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall);
     // Allow recheck (out_of_stock → order_confirmed) at ANY stage including delivered,
     // because no-stock items must never be permanently locked.
     const isRecheck = current.status==="out_of_stock" && status==="order_confirmed";
-    if (flowLocked && !isRecheck) return;
+    const isEditableItemState = ["pending","order_confirmed","out_of_stock"].includes(current.status);
+    if (!isRecheck && !isEditableItemState) return;
 
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
     // If this recheck moves an item out of out_of_stock and the overall was "delivered",
     // reopen the overall status to "order_confirmed" so the re-ordered item can flow
     // through the pipeline again.
     let newOverall = order.overall;
-    if (isRecheck && order.overall==="delivered") newOverall = "order_confirmed";
+    if (isRecheck && order.overall!=="cancelled") newOverall = "order_confirmed";
     try { await updateDoc(doc(db,"orders",oId),{overall:newOverall,items:upd}); } catch(e) { hErr(e); }
   };
 
@@ -714,7 +716,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setCo = async (oId,iIdx,coId) => {
     if (!isOwner&&!can("manageCompanies")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    if (["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)) return;
+    const current = order.items[iIdx];
+    if (!current || current.status==="delivered" || current.status==="cancelled") return;
+    if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
   };
@@ -836,6 +840,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
       <>
         {order.items.map((it,iIdx)=>{
           const selectedCo = cos.find(c=>c.id===it.co);
+          const itemLocked = it.status==="delivered" || it.status==="cancelled";
+          const canEditProc = !itemLocked && ["pending","order_confirmed","out_of_stock"].includes(it.status);
           return (
             <div key={iIdx} style={s.oiCard}>
               <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:6 }}>
@@ -851,12 +857,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   <select
                     style={s.sel}
                     value={it.co||""}
-                    disabled={["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)}
+                    disabled={!canEditProc}
                     onChange={e=>setCo(order.id,iIdx,e.target.value)}>
                     <option value="">{t.selectCo}</option>
                     {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  {selectedCo&&selectedCo.phone&&!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
+                  {selectedCo&&selectedCo.phone&&canEditProc&&(
                     <a href={waLink(selectedCo.phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
                   )}
                 </div>
@@ -871,7 +877,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   onPointerDown={e=>e.stopPropagation()}
                   onTouchStart={e=>e.stopPropagation()}>
                   <input style={s.inp} placeholder={t.price} inputMode="numeric"
-                    disabled={["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)}
+                    disabled={!canEditProc}
                     value={prices[`${order.id}-${iIdx}`]??it.price??""}
                     onClick={e=>e.stopPropagation()}
                     onFocus={e=>e.stopPropagation()}
@@ -879,7 +885,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     onPointerDown={e=>e.stopPropagation()}
                     onTouchStart={e=>e.stopPropagation()}
                     onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
-                  {!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
+                  {canEditProc&&(
                     <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
                   )}
                 </div>
@@ -888,7 +894,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               {/* Item-level status (Confirmed / No Stock / Recheck) */}
               {(isOwner||can("setStatus"))&&(
                 <div style={s.sRow}>
-                  {!["ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch","delivered","cancelled"].includes(order.overall)&&(
+                  {canEditProc&&(
                     <>
                       <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
                         onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
@@ -896,7 +902,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                         onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
                     </>
                   )}
-                  {it.status==="out_of_stock" && order.overall!=="cancelled"&&(
+                  {it.status==="out_of_stock" && order.overall!=="cancelled" && itemLocked===false&&(
                     <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
                       onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
                       {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
