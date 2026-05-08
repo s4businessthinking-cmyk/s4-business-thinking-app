@@ -98,9 +98,14 @@ const TR = {
     confirmLogout:"লগআউট করতে চান?",
     tabShop:"🏪 দোকান", tabOwner:"👤 অর্ডার", tabCompany:"🏢 কোম্পানি",
     newOrder:"📋 নতুন Purchase Order",
-    itemName:"আইটেমের নাম", code:"কোড / মডেল / সাইজ", brand:"ব্র্যান্ডের নাম",
-    qty:"পরিমাণ", unitPcs:"পিস", unitSet:"সেট",
-    addItem:"+ আরো আইটেম", noteP:"বিশেষ নোট (ঐচ্ছিক)...",
+    itemName:"আইটেমের নাম *", code:"কোড / মডেল / সাইজ", brand:"ব্র্যান্ডের নাম",
+    qty:"পরিমাণ *", unitPcs:"পিস", unitSet:"সেট",
+    addItem:"✚ Invoice-এ যোগ করুন",
+    invoiceList:"📄 Invoice তালিকা",
+    invoiceEmpty:"এখনো কোনো আইটেম যোগ হয়নি",
+    noItemName:"আইটেমের নাম দিন!",
+    noQty:"পরিমাণ দিন!",
+    noteP:"বিশেষ নোট (ঐচ্ছিক)...",
     sendOrder:"📤 অর্ডার পাঠান", sentOrders:"📜 পাঠানো অর্ডারসমূহ",
     noOrders:"কোনো অর্ডার আসেনি এখনো",
     selectCo:"কোম্পানি বেছে নিন", price:"কোম্পানির দাম (৳)", save:"সেভ",
@@ -176,9 +181,14 @@ const TR = {
     confirmLogout:"Do you want to logout?",
     tabShop:"🏪 Shop", tabOwner:"👤 Orders", tabCompany:"🏢 Companies",
     newOrder:"📋 New Purchase Order",
-    itemName:"Item Name", code:"Code / Model / Size", brand:"Brand Name",
-    qty:"Quantity", unitPcs:"Pcs", unitSet:"Set",
-    addItem:"+ Add Item", noteP:"Special note (optional)...",
+    itemName:"Item Name *", code:"Code / Model / Size", brand:"Brand Name",
+    qty:"Quantity *", unitPcs:"Pcs", unitSet:"Set",
+    addItem:"✚ Add to Invoice",
+    invoiceList:"📄 Invoice List",
+    invoiceEmpty:"No items added yet",
+    noItemName:"Please enter item name!",
+    noQty:"Please enter quantity!",
+    noteP:"Special note (optional)...",
     sendOrder:"📤 Send Order", sentOrders:"📜 Sent Orders",
     noOrders:"No orders yet",
     selectCo:"Select Company", price:"Company price (৳)", save:"Save",
@@ -251,7 +261,7 @@ function useWindowWidth() {
   return width;
 }
 
-// ─── PRICE CELL — নিজের state রাখে, MainApp re-render হলেও focus হারাবে না ──
+// ─── PRICE CELL ──────────────────────────────────────────────
 function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }) {
   const [val, setVal] = useState(initialValue ?? "");
   const prevRef = useRef(initialValue);
@@ -566,10 +576,16 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [localShop,setLocalShop]=useState(shopProp);
 
   const [tab,setTab]=useState(isOwner?"owner":"shop");
-  const [items,setItems]=useState([newItem()]);
+
+  // ── INVOICE STATE ──
+  // items = confirmed invoice list (locked rows)
+  // currentItem = the form being filled right now
+  const [items,setItems]=useState([]);
+  const [currentItem,setCurrentItem]=useState(newItem());
   const [note,setNote]=useState("");
+  const nameRef = useRef(null);
+
   const [selOrder,setSelOrder]=useState(null);
-  
 
   const [editId,setEditId]=useState(null);
   const [editNm,setEditNm]=useState(""); const [editPh,setEditPh]=useState("");
@@ -618,20 +634,28 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   },[shopId]);
 
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
-  const addIt = () => setItems(p=>[...p,newItem()]);
-  const delIt = (id) => setItems(p=>p.filter(it=>it.id!==id));
-  const updIt = (id,f,v) => {
-    const val = (f==="name" && typeof v==="string" && v.length>0) ? (v.charAt(0).toUpperCase()+v.slice(1)) : v;
-    setItems(p=>p.map(it=>it.id===id?{...it,[f]:val}:it));
+
+  // ── INVOICE ITEM FUNCTIONS ──
+  const updCurrentItem = (field, val) => {
+    const value = (field==="name" && typeof val==="string" && val.length>0)
+      ? (val.charAt(0).toUpperCase()+val.slice(1))
+      : val;
+    setCurrentItem(p=>({...p,[field]:value}));
   };
-  const handleEnterNextField = (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    const block = e.currentTarget.closest('[data-item-block="1"]');
-    if (!block) return;
-    const fields = block.querySelectorAll("input, select, textarea");
-    const idx = Array.from(fields).indexOf(e.currentTarget);
-    if (idx >= 0 && idx < fields.length - 1) fields[idx + 1].focus();
+
+  const addItToInvoice = () => {
+    if (!currentItem.name.trim()) return toast(t.noItemName,"err");
+    if (!currentItem.qty.toString().trim()) return toast(t.noQty,"err");
+    setItems(p=>[...p, { ...currentItem, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
+    setCurrentItem(newItem());
+    // Auto-focus the name field for fast entry
+    setTimeout(()=>{ nameRef.current?.focus(); },50);
+  };
+
+  const delIt = (id) => setItems(p=>p.filter(it=>it.id!==id));
+
+  const handleEnterAdd = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addItToInvoice(); }
   };
 
   const sendOrder = async () => {
@@ -651,8 +675,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         });
         orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
       } catch (serialErr) {
-        // Fallback: if shop counter update is blocked by Firestore rules,
-        // still allow order creation with sequential order number.
         console.warn("Serial transaction failed, using fallback order number", serialErr);
         const recentSnap = await getDocs(query(
           collection(db, "orders"),
@@ -675,7 +697,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         items:valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
         note:note||"", createdAt:serverTimestamp(), overall:"pending", read:false,
       });
-      setItems([newItem()]); setNote(""); toast(t.n1);
+      setItems([]); setCurrentItem(newItem()); setNote(""); toast(t.n1);
     } catch(e) { hErr(e); }
   };
 
@@ -692,21 +714,13 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const setItemStatus = async (oId,iIdx,status) => {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    // A fully cancelled order is immutable. A fully delivered order only allows
-    // rechecking no-stock items — nothing else can change.
     if (order.overall==="cancelled") return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered"||current.status==="cancelled") return;
-    // Allow recheck (out_of_stock → order_confirmed) at ANY stage including delivered,
-    // because no-stock items must never be permanently locked.
     const isRecheck = current.status==="out_of_stock" && status==="order_confirmed";
     const isEditableItemState = ["pending","order_confirmed","out_of_stock"].includes(current.status);
     if (!isRecheck && !isEditableItemState) return;
-
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
-    // If this recheck moves an item out of out_of_stock and the overall was "delivered",
-    // reopen the overall status to "order_confirmed" so the re-ordered item can flow
-    // through the pipeline again.
     let newOverall = order.overall;
     if (isRecheck && order.overall!=="cancelled") newOverall = "order_confirmed";
     try { await updateDoc(doc(db,"orders",oId),{overall:newOverall,items:upd}); } catch(e) { hErr(e); }
@@ -718,11 +732,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (isSalesman&&!can("markDelivery")&&order.createdBy!==user.uid) return;
     const target = order.items[iIdx];
     if (!target || target.status!=="out_for_branch") return;
-
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status:"delivered"}:it);
-    // Active items = অর্ডারের যেগুলো এখনো process হচ্ছে।
-    // cancelled + out_of_stock উভয়ই বাদ — কারণ no_stock item পরে recheck হলে আবার flow এ আসবে।
-    // সব deliverable item delivered হলে overall = "delivered" হবে।
     const activeItems = upd.filter(it=>it.status!=="cancelled" && it.status!=="out_of_stock");
     const allDelivered = activeItems.length>0 && activeItems.every(it=>it.status==="delivered");
     const overall = allDelivered ? "delivered" : order.overall;
@@ -734,7 +744,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (!window.confirm(t.delConfirm)) return;
     try {
       await deleteDoc(doc(db,"orders",oId));
-      setPrices(p=>{ const n={...p}; Object.keys(n).forEach(k=>{if(k.startsWith(`${oId}-`)) delete n[k];}); return n; });
       if (selOrder===oId) setSelOrder(null); toast(t.n7,"err");
     } catch(e) { hErr(e); }
   };
@@ -841,16 +850,12 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     if (order.overall==="cancelled") return;
-    // After a recheck reopens a delivered order, allow it to flow forward again.
-    // But a fully-delivered order with no no-stock items cannot be moved.
     const hasRecheckableItems = order.items.some(it=>it.status==="order_confirmed"||it.status==="pending");
     if (order.overall==="delivered" && !hasRecheckableItems) return;
     if (newStatus==="ordered_supplier") {
-      // Active items = যেগুলো এখনো process হচ্ছে (out_of_stock/delivered/cancelled বাদে)
       const activeItems = order.items.filter(it =>
         it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered"
       );
-      // ১. Company check — প্রতিটা active item-এ company select থাকতে হবে
       const missingCo = activeItems.some(it => !it.co);
       if (missingCo) return toast(
         lang==="bn"
@@ -858,7 +863,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
           : "❌ Select a company for every item before ordering supplier",
         "err"
       );
-      // ২. Price check — প্রতিটা active item-এ দাম দেওয়া থাকতে হবে
       const missingPrice = activeItems.some(it => !String(it.price||"").trim());
       if (missingPrice) return toast(
         lang==="bn"
@@ -867,8 +871,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         "err"
       );
     }
-    // Only propagate the new status to items that are actively in-flow.
-    // Items with status "out_of_stock", "delivered", or "cancelled" are never touched.
     const updatable = new Set(["order_confirmed","ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
     const newItems = updatable.has(newStatus)
       ? order.items.map(it =>
@@ -885,7 +887,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
   // ── RENDER ORDER ITEMS (expanded detail view) ──
   const renderOrderItems = (order) => {
-    const showItemControls = isOwner || can("manageCompanies") || can("setPrices") || can("setStatus");
     return (
       <>
         {order.items.map((it,iIdx)=>{
@@ -900,8 +901,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
                 <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
               </div>
-
-              {/* কোম্পানি select + WhatsApp */}
               {(isOwner||can("manageCompanies"))&&(
                 <div style={s.row}>
                   <select
@@ -917,8 +916,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   )}
                 </div>
               )}
-
-              {/* দাম সেভ */}
               {(isOwner||can("setPrices"))&&(
                 <PriceCell
                   initialValue={it.price ?? ""}
@@ -928,8 +925,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   onSave={(val) => savePrice(order.id, iIdx, val)}
                 />
               )}
-
-              {/* Item-level status */}
               {(isOwner||can("setStatus"))&&(
                 <div style={s.sRow}>
                   {it.status==="out_of_stock" && !itemLocked && order.overall!=="cancelled" ? (
@@ -947,8 +942,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   )}
                 </div>
               )}
-
-              {/* Salesman / authorized: Mark Delivered for items in out_for_branch */}
               {(isSalesman&&order.createdBy===user.uid&&it.status==="out_for_branch")&&(
                 <div style={{ marginTop:8 }}>
                   <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
@@ -962,14 +955,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           );
         })}
-
-        {/* OWNER STATUS FLOW BUTTONS */}
         {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&(
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
               {lang==="bn"?"স্ট্যাটাস আপডেট করুন":"Update Status"}
             </div>
-
             {order.overall==="pending"&&(
               <button style={{ ...s.flowBtn, background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" }}
                 onClick={()=>setOrderStatus(order.id,"order_confirmed")}>
@@ -1007,8 +997,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   : "⏳ Waiting for salesman to confirm receipt"}
               </div>
             )}
-            {/* When overall is "delivered" but some items were rechecked (out_of_stock → order_confirmed),
-                the order reopens and the owner must push those items through the flow again. */}
             {order.overall==="delivered"&&order.items.some(it=>it.status==="order_confirmed")&&(
               <div style={{ background:"#1c1917", border:"1px solid #f97316", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
                 <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:8 }}>
@@ -1022,8 +1010,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             )}
           </div>
         )}
-
-        {/* Delete order button */}
         {can("deleteOrder")&&(
           <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>🗑️ {t.delOrder}</button>
         )}
@@ -1095,7 +1081,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   };
 
-  // ── TAB CONTENT (mobile + desktop উভয়ের জন্য একই) ──
+  // ── TAB CONTENT ──
   const tabContent = (
     <>
       {!isOwner&&tab==="shop"&&(
@@ -1103,38 +1089,111 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
           {can("sendOrder")&&(
             <>
               <div style={s.secTitle}>{t.newOrder}</div>
-              <div style={s.card}>
-                {items.map((item,i)=>(
-                  <div key={item.id} style={s.itemBlock} data-item-block="1">
-                    <div style={s.itemHead}>
-                      <div style={s.iNum}>{i+1}</div>
-                      <input style={{ ...s.inp, flex:1 }} placeholder={t.itemName} value={item.name}
-                        onChange={e=>updIt(item.id,"name",e.target.value)} onKeyDown={handleEnterNextField} />
-                      {items.length>1&&<button style={s.rmBtn} onClick={()=>delIt(item.id)}>✕</button>}
-                    </div>
-                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.code} value={item.code}
-                      onChange={e=>updIt(item.id,"code",e.target.value)} onKeyDown={handleEnterNextField} />
-                    <input style={{ ...s.inp, marginTop:6 }} placeholder={t.brand} value={item.brand}
-                      onChange={e=>updIt(item.id,"brand",e.target.value)} onKeyDown={handleEnterNextField} />
-                    <div style={{ display:"flex", gap:7, marginTop:6 }}>
-                      <input style={{ ...s.inp, flex:2 }} placeholder={t.qty} inputMode="numeric" value={item.qty}
-                        onChange={e=>updIt(item.id,"qty",e.target.value)} onKeyDown={handleEnterNextField} />
-                      <select style={{ ...s.sel, flex:1 }} value={item.unit}
-                        onChange={e=>updIt(item.id,"unit",e.target.value)} onKeyDown={handleEnterNextField}>
-                        <option value="Pcs">{t.unitPcs}</option>
-                        <option value="Set">{t.unitSet}</option>
-                      </select>
-                    </div>
-                  </div>
-                ))}
-                <button style={s.addBtn} onClick={addIt}>{t.addItem}</button>
-                <textarea style={s.ta} placeholder={t.noteP} value={note} onChange={e=>setNote(e.target.value)} rows={2} />
-                <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
+
+              {/* ── ITEM ENTRY FORM ── */}
+              <div style={{ ...s.card, border:"1px solid #3f3f46" }}>
+                <input
+                  ref={nameRef}
+                  style={{ ...s.inp, marginBottom:8, fontSize:15, fontWeight:600 }}
+                  placeholder={t.itemName}
+                  value={currentItem.name}
+                  onChange={e=>updCurrentItem("name",e.target.value)}
+                  onKeyDown={handleEnterAdd}
+                />
+                <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                  <input style={{ ...s.inp, flex:1 }} placeholder={t.code}
+                    value={currentItem.code}
+                    onChange={e=>updCurrentItem("code",e.target.value)}
+                    onKeyDown={handleEnterAdd}
+                  />
+                  <input style={{ ...s.inp, flex:1 }} placeholder={t.brand}
+                    value={currentItem.brand}
+                    onChange={e=>updCurrentItem("brand",e.target.value)}
+                    onKeyDown={handleEnterAdd}
+                  />
+                </div>
+                <div style={{ display:"flex", gap:7, marginBottom:10 }}>
+                  <input
+                    style={{ ...s.inp, flex:2 }}
+                    placeholder={t.qty}
+                    inputMode="numeric"
+                    value={currentItem.qty}
+                    onChange={e=>updCurrentItem("qty",e.target.value)}
+                    onKeyDown={handleEnterAdd}
+                  />
+                  <select style={{ ...s.sel, flex:1 }} value={currentItem.unit}
+                    onChange={e=>updCurrentItem("unit",e.target.value)}>
+                    <option value="Pcs">{t.unitPcs}</option>
+                    <option value="Set">{t.unitSet}</option>
+                  </select>
+                </div>
+                <button style={s.addInvoiceBtn} onClick={addItToInvoice}>
+                  {t.addItem}
+                </button>
               </div>
+
+              {/* ── INVOICE LIST ── */}
+              {items.length > 0 && (
+                <div style={{ marginTop:14 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <div style={{ ...s.secTitle, margin:0 }}>{t.invoiceList}</div>
+                    <span style={{ fontSize:12, color:"#f97316", fontWeight:700, background:"#451a03", padding:"3px 10px", borderRadius:20 }}>
+                      {items.length}{lang==="bn"?"টি":""}
+                    </span>
+                  </div>
+                  <div style={s.invoiceCard}>
+                    {/* Header row */}
+                    <div style={s.invHeader}>
+                      <span style={{ width:22, flexShrink:0 }}>#</span>
+                      <span style={{ flex:1 }}>{lang==="bn"?"নাম":"Name"}</span>
+                      <span style={{ width:70, textAlign:"center" }}>{lang==="bn"?"কোড":"Code"}</span>
+                      <span style={{ width:60, textAlign:"center" }}>{lang==="bn"?"পরিমাণ":"Qty"}</span>
+                      <span style={{ width:26, flexShrink:0 }}></span>
+                    </div>
+                    {/* Item rows */}
+                    {items.map((item, idx) => (
+                      <div key={item.id} style={s.invRow}>
+                        <span style={{ ...s.invSerial, width:22, flexShrink:0 }}>{idx+1}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                            {item.name}
+                          </div>
+                          {item.brand&&(
+                            <div style={{ fontSize:11, color:"#71717a" }}>🏷️ {item.brand}</div>
+                          )}
+                        </div>
+                        <div style={{ width:70, textAlign:"center" }}>
+                          {item.code
+                            ? <span style={{ fontSize:11, color:"#a1a1aa", fontFamily:"monospace" }}>{item.code}</span>
+                            : <span style={{ color:"#3f3f46" }}>—</span>
+                          }
+                        </div>
+                        <div style={{ width:60, textAlign:"center" }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{item.qty}</span>
+                          <span style={{ fontSize:10, color:"#71717a", marginLeft:2 }}>{item.unit}</span>
+                        </div>
+                        <button style={s.invDelBtn} onClick={()=>delIt(item.id)} title="Remove">✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Note + Send */}
+                  <textarea style={{ ...s.ta, marginTop:10 }} placeholder={t.noteP} value={note} onChange={e=>setNote(e.target.value)} rows={2} />
+                  <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
+                </div>
+              )}
+
+              {/* If no items yet, show empty state hint */}
+              {items.length === 0 && (
+                <div style={{ textAlign:"center", padding:"18px 0 4px", color:"#52525b", fontSize:12 }}>
+                  ↑ {lang==="bn"?"আইটেম যোগ করুন, তারপর অর্ডার পাঠান":"Add items above, then send order"}
+                </div>
+              )}
             </>
           )}
+
           {orders.length>0&&(<>
-            <div style={{ ...s.secTitle, marginTop:18 }}>{t.sentOrders}</div>
+            <div style={{ ...s.secTitle, marginTop:20 }}>{t.sentOrders}</div>
             {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
           </>)}
           {orders.length===0&&!can("sendOrder")&&(
@@ -1367,6 +1426,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     </div>
   );
 }
+
 // ─── ROOT ────────────────────────────────────────────────────
 export default function App() {
   const [lang,setLangState]=useState(loadLang());
@@ -1486,14 +1546,18 @@ const s = {
   panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
   secTitle:    { fontSize:14, fontWeight:700, color:"#f97316", marginBottom:10 },
   card:        { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:14, marginBottom:10 },
-  itemBlock:   { background:"#0f0f12", border:"1px solid #27272a", borderRadius:10, padding:10, marginBottom:10 },
-  itemHead:    { display:"flex", alignItems:"center", gap:8 },
-  iNum:        { width:22, height:22, borderRadius:"50%", background:"#27272a", color:"#f97316", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
   inp:         { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
-  rmBtn:       { padding:"7px 9px", borderRadius:8, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, flexShrink:0 },
-  addBtn:      { width:"100%", padding:"8px", borderRadius:8, border:"1px dashed #3f3f46", background:"transparent", color:"#71717a", cursor:"pointer", fontSize:12, marginBottom:8 },
   ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
   sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
+  // ── Invoice button ──
+  addInvoiceBtn: { width:"100%", padding:"11px", borderRadius:10, border:"2px dashed #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
+  // ── Invoice table ──
+  invoiceCard: { background:"#18181b", border:"1px solid #27272a", borderRadius:12, overflow:"hidden", marginBottom:4 },
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:"#27272a", fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:"1px solid #27272a" },
+  invSerial:   { fontSize:12, fontWeight:800, color:"#f97316" },
+  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
+  // ──
   oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
   oId:         { fontSize:14, fontWeight:800, color:"#f4f4f5" },
   sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
