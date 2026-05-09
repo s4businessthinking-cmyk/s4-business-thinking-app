@@ -1302,7 +1302,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
           {orders.length>0&&(<>
             <div style={{ ...s.secTitle, marginTop:20 }}>{t.sentOrders}</div>
-            {/* Search box */}
+          </>)}
+          {/* Search box - always visible */}
+          {orders.length>0&&(
             <div style={{ position:"relative", marginBottom:12 }}>
               <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
               <input
@@ -1313,9 +1315,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               />
               {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
             </div>
-            {/* Daily grouped orders */}
-            {(() => {
+          )}
+          {/* Daily grouped orders */}
+          {(() => {
               const filtered = filterOrders(orders);
+              if (!filtered.length && !searchQ) return null;
               if (!filtered.length) return (
                 <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
               );
@@ -1331,7 +1335,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 </div>
               ));
             })()}
-          </>)}
           {orders.length===0&&!can("sendOrder")&&(
             <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
           )}
