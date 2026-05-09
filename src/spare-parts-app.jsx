@@ -245,9 +245,36 @@ const SC = {
 };
 
 const LANG_KEY = "sparetrack-lang";
+const WA_STYLE_KEY = "wa-msg-style";
 const ORDER_PREFIX = "S4-";
 const loadLang = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
 const saveLang = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
+const loadWaStyle = () => { try { return localStorage.getItem(WA_STYLE_KEY)||"1"; } catch { return "1"; } };
+const saveWaStyle = (v) => { try { localStorage.setItem(WA_STYLE_KEY,v); } catch {} };
+
+// ─── WA STYLES ───────────────────────────────────────────────
+const WA_STYLES = [
+  {
+    id:"1", labelBn:"বুলেট", labelEn:"Bullet",
+    previewBn:"▪️ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n▪️ *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"▪️ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n▪️ *Air Filter* | AF-456 | Honda | 1 Set",
+  },
+  {
+    id:"2", labelBn:"নম্বর", labelEn:"Numbered",
+    previewBn:"1️⃣ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2️⃣ *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"1️⃣ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2️⃣ *Air Filter* | AF-456 | Honda | 1 Set",
+  },
+  {
+    id:"3", labelBn:"ডায়মন্ড", labelEn:"Diamond",
+    previewBn:"🔸 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n🔸 *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"🔸 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n🔸 *Air Filter* | AF-456 | Honda | 1 Set",
+  },
+  {
+    id:"4", labelBn:"লাইন", labelEn:"Lined",
+    previewBn:"──────────────\n▪️ *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n▪️ *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
+    previewEn:"──────────────\n▪️ *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n▪️ *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
+  },
+];
 const newItem  = () => ({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name:"", code:"", brand:"", qty:"", unit:"Pcs" });
 
 // ─── RESPONSIVE HOOK ─────────────────────────────────────────
@@ -637,6 +664,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
   const [searchQ,setSearchQ]=useState("");
+  const [waStyle,setWaStyleState]=useState(loadWaStyle());
+  const setWaStyle = (v) => { setWaStyleState(v); saveWaStyle(v); };
 
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
@@ -884,14 +913,26 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (Number.isFinite(order.serialNo)) return `${ORDER_PREFIX}${String(order.serialNo).padStart(4, "0")}`;
     return shortId(order.id);
   };
-  const waLink   = (phone,order,item) => {
-    const codeLine  = item.code  ? (lang==="bn"?`কোড/মডেল: ${item.code}\n`:`Code/Model: ${item.code}\n`) : "";
-    const brandLine = item.brand ? (lang==="bn"?`ব্র্যান্ড: ${item.brand}\n`:`Brand: ${item.brand}\n`) : "";
-    const txt = encodeURIComponent(lang==="bn"
-      ? `🔧 PO #${getOrderDisplayNo(order)}\n\nআইটেম: ${item.name}\n${codeLine}${brandLine}পরিমাণ: ${item.qty} ${item.unit}\n\nদয়া করে দাম ও স্টক জানান।`
-      : `🔧 PO #${getOrderDisplayNo(order)}\n\nItem: ${item.name}\n${codeLine}${brandLine}Qty: ${item.qty} ${item.unit}\n\nPlease share price and stock availability.`
-    );
-    return `https://wa.me/${phone}?text=${txt}`;
+  // ── WA MESSAGE BUILDER (grouped, style-aware) ──
+  const waLinkGroup = (phone, items) => {
+    const isBn = lang === "bn";
+    const title = isBn ? "*পণ্যের তালিকা:*" : "*Product List:*";
+    const footer = isBn
+      ? "_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ"
+      : "_Please share price and stock availability._ 🙏 Thank you";
+    const nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+    let lines = "";
+    items.forEach((it, i) => {
+      const name = `*${it.name}*`;
+      const meta = [it.code, it.brand, `${it.qty} ${it.unit}`].filter(Boolean).join(" | ");
+      if (waStyle==="1") lines += `▪️ ${name} | ${meta}\n`;
+      else if (waStyle==="2") lines += `${nums[i]||`${i+1}.`} ${name} | ${meta}\n`;
+      else if (waStyle==="3") lines += `🔸 ${name} | ${meta}\n`;
+      else if (waStyle==="4") lines += `──────────────\n▪️ ${name}\n   ${meta}\n`;
+    });
+    if (waStyle==="4") lines += "──────────────";
+    const msg = `${title}\n${lines}\n${footer}`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
   const handleLogout = async () => {
@@ -1019,9 +1060,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     <option value="">{t.selectCo}</option>
                     {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  {selectedCo&&selectedCo.phone&&canEditProc&&(
-                    <a href={waLink(selectedCo.phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
-                  )}
                 </div>
               )}
               {(isOwner||can("setPrices"))&&(
@@ -1063,6 +1101,33 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           );
         })}
+        {/* ── Grouped WA buttons per company ── */}
+        {(isOwner||can("manageCompanies"))&&(()=>{
+          const groups = {};
+          order.items.forEach(it => {
+            if (!it.co || it.status==="cancelled") return;
+            const co = cos.find(c=>c.id===it.co);
+            if (!co?.phone) return;
+            if (!groups[it.co]) groups[it.co] = { co, items:[] };
+            groups[it.co].items.push(it);
+          });
+          const entries = Object.values(groups);
+          if (!entries.length) return null;
+          return (
+            <div style={{ marginTop:10, marginBottom:4 }}>
+              <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:6 }}>
+                {lang==="bn"?"💬 WhatsApp-এ পাঠান":"💬 Send via WhatsApp"}
+              </div>
+              {entries.map(({co, items})=>(
+                <a key={co.id} href={waLinkGroup(co.phone, items)} target="_blank" rel="noreferrer"
+                  style={{ ...s.waBtn, display:"flex", justifyContent:"space-between", marginBottom:7, textDecoration:"none", borderRadius:10 }}>
+                  <span>💬 {co.name}</span>
+                  <span style={{ opacity:0.8, fontSize:11 }}>{items.length} {lang==="bn"?"টি পণ্য":"items"}</span>
+                </a>
+              ))}
+            </div>
+          );
+        })()}
         {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&(
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
@@ -1566,6 +1631,28 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               ))}
             </div>
           )}
+          <div style={s.card}>
+            <div style={s.settingsLbl}>{lang==="bn"?"💬 WhatsApp Message Style":"💬 WhatsApp Message Style"}</div>
+            <div style={{ fontSize:11, color:"#71717a", marginBottom:12 }}>
+              {lang==="bn"?"কোম্পানিকে WhatsApp করার সময় কোন style-এ message যাবে বেছে নিন":"Choose how messages look when sending to companies"}
+            </div>
+            {WA_STYLES.map(st=>(
+              <button key={st.id} onClick={()=>setWaStyle(st.id)}
+                style={{ width:"100%", textAlign:"left", background:waStyle===st.id?"#1c1917":"#09090b",
+                  border:`1px solid ${waStyle===st.id?"#f97316":"#27272a"}`, borderRadius:10,
+                  padding:"10px 12px", marginBottom:8, cursor:"pointer", fontFamily:"inherit" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                  <span style={{ fontSize:12, fontWeight:700, color:waStyle===st.id?"#f97316":"#a1a1aa" }}>
+                    {waStyle===st.id?"✅ ":""}{lang==="bn"?st.labelBn:st.labelEn}
+                  </span>
+                </div>
+                <pre style={{ fontSize:11, color:"#71717a", margin:0, fontFamily:"monospace", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
+                  {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._ 🙏 Thanks`}
+                </pre>
+              </button>
+            ))}
+          </div>
+
           <div style={s.card}>
             <div style={s.settingsLbl}>{t.languageLbl}</div>
             <div style={s.langSw}>
