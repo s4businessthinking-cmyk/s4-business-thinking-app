@@ -430,10 +430,15 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
     try {
       let shopId=null, shopData=null;
       if (!isOwner) {
-        const q = query(collection(db,"shops"), where("inviteCode","==",inviteCode.trim().toUpperCase()));
-        const snap = await getDocs(q);
-        if (snap.empty) throw { code:"invite/not-found" };
-        shopId=snap.docs[0].id; shopData=snap.docs[0].data();
+        // ── Single-use invite code lookup ──
+        const codeRef = doc(db,"inviteCodes", inviteCode.trim().toUpperCase());
+        const codeSnap = await getDoc(codeRef);
+        if (!codeSnap.exists()) throw { code:"invite/not-found" };
+        if (codeSnap.data().used === true) throw { code:"invite/already-used" };
+        shopId = codeSnap.data().shopId;
+        const shopSnap2 = await getDoc(doc(db,"shops",shopId));
+        if (!shopSnap2.exists()) throw { code:"invite/not-found" };
+        shopData = shopSnap2.data();
       }
       const cred = await createUserWithEmailAndPassword(auth,email.trim(),pw);
       const uid = cred.user.uid;
@@ -457,19 +462,39 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
           await setDoc(doc(db,"shops",shopId),{
             companyName:companyName.trim(), ownerName:personName.trim(), ownerUid:uid,
             country, area:area.trim(), mobile:mobile.trim(), email:email.trim(),
-            inviteCode:generateInviteCode(),
             positions:[],
             createdAt:serverTimestamp(),
           });
+          // ── Create 3 initial single-use invite codes ──
+          for (let i=0; i<3; i++) {
+            const code = generateInviteCode();
+            await setDoc(doc(db,"inviteCodes",code),{
+              shopId:uid, used:false, createdAt:serverTimestamp(),
+            });
+          }
         } catch(e) {
           if (userCreated) { try { await deleteDoc(doc(db,"users",uid)); } catch {} }
           try { await cred.user.delete(); } catch {}
           throw {code:"shop/create-failed",message:e.message};
         }
+      } else {
+        // ── Mark this invite code as used ──
+        try {
+          await updateDoc(doc(db,"inviteCodes",inviteCode.trim().toUpperCase()),{
+            used:true, usedBy:uid, usedByName:personName.trim(), usedAt:serverTimestamp(),
+          });
+        } catch(e) { console.warn("Could not mark code used:",e); }
       }
       try { await sendEmailVerification(cred.user); } catch(e) { console.warn(e); }
       toast(t.n9);
-    } catch(err) { toast(friendlyAuthError(err,lang),"err"); }
+    } catch(err) {
+      // Handle invite/already-used error with friendly message
+      if (err.code === "invite/already-used") {
+        toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
+      } else {
+        toast(friendlyAuthError(err,lang),"err");
+      }
+    }
     finally { setBusy(false); }
   };
 
@@ -560,6 +585,24 @@ function PermToggle({ isOn, onToggle }) {
   );
 }
 
+// ─── INVITE CODE ROW ─────────────────────────────────────────
+function InviteCodeRow({ c, lang, t, onDelete }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(c.code); setCopied(true); setTimeout(()=>setCopied(false),2000); }
+    catch { alert(c.code); }
+  };
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid #27272a" }}>
+      <span style={{ fontSize:16, fontWeight:800, color:"#f97316", fontFamily:"monospace", flex:1, letterSpacing:2 }}>{c.code}</span>
+      <button style={{ padding:"6px 12px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", cursor:"pointer", fontSize:12, fontWeight:700 }}
+        onClick={copy}>{copied?(lang==="bn"?"✅ কপি":"✅ Copied"):(lang==="bn"?"📋 কপি":"📋 Copy")}</button>
+      <button style={{ padding:"6px 8px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12 }}
+        onClick={()=>onDelete(c.code)}>🗑️</button>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const isOwner = profile.role==="owner";
@@ -572,6 +615,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [orders,setOrders]=useState([]);
   const [cos,setCos]=useState([]);
   const [team,setTeam]=useState([]);
+  const [inviteCodes,setInviteCodes]=useState([]);
   const [syncState,setSyncState]=useState("connecting");
   const [localShop,setLocalShop]=useState(shopProp);
 
@@ -634,7 +678,33 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   },[shopId]);
 
+  // ── Invite codes listener (owner only) ──
+  useEffect(() => {
+    if (!isOwner) return;
+    return onSnapshot(
+      query(collection(db,"inviteCodes"), where("shopId","==",shopId)),
+      snap => setInviteCodes(snap.docs.map(d=>({...d.data(), code:d.id}))),
+      err  => console.error(err)
+    );
+  },[shopId, isOwner]);
+
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
+
+  // ── Generate a new single-use invite code ──
+  const generateNewCode = async () => {
+    try {
+      const code = generateInviteCode();
+      await setDoc(doc(db,"inviteCodes",code),{
+        shopId, used:false, createdAt:serverTimestamp(),
+      });
+      toast(lang==="bn"?"✅ নতুন Invite Code তৈরি হয়েছে!":"✅ New invite code created!");
+    } catch(e) { hErr(e); }
+  };
+
+  const deleteInviteCode = async (code) => {
+    try { await deleteDoc(doc(db,"inviteCodes",code)); }
+    catch(e) { hErr(e); }
+  };
 
   // ── INVOICE ITEM FUNCTIONS ──
   const updCurrentItem = (field, val) => {
@@ -1377,12 +1447,40 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <div style={{ fontSize:12, color:"#71717a" }}>📱 {localShop.mobile} · {localShop.area}</div>
             </div>
           )}
-          {isOwner&&localShop?.inviteCode&&(
+          {isOwner&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
-              <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
+                <button style={s.addCoBtn} onClick={generateNewCode}>
+                  {lang==="bn"?"+ নতুন Code":"+ New Code"}
+                </button>
+              </div>
               <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:12 }}>{t.inviteCodeDesc}</div>
-              <div style={s.inviteBox}>{localShop.inviteCode}</div>
-              <button style={{ ...s.sendBtn, marginTop:10 }} onClick={copyCode}>{copyState?t.codeCopied:t.copyCode}</button>
+
+              {/* Unused codes */}
+              {inviteCodes.filter(c=>!c.used).length === 0 && (
+                <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
+                  {lang==="bn"?"কোনো active code নেই। নতুন তৈরি করুন।":"No active codes. Generate one above."}
+                </div>
+              )}
+              {inviteCodes.filter(c=>!c.used).map(c=>(
+                <InviteCodeRow key={c.code} c={c} lang={lang} t={t} onDelete={deleteInviteCode} />
+              ))}
+
+              {/* Used codes (collapsed) */}
+              {inviteCodes.filter(c=>c.used).length > 0 && (
+                <div style={{ marginTop:12, paddingTop:10, borderTop:"1px solid #27272a" }}>
+                  <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:8 }}>
+                    {lang==="bn"?"ব্যবহৃত Codes":"Used Codes"} ({inviteCodes.filter(c=>c.used).length})
+                  </div>
+                  {inviteCodes.filter(c=>c.used).map(c=>(
+                    <div key={c.code} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderTop:"1px solid #1f1f23" }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:"#3f3f46", fontFamily:"monospace", flex:1, letterSpacing:1 }}>{c.code}</span>
+                      <span style={{ fontSize:11, color:"#52525b" }}>✅ {c.usedByName||"—"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {isOwner&&(
