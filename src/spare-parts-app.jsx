@@ -1444,7 +1444,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
               <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5", marginBottom:4 }}>🏢 {localShop.companyName}</div>
               <div style={{ fontSize:12, color:"#71717a" }}>{t.ownerLabel}: {localShop.ownerName}</div>
-              <div style={{ fontSize:12, color:"#71717a" }}>📱 {localShop.mobile} · {localShop.area}</div>
+              <div style={{ fontSize:12, color:"#71717a" }}>📍 {localShop.area}</div>
             </div>
           )}
           {isOwner&&(
@@ -1527,7 +1527,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"🏢":"👨‍💼"}</div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
-                      <div style={{ fontSize:11, color:"#71717a" }}>{m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)} · {m.email}</div>
+                      <div style={{ fontSize:11, color:"#71717a" }}>
+                        {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)}
+                        {m.mobile&&<span> · 📱 {m.mobile}</span>}
+                        {m.area&&<span> · {m.area}</span>}
+                      </div>
                     </div>
                   </div>
                   {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
