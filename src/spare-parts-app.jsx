@@ -592,6 +592,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [newNm,setNewNm]=useState(""); const [newPh,setNewPh]=useState("");
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
+  const [searchQ,setSearchQ]=useState("");
 
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
@@ -836,6 +837,43 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const unread = isOwner || isOrderManager
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
+
+  // ── SEARCH FILTER ──
+  const filterOrders = (list) => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(o => {
+      const noMatch = getOrderDisplayNo(o).toLowerCase().includes(q);
+      const itemMatch = o.items?.some(it =>
+        it.name?.toLowerCase().includes(q) ||
+        it.brand?.toLowerCase().includes(q) ||
+        it.code?.toLowerCase().includes(q)
+      );
+      const d = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+      // Match against several date formats so user can type e.g. "9 may", "09/05", "2026"
+      const dateFormats = [
+        d.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" }),
+        d.toLocaleDateString("en-GB",  { day:"numeric", month:"long", year:"numeric" }),
+        d.toLocaleDateString("en-GB",  { day:"2-digit", month:"2-digit", year:"numeric" }), // 09/05/2026
+        d.toLocaleDateString("en-GB",  { day:"numeric", month:"short" }),                   // 9 May
+        String(d.getFullYear()),
+      ];
+      const dateMatch = dateFormats.some(f => f.toLowerCase().includes(q));
+      return noMatch || itemMatch || dateMatch;
+    });
+  };
+
+  // ── DAILY GROUP ──
+  const groupByDay = (list) => {
+    const groups = {};
+    list.forEach(o => {
+      const d = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+      const key = d.toLocaleDateString(lang==="bn"?"bn-BD":"en-GB", { day:"numeric", month:"long", year:"numeric" });
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(o);
+    });
+    return Object.entries(groups); // [ [dateStr, [orders]], ... ]
+  };
 
   const visibleTabs = isOwner
     ? [["owner",t.tabOwner],["companies",t.tabCompany],["settings",t.tabSettings]]
@@ -1194,7 +1232,35 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
           {orders.length>0&&(<>
             <div style={{ ...s.secTitle, marginTop:20 }}>{t.sentOrders}</div>
-            {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
+            {/* Search box */}
+            <div style={{ position:"relative", marginBottom:12 }}>
+              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+              <input
+                style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+                placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+                value={searchQ}
+                onChange={e=>setSearchQ(e.target.value)}
+              />
+              {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+            </div>
+            {/* Daily grouped orders */}
+            {(() => {
+              const filtered = filterOrders(orders);
+              if (!filtered.length) return (
+                <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+              );
+              const groups = groupByDay(filtered);
+              return groups.map(([dateStr, dayOrders]) => (
+                <div key={dateStr}>
+                  <div style={s.dayHeader}>
+                    <span style={s.dayDot} />
+                    <span style={s.dayLabel}>📅 {dateStr}</span>
+                    <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                  </div>
+                  {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
+                </div>
+              ));
+            })()}
           </>)}
           {orders.length===0&&!can("sendOrder")&&(
             <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
@@ -1204,8 +1270,38 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {isOwner&&tab==="owner"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
-          {orders.length===0&&<div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>}
-          {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+          {/* Search box */}
+          <div style={{ position:"relative", marginBottom:12 }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+            <input
+              style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+              placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+              value={searchQ}
+              onChange={e=>setSearchQ(e.target.value)}
+            />
+            {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+          </div>
+          {/* Daily grouped orders */}
+          {orders.length===0
+            ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+            : (() => {
+                const filtered = filterOrders(orders);
+                if (!filtered.length) return (
+                  <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+                );
+                const groups = groupByDay(filtered);
+                return groups.map(([dateStr, dayOrders]) => (
+                  <div key={dateStr}>
+                    <div style={s.dayHeader}>
+                      <span style={s.dayDot} />
+                      <span style={s.dayLabel}>📅 {dateStr}</span>
+                      <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                    </div>
+                    {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+                  </div>
+                ));
+              })()
+          }
         </div>
       )}
 
@@ -1614,4 +1710,8 @@ const s = {
   sideTabA:       { background:"#f97316", color:"#fff" },
   sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
   sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
+  dayHeader:   { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:"1px solid #27272a" },
+  dayDot:      { width:8, height:8, borderRadius:"50%", background:"#f97316", flexShrink:0 },
+  dayLabel:    { fontSize:13, fontWeight:700, color:"#f97316", flex:1 },
+  dayCount:    { fontSize:11, color:"#71717a", background:"#27272a", padding:"2px 8px", borderRadius:10 },
 };
