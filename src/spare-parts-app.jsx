@@ -145,6 +145,16 @@ const TR = {
     permSaved:"পারমিশন আপডেট হয়েছে ✅",
     positionAdded:"পদবী যোগ হয়েছে ✅", positionDeleted:"পদবী মুছে ফেলা হয়েছে।",
     defaultPosition:"সেলসম্যান (ডিফল্ট)",
+    tabProducts:"📦 পণ্য",
+    pmTitle:"📦 Product Master",
+    pmAdd:"+ নতুন পণ্য",
+    pmName:"পণ্যের নাম *", pmCode:"কোড / মডেল", pmBrand:"ব্র্যান্ড",
+    pmCategory:"ক্যাটাগরি", pmPrice:"দাম (৳)", pmUnit:"ইউনিট",
+    pmSearch:"পণ্য খুঁজুন...",
+    pmNoProducts:"কোনো পণ্য নেই। যোগ করুন।",
+    pmAdded:"পণ্য যোগ হয়েছে ✅", pmUpdated:"পণ্য আপডেট হয়েছে ✅", pmDeleted:"পণ্য মুছে ফেলা হয়েছে।",
+    pmSelectHint:"পণ্য বেছে নিন বা নিজে লিখুন",
+    pmFromMaster:"📦 Product Master থেকে বেছে নিন",
   },
   en: {
     appSub:"Parts Order Management",
@@ -228,6 +238,16 @@ const TR = {
     permSaved:"Permissions updated ✅",
     positionAdded:"Position added ✅", positionDeleted:"Position deleted.",
     defaultPosition:"Salesman (Default)",
+    tabProducts:"📦 Products",
+    pmTitle:"📦 Product Master",
+    pmAdd:"+ New Product",
+    pmName:"Product Name *", pmCode:"Code / Model", pmBrand:"Brand",
+    pmCategory:"Category", pmPrice:"Price (৳)", pmUnit:"Unit",
+    pmSearch:"Search products...",
+    pmNoProducts:"No products yet. Add one.",
+    pmAdded:"Product added ✅", pmUpdated:"Product updated ✅", pmDeleted:"Product deleted.",
+    pmSelectHint:"Select a product or type manually",
+    pmFromMaster:"📦 Select from Product Master",
   },
 };
 
@@ -643,6 +663,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [cos,setCos]=useState([]);
   const [team,setTeam]=useState([]);
   const [inviteCodes,setInviteCodes]=useState([]);
+  const [products,setProducts]=useState([]);
   const [syncState,setSyncState]=useState("connecting");
   const [localShop,setLocalShop]=useState(shopProp);
 
@@ -718,6 +739,15 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   },[shopId, isOwner]);
 
+  // ── Products listener ──
+  useEffect(() => {
+    return onSnapshot(
+      query(collection(db,"products"), where("shopId","==",shopId), orderBy("name")),
+      snap => setProducts(snap.docs.map(d=>({...d.data(),id:d.id}))),
+      err  => console.error(err)
+    );
+  },[shopId]);
+
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
 
   // ── Generate a new single-use invite code ──
@@ -734,6 +764,53 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const deleteInviteCode = async (code) => {
     try { await deleteDoc(doc(db,"inviteCodes",code)); }
     catch(e) { hErr(e); }
+  };
+
+  // ── PRODUCT MASTER STATE ──
+  const [pmSearch,setPmSearch]=useState("");
+  const [pmShowAdd,setPmShowAdd]=useState(false);
+  const [pmEditId,setPmEditId]=useState(null);
+  const [pmForm,setPmForm]=useState({name:"",code:"",brand:"",category:"",price:"",unit:"Pcs"});
+  const [showProductPicker,setShowProductPicker]=useState(false);
+  const [productPickerQ,setProductPickerQ]=useState("");
+
+  const pmReset = () => setPmForm({name:"",code:"",brand:"",category:"",price:"",unit:"Pcs"});
+  const pmUpd = (f,v) => setPmForm(p=>({...p,[f]:v}));
+
+  const addProduct = async () => {
+    if (!pmForm.name.trim()) return toast(t.e3,"err");
+    try {
+      await addDoc(collection(db,"products"),{
+        shopId, name:pmForm.name.trim(), code:pmForm.code.trim(),
+        brand:pmForm.brand.trim(), category:pmForm.category.trim(),
+        price:pmForm.price.trim(), unit:pmForm.unit||"Pcs",
+        createdAt:serverTimestamp(),
+      });
+      pmReset(); setPmShowAdd(false); toast(t.pmAdded);
+    } catch(e) { hErr(e); }
+  };
+
+  const editProduct = async (id) => {
+    if (!pmForm.name.trim()) return toast(t.e3,"err");
+    try {
+      await updateDoc(doc(db,"products",id),{
+        name:pmForm.name.trim(), code:pmForm.code.trim(),
+        brand:pmForm.brand.trim(), category:pmForm.category.trim(),
+        price:pmForm.price.trim(), unit:pmForm.unit||"Pcs",
+      });
+      pmReset(); setPmEditId(null); toast(t.pmUpdated);
+    } catch(e) { hErr(e); }
+  };
+
+  const deleteProduct = async (id) => {
+    if (!window.confirm(lang==="bn"?"এই পণ্যটি মুছে ফেলবেন?":"Delete this product?")) return;
+    try { await deleteDoc(doc(db,"products",id)); toast(t.pmDeleted,"err"); }
+    catch(e) { hErr(e); }
+  };
+
+  const selectProductToOrder = (prod) => {
+    setCurrentItem(p=>({...p, name:prod.name, code:prod.code||"", brand:prod.brand||"", unit:prod.unit||"Pcs"}));
+    setShowProductPicker(false); setProductPickerQ("");
   };
 
   // ── INVOICE ITEM FUNCTIONS ──
@@ -988,7 +1065,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["settings",t.tabSettings]]
+    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["settings",t.tabSettings]]
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
@@ -1266,6 +1343,36 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
               {/* ── ITEM ENTRY FORM ── */}
               <div style={{ ...s.card, border:"1px solid #3f3f46" }}>
+                {/* Product picker trigger */}
+                {products.length>0&&(
+                  <div style={{ marginBottom:8 }}>
+                    <button style={{ ...s.addInvoiceBtn, background:"rgba(99,102,241,0.08)", borderColor:"#6366f1", color:"#818cf8", padding:"9px" }}
+                      onClick={()=>{ setShowProductPicker(!showProductPicker); setProductPickerQ(""); }}>
+                      📦 {t.pmFromMaster}
+                    </button>
+                    {showProductPicker&&(
+                      <div style={{ background:"#09090b", border:"1px solid #3f3f46", borderRadius:10, marginTop:6, overflow:"hidden" }}>
+                        <input autoFocus style={{ ...s.inp, borderRadius:0, borderLeft:"none", borderRight:"none", borderTop:"none", borderColor:"#27272a" }}
+                          placeholder={t.pmSearch} value={productPickerQ}
+                          onChange={e=>setProductPickerQ(e.target.value)} />
+                        <div style={{ maxHeight:200, overflowY:"auto" }}>
+                          {products
+                            .filter(p=> !productPickerQ || p.name.toLowerCase().includes(productPickerQ.toLowerCase()) || (p.code||"").toLowerCase().includes(productPickerQ.toLowerCase()) || (p.brand||"").toLowerCase().includes(productPickerQ.toLowerCase()) || (p.category||"").toLowerCase().includes(productPickerQ.toLowerCase()))
+                            .map(p=>(
+                              <button key={p.id} onClick={()=>selectProductToOrder(p)}
+                                style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:"1px solid #27272a", color:"#e4e4e7", cursor:"pointer", fontFamily:"inherit" }}>
+                                <div style={{ fontSize:13, fontWeight:700 }}>{p.name}</div>
+                                <div style={{ fontSize:11, color:"#71717a" }}>
+                                  {[p.code,p.brand,p.category].filter(Boolean).join(" · ")}
+                                  {p.price&&<span style={{ color:"#22c55e", marginLeft:6 }}>৳{p.price}</span>}
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <input
                   ref={nameRef}
                   style={{ ...s.inp, marginBottom:8, fontSize:15, fontWeight:600 }}
@@ -1441,6 +1548,166 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 ));
               })()
           }
+        </div>
+      )}
+
+      {isOwner&&tab==="products"&&(
+        <div style={isDesktop?s.desktopPanel:s.panel}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
+            <div style={{ display:"flex", gap:8 }}>
+              <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>
+                📥 {lang==="bn"?"Import":"Import"}
+                <input type="file" accept=".xls,.xlsx,.csv" style={{ display:"none" }} onChange={async (e)=>{
+                  const file = e.target.files[0]; if (!file) return;
+                  toast(lang==="bn"?"📥 Import হচ্ছে...":"📥 Importing...");
+                  try {
+                    const { default: Papa } = await import('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js').catch(()=>({default:null}));
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                      try {
+                        // Parse CSV/Excel as text
+                        const text = ev.target.result;
+                        const lines = text.split('\n').filter(l=>l.trim());
+                        if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data in file","err");
+                        const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+                        // Map headers
+                        const nameIdx = headers.findIndex(h=>h.includes('name')||h.includes('product'));
+                        const codeIdx = headers.findIndex(h=>h.includes('code')||h.includes('model'));
+                        const brandIdx = headers.findIndex(h=>h.includes('brand')||h.includes('company'));
+                        const catIdx = headers.findIndex(h=>h.includes('categ')||h.includes('group'));
+                        const priceIdx = headers.findIndex(h=>h.includes('price')||h.includes('rate')||h.includes('exclusive'));
+                        const unitIdx = headers.findIndex(h=>h.includes('unit'));
+                        if (nameIdx<0) return toast(lang==="bn"?"Product Name column পাওয়া যায়নি":"Could not find Product Name column","err");
+                        // Parse rows in batches
+                        const rows = lines.slice(1);
+                        let added=0, batch=[];
+                        for (const line of rows) {
+                          const cells = line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+                          const name = cells[nameIdx]||''; if (!name||name==='nan') continue;
+                          let price = priceIdx>=0?(cells[priceIdx]||''):'';
+                          try { if (parseFloat(price)===0) price=''; } catch{}
+                          let brand = brandIdx>=0?(cells[brandIdx]||''):'';
+                          if (brand==='UNAVAILABLE') brand='';
+                          let cat = catIdx>=0?(cells[catIdx]||''):'';
+                          if (cat==='UNAVAILABLE') cat='';
+                          let unit = unitIdx>=0?(cells[unitIdx]||'Pcs'):'Pcs';
+                          if (unit==='Nos'||unit==='nan'||!unit) unit='Pcs';
+                          batch.push({ shopId, name:name.trim(), code:(codeIdx>=0?cells[codeIdx]||'':'').trim(), brand:brand.trim(), category:cat.trim(), price:price.trim(), unit, createdAt:serverTimestamp() });
+                          if (batch.length>=400) {
+                            await Promise.all(batch.map(p=>addDoc(collection(db,"products"),p)));
+                            added+=batch.length; batch=[];
+                            toast(`📥 ${added} ${lang==="bn"?"টি import হয়েছে...":"imported..."}`);
+                          }
+                        }
+                        if (batch.length>0) {
+                          await Promise.all(batch.map(p=>addDoc(collection(db,"products"),p)));
+                          added+=batch.length;
+                        }
+                        toast(`✅ ${added} ${lang==="bn"?"টি পণ্য import সম্পন্ন!":"products imported!"}`);
+                      } catch(err) { toast(err.message||"Import failed","err"); }
+                    };
+                    reader.readAsText(file);
+                  } catch(err) { toast(err.message||"Import failed","err"); }
+                  e.target.value='';
+                }} />
+              </label>
+              <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); }}>
+                {pmShowAdd?`✕ ${t.cancel}`:t.pmAdd}
+              </button>
+            </div>
+          </div>
+
+          {/* Add form */}
+          {pmShowAdd&&(
+            <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:10 }}>{t.pmAdd}</div>
+              <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.pmName} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
+              <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                <input style={{ ...s.inp, flex:1 }} placeholder={t.pmCode} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
+                <input style={{ ...s.inp, flex:1 }} placeholder={t.pmBrand} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
+              </div>
+              <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                <input style={{ ...s.inp, flex:2 }} placeholder={t.pmCategory} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
+                <input style={{ ...s.inp, flex:1 }} placeholder={t.pmPrice} inputMode="numeric" value={pmForm.price} onChange={e=>pmUpd("price",e.target.value)} />
+              </div>
+              <div style={{ display:"flex", gap:7, marginBottom:12 }}>
+                <select style={{ ...s.sel, flex:1 }} value={pmForm.unit} onChange={e=>pmUpd("unit",e.target.value)}>
+                  <option value="Pcs">{lang==="bn"?"পিস":"Pcs"}</option>
+                  <option value="Set">{lang==="bn"?"সেট":"Set"}</option>
+                  <option value="Kg">Kg</option>
+                  <option value="Ltr">Ltr</option>
+                  <option value="Box">{lang==="bn"?"বক্স":"Box"}</option>
+                </select>
+              </div>
+              <button style={{ ...s.sendBtn, padding:"10px" }} onClick={addProduct}>{t.addBtn}</button>
+            </div>
+          )}
+
+          {/* Search */}
+          <div style={{ position:"relative", marginBottom:12 }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+            <input style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+              placeholder={t.pmSearch} value={pmSearch} onChange={e=>setPmSearch(e.target.value)} />
+            {pmSearch&&<button onClick={()=>setPmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16 }}>✕</button>}
+          </div>
+
+          {/* Product list */}
+          {products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
+          {products
+            .filter(p=>!pmSearch||(p.name+p.code+p.brand+p.category).toLowerCase().includes(pmSearch.toLowerCase()))
+            .map(p=>(
+              <div key={p.id} style={s.card}>
+                {pmEditId===p.id?(
+                  <div>
+                    <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:10 }}>{t.editTitle}</div>
+                    <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.pmName} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
+                    <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                      <input style={{ ...s.inp, flex:1 }} placeholder={t.pmCode} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
+                      <input style={{ ...s.inp, flex:1 }} placeholder={t.pmBrand} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
+                    </div>
+                    <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                      <input style={{ ...s.inp, flex:2 }} placeholder={t.pmCategory} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
+                      <input style={{ ...s.inp, flex:1 }} placeholder={t.pmPrice} inputMode="numeric" value={pmForm.price} onChange={e=>pmUpd("price",e.target.value)} />
+                    </div>
+                    <select style={{ ...s.sel, marginBottom:10 }} value={pmForm.unit} onChange={e=>pmUpd("unit",e.target.value)}>
+                      <option value="Pcs">{lang==="bn"?"পিস":"Pcs"}</option>
+                      <option value="Set">{lang==="bn"?"সেট":"Set"}</option>
+                      <option value="Kg">Kg</option>
+                      <option value="Ltr">Ltr</option>
+                      <option value="Box">{lang==="bn"?"বক্স":"Box"}</option>
+                    </select>
+                    <div style={s.row}>
+                      <button style={{ ...s.savBtn, flex:1, padding:"10px" }} onClick={()=>editProduct(p.id)}>{t.saveEdit}</button>
+                      <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmEditId(null); pmReset(); }}>{t.cancel}</button>
+                    </div>
+                  </div>
+                ):(
+                  <div>
+                    <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
+                      <div style={{ width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{p.name}</div>
+                        <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>
+                          {p.code&&<span>📋 {p.code}</span>}
+                          {p.code&&p.brand&&<span> · </span>}
+                          {p.brand&&<span>🏷️ {p.brand}</span>}
+                          {p.category&&<span style={{ marginLeft:6, background:"#27272a", padding:"1px 7px", borderRadius:10 }}>🗂️ {p.category}</span>}
+                        </div>
+                        <div style={{ fontSize:12, marginTop:4, display:"flex", gap:10 }}>
+                          {p.price&&<span style={{ color:"#22c55e", fontWeight:700 }}>৳ {p.price}</span>}
+                          <span style={{ color:"#71717a" }}>{p.unit}</span>
+                        </div>
+                      </div>
+                      <div style={{ display:"flex", gap:6, flexShrink:0 }}>
+                        <button style={s.edBtn} onClick={()=>{ setPmEditId(p.id); setPmForm({name:p.name,code:p.code||"",brand:p.brand||"",category:p.category||"",price:p.price||"",unit:p.unit||"Pcs"}); setPmShowAdd(false); }}>✏️</button>
+                        <button style={s.dlBtn} onClick={()=>deleteProduct(p.id)}>🗑️</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
         </div>
       )}
 
