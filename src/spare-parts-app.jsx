@@ -1559,7 +1559,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 </button>
               )}
 
-              {/* WA style */}
+              {/* WA style - owner only */}
+              {isOwner&&(
               <button style={s.settingsRow} onClick={()=>setSettingsPage("wastyle")}>
                 <span style={s.settingsRowIcon}>💬</span>
                 <div style={{ flex:1 }}>
@@ -1568,6 +1569,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 </div>
                 <span style={s.settingsArrow}>›</span>
               </button>
+              )}
 
               {/* Language */}
               <button style={s.settingsRow} onClick={()=>setSettingsPage("language")}>
