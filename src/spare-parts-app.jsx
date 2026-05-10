@@ -22,6 +22,7 @@ import {
   getDoc,
   getDocs,
   runTransaction,
+  writeBatch,
   serverTimestamp,
 } from "firebase/firestore";
 import {
@@ -739,14 +740,17 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   },[shopId, isOwner]);
 
-  // ── Products listener ──
-  useEffect(() => {
-    return onSnapshot(
-      query(collection(db,"products"), where("shopId","==",shopId), orderBy("name")),
-      snap => setProducts(snap.docs.map(d=>({...d.data(),id:d.id}))),
-      err  => console.error(err)
-    );
-  },[shopId]);
+  // ── Products — one-time fetch (not real-time, too heavy for 3000+ items) ──
+  const [productsLoading,setProductsLoading]=useState(false);
+  const fetchProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId), orderBy("name")));
+      setProducts(snap.docs.map(d=>({...d.data(),id:d.id})));
+    } catch(e) { console.error(e); }
+    finally { setProductsLoading(false); }
+  };
+  useEffect(() => { fetchProducts(); },[shopId]);
 
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
 
@@ -1556,60 +1560,91 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
             <div style={{ display:"flex", gap:8 }}>
+              {/* Refresh */}
+              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }}
+                onClick={fetchProducts} disabled={productsLoading}>
+                {productsLoading?"⏳":"🔄"}
+              </button>
+              {/* Clear all */}
+              {products.length>0&&(
+                <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
+                  onClick={async()=>{
+                    if (!window.confirm(lang==="bn"?`সব ${products.length}টি পণ্য মুছে ফেলবেন?`:`Delete all ${products.length} products?`)) return;
+                    toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
+                    try {
+                      const BATCH=500;
+                      for (let i=0;i<products.length;i+=BATCH) {
+                        const batch=writeBatch(db);
+                        products.slice(i,i+BATCH).forEach(p=>batch.delete(doc(db,"products",p.id)));
+                        await batch.commit();
+                      }
+                      setProducts([]);
+                      toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
+                    } catch(e){ hErr(e); }
+                  }}>
+                  🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}
+                </button>
+              )}
+              {/* Import CSV */}
               <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>
                 📥 {lang==="bn"?"Import":"Import"}
-                <input type="file" accept=".xls,.xlsx,.csv" style={{ display:"none" }} onChange={async (e)=>{
+                <input type="file" accept=".csv" style={{ display:"none" }} onChange={async (e)=>{
                   const file = e.target.files[0]; if (!file) return;
-                  toast(lang==="bn"?"📥 Import হচ্ছে...":"📥 Importing...");
-                  try {
-                    const { default: Papa } = await import('https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js').catch(()=>({default:null}));
-                    const reader = new FileReader();
-                    reader.onload = async (ev) => {
-                      try {
-                        // Parse CSV/Excel as text
-                        const text = ev.target.result;
-                        const lines = text.split('\n').filter(l=>l.trim());
-                        if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data in file","err");
-                        const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
-                        // Map headers
-                        const nameIdx = headers.findIndex(h=>h.includes('name')||h.includes('product'));
-                        const codeIdx = headers.findIndex(h=>h.includes('code')||h.includes('model'));
-                        const brandIdx = headers.findIndex(h=>h.includes('brand')||h.includes('company'));
-                        const catIdx = headers.findIndex(h=>h.includes('categ')||h.includes('group'));
-                        const priceIdx = headers.findIndex(h=>h.includes('price')||h.includes('rate')||h.includes('exclusive'));
-                        const unitIdx = headers.findIndex(h=>h.includes('unit'));
-                        if (nameIdx<0) return toast(lang==="bn"?"Product Name column পাওয়া যায়নি":"Could not find Product Name column","err");
-                        // Parse rows in batches
-                        const rows = lines.slice(1);
-                        let added=0, batch=[];
-                        for (const line of rows) {
-                          const cells = line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
-                          const name = cells[nameIdx]||''; if (!name||name==='nan') continue;
-                          let price = priceIdx>=0?(cells[priceIdx]||''):'';
-                          try { if (parseFloat(price)===0) price=''; } catch{}
-                          let brand = brandIdx>=0?(cells[brandIdx]||''):'';
-                          if (brand==='UNAVAILABLE') brand='';
-                          let cat = catIdx>=0?(cells[catIdx]||''):'';
-                          if (cat==='UNAVAILABLE') cat='';
-                          let unit = unitIdx>=0?(cells[unitIdx]||'Pcs'):'Pcs';
-                          if (unit==='Nos'||unit==='nan'||!unit) unit='Pcs';
-                          batch.push({ shopId, name:name.trim(), code:(codeIdx>=0?cells[codeIdx]||'':'').trim(), brand:brand.trim(), category:cat.trim(), price:price.trim(), unit, createdAt:serverTimestamp() });
-                          if (batch.length>=400) {
-                            await Promise.all(batch.map(p=>addDoc(collection(db,"products"),p)));
-                            added+=batch.length; batch=[];
-                            toast(`📥 ${added} ${lang==="bn"?"টি import হয়েছে...":"imported..."}`);
-                          }
-                        }
-                        if (batch.length>0) {
-                          await Promise.all(batch.map(p=>addDoc(collection(db,"products"),p)));
-                          added+=batch.length;
-                        }
-                        toast(`✅ ${added} ${lang==="bn"?"টি পণ্য import সম্পন্ন!":"products imported!"}`);
-                      } catch(err) { toast(err.message||"Import failed","err"); }
-                    };
-                    reader.readAsText(file);
-                  } catch(err) { toast(err.message||"Import failed","err"); }
                   e.target.value='';
+                  // Warn if products already exist
+                  if (products.length>0) {
+                    if (!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। নতুন করে import করলে duplicate হতে পারে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`There are already ${products.length} products. Import may create duplicates. Use "Clear All" first. Continue anyway?`)) return;
+                  }
+                  toast(lang==="bn"?"📥 ফাইল পড়া হচ্ছে...":"📥 Reading file...");
+                  try {
+                    const text = await file.text();
+                    const lines = text.split('\n').filter(l=>l.trim());
+                    if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data in file","err");
+                    const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
+                    const nameIdx  = headers.findIndex(h=>h.includes('name')||h.includes('product'));
+                    const codeIdx  = headers.findIndex(h=>h.includes('code')||h.includes('model'));
+                    const brandIdx = headers.findIndex(h=>h.includes('brand')||h.includes('company'));
+                    const catIdx   = headers.findIndex(h=>h.includes('categ')||h.includes('group'));
+                    const priceIdx = headers.findIndex(h=>h.includes('price')||h.includes('exclusive')||h.includes('rate'));
+                    const unitIdx  = headers.findIndex(h=>h.includes('unit'));
+                    if (nameIdx<0) return toast(lang==="bn"?"'ProductName' column পাওয়া যায়নি":"'ProductName' column not found","err");
+                    // Parse + deduplicate by name+code
+                    const seen = new Set();
+                    const allRows = [];
+                    for (const line of lines.slice(1)) {
+                      const cells = line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+                      const name = (cells[nameIdx]||'').trim();
+                      if (!name||name==='nan'||name==='ProductName') continue;
+                      const code = (codeIdx>=0?cells[codeIdx]||'':'').trim();
+                      const key = `${name}||${code}`.toLowerCase();
+                      if (seen.has(key)) continue; // skip duplicate
+                      seen.add(key);
+                      let brand = brandIdx>=0?(cells[brandIdx]||''):'';
+                      let cat   = catIdx>=0?(cells[catIdx]||''):'';
+                      let price = priceIdx>=0?(cells[priceIdx]||''):'';
+                      let unit  = unitIdx>=0?(cells[unitIdx]||'Pcs'):'Pcs';
+                      if (brand==='UNAVAILABLE') brand='';
+                      if (cat==='UNAVAILABLE') cat='';
+                      try { if (parseFloat(price)===0) price=''; } catch{ price=''; }
+                      if (!unit||unit==='Nos'||unit==='nan') unit='Pcs';
+                      allRows.push({ shopId, name, code, brand:brand.trim(), category:cat.trim(), price:price.trim(), unit });
+                    }
+                    if (allRows.length===0) return toast(lang==="bn"?"কোনো valid product পাওয়া যায়নি":"No valid products found","err");
+                    toast(lang==="bn"?`📥 ${allRows.length}টি পণ্য import হচ্ছে...`:`📥 Importing ${allRows.length} products...`);
+                    // writeBatch — 500 per batch
+                    let done=0;
+                    const BATCH=500;
+                    for (let i=0;i<allRows.length;i+=BATCH) {
+                      const chunk=allRows.slice(i,i+BATCH);
+                      const batch=writeBatch(db);
+                      chunk.forEach(p=>batch.set(doc(collection(db,"products")),{...p,createdAt:serverTimestamp()}));
+                      await batch.commit();
+                      done+=chunk.length;
+                      toast(lang==="bn"?`📥 ${done} / ${allRows.length} হয়েছে...`:`📥 ${done} / ${allRows.length}...`);
+                    }
+                    await fetchProducts();
+                    toast(lang==="bn"?`✅ ${done}টি পণ্য import সম্পন্ন!`:`✅ ${done} products imported!`);
+                  } catch(err) { toast(err.message||"Import failed","err"); }
                 }} />
               </label>
               <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); }}>
