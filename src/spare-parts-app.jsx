@@ -672,6 +672,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
+  const [settingsPage,setSettingsPage]=useState(null); // null = menu list
 
   useEffect(() => {
     if (!shopId) return;
@@ -1495,19 +1496,125 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {tab==="settings"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
-          <div style={s.secTitle}>{t.settingsTitle}</div>
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{t.profileTitle}</div>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{profile.personName}</div>
-                <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-                <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
+          {/* ── SETTINGS MENU ── */}
+          {!settingsPage&&(
+            <>
+              <div style={s.secTitle}>{t.settingsTitle}</div>
+
+              {/* Profile row */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("profile")}>
+                <span style={s.settingsRowIcon}>👤</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.profileTitle}</div>
+                  <div style={s.settingsRowSub}>{profile.personName}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Shop info row */}
+              {localShop&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("shop")}>
+                  <span style={s.settingsRowIcon}>🏢</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.shopInfoTitle}</div>
+                    <div style={s.settingsRowSub}>{localShop.companyName}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* Invite codes (owner only) */}
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("invite")}>
+                  <span style={s.settingsRowIcon}>🔗</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.inviteCodeTitle}</div>
+                    <div style={s.settingsRowSub}>{inviteCodes.filter(c=>!c.used).length} {lang==="bn"?"টি active":"active"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* Positions (owner only) */}
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("positions")}>
+                  <span style={s.settingsRowIcon}>📋</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.managePositionsTitle}</div>
+                    <div style={s.settingsRowSub}>{(localShop?.positions||[]).length} {lang==="bn"?"টি পদবী":"positions"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* Team members */}
+              {team.length>0&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("team")}>
+                  <span style={s.settingsRowIcon}>👥</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.teamTitle}</div>
+                    <div style={s.settingsRowSub}>{team.length} {lang==="bn"?"জন সদস্য":"members"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* WA style */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("wastyle")}>
+                <span style={s.settingsRowIcon}>💬</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{lang==="bn"?"WhatsApp Message Style":"WhatsApp Message Style"}</div>
+                  <div style={s.settingsRowSub}>{WA_STYLES.find(s=>s.id===waStyle)?.[lang==="bn"?"labelBn":"labelEn"]||""}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Language */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("language")}>
+                <span style={s.settingsRowIcon}>🌐</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.languageLbl}</div>
+                  <div style={s.settingsRowSub}>{lang==="bn"?"বাংলা":"English"}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Sync status */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("sync")}>
+                <span style={s.settingsRowIcon}>{syncState==="connected"?"🟢":syncState==="offline"?"🔴":"🟡"}</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.syncStatus}</div>
+                  <div style={s.settingsRowSub}>{syncState==="connected"?"Online":syncState==="offline"?"Offline":"Connecting..."}</div>
+                </div>
+              </button>
+
+              {/* Logout */}
+              <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
+            </>
+          )}
+
+          {/* ── SUB PAGES ── */}
+          {settingsPage&&(
+            <button style={s.backRowBtn} onClick={()=>setSettingsPage(null)}>
+              ← {lang==="bn"?"সেটিংস":"Settings"}
+            </button>
+          )}
+
+          {settingsPage==="profile"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.profileTitle}</div>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{profile.personName}</div>
+                  <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
+                  <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
+                </div>
               </div>
             </div>
-          </div>
-          {localShop&&(
+          )}
+
+          {settingsPage==="shop"&&localShop&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
               <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5", marginBottom:4 }}>🏢 {localShop.companyName}</div>
@@ -1515,18 +1622,15 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               <div style={{ fontSize:12, color:"#71717a" }}>📍 {localShop.area}</div>
             </div>
           )}
-          {isOwner&&(
+
+          {settingsPage==="invite"&&isOwner&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
               <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
                 <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
-                <button style={s.addCoBtn} onClick={generateNewCode}>
-                  {lang==="bn"?"+ নতুন Code":"+ New Code"}
-                </button>
+                <button style={s.addCoBtn} onClick={generateNewCode}>{lang==="bn"?"+ নতুন Code":"+ New Code"}</button>
               </div>
               <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:12 }}>{t.inviteCodeDesc}</div>
-
-              {/* Unused codes */}
-              {inviteCodes.filter(c=>!c.used).length === 0 && (
+              {inviteCodes.filter(c=>!c.used).length===0&&(
                 <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
                   {lang==="bn"?"কোনো active code নেই। নতুন তৈরি করুন।":"No active codes. Generate one above."}
                 </div>
@@ -1534,9 +1638,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               {inviteCodes.filter(c=>!c.used).map(c=>(
                 <InviteCodeRow key={c.code} c={c} lang={lang} t={t} onDelete={deleteInviteCode} />
               ))}
-
-              {/* Used codes (collapsed) */}
-              {inviteCodes.filter(c=>c.used).length > 0 && (
+              {inviteCodes.filter(c=>c.used).length>0&&(
                 <div style={{ marginTop:12, paddingTop:10, borderTop:"1px solid #27272a" }}>
                   <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:8 }}>
                     {lang==="bn"?"ব্যবহৃত Codes":"Used Codes"} ({inviteCodes.filter(c=>c.used).length})
@@ -1551,7 +1653,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               )}
             </div>
           )}
-          {isOwner&&(
+
+          {settingsPage==="positions"&&isOwner&&(
             <div style={s.card}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <div style={s.settingsLbl}>{t.managePositionsTitle}</div>
@@ -1586,7 +1689,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               }
             </div>
           )}
-          {team.length>0&&(
+
+          {settingsPage==="team"&&team.length>0&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
               {team.map((m,idx)=>(
@@ -1631,42 +1735,49 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
               ))}
             </div>
           )}
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{lang==="bn"?"💬 WhatsApp Message Style":"💬 WhatsApp Message Style"}</div>
-            <div style={{ fontSize:11, color:"#71717a", marginBottom:12 }}>
-              {lang==="bn"?"কোম্পানিকে WhatsApp করার সময় কোন style-এ message যাবে বেছে নিন":"Choose how messages look when sending to companies"}
-            </div>
-            {WA_STYLES.map(st=>(
-              <button key={st.id} onClick={()=>setWaStyle(st.id)}
-                style={{ width:"100%", textAlign:"left", background:waStyle===st.id?"#1c1917":"#09090b",
-                  border:`1px solid ${waStyle===st.id?"#f97316":"#27272a"}`, borderRadius:10,
-                  padding:"10px 12px", marginBottom:8, cursor:"pointer", fontFamily:"inherit" }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
-                  <span style={{ fontSize:12, fontWeight:700, color:waStyle===st.id?"#f97316":"#a1a1aa" }}>
-                    {waStyle===st.id?"✅ ":""}{lang==="bn"?st.labelBn:st.labelEn}
-                  </span>
-                </div>
-                <pre style={{ fontSize:11, color:"#71717a", margin:0, fontFamily:"monospace", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
-                  {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._ 🙏 Thanks`}
-                </pre>
-              </button>
-            ))}
-          </div>
 
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{t.languageLbl}</div>
-            <div style={s.langSw}>
-              <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="bn"?s.lBtnA:{}) }} onClick={()=>setLang("bn")}>বাংলা</button>
-              <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
+          {settingsPage==="wastyle"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{lang==="bn"?"💬 WhatsApp Message Style":"💬 WhatsApp Message Style"}</div>
+              <div style={{ fontSize:11, color:"#71717a", marginBottom:12 }}>
+                {lang==="bn"?"কোম্পানিকে WhatsApp করার সময় কোন style-এ message যাবে বেছে নিন":"Choose how messages look when sending to companies"}
+              </div>
+              {WA_STYLES.map(st=>(
+                <button key={st.id} onClick={()=>setWaStyle(st.id)}
+                  style={{ width:"100%", textAlign:"left", background:waStyle===st.id?"#1c1917":"#09090b",
+                    border:`1px solid ${waStyle===st.id?"#f97316":"#27272a"}`, borderRadius:10,
+                    padding:"10px 12px", marginBottom:8, cursor:"pointer", fontFamily:"inherit" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:waStyle===st.id?"#f97316":"#a1a1aa" }}>
+                      {waStyle===st.id?"✅ ":""}{lang==="bn"?st.labelBn:st.labelEn}
+                    </span>
+                  </div>
+                  <pre style={{ fontSize:11, color:"#71717a", margin:0, fontFamily:"monospace", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
+                    {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._ 🙏 Thanks`}
+                  </pre>
+                </button>
+              ))}
             </div>
-          </div>
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{t.syncStatus}</div>
-            <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
-              {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
+          )}
+
+          {settingsPage==="language"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.languageLbl}</div>
+              <div style={s.langSw}>
+                <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="bn"?s.lBtnA:{}) }} onClick={()=>setLang("bn")}>বাংলা</button>
+                <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
+              </div>
             </div>
-          </div>
-          {!isDesktop&&<button style={s.logoutBtn} onClick={handleLogout}>🚪 {t.logout}</button>}
+          )}
+
+          {settingsPage==="sync"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.syncStatus}</div>
+              <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
+                {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -1841,69 +1952,4 @@ const s = {
   addInvoiceBtn: { width:"100%", padding:"11px", borderRadius:10, border:"2px dashed #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
   // ── Invoice table ──
   invoiceCard: { background:"#18181b", border:"1px solid #27272a", borderRadius:12, overflow:"hidden", marginBottom:4 },
-  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:"#27272a", fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:"1px solid #27272a" },
-  invSerial:   { fontSize:12, fontWeight:800, color:"#f97316" },
-  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
-  // ──
-  oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
-  oId:         { fontSize:14, fontWeight:800, color:"#f4f4f5" },
-  sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
-  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:"1px solid #27272a", flexWrap:"wrap" },
-  iName:       { fontSize:13, color:"#d4d4d8", fontWeight:600 },
-  iMeta:       { fontSize:10, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
-  iQty:        { fontSize:12, color:"#71717a" },
-  iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
-  empty:       { textAlign:"center", padding:"50px 20px", color:"#52525b", fontSize:14 },
-  nBadge:      { fontSize:10, background:"#451a03", color:"#f97316", padding:"2px 7px", borderRadius:10, fontWeight:700 },
-  div:         { height:1, background:"#27272a", margin:"10px 0" },
-  oiCard:      { background:"#09090b", borderRadius:10, padding:12, marginBottom:8, border:"1px solid #27272a" },
-  row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
-  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#e4e4e7", fontSize:14, outline:"none", fontFamily:"inherit" },
-  waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
-  savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
-  sRow:        { display:"flex", gap:7, marginBottom:7 },
-  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#a1a1aa", fontSize:12, fontWeight:700, cursor:"pointer" },
-  stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
-  stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
-  delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
-  delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
-  flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
-  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:"1px solid #f97316", background:"transparent", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700 },
-  coIcon:      { width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
-  edBtn:       { padding:"6px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#27272a", color:"#e4e4e7", cursor:"pointer", fontSize:13 },
-  dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
-  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
-  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
-  authIcon:    { fontSize:48, marginBottom:8 },
-  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
-  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
-  authTitle:   { fontSize:24, fontWeight:800, color:"#f97316", marginBottom:6 },
-  authSub:     { fontSize:13, color:"#a1a1aa", marginBottom:20 },
-  authCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:16, textAlign:"left" },
-  authFooter:  { fontSize:12, color:"#a1a1aa", marginTop:16 },
-  linkBtn:     { background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
-  linkBtnInline:{ background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
-  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
-  roleCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:14, padding:"22px 18px", cursor:"pointer", color:"#e4e4e7", textAlign:"left", fontFamily:"inherit", transition:"border-color 0.2s" },
-  roleEmoji:   { fontSize:38, marginBottom:8 },
-  roleName:    { fontSize:16, fontWeight:700, color:"#f4f4f5", marginBottom:4 },
-  roleDesc:    { fontSize:12, color:"#a1a1aa" },
-  settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
-  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
-  desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
-  desktopContent: { flex:1, overflowY:"auto", background:"#09090b" },
-  desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
-  sidebar:        { width:230, minWidth:230, background:"#18181b", borderRight:"1px solid #27272a", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
-  sideProfile:    { background:"#09090b", borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:"1px solid #27272a" },
-  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
-  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
-  sideTabA:       { background:"#f97316", color:"#fff" },
-  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
-  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-  dayHeader:   { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:"1px solid #27272a" },
-  dayDot:      { width:8, height:8, borderRadius:"50%", background:"#f97316", flexShrink:0 },
-  dayLabel:    { fontSize:13, fontWeight:700, color:"#f97316", flex:1 },
-  dayCount:    { fontSize:11, color:"#71717a", background:"#27272a", padding:"2px 8px", borderRadius:10 },
-};
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:"#27272a", fontSize:
