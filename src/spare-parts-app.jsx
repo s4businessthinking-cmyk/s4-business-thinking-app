@@ -653,91 +653,151 @@ function InviteCodeRow({ c, lang, t, onDelete }) {
 
 // ─── PRODUCT FORM COMPONENT ──────────────────────────────────
 function PmForm({ pmForm, pmUpd, t, lang }) {
-  const inp = { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", marginBottom:8 };
-  const sel = { ...inp, background:"#18181b" };
-  const lbl = { fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:4, display:"block" };
-  const row = { display:"flex", gap:8, marginBottom:0 };
+  const inp  = { padding:"9px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  const calcInp = { ...inp, background:"#0d1117", color:"#22c55e", fontWeight:700 };
+  const lbl  = { fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:3, display:"block" };
+  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:"1px solid #27272a", marginBottom:10 };
+  const g2   = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 };
+
+  // More barcodes state
+  const [newRef, setNewRef] = useState("");
+  const mbs = pmForm.moreBarcodes||[];
+
   return (
     <div>
-      <label style={lbl}>{t.pmName}</label>
-      <input style={inp} placeholder={t.pmName} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
-      <div style={row}>
-        <div style={{ flex:1 }}>
+      {/* ── Basic Info ── */}
+      <div style={{ marginBottom:8 }}>
+        <label style={lbl}>{t.pmName} *</label>
+        <input style={inp} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
+      </div>
+      <div style={g2}>
+        <div>
           <label style={lbl}>{t.pmCode}</label>
-          <input style={inp} placeholder={t.pmCode} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
+          <input style={inp} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
         </div>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>Barcode</label>
-          <input style={inp} placeholder="Barcode" value={pmForm.barcode||""} onChange={e=>pmUpd("barcode",e.target.value)} />
-        </div>
-      </div>
-      <div style={row}>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>EAN Code</label>
-          <input style={inp} placeholder="EAN Code" value={pmForm.ean||""} onChange={e=>pmUpd("ean",e.target.value)} />
-        </div>
-        <div style={{ flex:1 }}>
+        <div>
           <label style={lbl}>{t.pmBrand}</label>
-          <input style={inp} placeholder={t.pmBrand} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
+          <input style={inp} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
         </div>
       </div>
-      <div style={row}>
-        <div style={{ flex:1 }}>
+      <div style={g2}>
+        <div>
           <label style={lbl}>{t.pmCategory}</label>
-          <input style={inp} placeholder={t.pmCategory} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
+          <input style={inp} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
         </div>
-        <div style={{ flex:1 }}>
+        <div>
           <label style={lbl}>{lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category"}</label>
-          <input style={inp} placeholder="Sub-Category" value={pmForm.subcategory||""} onChange={e=>pmUpd("subcategory",e.target.value)} />
+          <input style={inp} value={pmForm.subcategory||""} onChange={e=>pmUpd("subcategory",e.target.value)} />
         </div>
       </div>
-      <div style={row}>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>Landing Cost</label>
-          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.landingCost||""} onChange={e=>pmUpd("landingCost",e.target.value)} />
+
+      {/* ── Barcode Section ── */}
+      <div style={sec}>🔢 Barcode / Reference</div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Barcode</label>
+          <input style={inp} value={pmForm.barcode||""} onChange={e=>pmUpd("barcode",e.target.value)} />
         </div>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>VAT %</label>
-          <input style={inp} placeholder="0" inputMode="decimal" value={pmForm.vatPerc||""} onChange={e=>pmUpd("vatPerc",e.target.value)} />
-        </div>
-      </div>
-      <div style={row}>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>VAT Excl. Rate</label>
-          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.vatExclusive||""} onChange={e=>pmUpd("vatExclusive",e.target.value)} />
-        </div>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>VAT Incl. Rate</label>
-          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.vatInclusive||""} onChange={e=>pmUpd("vatInclusive",e.target.value)} />
+        <div>
+          <label style={lbl}>EAN Code</label>
+          <input style={inp} value={pmForm.ean||""} onChange={e=>pmUpd("ean",e.target.value)} />
         </div>
       </div>
-      <div style={row}>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>MRP</label>
-          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.mrp||""} onChange={e=>pmUpd("mrp",e.target.value)} />
+      {/* More Barcodes */}
+      <div style={{ marginBottom:8 }}>
+        <label style={lbl}>More Barcodes / Reference Numbers</label>
+        <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+          <input style={{ ...inp, flex:1 }} placeholder={lang==="bn"?"Reference নম্বর লিখুন...":"Enter reference number..."} value={newRef} onChange={e=>setNewRef(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter"&&newRef.trim()){ pmUpd("moreBarcodes",[...mbs,newRef.trim()]); setNewRef(""); } }} />
+          <button onClick={()=>{ if(newRef.trim()){ pmUpd("moreBarcodes",[...mbs,newRef.trim()]); setNewRef(""); } }}
+            style={{ padding:"9px 14px", borderRadius:8, border:"none", background:"#f97316", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:700, flexShrink:0 }}>+</button>
         </div>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>{lang==="bn"?"Opening Stock":"Opening Stock"}</label>
-          <input style={inp} placeholder="0" inputMode="decimal" value={pmForm.openingStock||""} onChange={e=>pmUpd("openingStock",e.target.value)} />
-        </div>
+        {mbs.length>0&&(
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            {mbs.map((r,i)=>(
+              <span key={i} style={{ background:"#1c1917", border:"1px solid #451a03", color:"#f97316", borderRadius:20, padding:"3px 10px", fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
+                {r}
+                <button onClick={()=>pmUpd("moreBarcodes",mbs.filter((_,j)=>j!==i))} style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
-      <div style={row}>
-        <div style={{ flex:1 }}>
-          <label style={lbl}>{t.pmUnit}</label>
-          <select style={sel} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
-            <option value="Pcs">Pcs</option>
-            <option value="Set">Set</option>
-            <option value="Nos">Nos</option>
-            <option value="Kg">Kg</option>
-            <option value="Ltr">Ltr</option>
-            <option value="Box">Box</option>
-            <option value="Cm">Cm</option>
+
+      {/* ── Tax Settings ── */}
+      <div style={sec}>🧾 Tax Settings</div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Sales VAT %</label>
+          <select style={{ ...inp, background:"#18181b" }} value={pmForm.salesVat||"0"} onChange={e=>pmUpd("salesVat",e.target.value)}>
+            <option value="0">0%</option>
+            <option value="5">5%</option>
           </select>
         </div>
-        <div style={{ flex:2 }}>
-          <label style={lbl}>{lang==="bn"?"বিবরণ":"Description"}</label>
-          <input style={inp} placeholder={lang==="bn"?"বিবরণ":"Description"} value={pmForm.description||""} onChange={e=>pmUpd("description",e.target.value)} />
+        <div>
+          <label style={lbl}>Purchase VAT %</label>
+          <select style={{ ...inp, background:"#18181b" }} value={pmForm.purchaseVat||"0"} onChange={e=>pmUpd("purchaseVat",e.target.value)}>
+            <option value="0">0%</option>
+            <option value="5">5%</option>
+          </select>
         </div>
+      </div>
+
+      {/* ── Pricing ── */}
+      <div style={sec}>💰 Pricing</div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Landing Cost</label>
+          <input style={inp} inputMode="decimal" value={pmForm.landingCost||""} onChange={e=>pmUpd("landingCost",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>Margin %</label>
+          <input style={inp} inputMode="decimal" value={pmForm.marginPerc||""} onChange={e=>pmUpd("marginPerc",e.target.value)} />
+        </div>
+      </div>
+      <div style={g2}>
+        <div>
+          <label style={{ ...lbl, color:"#22c55e" }}>Margin Amount 🟢 auto</label>
+          <input style={calcInp} inputMode="decimal" value={pmForm.marginAmount||""} onChange={e=>pmUpd("marginAmount",e.target.value)} />
+        </div>
+        <div>
+          <label style={{ ...lbl, color:"#22c55e" }}>VAT Exclusive Rate 🟢 auto</label>
+          <input style={calcInp} inputMode="decimal" value={pmForm.vatExclusive||""} onChange={e=>pmUpd("vatExclusive",e.target.value)} />
+        </div>
+      </div>
+      <div style={g2}>
+        <div>
+          <label style={{ ...lbl, color:"#06b6d4" }}>VAT Inclusive Rate 🔵 auto</label>
+          <input style={{ ...calcInp, color:"#06b6d4" }} inputMode="decimal" value={pmForm.vatInclusive||""} onChange={e=>pmUpd("vatInclusive",e.target.value)} />
+        </div>
+        <div>
+          {/* VAT on MRP checkbox above MRP box */}
+          <label style={{ display:"flex", alignItems:"center", gap:7, cursor:"pointer", marginBottom:5 }}>
+            <input type="checkbox" checked={!!pmForm.vatOnMrp} onChange={e=>pmUpd("vatOnMrp",e.target.checked)}
+              style={{ width:16, height:16, accentColor:"#f97316", cursor:"pointer" }} />
+            <span style={{ fontSize:11, color:"#f97316", fontWeight:700 }}>✅ VAT on MRP</span>
+          </label>
+          <label style={lbl}>MRP</label>
+          <input style={inp} inputMode="decimal" value={pmForm.mrp||""} onChange={e=>pmUpd("mrp",e.target.value)} />
+        </div>
+      </div>
+
+      {/* ── Other ── */}
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Opening Stock</label>
+          <input style={inp} inputMode="decimal" value={pmForm.openingStock||""} onChange={e=>pmUpd("openingStock",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>{t.pmUnit}</label>
+          <select style={{ ...inp, background:"#18181b" }} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
+            {["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr"].map(u=><option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style={lbl}>{lang==="bn"?"বিবরণ":"Description"}</label>
+        <input style={inp} value={pmForm.description||""} onChange={e=>pmUpd("description",e.target.value)} />
       </div>
     </div>
   );
@@ -863,8 +923,14 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   // ── PRODUCT MASTER STATE ──
-  const emptyPmForm = {name:"",code:"",barcode:"",ean:"",brand:"",category:"",subcategory:"",
-    landingCost:"",vatPerc:"",vatExclusive:"",vatInclusive:"",mrp:"",openingStock:"",unit:"Pcs",description:""};
+  const emptyPmForm = {
+    name:"", code:"", barcode:"", ean:"", moreBarcodes:[],
+    brand:"", category:"", subcategory:"",
+    salesVat:"0", purchaseVat:"0",
+    landingCost:"", marginPerc:"", marginAmount:"",
+    vatExclusive:"", vatInclusive:"", vatOnMrp:false, mrp:"",
+    openingStock:"", unit:"Pcs", description:""
+  };
   const [pmSearch,setPmSearch]=useState("");
   const [pmCatFilter,setPmCatFilter]=useState("ALL");
   const [pmShowAdd,setPmShowAdd]=useState(false);
@@ -875,8 +941,67 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [productPickerQ,setProductPickerQ]=useState("");
 
   const pmReset = () => setPmForm(emptyPmForm);
-  const pmUpd = (f,v) => setPmForm(p=>({...p,[f]:v}));
   const pmDetail = products.find(p=>p.id===pmDetailId)||null;
+
+  // Smart pmUpd — triggers auto-calculations
+  const pmUpd = (field, val) => {
+    setPmForm(prev => {
+      const next = { ...prev, [field]: val };
+      const n = (v) => parseFloat(v)||0;
+
+      if (field==="landingCost"||field==="marginPerc"||field==="marginAmount"||field==="vatExclusive"||field==="salesVat"||field==="vatOnMrp") {
+        const lc = n(field==="landingCost"?val:next.landingCost);
+        let mp = n(field==="marginPerc"?val:next.marginPerc);
+        let ma = n(field==="marginAmount"?val:next.marginAmount);
+        let ve = n(field==="vatExclusive"?val:next.vatExclusive);
+        const sv = n(field==="salesVat"?val:next.salesVat);
+
+        if (field==="landingCost"||field==="marginPerc") {
+          // LC or MP changed → recalc MA and VE
+          ma = lc>0 && mp>0 ? parseFloat((lc*mp/100).toFixed(4)) : ma;
+          ve = lc>0 ? parseFloat((lc+ma).toFixed(4)) : ve;
+          next.marginAmount = ma||ma===0 ? String(ma) : "";
+          next.vatExclusive = ve ? String(ve) : "";
+        } else if (field==="marginAmount") {
+          // MA changed → recalc MP and VE
+          mp = lc>0 ? parseFloat((ma/lc*100).toFixed(4)) : 0;
+          ve = parseFloat((lc+ma).toFixed(4));
+          next.marginPerc = mp ? String(mp) : "";
+          next.vatExclusive = ve ? String(ve) : "";
+        } else if (field==="vatExclusive") {
+          // VE changed manually → recalc MA and MP
+          ma = parseFloat((ve-lc).toFixed(4));
+          mp = lc>0 ? parseFloat((ma/lc*100).toFixed(4)) : 0;
+          next.marginAmount = ma ? String(ma) : "";
+          next.marginPerc = mp ? String(mp) : "";
+        }
+
+        // Always recalc VAT Inclusive from current VE
+        const currentVe = n(next.vatExclusive);
+        if (currentVe>0) {
+          const vi = parseFloat((currentVe + currentVe*sv/100).toFixed(4));
+          next.vatInclusive = String(vi);
+          // MRP auto-fill based on vatOnMrp
+          const vatOn = field==="vatOnMrp"?val:next.vatOnMrp;
+          next.mrp = vatOn ? String(vi) : String(currentVe);
+        }
+      }
+
+      // vatInclusive manually typed
+      if (field==="vatInclusive") {
+        // keep as typed, don't override
+      }
+
+      // vatOnMrp toggled → update MRP
+      if (field==="vatOnMrp") {
+        const vi = n(next.vatInclusive);
+        const ve = n(next.vatExclusive);
+        next.mrp = val ? (vi?String(vi):"") : (ve?String(ve):"");
+      }
+
+      return next;
+    });
+  };
 
   const addProduct = async () => {
     if (!pmForm.name.trim()) return toast(t.e3,"err");
@@ -1454,7 +1579,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                           onChange={e=>setProductPickerQ(e.target.value)} />
                         <div style={{ maxHeight:200, overflowY:"auto" }}>
                           {products
-                            .filter(p=> !productPickerQ || p.name.toLowerCase().includes(productPickerQ.toLowerCase()) || (p.code||"").toLowerCase().includes(productPickerQ.toLowerCase()) || (p.brand||"").toLowerCase().includes(productPickerQ.toLowerCase()) || (p.category||"").toLowerCase().includes(productPickerQ.toLowerCase()))
+                            .filter(p=> !productPickerQ || (p.name+' '+(p.code||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+(p.barcode||'')+' '+(p.moreBarcodes||[]).join(' ')).toLowerCase().includes(productPickerQ.toLowerCase()))
                             .map(p=>(
                               <button key={p.id} onClick={()=>selectProductToOrder(p)}
                                 style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:"1px solid #27272a", color:"#e4e4e7", cursor:"pointer", fontFamily:"inherit" }}>
@@ -1852,7 +1977,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
           {!productsLoading&&(()=>{
             const filtered = products.filter(p=>{
               const q = pmSearch.toLowerCase();
-              const matchQ = !q || (p.name+' '+(p.code||'')+' '+(p.barcode||'')+' '+(p.ean||'')+' '+(p.brand||'')+' '+(p.category||'')).toLowerCase().includes(q);
+              const refs = (p.moreBarcodes||[]).join(' ');
+              const matchQ = !q || (p.name+' '+(p.code||'')+' '+(p.barcode||'')+' '+(p.ean||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+refs).toLowerCase().includes(q);
               const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
               return matchQ && matchCat;
             });
