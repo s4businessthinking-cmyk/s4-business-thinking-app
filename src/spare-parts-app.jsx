@@ -651,6 +651,98 @@ function InviteCodeRow({ c, lang, t, onDelete }) {
   );
 }
 
+// ─── PRODUCT FORM COMPONENT ──────────────────────────────────
+function PmForm({ pmForm, pmUpd, t, lang }) {
+  const inp = { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", marginBottom:8 };
+  const sel = { ...inp, background:"#18181b" };
+  const lbl = { fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:4, display:"block" };
+  const row = { display:"flex", gap:8, marginBottom:0 };
+  return (
+    <div>
+      <label style={lbl}>{t.pmName}</label>
+      <input style={inp} placeholder={t.pmName} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>{t.pmCode}</label>
+          <input style={inp} placeholder={t.pmCode} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>Barcode</label>
+          <input style={inp} placeholder="Barcode" value={pmForm.barcode||""} onChange={e=>pmUpd("barcode",e.target.value)} />
+        </div>
+      </div>
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>EAN Code</label>
+          <input style={inp} placeholder="EAN Code" value={pmForm.ean||""} onChange={e=>pmUpd("ean",e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>{t.pmBrand}</label>
+          <input style={inp} placeholder={t.pmBrand} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
+        </div>
+      </div>
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>{t.pmCategory}</label>
+          <input style={inp} placeholder={t.pmCategory} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>{lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category"}</label>
+          <input style={inp} placeholder="Sub-Category" value={pmForm.subcategory||""} onChange={e=>pmUpd("subcategory",e.target.value)} />
+        </div>
+      </div>
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>Landing Cost</label>
+          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.landingCost||""} onChange={e=>pmUpd("landingCost",e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>VAT %</label>
+          <input style={inp} placeholder="0" inputMode="decimal" value={pmForm.vatPerc||""} onChange={e=>pmUpd("vatPerc",e.target.value)} />
+        </div>
+      </div>
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>VAT Excl. Rate</label>
+          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.vatExclusive||""} onChange={e=>pmUpd("vatExclusive",e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>VAT Incl. Rate</label>
+          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.vatInclusive||""} onChange={e=>pmUpd("vatInclusive",e.target.value)} />
+        </div>
+      </div>
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>MRP</label>
+          <input style={inp} placeholder="0.00" inputMode="decimal" value={pmForm.mrp||""} onChange={e=>pmUpd("mrp",e.target.value)} />
+        </div>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>{lang==="bn"?"Opening Stock":"Opening Stock"}</label>
+          <input style={inp} placeholder="0" inputMode="decimal" value={pmForm.openingStock||""} onChange={e=>pmUpd("openingStock",e.target.value)} />
+        </div>
+      </div>
+      <div style={row}>
+        <div style={{ flex:1 }}>
+          <label style={lbl}>{t.pmUnit}</label>
+          <select style={sel} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
+            <option value="Pcs">Pcs</option>
+            <option value="Set">Set</option>
+            <option value="Nos">Nos</option>
+            <option value="Kg">Kg</option>
+            <option value="Ltr">Ltr</option>
+            <option value="Box">Box</option>
+            <option value="Cm">Cm</option>
+          </select>
+        </div>
+        <div style={{ flex:2 }}>
+          <label style={lbl}>{lang==="bn"?"বিবরণ":"Description"}</label>
+          <input style={inp} placeholder={lang==="bn"?"বিবরণ":"Description"} value={pmForm.description||""} onChange={e=>pmUpd("description",e.target.value)} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const isOwner = profile.role==="owner";
@@ -771,49 +863,50 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   // ── PRODUCT MASTER STATE ──
+  const emptyPmForm = {name:"",code:"",barcode:"",ean:"",brand:"",category:"",subcategory:"",
+    landingCost:"",vatPerc:"",vatExclusive:"",vatInclusive:"",mrp:"",openingStock:"",unit:"Pcs",description:""};
   const [pmSearch,setPmSearch]=useState("");
+  const [pmCatFilter,setPmCatFilter]=useState("ALL");
   const [pmShowAdd,setPmShowAdd]=useState(false);
   const [pmEditId,setPmEditId]=useState(null);
-  const [pmForm,setPmForm]=useState({name:"",code:"",brand:"",category:"",price:"",unit:"Pcs"});
+  const [pmForm,setPmForm]=useState(emptyPmForm);
+  const [pmDetailId,setPmDetailId]=useState(null); // full detail modal
   const [showProductPicker,setShowProductPicker]=useState(false);
   const [productPickerQ,setProductPickerQ]=useState("");
 
-  const pmReset = () => setPmForm({name:"",code:"",brand:"",category:"",price:"",unit:"Pcs"});
+  const pmReset = () => setPmForm(emptyPmForm);
   const pmUpd = (f,v) => setPmForm(p=>({...p,[f]:v}));
+  const pmDetail = products.find(p=>p.id===pmDetailId)||null;
 
   const addProduct = async () => {
     if (!pmForm.name.trim()) return toast(t.e3,"err");
     try {
-      await addDoc(collection(db,"products"),{
-        shopId, name:pmForm.name.trim(), code:pmForm.code.trim(),
-        brand:pmForm.brand.trim(), category:pmForm.category.trim(),
-        price:pmForm.price.trim(), unit:pmForm.unit||"Pcs",
-        createdAt:serverTimestamp(),
-      });
+      await addDoc(collection(db,"products"),{ shopId, ...pmForm, name:pmForm.name.trim(), createdAt:serverTimestamp() });
       pmReset(); setPmShowAdd(false); toast(t.pmAdded);
+      await fetchProducts();
     } catch(e) { hErr(e); }
   };
 
   const editProduct = async (id) => {
     if (!pmForm.name.trim()) return toast(t.e3,"err");
     try {
-      await updateDoc(doc(db,"products",id),{
-        name:pmForm.name.trim(), code:pmForm.code.trim(),
-        brand:pmForm.brand.trim(), category:pmForm.category.trim(),
-        price:pmForm.price.trim(), unit:pmForm.unit||"Pcs",
-      });
-      pmReset(); setPmEditId(null); toast(t.pmUpdated);
+      await updateDoc(doc(db,"products",id),{ ...pmForm, name:pmForm.name.trim() });
+      pmReset(); setPmEditId(null); setPmDetailId(null); toast(t.pmUpdated);
+      await fetchProducts();
     } catch(e) { hErr(e); }
   };
 
   const deleteProduct = async (id) => {
     if (!window.confirm(lang==="bn"?"এই পণ্যটি মুছে ফেলবেন?":"Delete this product?")) return;
-    try { await deleteDoc(doc(db,"products",id)); toast(t.pmDeleted,"err"); }
-    catch(e) { hErr(e); }
+    try {
+      await deleteDoc(doc(db,"products",id));
+      setProducts(p=>p.filter(x=>x.id!==id));
+      setPmDetailId(null); toast(t.pmDeleted,"err");
+    } catch(e) { hErr(e); }
   };
 
   const selectProductToOrder = (prod) => {
-    setCurrentItem(p=>({...p, name:prod.name, code:prod.code||"", brand:prod.brand||"", unit:prod.unit||"Pcs"}));
+    setCurrentItem(p=>({...p, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs"}));
     setShowProductPicker(false); setProductPickerQ("");
   };
 
@@ -1557,192 +1650,239 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {isOwner&&tab==="products"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
+
+          {/* ── PRODUCT DETAIL MODAL ── */}
+          {pmDetailId&&pmDetail&&(
+            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:200, overflowY:"auto", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 12px 40px" }}>
+              <div style={{ width:"100%", maxWidth:560, background:"#18181b", borderRadius:16, border:"1px solid #27272a", overflow:"hidden" }}>
+                {/* Modal header */}
+                <div style={{ background:"#09090b", padding:"14px 16px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid #27272a" }}>
+                  <div style={{ width:44, height:44, background:"#27272a", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📦</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:15, fontWeight:800, color:"#f4f4f5", lineHeight:1.2 }}>{pmDetail.name}</div>
+                    {pmDetail.category&&<div style={{ fontSize:11, color:"#f97316", marginTop:2 }}>🗂️ {pmDetail.category}</div>}
+                  </div>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button style={s.edBtn} onClick={()=>{ setPmForm({name:pmDetail.name,code:pmDetail.code||"",barcode:pmDetail.barcode||"",ean:pmDetail.ean||"",brand:pmDetail.brand||"",category:pmDetail.category||"",subcategory:pmDetail.subcategory||"",landingCost:pmDetail.landingCost||"",vatPerc:pmDetail.vatPerc||"",vatExclusive:pmDetail.vatExclusive||"",vatInclusive:pmDetail.vatInclusive||"",mrp:pmDetail.mrp||"",openingStock:pmDetail.openingStock||"",unit:pmDetail.unit||"Pcs",description:pmDetail.description||""}); setPmEditId(pmDetail.id); setPmShowAdd(false); }}>✏️</button>
+                    <button style={s.dlBtn} onClick={()=>deleteProduct(pmDetail.id)}>🗑️</button>
+                    <button style={{ ...s.stBtn, padding:"6px 12px" }} onClick={()=>{ setPmDetailId(null); setPmEditId(null); pmReset(); }}>✕</button>
+                  </div>
+                </div>
+
+                {/* Edit form inside modal */}
+                {pmEditId===pmDetail.id?(
+                  <div style={{ padding:16 }}>
+                    <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:12 }}>✏️ {t.editTitle}</div>
+                    <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} />
+                    <div style={s.row}>
+                      <button style={{ ...s.sendBtn, flex:1 }} onClick={()=>editProduct(pmDetail.id)}>{t.saveEdit}</button>
+                      <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmEditId(null); pmReset(); }}>{t.cancel}</button>
+                    </div>
+                  </div>
+                ):(
+                  <div style={{ padding:16 }}>
+                    {/* Info grid */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                      {[
+                        { lbl:lang==="bn"?"কোড / মডেল":"Code / Model", val:pmDetail.code, icon:"📋" },
+                        { lbl:"Barcode", val:pmDetail.barcode, icon:"🔢" },
+                        { lbl:"EAN Code", val:pmDetail.ean, icon:"📊" },
+                        { lbl:lang==="bn"?"ব্র্যান্ড":"Brand", val:pmDetail.brand, icon:"🏷️" },
+                        { lbl:lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category", val:pmDetail.subcategory, icon:"🗂️" },
+                        { lbl:lang==="bn"?"ইউনিট":"Unit", val:pmDetail.unit, icon:"📐" },
+                      ].map(({lbl,val,icon})=> val?(
+                        <div key={lbl} style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                          <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>{icon} {lbl}</div>
+                          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{val}</div>
+                        </div>
+                      ):null)}
+                    </div>
+                    {/* Pricing section */}
+                    <div style={{ background:"#09090b", borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
+                      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>💰 {lang==="bn"?"মূল্য তথ্য":"Pricing Info"}</div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                        {[
+                          { lbl:lang==="bn"?"Landing Cost":"Landing Cost", val:pmDetail.landingCost, color:"#a1a1aa" },
+                          { lbl:lang==="bn"?"VAT %":"VAT %", val:pmDetail.vatPerc?`${pmDetail.vatPerc}%`:null, color:"#f59e0b" },
+                          { lbl:lang==="bn"?"VAT Excl.":"VAT Excl.", val:pmDetail.vatExclusive, color:"#22c55e" },
+                          { lbl:lang==="bn"?"VAT Incl.":"VAT Incl.", val:pmDetail.vatInclusive, color:"#06b6d4" },
+                          { lbl:"MRP", val:pmDetail.mrp, color:"#f97316" },
+                          { lbl:lang==="bn"?"Opening Stock":"Opening Stock", val:pmDetail.openingStock, color:"#a855f7" },
+                        ].map(({lbl,val,color})=>(
+                          <div key={lbl} style={{ textAlign:"center", padding:"8px 6px", background:"#18181b", borderRadius:8 }}>
+                            <div style={{ fontSize:9, color:"#71717a", marginBottom:4, textTransform:"uppercase" }}>{lbl}</div>
+                            <div style={{ fontSize:14, fontWeight:800, color: val?color:"#3f3f46" }}>{val||"—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {pmDetail.description&&(
+                      <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                        <div style={{ fontSize:10, color:"#71717a", marginBottom:4 }}>📝 {lang==="bn"?"বিবরণ":"Description"}</div>
+                        <div style={{ fontSize:12, color:"#d4d4d8" }}>{pmDetail.description}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── HEADER ── */}
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
-            <div style={{ display:"flex", gap:8 }}>
-              {/* Refresh */}
-              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }}
-                onClick={fetchProducts} disabled={productsLoading}>
-                {productsLoading?"⏳":"🔄"}
-              </button>
-              {/* Clear all */}
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }} onClick={fetchProducts} disabled={productsLoading}>{productsLoading?"⏳":"🔄"}</button>
               {products.length>0&&(
                 <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
                   onClick={async()=>{
                     if (!window.confirm(lang==="bn"?`সব ${products.length}টি পণ্য মুছে ফেলবেন?`:`Delete all ${products.length} products?`)) return;
                     toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
                     try {
-                      const BATCH=500;
-                      for (let i=0;i<products.length;i+=BATCH) {
+                      for (let i=0;i<products.length;i+=500) {
                         const batch=writeBatch(db);
-                        products.slice(i,i+BATCH).forEach(p=>batch.delete(doc(db,"products",p.id)));
+                        products.slice(i,i+500).forEach(p=>batch.delete(doc(db,"products",p.id)));
                         await batch.commit();
                       }
                       setProducts([]);
                       toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
                     } catch(e){ hErr(e); }
-                  }}>
-                  🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}
-                </button>
+                  }}>🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}</button>
               )}
-              {/* Import CSV */}
               <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>
-                📥 {lang==="bn"?"Import":"Import"}
+                📥 Import
                 <input type="file" accept=".csv" style={{ display:"none" }} onChange={async (e)=>{
-                  const file = e.target.files[0]; if (!file) return;
-                  e.target.value='';
-                  // Warn if products already exist
-                  if (products.length>0) {
-                    if (!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। নতুন করে import করলে duplicate হতে পারে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`There are already ${products.length} products. Import may create duplicates. Use "Clear All" first. Continue anyway?`)) return;
-                  }
+                  const file=e.target.files[0]; if (!file) return; e.target.value='';
+                  if (products.length>0&&!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`${products.length} products exist. Clear first. Continue anyway?`)) return;
                   toast(lang==="bn"?"📥 ফাইল পড়া হচ্ছে...":"📥 Reading file...");
                   try {
-                    const text = await file.text();
-                    const lines = text.split('\n').filter(l=>l.trim());
-                    if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data in file","err");
-                    const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());
-                    const nameIdx  = headers.findIndex(h=>h.includes('name')||h.includes('product'));
-                    const codeIdx  = headers.findIndex(h=>h.includes('code')||h.includes('model'));
-                    const brandIdx = headers.findIndex(h=>h.includes('brand')||h.includes('company'));
-                    const catIdx   = headers.findIndex(h=>h.includes('categ')||h.includes('group'));
-                    const priceIdx = headers.findIndex(h=>h.includes('price')||h.includes('exclusive')||h.includes('rate'));
-                    const unitIdx  = headers.findIndex(h=>h.includes('unit'));
-                    if (nameIdx<0) return toast(lang==="bn"?"'ProductName' column পাওয়া যায়নি":"'ProductName' column not found","err");
-                    // Parse + deduplicate by name+code
-                    const seen = new Set();
-                    const allRows = [];
+                    const text=await file.text();
+                    const lines=text.split('\n').filter(l=>l.trim());
+                    if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data","err");
+                    const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').toLowerCase());
+                    const fi=(kws)=>h.findIndex(x=>kws.some(k=>x.includes(k)));
+                    const idx={
+                      name:fi(['productname','name']), code:fi(['productcode','code','model']),
+                      barcode:fi(['barcode']), ean:fi(['ean']),
+                      brand:fi(['company','brand']), category:fi(['category']),
+                      subcategory:fi(['subcategory']), landingCost:fi(['landingcost','landing']),
+                      vatPerc:fi(['vat_perc','vatperc','vat%']), vatExclusive:fi(['vatexclusive','exclusive']),
+                      vatInclusive:fi(['vatinclusive','inclusive']), mrp:fi(['mrp']),
+                      openingStock:fi(['openingstock','opening']), unit:fi(['unit']),
+                      description:fi(['description']),
+                    };
+                    if (idx.name<0) return toast(lang==="bn"?"'ProductName' column নেই":"'ProductName' column not found","err");
+                    const seen=new Set(); const rows=[];
                     for (const line of lines.slice(1)) {
-                      const cells = line.split(',').map(c=>c.trim().replace(/^"|"$/g,''));
-                      const name = (cells[nameIdx]||'').trim();
-                      if (!name||name==='nan'||name==='ProductName') continue;
-                      const code = (codeIdx>=0?cells[codeIdx]||'':'').trim();
-                      const key = `${name}||${code}`.toLowerCase();
-                      if (seen.has(key)) continue; // skip duplicate
-                      seen.add(key);
-                      let brand = brandIdx>=0?(cells[brandIdx]||''):'';
-                      let cat   = catIdx>=0?(cells[catIdx]||''):'';
-                      let price = priceIdx>=0?(cells[priceIdx]||''):'';
-                      let unit  = unitIdx>=0?(cells[unitIdx]||'Pcs'):'Pcs';
-                      if (brand==='UNAVAILABLE') brand='';
-                      if (cat==='UNAVAILABLE') cat='';
-                      try { if (parseFloat(price)===0) price=''; } catch{ price=''; }
-                      if (!unit||unit==='Nos'||unit==='nan') unit='Pcs';
-                      allRows.push({ shopId, name, code, brand:brand.trim(), category:cat.trim(), price:price.trim(), unit });
+                      const c=line.split(',').map(x=>x.trim().replace(/^"|"$/g,''));
+                      const name=(c[idx.name]||'').trim(); if (!name||name==='nan') continue;
+                      const code=(idx.code>=0?c[idx.code]||'':'').trim();
+                      const key=`${name}||${code}`.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
+                      const clean=(i,zeroEmpty=false)=>{ if (i<0) return ''; let v=(c[i]||'').trim(); if (v==='UNAVAILABLE'||v==='nan') return ''; if (zeroEmpty) { try { if (parseFloat(v)===0) return ''; } catch{} } return v; };
+                      rows.push({ shopId, name, code, barcode:clean(idx.barcode), ean:clean(idx.ean),
+                        brand:clean(idx.brand), category:clean(idx.category), subcategory:clean(idx.subcategory),
+                        landingCost:clean(idx.landingCost,true), vatPerc:clean(idx.vatPerc,true),
+                        vatExclusive:clean(idx.vatExclusive,true), vatInclusive:clean(idx.vatInclusive,true),
+                        mrp:clean(idx.mrp,true), openingStock:clean(idx.openingStock,true),
+                        unit:['Nos','nan',''].includes(clean(idx.unit))?'Pcs':clean(idx.unit),
+                        description:clean(idx.description),
+                      });
                     }
-                    if (allRows.length===0) return toast(lang==="bn"?"কোনো valid product পাওয়া যায়নি":"No valid products found","err");
-                    toast(lang==="bn"?`📥 ${allRows.length}টি পণ্য import হচ্ছে...`:`📥 Importing ${allRows.length} products...`);
-                    // writeBatch — 500 per batch
+                    if (!rows.length) return toast(lang==="bn"?"কোনো valid product নেই":"No valid products","err");
+                    toast(lang==="bn"?`📥 ${rows.length}টি import হচ্ছে...`:`📥 Importing ${rows.length}...`);
                     let done=0;
-                    const BATCH=500;
-                    for (let i=0;i<allRows.length;i+=BATCH) {
-                      const chunk=allRows.slice(i,i+BATCH);
+                    for (let i=0;i<rows.length;i+=500) {
                       const batch=writeBatch(db);
-                      chunk.forEach(p=>batch.set(doc(collection(db,"products")),{...p,createdAt:serverTimestamp()}));
-                      await batch.commit();
-                      done+=chunk.length;
-                      toast(lang==="bn"?`📥 ${done} / ${allRows.length} হয়েছে...`:`📥 ${done} / ${allRows.length}...`);
+                      rows.slice(i,i+500).forEach(p=>batch.set(doc(collection(db,"products")),{...p,createdAt:serverTimestamp()}));
+                      await batch.commit(); done+=Math.min(500,rows.length-i);
+                      toast(`📥 ${done}/${rows.length}...`);
                     }
                     await fetchProducts();
                     toast(lang==="bn"?`✅ ${done}টি পণ্য import সম্পন্ন!`:`✅ ${done} products imported!`);
-                  } catch(err) { toast(err.message||"Import failed","err"); }
+                  } catch(err){ toast(err.message||"Import failed","err"); }
                 }} />
               </label>
-              <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); }}>
+              <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); setPmDetailId(null); }}>
                 {pmShowAdd?`✕ ${t.cancel}`:t.pmAdd}
               </button>
             </div>
           </div>
 
-          {/* Add form */}
+          {/* ── ADD FORM ── */}
           {pmShowAdd&&(
             <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:10 }}>{t.pmAdd}</div>
-              <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.pmName} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
-              <div style={{ display:"flex", gap:7, marginBottom:8 }}>
-                <input style={{ ...s.inp, flex:1 }} placeholder={t.pmCode} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
-                <input style={{ ...s.inp, flex:1 }} placeholder={t.pmBrand} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
+              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:12 }}>➕ {t.pmAdd}</div>
+              <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} />
+              <div style={s.row}>
+                <button style={{ ...s.sendBtn, flex:1 }} onClick={addProduct}>{t.addBtn}</button>
+                <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmShowAdd(false); pmReset(); }}>{t.cancel}</button>
               </div>
-              <div style={{ display:"flex", gap:7, marginBottom:8 }}>
-                <input style={{ ...s.inp, flex:2 }} placeholder={t.pmCategory} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
-                <input style={{ ...s.inp, flex:1 }} placeholder={t.pmPrice} inputMode="numeric" value={pmForm.price} onChange={e=>pmUpd("price",e.target.value)} />
-              </div>
-              <div style={{ display:"flex", gap:7, marginBottom:12 }}>
-                <select style={{ ...s.sel, flex:1 }} value={pmForm.unit} onChange={e=>pmUpd("unit",e.target.value)}>
-                  <option value="Pcs">{lang==="bn"?"পিস":"Pcs"}</option>
-                  <option value="Set">{lang==="bn"?"সেট":"Set"}</option>
-                  <option value="Kg">Kg</option>
-                  <option value="Ltr">Ltr</option>
-                  <option value="Box">{lang==="bn"?"বক্স":"Box"}</option>
-                </select>
-              </div>
-              <button style={{ ...s.sendBtn, padding:"10px" }} onClick={addProduct}>{t.addBtn}</button>
             </div>
           )}
 
-          {/* Search */}
-          <div style={{ position:"relative", marginBottom:12 }}>
+          {/* ── SEARCH + CATEGORY FILTER ── */}
+          <div style={{ position:"relative", marginBottom:10 }}>
             <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
             <input style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
               placeholder={t.pmSearch} value={pmSearch} onChange={e=>setPmSearch(e.target.value)} />
             {pmSearch&&<button onClick={()=>setPmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16 }}>✕</button>}
           </div>
 
-          {/* Product list */}
-          {products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
-          {products
-            .filter(p=>!pmSearch||(p.name+p.code+p.brand+p.category).toLowerCase().includes(pmSearch.toLowerCase()))
-            .map(p=>(
-              <div key={p.id} style={s.card}>
-                {pmEditId===p.id?(
-                  <div>
-                    <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:10 }}>{t.editTitle}</div>
-                    <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.pmName} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
-                    <div style={{ display:"flex", gap:7, marginBottom:8 }}>
-                      <input style={{ ...s.inp, flex:1 }} placeholder={t.pmCode} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
-                      <input style={{ ...s.inp, flex:1 }} placeholder={t.pmBrand} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
-                    </div>
-                    <div style={{ display:"flex", gap:7, marginBottom:8 }}>
-                      <input style={{ ...s.inp, flex:2 }} placeholder={t.pmCategory} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
-                      <input style={{ ...s.inp, flex:1 }} placeholder={t.pmPrice} inputMode="numeric" value={pmForm.price} onChange={e=>pmUpd("price",e.target.value)} />
-                    </div>
-                    <select style={{ ...s.sel, marginBottom:10 }} value={pmForm.unit} onChange={e=>pmUpd("unit",e.target.value)}>
-                      <option value="Pcs">{lang==="bn"?"পিস":"Pcs"}</option>
-                      <option value="Set">{lang==="bn"?"সেট":"Set"}</option>
-                      <option value="Kg">Kg</option>
-                      <option value="Ltr">Ltr</option>
-                      <option value="Box">{lang==="bn"?"বক্স":"Box"}</option>
-                    </select>
-                    <div style={s.row}>
-                      <button style={{ ...s.savBtn, flex:1, padding:"10px" }} onClick={()=>editProduct(p.id)}>{t.saveEdit}</button>
-                      <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmEditId(null); pmReset(); }}>{t.cancel}</button>
-                    </div>
-                  </div>
-                ):(
-                  <div>
-                    <div style={{ display:"flex", alignItems:"flex-start", gap:10 }}>
-                      <div style={{ width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{p.name}</div>
-                        <div style={{ fontSize:11, color:"#71717a", marginTop:2 }}>
-                          {p.code&&<span>📋 {p.code}</span>}
-                          {p.code&&p.brand&&<span> · </span>}
-                          {p.brand&&<span>🏷️ {p.brand}</span>}
-                          {p.category&&<span style={{ marginLeft:6, background:"#27272a", padding:"1px 7px", borderRadius:10 }}>🗂️ {p.category}</span>}
-                        </div>
-                        <div style={{ fontSize:12, marginTop:4, display:"flex", gap:10 }}>
-                          {p.price&&<span style={{ color:"#22c55e", fontWeight:700 }}>৳ {p.price}</span>}
-                          <span style={{ color:"#71717a" }}>{p.unit}</span>
-                        </div>
-                      </div>
-                      <div style={{ display:"flex", gap:6, flexShrink:0 }}>
-                        <button style={s.edBtn} onClick={()=>{ setPmEditId(p.id); setPmForm({name:p.name,code:p.code||"",brand:p.brand||"",category:p.category||"",price:p.price||"",unit:p.unit||"Pcs"}); setPmShowAdd(false); }}>✏️</button>
-                        <button style={s.dlBtn} onClick={()=>deleteProduct(p.id)}>🗑️</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          {/* Category filter pills */}
+          {!pmSearch&&products.length>0&&(()=>{
+            const cats = ["ALL",...[...new Set(products.map(p=>p.category).filter(Boolean))].sort()];
+            return (
+              <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:10, marginBottom:6 }}>
+                {cats.map(cat=>(
+                  <button key={cat} onClick={()=>setPmCatFilter(cat)}
+                    style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit",
+                      background:pmCatFilter===cat?"#f97316":"transparent",
+                      borderColor:pmCatFilter===cat?"#f97316":"#3f3f46",
+                      color:pmCatFilter===cat?"#fff":"#a1a1aa" }}>
+                    {cat==="ALL"?(lang==="bn"?"সব":"All"):cat}
+                  </button>
+                ))}
               </div>
-            ))}
+            );
+          })()}
+
+          {/* ── PRODUCT LIST ── */}
+          {productsLoading&&<div style={s.empty}><div style={{ fontSize:36 }}>⏳</div><div>{lang==="bn"?"লোড হচ্ছে...":"Loading..."}</div></div>}
+          {!productsLoading&&products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
+          {!productsLoading&&(()=>{
+            const filtered = products.filter(p=>{
+              const q = pmSearch.toLowerCase();
+              const matchQ = !q || (p.name+' '+(p.code||'')+' '+(p.barcode||'')+' '+(p.ean||'')+' '+(p.brand||'')+' '+(p.category||'')).toLowerCase().includes(q);
+              const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
+              return matchQ && matchCat;
+            });
+            if (filtered.length===0) return <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results"}</div></div>;
+            return filtered.map(p=>(
+              <div key={p.id} style={{ ...s.card, cursor:"pointer", transition:"border-color 0.15s" }}
+                onClick={()=>{ setPmDetailId(p.id); setPmEditId(null); pmReset(); }}>
+                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  {/* Color dot by category */}
+                  <div style={{ width:42, height:42, borderRadius:12, background:"#09090b", border:"1px solid #27272a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
+                    <div style={{ fontSize:11, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:6 }}>
+                      {p.code&&<span>📋 {p.code}</span>}
+                      {p.brand&&<span>🏷️ {p.brand}</span>}
+                      {p.barcode&&<span>🔢 {p.barcode}</span>}
+                    </div>
+                    <div style={{ display:"flex", gap:6, marginTop:5, flexWrap:"wrap", alignItems:"center" }}>
+                      {p.category&&<span style={{ fontSize:10, background:"#1c1917", color:"#f97316", padding:"2px 8px", borderRadius:20, border:"1px solid #451a03" }}>{p.category}</span>}
+                      {p.vatExclusive&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>৳{p.vatExclusive}</span>}
+                      {p.mrp&&parseFloat(p.mrp)>0&&<span style={{ fontSize:10, color:"#71717a" }}>MRP {p.mrp}</span>}
+                      {p.openingStock&&parseFloat(p.openingStock)>0&&<span style={{ fontSize:10, color:"#818cf8" }}>Stock: {p.openingStock}</span>}
+                      <span style={{ fontSize:10, color:"#52525b", marginLeft:"auto" }}>{p.unit}</span>
+                    </div>
+                  </div>
+                  <span style={{ fontSize:20, color:"#3f3f46", flexShrink:0 }}>›</span>
+                </div>
+              </div>
+            ));
+          })()}
         </div>
       )}
 
