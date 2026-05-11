@@ -354,7 +354,7 @@ function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }
 }
 
 // ─── HEADER ──────────────────────────────────────────────────
-function Header({ t, lang, setLang, children, isDesktop, s }) {
+function Header({ t, lang, setLang, children, isDesktop }) {
   return (
     <div style={s.hdr}>
       <div style={s.hLeft}>
@@ -373,7 +373,7 @@ function Header({ t, lang, setLang, children, isDesktop, s }) {
 }
 
 // ─── SETUP ───────────────────────────────────────────────────
-function SetupScreen({ t, lang, setLang, s }) {
+function SetupScreen({ t, lang, setLang }) {
   return (
     <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
       <div style={s.authWrap}>
@@ -386,7 +386,7 @@ function SetupScreen({ t, lang, setLang, s }) {
 }
 
 // ─── LOGIN ───────────────────────────────────────────────────
-function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast, s }) {
+function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast }) {
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -417,7 +417,7 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
 }
 
 // ─── PASSWORD RESET ──────────────────────────────────────────
-function ResetScreen({ t, lang, setLang, onBack, toast, s }) {
+function ResetScreen({ t, lang, setLang, onBack, toast }) {
   const [email,setEmail]=useState(""); const [busy,setBusy]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -444,7 +444,7 @@ function ResetScreen({ t, lang, setLang, onBack, toast, s }) {
 }
 
 // ─── ROLE PICKER ─────────────────────────────────────────────
-function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s }) {
+function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin }) {
   return (
     <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
       <div style={s.authWrap}>
@@ -472,7 +472,7 @@ function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s }) {
 }
 
 // ─── SIGNUP FORM ─────────────────────────────────────────────
-function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s }) {
+function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) {
   const [companyName,setCompanyName]=useState("");
   const [personName,setPersonName]=useState("");
   const [country,setCountry]=useState("BD");
@@ -606,7 +606,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s 
 }
 
 // ─── VERIFY GATE ─────────────────────────────────────────────
-function VerifyGate({ t, lang, setLang, user, toast, onLogout, s }) {
+function VerifyGate({ t, lang, setLang, user, toast, onLogout }) {
   const [busy,setBusy]=useState(false);
   const recheck = async () => {
     setBusy(true);
@@ -2556,7 +2556,121 @@ export default function App() {
 }
 
 // ─── STYLES (theme-aware) ────────────────────────────────────
-function getStyles(th) { return {
+// ─── INJECT THEME CSS VARIABLES ──────────────────────────────
+function applyTheme(th) {
+  const r = document.documentElement.style;
+  r.setProperty("--bg-root",    th.bgRoot);
+  r.setProperty("--bg-card",    th.bgCard);
+  r.setProperty("--bg-inp",     th.bgInp);
+  r.setProperty("--bg-sel",     th.bgSel);
+  r.setProperty("--bg-hdr",     th.bgHdr);
+  r.setProperty("--bg-sidebar", th.bgSidebar);
+  r.setProperty("--bg-oicard",  th.bgOiCard);
+  r.setProperty("--border",     th.border);
+  r.setProperty("--border-mid", th.borderMid);
+  r.setProperty("--txt-primary",   th.txtPrimary);
+  r.setProperty("--txt-secondary", th.txtSecondary);
+  r.setProperty("--txt-muted",     th.txtMuted);
+  r.setProperty("--txt-faint",     th.txtFaint);
+  r.setProperty("--accent",        th.accent);
+  r.setProperty("--accent-dim",    th.accentDim);
+}
+// Apply dark theme immediately on load
+applyTheme(THEMES[loadTheme()]||THEMES.dark);
+
+function getStyles() { return {
+  root:        { minHeight:"100vh", background:"var(--bg-root)", color:"var(--txt-secondary)", fontFamily:"'Segoe UI', system-ui, sans-serif" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
+  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid var(--border)", background:"var(--bg-hdr)", position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
+  hLeft:       { display:"flex", alignItems:"center", gap:10 },
+  title:       { fontSize:14, fontWeight:800, color:"var(--accent)", lineHeight:1.1 },
+  sub:         { fontSize:10, color:"var(--txt-muted)" },
+  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:"1px solid var(--border-mid)" },
+  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:"var(--txt-muted)", cursor:"pointer", fontSize:12, fontWeight:700 },
+  lBtnA:       { background:"var(--accent)", color:"#fff" },
+  tabs:        { display:"flex", gap:5 },
+  tab:         { padding:"7px 11px", borderRadius:8, border:"1px solid var(--border-mid)", background:"transparent", color:"var(--txt-muted)", cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
+  tabA:        { background:"var(--accent)", color:"#fff", border:"1px solid var(--accent)" },
+  badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
+  panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
+  secTitle:    { fontSize:14, fontWeight:700, color:"var(--accent)", marginBottom:10 },
+  card:        { background:"var(--bg-card)", border:"1px solid var(--border)", borderRadius:12, padding:14, marginBottom:10 },
+  inp:         { padding:"10px 12px", borderRadius:8, border:"1px solid var(--border-mid)", background:"var(--bg-inp)", color:"var(--txt-primary)", fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
+  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid var(--border-mid)", background:"var(--bg-inp)", color:"var(--txt-primary)", fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
+  sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
+  addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:"2px dashed var(--accent)", background:"var(--accent-dim)", color:"var(--accent)", fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
+  invoiceCard: { background:"var(--bg-card)", border:"1px solid var(--border)", borderRadius:12, overflow:"hidden", marginBottom:4 },
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:"var(--border)", fontSize:10, color:"var(--txt-muted)", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:"1px solid var(--border)" },
+  invSerial:   { fontSize:12, fontWeight:800, color:"var(--accent)" },
+  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
+  oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
+  oId:         { fontSize:14, fontWeight:800, color:"var(--txt-primary)" },
+  sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
+  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:"1px solid var(--border)", flexWrap:"wrap" },
+  iName:       { fontSize:13, color:"var(--txt-secondary)", fontWeight:600 },
+  iMeta:       { fontSize:10, color:"var(--txt-muted)", marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
+  iQty:        { fontSize:12, color:"var(--txt-muted)" },
+  iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
+  empty:       { textAlign:"center", padding:"50px 20px", color:"var(--txt-faint)", fontSize:14 },
+  nBadge:      { fontSize:10, background:"var(--accent-dim)", color:"var(--accent)", padding:"2px 7px", borderRadius:10, fontWeight:700 },
+  div:         { height:1, background:"var(--border)", margin:"10px 0" },
+  oiCard:      { background:"var(--bg-oicard)", borderRadius:10, padding:12, marginBottom:8, border:"1px solid var(--border)" },
+  row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
+  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid var(--border-mid)", background:"var(--bg-sel)", color:"var(--txt-primary)", fontSize:14, outline:"none", fontFamily:"inherit" },
+  waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
+  savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
+  sRow:        { display:"flex", gap:7, marginBottom:7 },
+  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:"1px solid var(--border-mid)", background:"var(--bg-card)", color:"var(--txt-muted)", fontSize:12, fontWeight:700, cursor:"pointer" },
+  stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
+  stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
+  delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
+  delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
+  flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
+  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:"1px solid var(--accent)", background:"transparent", color:"var(--accent)", cursor:"pointer", fontSize:12, fontWeight:700 },
+  coIcon:      { width:40, height:40, background:"var(--border)", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
+  edBtn:       { padding:"6px 10px", borderRadius:8, border:"1px solid var(--border-mid)", background:"var(--bg-card)", color:"var(--txt-secondary)", cursor:"pointer", fontSize:13 },
+  dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
+  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
+  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
+  authIcon:    { fontSize:48, marginBottom:8 },
+  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
+  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
+  authTitle:   { fontSize:24, fontWeight:800, color:"var(--accent)", marginBottom:6 },
+  authSub:     { fontSize:13, color:"var(--txt-muted)", marginBottom:20 },
+  authCard:    { background:"var(--bg-card)", border:"1px solid var(--border)", borderRadius:12, padding:16, textAlign:"left" },
+  authFooter:  { fontSize:12, color:"var(--txt-muted)", marginTop:16 },
+  linkBtn:     { background:"transparent", border:"none", color:"var(--accent)", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
+  linkBtnInline:{ background:"transparent", border:"none", color:"var(--accent)", cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
+  roleCard:    { background:"var(--bg-card)", border:"1px solid var(--border)", borderRadius:14, padding:"22px 18px", cursor:"pointer", color:"var(--txt-secondary)", textAlign:"left", fontFamily:"inherit" },
+  roleEmoji:   { fontSize:38, marginBottom:8 },
+  roleName:    { fontSize:16, fontWeight:700, color:"var(--txt-primary)", marginBottom:4 },
+  roleDesc:    { fontSize:12, color:"var(--txt-muted)" },
+  settingsLbl: { fontSize:11, color:"var(--txt-muted)", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  inviteBox:   { fontSize:22, fontWeight:800, color:"var(--accent)", textAlign:"center", padding:"16px", background:"var(--bg-inp)", borderRadius:10, border:"2px dashed var(--accent)", letterSpacing:2, fontFamily:"monospace" },
+  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
+  desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
+  desktopContent: { flex:1, overflowY:"auto", background:"var(--bg-root)" },
+  desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
+  sidebar:        { width:230, minWidth:230, background:"var(--bg-sidebar)", borderRight:"1px solid var(--border)", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
+  sideProfile:    { background:"var(--bg-inp)", borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:"1px solid var(--border)" },
+  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
+  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"var(--txt-muted)", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
+  sideTabA:       { background:"var(--accent)", color:"#fff" },
+  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
+  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
+  dayHeader:      { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:"1px solid var(--border)" },
+  dayDot:         { width:8, height:8, borderRadius:"50%", background:"var(--accent)", flexShrink:0 },
+  dayLabel:       { fontSize:13, fontWeight:700, color:"var(--accent)", flex:1 },
+  dayCount:       { fontSize:11, color:"var(--txt-muted)", background:"var(--border)", padding:"2px 8px", borderRadius:10 },
+  settingsRow:    { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:"var(--bg-card)", border:"1px solid var(--border)", borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
+  settingsRowIcon:{ fontSize:22, flexShrink:0, width:32, textAlign:"center" },
+  settingsRowLabel:{ fontSize:14, fontWeight:700, color:"var(--txt-primary)", marginBottom:2 },
+  settingsRowSub: { fontSize:11, color:"var(--txt-muted)" },
+  settingsArrow:  { fontSize:20, color:"var(--border-mid)", flexShrink:0 },
+  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:"var(--accent)", cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
+};}
   root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
   notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
   hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
