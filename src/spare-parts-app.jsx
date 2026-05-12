@@ -267,32 +267,11 @@ const SC = {
 
 const LANG_KEY = "sparetrack-lang";
 const WA_STYLE_KEY = "wa-msg-style";
-const THEME_KEY    = "s4-theme";
 const ORDER_PREFIX = "S4-";
-const loadLang     = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
-const saveLang     = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
-const loadWaStyle  = () => { try { return localStorage.getItem(WA_STYLE_KEY)||"1"; } catch { return "1"; } };
-const saveWaStyle  = (v) => { try { localStorage.setItem(WA_STYLE_KEY,v); } catch {} };
-const loadTheme    = () => { try { return localStorage.getItem(THEME_KEY)||"dark"; } catch { return "dark"; } };
-const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {} };
-
-// ─── THEME PALETTES ──────────────────────────────────────────
-const THEMES = {
-  dark: {
-    bgRoot:"#09090b", bgCard:"#18181b", bgInp:"#09090b", bgSel:"#18181b",
-    bgHdr:"#18181b", bgSidebar:"#18181b", bgOiCard:"#09090b",
-    border:"#27272a", borderMid:"#3f3f46",
-    txtPrimary:"#f4f4f5", txtSecondary:"#e4e4e7", txtMuted:"#71717a", txtFaint:"#52525b",
-    accent:"#f97316", accentDim:"#451a03",
-  },
-  light: {
-    bgRoot:"#f1f5f9", bgCard:"#ffffff", bgInp:"#f8fafc", bgSel:"#ffffff",
-    bgHdr:"#ffffff", bgSidebar:"#ffffff", bgOiCard:"#f8fafc",
-    border:"#e2e8f0", borderMid:"#cbd5e1",
-    txtPrimary:"#0f172a", txtSecondary:"#1e293b", txtMuted:"#64748b", txtFaint:"#94a3b8",
-    accent:"#f97316", accentDim:"#fff7ed",
-  },
-};
+const loadLang = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
+const saveLang = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
+const loadWaStyle = () => { try { return localStorage.getItem(WA_STYLE_KEY)||"1"; } catch { return "1"; } };
+const saveWaStyle = (v) => { try { localStorage.setItem(WA_STYLE_KEY,v); } catch {} };
 
 // ─── WA STYLES ───────────────────────────────────────────────
 const WA_STYLES = [
@@ -825,7 +804,7 @@ function PmForm({ pmForm, pmUpd, t, lang }) {
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────
-function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
+function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const isOwner = profile.role==="owner";
   const isSalesman = !isOwner;
   const shopId  = profile.shopId;
@@ -2160,16 +2139,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
               </button>
               )}
 
-              {/* Theme */}
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("theme")}>
-                <span style={s.settingsRowIcon}>{theme==="dark"?"🌙":"☀️"}</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{lang==="bn"?"থিম":"Theme"}</div>
-                  <div style={s.settingsRowSub}>{theme==="dark"?(lang==="bn"?"ডার্ক মোড":"Dark Mode"):(lang==="bn"?"লাইট মোড":"Light Mode")}</div>
-                </div>
-                <span style={s.settingsArrow}>›</span>
-              </button>
-
               {/* Language */}
               <button style={s.settingsRow} onClick={()=>setSettingsPage("language")}>
                 <span style={s.settingsRowIcon}>🌐</span>
@@ -2361,28 +2330,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
             </div>
           )}
 
-          {settingsPage==="theme"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"থিম বেছে নিন":"Choose Theme"}</div>
-              <div style={{ display:"flex", gap:10 }}>
-                {[
-                  { id:"dark",  icon:"🌙", labelBn:"ডার্ক মোড",  labelEn:"Dark Mode"  },
-                  { id:"light", icon:"☀️", labelBn:"লাইট মোড", labelEn:"Light Mode" },
-                ].map(opt=>(
-                  <button key={opt.id} onClick={()=>setTheme(opt.id)}
-                    style={{ flex:1, padding:"20px 10px", borderRadius:14, border:`2px solid ${theme===opt.id?th.accent:th.border}`,
-                      background:theme===opt.id?th.accentDim:th.bgInp, cursor:"pointer", fontFamily:"inherit",
-                      display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
-                    <span style={{ fontSize:32 }}>{opt.icon}</span>
-                    <span style={{ fontSize:13, fontWeight:700, color:theme===opt.id?th.accent:th.txtMuted }}>
-                      {theme===opt.id?"✅ ":""}{lang==="bn"?opt.labelBn:opt.labelEn}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {settingsPage==="language"&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.languageLbl}</div>
@@ -2455,11 +2402,6 @@ export default function App() {
   const setLang = (l) => { setLangState(l); saveLang(l); };
   const t = TR[lang];
 
-  const [theme,setThemeState]=useState(loadTheme());
-  const setTheme = (v) => { setThemeState(v); saveTheme(v); };
-  const th = THEMES[theme]||THEMES.dark;
-  const s  = getStyles(th);
-
   const [user,setUser]=useState(null);
   const [profile,setProfile]=useState(null);
   const [shop,setShop]=useState(null);
@@ -2514,29 +2456,29 @@ export default function App() {
     <div style={{ ...s.notif, background:notif.type==="err"?"#450a0a":"#052e16", borderColor:notif.type==="err"?"#ef4444":"#22c55e", color:notif.type==="err"?"#ef4444":"#22c55e" }}>{notif.msg}</div>
   );
 
-  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
+  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
 
   if (!user) {
     let screen;
-    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} s={s} />;
-    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} s={s} />;
-    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} s={s} />;
-    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} s={s} />;
+    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} />;
+    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} />;
+    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} />;
+    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} />;
     return <>{Notif}{screen}</>;
   }
 
-  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} s={s} /></>;
+  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} /></>;
 
   if (!profile) {
     return (
-      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} />
+      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
         <div style={s.welcomeWrap}>
           {profileError?(
             <>
               <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
               <div style={{ ...s.authTitle, color:"#ef4444" }}>{lang==="bn"?"প্রোফাইল পাওয়া যায়নি":"Profile not found"}</div>
               <div style={{ ...s.authSub, marginBottom:8 }}>{lang==="bn"?"আপনার প্রোফাইল ডেটা পাওয়া যায়নি। নতুন করে সাইন আপ করুন।":"Profile data missing. Please sign up again."}</div>
-              <div style={{ fontSize:11, color:th.txtMuted, marginBottom:20 }}>{profileError}</div>
+              <div style={{ fontSize:11, color:"#71717a", marginBottom:20 }}>{profileError}</div>
               <button style={s.sendBtn} onClick={()=>loadProfile(user)}>{lang==="bn"?"🔄 আবার চেষ্টা করুন":"🔄 Retry"}</button>
               <button style={{ ...s.linkBtn, marginTop:12 }} onClick={()=>signOut(auth)}>{lang==="bn"?"🚪 লগআউট":"🚪 Logout"}</button>
             </>
@@ -2552,201 +2494,104 @@ export default function App() {
     );
   }
 
-  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} /></>;
+  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} /></>;
 }
 
-// ─── STYLES (theme-aware) ────────────────────────────────────
-// ─── INJECT THEME CSS VARIABLES ──────────────────────────────
-  root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
-  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
+// ─── STYLES ──────────────────────────────────────────────────
+const s = {
+  root:        { minHeight:"100vh", background:"#09090b", color:"#e4e4e7", fontFamily:"'Segoe UI', system-ui, sans-serif" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.5)" },
+  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid #27272a", background:"#18181b", position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
   hLeft:       { display:"flex", alignItems:"center", gap:10 },
-  title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
-  sub:         { fontSize:10, color:th.txtMuted },
-  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
-  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
-  lBtnA:       { background:th.accent, color:"#fff" },
+  title:       { fontSize:14, fontWeight:800, color:"#f97316", lineHeight:1.1 },
+  sub:         { fontSize:10, color:"#71717a" },
+  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:"1px solid #3f3f46" },
+  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:700 },
+  lBtnA:       { background:"#f97316", color:"#fff" },
   tabs:        { display:"flex", gap:5 },
-  tab:         { padding:"7px 11px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
-  tabA:        { background:th.accent, color:"#fff", border:`1px solid ${th.accent}` },
+  tab:         { padding:"7px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
+  tabA:        { background:"#f97316", color:"#fff", border:"1px solid #f97316" },
   badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
   panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
-  secTitle:    { fontSize:14, fontWeight:700, color:th.accent, marginBottom:10 },
-  card:        { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:14, marginBottom:10 },
-  inp:         { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
-  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
+  secTitle:    { fontSize:14, fontWeight:700, color:"#f97316", marginBottom:10 },
+  card:        { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:14, marginBottom:10 },
+  inp:         { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
+  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
   sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
-  addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:th.accent==="#f97316"?"rgba(249,115,22,0.08)":th.accentDim, color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
-  invoiceCard: { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, overflow:"hidden", marginBottom:4 },
-  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:`1px solid ${th.border}` },
-  invSerial:   { fontSize:12, fontWeight:800, color:th.accent },
+  // ── Invoice button ──
+  addInvoiceBtn: { width:"100%", padding:"11px", borderRadius:10, border:"2px dashed #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
+  // ── Invoice table ──
+  invoiceCard: { background:"#18181b", border:"1px solid #27272a", borderRadius:12, overflow:"hidden", marginBottom:4 },
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:"#27272a", fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:"1px solid #27272a" },
+  invSerial:   { fontSize:12, fontWeight:800, color:"#f97316" },
   invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
+  // ──
   oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
-  oId:         { fontSize:14, fontWeight:800, color:th.txtPrimary },
+  oId:         { fontSize:14, fontWeight:800, color:"#f4f4f5" },
   sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
-  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:`1px solid ${th.border}`, flexWrap:"wrap" },
-  iName:       { fontSize:13, color:th.txtSecondary, fontWeight:600 },
-  iMeta:       { fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
-  iQty:        { fontSize:12, color:th.txtMuted },
+  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:"1px solid #27272a", flexWrap:"wrap" },
+  iName:       { fontSize:13, color:"#d4d4d8", fontWeight:600 },
+  iMeta:       { fontSize:10, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
+  iQty:        { fontSize:12, color:"#71717a" },
   iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
-  empty:       { textAlign:"center", padding:"50px 20px", color:th.txtFaint, fontSize:14 },
-  nBadge:      { fontSize:10, background:th.accentDim, color:th.accent, padding:"2px 7px", borderRadius:10, fontWeight:700 },
-  div:         { height:1, background:th.border, margin:"10px 0" },
-  oiCard:      { background:th.bgOiCard, borderRadius:10, padding:12, marginBottom:8, border:`1px solid ${th.border}` },
+  empty:       { textAlign:"center", padding:"50px 20px", color:"#52525b", fontSize:14 },
+  nBadge:      { fontSize:10, background:"#451a03", color:"#f97316", padding:"2px 7px", borderRadius:10, fontWeight:700 },
+  div:         { height:1, background:"#27272a", margin:"10px 0" },
+  oiCard:      { background:"#09090b", borderRadius:10, padding:12, marginBottom:8, border:"1px solid #27272a" },
   row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
-  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgSel, color:th.txtPrimary, fontSize:14, outline:"none", fontFamily:"inherit" },
+  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#e4e4e7", fontSize:14, outline:"none", fontFamily:"inherit" },
   waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
   savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
   sRow:        { display:"flex", gap:7, marginBottom:7 },
-  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtMuted, fontSize:12, fontWeight:700, cursor:"pointer" },
+  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#a1a1aa", fontSize:12, fontWeight:700, cursor:"pointer" },
   stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
   stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
   delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
   delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
   flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
-  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:`1px solid ${th.accent}`, background:"transparent", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700 },
-  coIcon:      { width:40, height:40, background:th.border, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
-  edBtn:       { padding:"6px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtSecondary, cursor:"pointer", fontSize:13 },
+  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:"1px solid #f97316", background:"transparent", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700 },
+  coIcon:      { width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
+  edBtn:       { padding:"6px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#27272a", color:"#e4e4e7", cursor:"pointer", fontSize:13 },
   dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
   authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
   welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
   authIcon:    { fontSize:48, marginBottom:8 },
   headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
   bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
-  authTitle:   { fontSize:24, fontWeight:800, color:th.accent, marginBottom:6 },
-  authSub:     { fontSize:13, color:th.txtMuted, marginBottom:20 },
-  authCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:16, textAlign:"left" },
-  authFooter:  { fontSize:12, color:th.txtMuted, marginTop:16 },
-  linkBtn:     { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
-  linkBtnInline:{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  authTitle:   { fontSize:24, fontWeight:800, color:"#f97316", marginBottom:6 },
+  authSub:     { fontSize:13, color:"#a1a1aa", marginBottom:20 },
+  authCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:16, textAlign:"left" },
+  authFooter:  { fontSize:12, color:"#a1a1aa", marginTop:16 },
+  linkBtn:     { background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
+  linkBtnInline:{ background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
   roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
-  roleCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"22px 18px", cursor:"pointer", color:th.txtSecondary, textAlign:"left", fontFamily:"inherit" },
+  roleCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:14, padding:"22px 18px", cursor:"pointer", color:"#e4e4e7", textAlign:"left", fontFamily:"inherit", transition:"border-color 0.2s" },
   roleEmoji:   { fontSize:38, marginBottom:8 },
-  roleName:    { fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:4 },
-  roleDesc:    { fontSize:12, color:th.txtMuted },
-  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  inviteBox:   { fontSize:22, fontWeight:800, color:th.accent, textAlign:"center", padding:"16px", background:th.bgInp, borderRadius:10, border:`2px dashed ${th.accent}`, letterSpacing:2, fontFamily:"monospace" },
+  roleName:    { fontSize:16, fontWeight:700, color:"#f4f4f5", marginBottom:4 },
+  roleDesc:    { fontSize:12, color:"#a1a1aa" },
+  settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
   logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
   desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
-  desktopContent: { flex:1, overflowY:"auto", background:th.bgRoot },
+  desktopContent: { flex:1, overflowY:"auto", background:"#09090b" },
   desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
-  sidebar:        { width:230, minWidth:230, background:th.bgSidebar, borderRight:`1px solid ${th.border}`, display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
-  sideProfile:    { background:th.bgInp, borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:`1px solid ${th.border}` },
+  sidebar:        { width:230, minWidth:230, background:"#18181b", borderRight:"1px solid #27272a", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
+  sideProfile:    { background:"#09090b", borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:"1px solid #27272a" },
   sideNav:        { display:"flex", flexDirection:"column", gap:6 },
-  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
-  sideTabA:       { background:th.accent, color:"#fff" },
+  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
+  sideTabA:       { background:"#f97316", color:"#fff" },
   sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
   sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-  dayHeader:      { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:`1px solid ${th.border}` },
-  dayDot:         { width:8, height:8, borderRadius:"50%", background:th.accent, flexShrink:0 },
-  dayLabel:       { fontSize:13, fontWeight:700, color:th.accent, flex:1 },
-  dayCount:       { fontSize:11, color:th.txtMuted, background:th.border, padding:"2px 8px", borderRadius:10 },
-  settingsRow:    { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
-  settingsRowIcon:{ fontSize:22, flexShrink:0, width:32, textAlign:"center" },
-  settingsRowLabel:{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
-  settingsRowSub: { fontSize:11, color:th.txtMuted },
-  settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
-  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
-};}
-
-// ─── STYLES FUNCTION ─────────────────────────────────────────
-function getStyles(th) { return {
-  root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
-  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
-  hLeft:       { display:"flex", alignItems:"center", gap:10 },
-  title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
-  sub:         { fontSize:10, color:th.txtMuted },
-  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
-  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
-  lBtnA:       { background:th.accent, color:"#fff" },
-  tabs:        { display:"flex", gap:5 },
-  tab:         { padding:"7px 11px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
-  tabA:        { background:th.accent, color:"#fff", border:`1px solid ${th.accent}` },
-  badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
-  panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
-  secTitle:    { fontSize:14, fontWeight:700, color:th.accent, marginBottom:10 },
-  card:        { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:14, marginBottom:10 },
-  inp:         { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
-  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
-  sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
-  addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.08)", color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
-  invoiceCard: { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, overflow:"hidden", marginBottom:4 },
-  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:`1px solid ${th.border}` },
-  invSerial:   { fontSize:12, fontWeight:800, color:th.accent },
-  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
-  oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
-  oId:         { fontSize:14, fontWeight:800, color:th.txtPrimary },
-  sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
-  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:`1px solid ${th.border}`, flexWrap:"wrap" },
-  iName:       { fontSize:13, color:th.txtSecondary, fontWeight:600 },
-  iMeta:       { fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
-  iQty:        { fontSize:12, color:th.txtMuted },
-  iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
-  empty:       { textAlign:"center", padding:"50px 20px", color:th.txtFaint, fontSize:14 },
-  nBadge:      { fontSize:10, background:th.accentDim, color:th.accent, padding:"2px 7px", borderRadius:10, fontWeight:700 },
-  div:         { height:1, background:th.border, margin:"10px 0" },
-  oiCard:      { background:th.bgOiCard, borderRadius:10, padding:12, marginBottom:8, border:`1px solid ${th.border}` },
-  row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
-  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgSel, color:th.txtPrimary, fontSize:14, outline:"none", fontFamily:"inherit" },
-  waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
-  savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
-  sRow:        { display:"flex", gap:7, marginBottom:7 },
-  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtMuted, fontSize:12, fontWeight:700, cursor:"pointer" },
-  stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
-  stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
-  delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
-  delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
-  flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
-  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:`1px solid ${th.accent}`, background:"transparent", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700 },
-  coIcon:      { width:40, height:40, background:th.border, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
-  edBtn:       { padding:"6px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtSecondary, cursor:"pointer", fontSize:13 },
-  dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
-  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
-  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
-  authIcon:    { fontSize:48, marginBottom:8 },
-  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
-  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
-  authTitle:   { fontSize:24, fontWeight:800, color:th.accent, marginBottom:6 },
-  authSub:     { fontSize:13, color:th.txtMuted, marginBottom:20 },
-  authCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:16, textAlign:"left" },
-  authFooter:  { fontSize:12, color:th.txtMuted, marginTop:16 },
-  linkBtn:     { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
-  linkBtnInline:{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
-  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
-  roleCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"22px 18px", cursor:"pointer", color:th.txtSecondary, textAlign:"left", fontFamily:"inherit" },
-  roleEmoji:   { fontSize:38, marginBottom:8 },
-  roleName:    { fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:4 },
-  roleDesc:    { fontSize:12, color:th.txtMuted },
-  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  inviteBox:   { fontSize:22, fontWeight:800, color:th.accent, textAlign:"center", padding:"16px", background:th.bgInp, borderRadius:10, border:`2px dashed ${th.accent}`, letterSpacing:2, fontFamily:"monospace" },
-  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
-  desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
-  desktopContent: { flex:1, overflowY:"auto", background:th.bgRoot },
-  desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
-  sidebar:        { width:230, minWidth:230, background:th.bgSidebar, borderRight:`1px solid ${th.border}`, display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
-  sideProfile:    { background:th.bgInp, borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:`1px solid ${th.border}` },
-  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
-  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
-  sideTabA:       { background:th.accent, color:"#fff" },
-  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
-  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-  dayHeader:      { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:`1px solid ${th.border}` },
-  dayDot:         { width:8, height:8, borderRadius:"50%", background:th.accent, flexShrink:0 },
-  dayLabel:       { fontSize:13, fontWeight:700, color:th.accent, flex:1 },
-  dayCount:       { fontSize:11, color:th.txtMuted, background:th.border, padding:"2px 8px", borderRadius:10 },
-  settingsRow:    { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
-  settingsRowIcon:{ fontSize:22, flexShrink:0, width:32, textAlign:"center" },
-  settingsRowLabel:{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
-  settingsRowSub: { fontSize:11, color:th.txtMuted },
-  settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
-  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
-  addInvoiceBtn:  { width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.08)", color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
-  linkBtnInline:  { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  dayHeader:   { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:"1px solid #27272a" },
+  dayDot:      { width:8, height:8, borderRadius:"50%", background:"#f97316", flexShrink:0 },
+  dayLabel:    { fontSize:13, fontWeight:700, color:"#f97316", flex:1 },
+  dayCount:    { fontSize:11, color:"#71717a", background:"#27272a", padding:"2px 8px", borderRadius:10 },
+  // ── Settings accordion ──
+  settingsRow:      { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:"#18181b", border:"1px solid #27272a", borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
   settingsRowIcon:  { fontSize:22, flexShrink:0, width:32, textAlign:"center" },
-  settingsRowLabel: { fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
-};}
-
-const s = getStyles(THEMES.dark);
+  settingsRowLabel: { fontSize:14, fontWeight:700, color:"#f4f4f5", marginBottom:2 },
+  settingsRowSub:   { fontSize:11, color:"#71717a" },
+  settingsArrow:    { fontSize:20, color:"#3f3f46", flexShrink:0 },
+  backRowBtn:       { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
+};
