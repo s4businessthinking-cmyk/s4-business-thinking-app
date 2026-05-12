@@ -354,33 +354,17 @@ function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }
 }
 
 // ─── HEADER ──────────────────────────────────────────────────
-function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
-  const _s = s || _globalS;
+function Header({ t, lang, setLang, children, isDesktop }) {
   return (
-    <div style={_s.hdr}>
-      <div style={_s.hLeft}>
-        <img src={LOGO_URL} alt="S4" style={_s.headerLogo} />
-        <div><div style={_s.title}>{APP_NAME}</div><div style={_s.sub}>{t.appSub}</div></div>
+    <div style={s.hdr}>
+      <div style={s.hLeft}>
+        <img src={LOGO_URL} alt="S4" style={s.headerLogo} />
+        <div><div style={s.title}>{APP_NAME}</div><div style={s.sub}>{t.appSub}</div></div>
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-        {setTheme && (
-          <button
-            onClick={() => setTheme(theme==="dark"?"light":"dark")}
-            title={theme==="dark"?"Light Mode":"Dark Mode"}
-            style={{
-              width:34, height:34, borderRadius:8,
-              border:`1px solid ${theme==="dark"?"#3f3f46":"#cbd5e1"}`,
-              background:theme==="dark"?"#27272a":"#f1f5f9",
-              cursor:"pointer", fontSize:16, display:"flex",
-              alignItems:"center", justifyContent:"center",
-              flexShrink:0, transition:"all 0.2s",
-            }}>
-            {theme==="dark" ? "☀️" : "🌙"}
-          </button>
-        )}
-        <div style={_s.langSw}>
-          <button style={{ ..._s.lBtn, ...(lang==="bn"?_s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
-          <button style={{ ..._s.lBtn, ...(lang==="en"?_s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
+        <div style={s.langSw}>
+          <button style={{ ...s.lBtn, ...(lang==="bn"?s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
+          <button style={{ ...s.lBtn, ...(lang==="en"?s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
         </div>
         {!isDesktop && children}
       </div>
@@ -389,22 +373,20 @@ function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
 }
 
 // ─── SETUP ───────────────────────────────────────────────────
-function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
-  const _s = sp||_globalS;
+function SetupScreen({ t, lang, setLang }) {
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🔥</div>
-        <div style={{ ..._s.authTitle, color:"#f97316" }}>Firebase Setup Required</div>
-        <div style={_s.authSub}>SETUP.md ফাইল দেখে Firebase config যোগ করুন।</div>
+    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.authWrap}>
+        <div style={s.authIcon}>🔥</div>
+        <div style={{ ...s.authTitle, color:"#f97316" }}>Firebase Setup Required</div>
+        <div style={s.authSub}>SETUP.md ফাইল দেখে Firebase config যোগ করুন।</div>
       </div>
     </div>
   );
 }
 
 // ─── LOGIN ───────────────────────────────────────────────────
-function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast, s:sp, theme, setTheme }) {
-  const _s = sp||_globalS;
+function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast }) {
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -415,19 +397,19 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
     finally { setBusy(false); }
   };
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
-        <div style={_s.authTitle}>{t.welcomeBack}</div>
-        <div style={_s.authSub}>{t.welcomeBackSub}</div>
-        <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
-          <button type="button" style={_s.linkBtn} onClick={onSwitchToReset}>{t.forgotPw}</button>
+    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.authWrap}>
+        <img src={LOGO_URL} alt={APP_NAME} style={s.bigLogo} />
+        <div style={s.authTitle}>{t.welcomeBack}</div>
+        <div style={s.authSub}>{t.welcomeBackSub}</div>
+        <form onSubmit={submit} style={s.authCard}>
+          <input style={{ ...s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
+          <input style={{ ...s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
+          <button type="submit" style={s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
+          <button type="button" style={s.linkBtn} onClick={onSwitchToReset}>{t.forgotPw}</button>
         </form>
-        <div style={_s.authFooter}>{t.noAccount}{" "}
-          <button style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
+        <div style={s.authFooter}>{t.noAccount}{" "}
+          <button style={s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
         </div>
       </div>
     </div>
@@ -435,8 +417,7 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
 }
 
 // ─── PASSWORD RESET ──────────────────────────────────────────
-function ResetScreen({ t, lang, setLang, onBack, toast, s:sp, theme, setTheme }) {
-  const _s = sp||_globalS;
+function ResetScreen({ t, lang, setLang, onBack, toast }) {
   const [email,setEmail]=useState(""); const [busy,setBusy]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -447,44 +428,43 @@ function ResetScreen({ t, lang, setLang, onBack, toast, s:sp, theme, setTheme })
     finally { setBusy(false); }
   };
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🔑</div>
-        <div style={_s.authTitle}>{t.resetTitle}</div>
-        <div style={_s.authSub}>{t.resetMsg}</div>
-        <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} />
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.resetBtn}</button>
+    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.authWrap}>
+        <div style={s.authIcon}>🔑</div>
+        <div style={s.authTitle}>{t.resetTitle}</div>
+        <div style={s.authSub}>{t.resetMsg}</div>
+        <form onSubmit={submit} style={s.authCard}>
+          <input style={{ ...s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} />
+          <button type="submit" style={s.sendBtn} disabled={busy}>{busy?"...":t.resetBtn}</button>
         </form>
-        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
+        <button style={{ ...s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
       </div>
     </div>
   );
 }
 
 // ─── ROLE PICKER ─────────────────────────────────────────────
-function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:sp, theme, setTheme }) {
-  const _s = sp||_globalS;
+function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin }) {
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
-        <div style={_s.authTitle}>{t.chooseRole}</div>
-        <div style={_s.authSub}>{t.chooseRoleSub}</div>
-        <div style={{ ..._s.roleGrid, marginTop:24 }}>
-          <button style={_s.roleCard} onClick={() => onPick("owner")}>
-            <div style={_s.roleEmoji}>🏢</div>
-            <div style={_s.roleName}>{t.roleOwnerCard}</div>
-            <div style={_s.roleDesc}>{t.roleOwnerDesc}</div>
+    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.authWrap}>
+        <img src={LOGO_URL} alt={APP_NAME} style={s.bigLogo} />
+        <div style={s.authTitle}>{t.chooseRole}</div>
+        <div style={s.authSub}>{t.chooseRoleSub}</div>
+        <div style={{ ...s.roleGrid, marginTop:24 }}>
+          <button style={s.roleCard} onClick={() => onPick("owner")}>
+            <div style={s.roleEmoji}>🏢</div>
+            <div style={s.roleName}>{t.roleOwnerCard}</div>
+            <div style={s.roleDesc}>{t.roleOwnerDesc}</div>
           </button>
-          <button style={_s.roleCard} onClick={() => onPick("salesman")}>
-            <div style={_s.roleEmoji}>👨‍💼</div>
-            <div style={_s.roleName}>{t.roleSalesCard}</div>
-            <div style={_s.roleDesc}>{t.roleSalesDesc}</div>
+          <button style={s.roleCard} onClick={() => onPick("salesman")}>
+            <div style={s.roleEmoji}>👨‍💼</div>
+            <div style={s.roleName}>{t.roleSalesCard}</div>
+            <div style={s.roleDesc}>{t.roleSalesDesc}</div>
           </button>
         </div>
-        <div style={{ ..._s.authFooter, marginTop:24 }}>{t.haveAccount}{" "}
-          <button style={_s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
+        <div style={{ ...s.authFooter, marginTop:24 }}>{t.haveAccount}{" "}
+          <button style={s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
         </div>
       </div>
     </div>
@@ -492,8 +472,7 @@ function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:sp, the
 }
 
 // ─── SIGNUP FORM ─────────────────────────────────────────────
-function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme }) {
-  const _s = sp||_globalS;
+function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) {
   const [companyName,setCompanyName]=useState("");
   const [personName,setPersonName]=useState("");
   const [country,setCountry]=useState("BD");
@@ -589,16 +568,16 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
   };
 
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>{isOwner?"🏢":"👨‍💼"}</div>
-        <div style={_s.authTitle}>{isOwner?t.roleOwnerCard:t.roleSalesCard}</div>
-        <form onSubmit={submit} style={_s.authCard}>
-          {isOwner && <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.companyName} value={companyName} onChange={e=>setCompanyName(e.target.value)} />}
+    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.authWrap}>
+        <div style={s.authIcon}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div style={s.authTitle}>{isOwner?t.roleOwnerCard:t.roleSalesCard}</div>
+        <form onSubmit={submit} style={s.authCard}>
+          {isOwner && <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.companyName} value={companyName} onChange={e=>setCompanyName(e.target.value)} />}
           {!isOwner && (
             <>
               <input
-                style={{ ..._s.inp, marginBottom:4, textTransform:"uppercase", fontWeight:700, letterSpacing:1 }}
+                style={{ ...s.inp, marginBottom:4, textTransform:"uppercase", fontWeight:700, letterSpacing:1 }}
                 placeholder="INVITE CODE"
                 value={inviteCode}
                 onChange={e=>setInviteCode(e.target.value.toUpperCase())}
@@ -606,20 +585,20 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
               <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}>💡 {t.inviteCodeLbl}</div>
             </>
           )}
-          <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
-          <select style={{ ..._s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
+          <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
+          <select style={{ ...s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
             {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
           </select>
-          <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
-          <input style={{ ..._s.inp, marginBottom:12 }} type="password" placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.creatingAccount:t.createAccount}</button>
+          <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
+          <input style={{ ...s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
+          <input style={{ ...s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
+          <input style={{ ...s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
+          <input style={{ ...s.inp, marginBottom:12 }} type="password" placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
+          <button type="submit" style={s.sendBtn} disabled={busy}>{busy?t.creatingAccount:t.createAccount}</button>
         </form>
-        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
-        <div style={{ ..._s.authFooter, marginTop:8 }}>{t.haveAccount}{" "}
-          <button style={_s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
+        <button style={{ ...s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
+        <div style={{ ...s.authFooter, marginTop:8 }}>{t.haveAccount}{" "}
+          <button style={s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
         </div>
       </div>
     </div>
@@ -627,8 +606,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
 }
 
 // ─── VERIFY GATE ─────────────────────────────────────────────
-function VerifyGate({ t, lang, setLang, user, toast, onLogout, s:sp, theme, setTheme }) {
-  const _s = sp||_globalS;
+function VerifyGate({ t, lang, setLang, user, toast, onLogout }) {
   const [busy,setBusy]=useState(false);
   const recheck = async () => {
     setBusy(true);
@@ -643,18 +621,18 @@ function VerifyGate({ t, lang, setLang, user, toast, onLogout, s:sp, theme, setT
     finally { setBusy(false); }
   };
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>📧</div>
-        <div style={_s.authTitle}>{t.verifyTitle}</div>
-        <div style={_s.authSub}>{t.verifyMsg}</div>
-        <div style={{ ..._s.card, marginTop:16, textAlign:"center" }}>
+    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.authWrap}>
+        <div style={s.authIcon}>📧</div>
+        <div style={s.authTitle}>{t.verifyTitle}</div>
+        <div style={s.authSub}>{t.verifyMsg}</div>
+        <div style={{ ...s.card, marginTop:16, textAlign:"center" }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#f97316", marginBottom:4 }}>{user.email}</div>
           <div style={{ fontSize:12, color:"#71717a", marginBottom:16 }}>{t.verifyMsg2}</div>
-          <button style={{ ..._s.sendBtn, marginBottom:10 }} onClick={recheck} disabled={busy}>{t.verifyCheckBtn}</button>
-          <button style={{ ..._s.stBtn, width:"100%" }} onClick={resend} disabled={busy}>{t.resendVerify}</button>
+          <button style={{ ...s.sendBtn, marginBottom:10 }} onClick={recheck} disabled={busy}>{t.verifyCheckBtn}</button>
+          <button style={{ ...s.stBtn, width:"100%" }} onClick={resend} disabled={busy}>{t.resendVerify}</button>
         </div>
-        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onLogout}>{t.logout}</button>
+        <button style={{ ...s.linkBtn, marginTop:16 }} onClick={onLogout}>{t.logout}</button>
       </div>
     </div>
   );
@@ -2186,8 +2164,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
               <button style={s.settingsRow} onClick={()=>setSettingsPage("theme")}>
                 <span style={s.settingsRowIcon}>{theme==="dark"?"🌙":"☀️"}</span>
                 <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{lang==="bn"?"থিম / রঙ":"Theme"}</div>
+                  <div style={s.settingsRowLabel}>{lang==="bn"?"থিম":"Theme"}</div>
                   <div style={s.settingsRowSub}>{theme==="dark"?(lang==="bn"?"ডার্ক মোড":"Dark Mode"):(lang==="bn"?"লাইট মোড":"Light Mode")}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Language */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("language")}>
+                <span style={s.settingsRowIcon}>🌐</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.languageLbl}</div>
+                  <div style={s.settingsRowSub}>{lang==="bn"?"বাংলা":"English"}</div>
                 </div>
                 <span style={s.settingsArrow}>›</span>
               </button>
@@ -2373,44 +2361,34 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
             </div>
           )}
 
+          {settingsPage==="theme"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{lang==="bn"?"থিম বেছে নিন":"Choose Theme"}</div>
+              <div style={{ display:"flex", gap:10 }}>
+                {[
+                  { id:"dark",  icon:"🌙", labelBn:"ডার্ক মোড",  labelEn:"Dark Mode"  },
+                  { id:"light", icon:"☀️", labelBn:"লাইট মোড", labelEn:"Light Mode" },
+                ].map(opt=>(
+                  <button key={opt.id} onClick={()=>setTheme(opt.id)}
+                    style={{ flex:1, padding:"20px 10px", borderRadius:14, border:`2px solid ${theme===opt.id?th.accent:th.border}`,
+                      background:theme===opt.id?th.accentDim:th.bgInp, cursor:"pointer", fontFamily:"inherit",
+                      display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
+                    <span style={{ fontSize:32 }}>{opt.icon}</span>
+                    <span style={{ fontSize:13, fontWeight:700, color:theme===opt.id?th.accent:th.txtMuted }}>
+                      {theme===opt.id?"✅ ":""}{lang==="bn"?opt.labelBn:opt.labelEn}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {settingsPage==="language"&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.languageLbl}</div>
               <div style={s.langSw}>
                 <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="bn"?s.lBtnA:{}) }} onClick={()=>setLang("bn")}>বাংলা</button>
                 <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
-              </div>
-            </div>
-          )}
-
-          {settingsPage==="theme"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"🎨 থিম বেছে নিন":"🎨 Choose Theme"}</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                <button onClick={()=>setTheme("dark")}
-                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
-                    border:`2px solid ${theme==="dark"?"#f97316":"#3f3f46"}`,
-                    background:theme==="dark"?"rgba(249,115,22,0.08)":"transparent",
-                    cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
-                  <span style={{ fontSize:28 }}>🌙</span>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"ডার্ক মোড":"Dark Mode"}</div>
-                    <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"চোখে আরামদায়ক অন্ধকার থিম":"Easy on the eyes dark theme"}</div>
-                  </div>
-                  {theme==="dark"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
-                </button>
-                <button onClick={()=>setTheme("light")}
-                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
-                    border:`2px solid ${theme==="light"?"#f97316":"#3f3f46"}`,
-                    background:theme==="light"?"rgba(249,115,22,0.08)":"transparent",
-                    cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
-                  <span style={{ fontSize:28 }}>☀️</span>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"লাইট মোড":"Light Mode"}</div>
-                    <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"উজ্জ্বল সাদা থিম":"Bright white theme"}</div>
-                  </div>
-                  {theme==="light"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
-                </button>
               </div>
             </div>
           )}
@@ -2430,7 +2408,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
 
   return (
     <div style={s.root}>
-      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}>
+      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop}>
         <div style={s.tabs}>
           {visibleTabs.map(([k,label])=>(
             <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
@@ -2530,28 +2508,28 @@ export default function App() {
 
   useEffect(()=>()=>{ if (toastTimer.current) clearTimeout(toastTimer.current); },[]);
 
-  if (!FIREBASE_READY||!auth||!db) return <SetupScreen t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />;
+  if (!FIREBASE_READY||!auth||!db) return <SetupScreen t={t} lang={lang} setLang={setLang} />;
 
   const Notif = notif&&(
     <div style={{ ...s.notif, background:notif.type==="err"?"#450a0a":"#052e16", borderColor:notif.type==="err"?"#ef4444":"#22c55e", color:notif.type==="err"?"#ef4444":"#22c55e" }}>{notif.msg}</div>
   );
 
-  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
+  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
 
   if (!user) {
     let screen;
-    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
-    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} s={s} theme={theme} setTheme={setTheme} />;
-    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
-    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
+    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} s={s} />;
+    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} s={s} />;
+    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} s={s} />;
+    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} s={s} />;
     return <>{Notif}{screen}</>;
   }
 
-  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} s={s} theme={theme} setTheme={setTheme} /></>;
+  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} s={s} /></>;
 
   if (!profile) {
     return (
-      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />
+      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} />
         <div style={s.welcomeWrap}>
           {profileError?(
             <>
@@ -2576,6 +2554,101 @@ export default function App() {
 
   return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} /></>;
 }
+
+// ─── STYLES (theme-aware) ────────────────────────────────────
+// ─── INJECT THEME CSS VARIABLES ──────────────────────────────
+  root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
+  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
+  hLeft:       { display:"flex", alignItems:"center", gap:10 },
+  title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
+  sub:         { fontSize:10, color:th.txtMuted },
+  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
+  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
+  lBtnA:       { background:th.accent, color:"#fff" },
+  tabs:        { display:"flex", gap:5 },
+  tab:         { padding:"7px 11px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
+  tabA:        { background:th.accent, color:"#fff", border:`1px solid ${th.accent}` },
+  badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
+  panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
+  secTitle:    { fontSize:14, fontWeight:700, color:th.accent, marginBottom:10 },
+  card:        { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:14, marginBottom:10 },
+  inp:         { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
+  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
+  sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
+  addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:th.accent==="#f97316"?"rgba(249,115,22,0.08)":th.accentDim, color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
+  invoiceCard: { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, overflow:"hidden", marginBottom:4 },
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:`1px solid ${th.border}` },
+  invSerial:   { fontSize:12, fontWeight:800, color:th.accent },
+  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
+  oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
+  oId:         { fontSize:14, fontWeight:800, color:th.txtPrimary },
+  sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
+  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:`1px solid ${th.border}`, flexWrap:"wrap" },
+  iName:       { fontSize:13, color:th.txtSecondary, fontWeight:600 },
+  iMeta:       { fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
+  iQty:        { fontSize:12, color:th.txtMuted },
+  iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
+  empty:       { textAlign:"center", padding:"50px 20px", color:th.txtFaint, fontSize:14 },
+  nBadge:      { fontSize:10, background:th.accentDim, color:th.accent, padding:"2px 7px", borderRadius:10, fontWeight:700 },
+  div:         { height:1, background:th.border, margin:"10px 0" },
+  oiCard:      { background:th.bgOiCard, borderRadius:10, padding:12, marginBottom:8, border:`1px solid ${th.border}` },
+  row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
+  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgSel, color:th.txtPrimary, fontSize:14, outline:"none", fontFamily:"inherit" },
+  waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
+  savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
+  sRow:        { display:"flex", gap:7, marginBottom:7 },
+  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtMuted, fontSize:12, fontWeight:700, cursor:"pointer" },
+  stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
+  stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
+  delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
+  delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
+  flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
+  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:`1px solid ${th.accent}`, background:"transparent", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700 },
+  coIcon:      { width:40, height:40, background:th.border, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
+  edBtn:       { padding:"6px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtSecondary, cursor:"pointer", fontSize:13 },
+  dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
+  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
+  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
+  authIcon:    { fontSize:48, marginBottom:8 },
+  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
+  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
+  authTitle:   { fontSize:24, fontWeight:800, color:th.accent, marginBottom:6 },
+  authSub:     { fontSize:13, color:th.txtMuted, marginBottom:20 },
+  authCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:16, textAlign:"left" },
+  authFooter:  { fontSize:12, color:th.txtMuted, marginTop:16 },
+  linkBtn:     { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
+  linkBtnInline:{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
+  roleCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"22px 18px", cursor:"pointer", color:th.txtSecondary, textAlign:"left", fontFamily:"inherit" },
+  roleEmoji:   { fontSize:38, marginBottom:8 },
+  roleName:    { fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:4 },
+  roleDesc:    { fontSize:12, color:th.txtMuted },
+  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  inviteBox:   { fontSize:22, fontWeight:800, color:th.accent, textAlign:"center", padding:"16px", background:th.bgInp, borderRadius:10, border:`2px dashed ${th.accent}`, letterSpacing:2, fontFamily:"monospace" },
+  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
+  desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
+  desktopContent: { flex:1, overflowY:"auto", background:th.bgRoot },
+  desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
+  sidebar:        { width:230, minWidth:230, background:th.bgSidebar, borderRight:`1px solid ${th.border}`, display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
+  sideProfile:    { background:th.bgInp, borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:`1px solid ${th.border}` },
+  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
+  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
+  sideTabA:       { background:th.accent, color:"#fff" },
+  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
+  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
+  dayHeader:      { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:`1px solid ${th.border}` },
+  dayDot:         { width:8, height:8, borderRadius:"50%", background:th.accent, flexShrink:0 },
+  dayLabel:       { fontSize:13, fontWeight:700, color:th.accent, flex:1 },
+  dayCount:       { fontSize:11, color:th.txtMuted, background:th.border, padding:"2px 8px", borderRadius:10 },
+  settingsRow:    { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
+  settingsRowIcon:{ fontSize:22, flexShrink:0, width:32, textAlign:"center" },
+  settingsRowLabel:{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
+  settingsRowSub: { fontSize:11, color:th.txtMuted },
+  settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
+  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
+};}
 
 // ─── STYLES FUNCTION ─────────────────────────────────────────
 function getStyles(th) { return {
@@ -2670,7 +2743,10 @@ function getStyles(th) { return {
   settingsRowSub: { fontSize:11, color:th.txtMuted },
   settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
   backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
+  addInvoiceBtn:  { width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.08)", color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
+  linkBtnInline:  { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  settingsRowIcon:  { fontSize:22, flexShrink:0, width:32, textAlign:"center" },
+  settingsRowLabel: { fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
 };}
 
-// Fallback styles (dark) used by components before theme prop arrives
-const _globalS = getStyles(THEMES.dark);
+const s = getStyles(THEMES.dark);
