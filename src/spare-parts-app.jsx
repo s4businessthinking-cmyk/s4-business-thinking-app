@@ -51,6 +51,7 @@ const PERMISSIONS_LIST = [
   { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",  en: "Change Item Status" },
   { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",      en: "Mark as Delivered" },
   { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",        en: "Delete Orders" },
+  { key: "viewProducts",   bn: "পণ্য তালিকা দেখা",          en: "View Product List" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -60,6 +61,7 @@ const DEFAULT_PERMISSIONS = {
   setStatus: false,
   markDelivery: false,
   deleteOrder: false,
+  viewProducts: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -405,7 +407,7 @@ function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
 // ─── LOGIN ───────────────────────────────────────────────────
 function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast, s:sp, theme, setTheme }) {
   const _s = sp||_globalS;
-  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false);
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [showPw,setShowPw]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
     if (!email.trim()||!pw) return toast(friendlyAuthError({code:"validation/required"},lang),"err");
@@ -422,7 +424,11 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
         <div style={_s.authSub}>{t.welcomeBackSub}</div>
         <form onSubmit={submit} style={_s.authCard}>
           <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
+          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
+          <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
+            <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
+            <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
+          </label>
           <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
           <button type="button" style={_s.linkBtn} onClick={onSwitchToReset}>{t.forgotPw}</button>
         </form>
@@ -504,6 +510,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
   const [pw2,setPw2]=useState("");
   const [inviteCode,setInviteCode]=useState("");
   const [busy,setBusy]=useState(false);
+  const [showPw,setShowPw]=useState(false);
   const isOwner = role==="owner";
 
   const submit = async (e) => {
@@ -613,8 +620,12 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
           <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
           <input style={{ ..._s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
           <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
-          <input style={{ ..._s.inp, marginBottom:12 }} type="password" placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
+          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
+          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
+          <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
+            <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
+            <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
+          </label>
           <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.creatingAccount:t.createAccount}</button>
         </form>
         <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
@@ -684,7 +695,7 @@ function InviteCodeRow({ c, lang, t, onDelete }) {
     catch { alert(c.code); }
   };
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid #27272a" }}>
+    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:`1px solid ${th.border}` }}>
       <span style={{ fontSize:16, fontWeight:800, color:"#f97316", fontFamily:"monospace", flex:1, letterSpacing:2 }}>{c.code}</span>
       <button style={{ padding:"6px 12px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", cursor:"pointer", fontSize:12, fontWeight:700 }}
         onClick={copy}>{copied?(lang==="bn"?"✅ কপি":"✅ Copied"):(lang==="bn"?"📋 কপি":"📋 Copy")}</button>
@@ -695,11 +706,12 @@ function InviteCodeRow({ c, lang, t, onDelete }) {
 }
 
 // ─── PRODUCT FORM COMPONENT ──────────────────────────────────
-function PmForm({ pmForm, pmUpd, t, lang }) {
-  const inp  = { padding:"9px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
-  const calcInp = { ...inp, background:"#0d1117", color:"#22c55e", fontWeight:700 };
-  const lbl  = { fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:3, display:"block" };
-  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:"1px solid #27272a", marginBottom:10 };
+function PmForm({ pmForm, pmUpd, t, lang, th }) {
+  const _th  = th || {bgInp:"#09090b",bgCard:"#18181b",txtPrimary:"#f4f4f5",txtMuted:"#71717a",borderMid:"#3f3f46",border:"#27272a",accentDim:"#451a03"};
+  const inp  = { padding:"9px 11px", borderRadius:8, border:`1px solid ${_th.borderMid}`, background:_th.bgInp, color:_th.txtPrimary, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  const calcInp = { ...inp, color:"#22c55e", fontWeight:700 };
+  const lbl  = { fontSize:10, color:_th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:3, display:"block" };
+  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${_th.border}`, marginBottom:10 };
   const g2   = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 };
 
   // More barcodes state
@@ -758,7 +770,7 @@ function PmForm({ pmForm, pmUpd, t, lang }) {
         {mbs.length>0&&(
           <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
             {mbs.map((r,i)=>(
-              <span key={i} style={{ background:"#1c1917", border:"1px solid #451a03", color:"#f97316", borderRadius:20, padding:"3px 10px", fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
+              <span key={i} style={{ background:_th.accentDim, border:"1px solid #f97316", color:"#f97316", borderRadius:20, padding:"3px 10px", fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
                 {r}
                 <button onClick={()=>pmUpd("moreBarcodes",mbs.filter((_,j)=>j!==i))} style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}>✕</button>
               </span>
@@ -772,14 +784,14 @@ function PmForm({ pmForm, pmUpd, t, lang }) {
       <div style={g2}>
         <div>
           <label style={lbl}>Sales VAT %</label>
-          <select style={{ ...inp, background:"#18181b" }} value={pmForm.salesVat||"0"} onChange={e=>pmUpd("salesVat",e.target.value)}>
+          <select style={{ ...inp, background:_th.bgCard }} value={pmForm.salesVat||"0"} onChange={e=>pmUpd("salesVat",e.target.value)}>
             <option value="0">0%</option>
             <option value="5">5%</option>
           </select>
         </div>
         <div>
           <label style={lbl}>Purchase VAT %</label>
-          <select style={{ ...inp, background:"#18181b" }} value={pmForm.purchaseVat||"0"} onChange={e=>pmUpd("purchaseVat",e.target.value)}>
+          <select style={{ ...inp, background:_th.bgCard }} value={pmForm.purchaseVat||"0"} onChange={e=>pmUpd("purchaseVat",e.target.value)}>
             <option value="0">0%</option>
             <option value="5">5%</option>
           </select>
@@ -833,7 +845,7 @@ function PmForm({ pmForm, pmUpd, t, lang }) {
         </div>
         <div>
           <label style={lbl}>{t.pmUnit}</label>
-          <select style={{ ...inp, background:"#18181b" }} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
+          <select style={{ ...inp, background:_th.bgCard }} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
             {["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr"].map(u=><option key={u} value={u}>{u}</option>)}
           </select>
         </div>
@@ -871,6 +883,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [items,setItems]=useState([]);
   const [currentItem,setCurrentItem]=useState(newItem());
   const [note,setNote]=useState("");
+  const [editingOrderId,setEditingOrderId]=useState(null);
   const nameRef = useRef(null);
 
   const [selOrder,setSelOrder]=useState(null);
@@ -1101,9 +1114,36 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
     if (e.key === "Enter") { e.preventDefault(); addItToInvoice(); }
   };
 
+  const startEditOrder = (order) => {
+    setItems(order.items.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs"})));
+    setNote(order.note||"");
+    setEditingOrderId(order.id);
+    setSelOrder(null);
+    window.scrollTo({top:0,behavior:"smooth"});
+  };
+
+  const cancelEditOrder = () => {
+    setEditingOrderId(null);
+    setItems([]);
+    setCurrentItem(newItem());
+    setNote("");
+  };
+
   const sendOrder = async () => {
     const valid = items.filter(it=>it.name.trim());
     if (!valid.length) return toast(t.e1,"err");
+    // ── EDIT MODE: update existing order ──
+    if (editingOrderId) {
+      try {
+        await updateDoc(doc(db,"orders",editingOrderId),{
+          items:valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
+          note:note||"",
+        });
+        setEditingOrderId(null); setItems([]); setCurrentItem(newItem()); setNote("");
+        toast(lang==="bn"?"✅ অর্ডার আপডেট হয়েছে!":"✅ Order updated!");
+      } catch(e){ hErr(e); }
+      return;
+    }
     try {
       let serialNo = null;
       let orderNo = "";
@@ -1334,6 +1374,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
+        ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
         ["settings",t.tabSettings],
       ];
 
@@ -1387,7 +1428,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
           const canEditProc = !itemLocked && ["pending","order_confirmed","out_of_stock"].includes(it.status);
           return (
             <div key={iIdx} style={s.oiCard}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:6 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:6 }}>
                 {iIdx+1}. {it.name}
                 {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>📋 {it.code}</span>}
                 {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
@@ -1514,7 +1555,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
               </div>
             )}
             {order.overall==="delivered"&&order.items.some(it=>it.status==="order_confirmed")&&(
-              <div style={{ background:"#1c1917", border:"1px solid #f97316", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
+              <div style={{ background:th.accentDim, border:"1px solid #f97316", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
                 <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:8 }}>
                   🔁 {lang==="bn"?"No Stock আইটেম Recheck করা হয়েছে — আবার অর্ডার করুন":"No-stock items rechecked — re-order below"}
                 </div>
@@ -1538,6 +1579,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
     const isMyOrder = order.createdBy === user.uid;
     const isCancelled = order.overall === "cancelled";
     const canCancel = isMyOrder && !isCancelled && order.overall === "pending";
+    const orderAge = Date.now() - (order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt)).getTime();
+    const canEditOrder = isSalesman && isMyOrder && order.overall === "pending" && orderAge < 60 * 60 * 1000;
     const canExpandThis = !isCancelled && canExpand;
     return (
       <div style={{ ...s.card, cursor:canExpandThis?"pointer":"default", opacity:isCancelled?0.6:1 }}
@@ -1575,12 +1618,23 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
             <span style={{ fontSize:11, fontWeight:700, color:SC[it.status]?.color||SC[order.overall]?.color }}>{t.status[it.status]||t.status[order.overall]}</span>
           </div>
         ))}
-        {canCancel&&(
-          <button
-            style={{ ...s.delOrderBtn, marginTop:8, borderColor:"#713f12", color:"#f59e0b" }}
-            onClick={e=>{ e.stopPropagation(); cancelOrder(order.id); }}>
-            🚫 {lang==="bn"?"অর্ডার বাতিল করুন":"Cancel Order"}
-          </button>
+        {(canCancel||canEditOrder)&&(
+          <div style={{ display:"flex", gap:6, marginTop:8 }}>
+            {canEditOrder&&(
+              <button
+                style={{ ...s.delOrderBtn, flex:1, borderColor:"#1d4ed8", color:"#60a5fa" }}
+                onClick={e=>{ e.stopPropagation(); startEditOrder(order); }}>
+                ✏️ {lang==="bn"?"অর্ডার এডিট করুন":"Edit Order"}
+              </button>
+            )}
+            {canCancel&&(
+              <button
+                style={{ ...s.delOrderBtn, flex:1, borderColor:"#713f12", color:"#f59e0b" }}
+                onClick={e=>{ e.stopPropagation(); cancelOrder(order.id); }}>
+                🚫 {lang==="bn"?"বাতিল করুন":"Cancel Order"}
+              </button>
+            )}
+          </div>
         )}
         {selOrder===order.id&&canExpandThis&&(
           <div
@@ -1616,7 +1670,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                       📦 {t.pmFromMaster}
                     </button>
                     {showProductPicker&&(
-                      <div style={{ background:"#09090b", border:"1px solid #3f3f46", borderRadius:10, marginTop:6, overflow:"hidden" }}>
+                      <div style={{ background:th.bgInp, border:"1px solid #3f3f46", borderRadius:10, marginTop:6, overflow:"hidden" }}>
                         <input autoFocus style={{ ...s.inp, borderRadius:0, borderLeft:"none", borderRight:"none", borderTop:"none", borderColor:"#27272a" }}
                           placeholder={t.pmSearch} value={productPickerQ}
                           onChange={e=>setProductPickerQ(e.target.value)} />
@@ -1625,7 +1679,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                             .filter(p=> !productPickerQ || (p.name+' '+(p.code||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+(p.barcode||'')+' '+(p.moreBarcodes||[]).join(' ')).toLowerCase().includes(productPickerQ.toLowerCase()))
                             .map(p=>(
                               <button key={p.id} onClick={()=>selectProductToOrder(p)}
-                                style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:"1px solid #27272a", color:"#e4e4e7", cursor:"pointer", fontFamily:"inherit" }}>
+                                style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:`1px solid ${th.border}`, color:th.txtSecondary, cursor:"pointer", fontFamily:"inherit" }}>
                                 <div style={{ fontSize:13, fontWeight:700 }}>{p.name}</div>
                                 <div style={{ fontSize:11, color:"#71717a" }}>
                                   {[p.code,p.brand,p.category].filter(Boolean).join(" · ")}
@@ -1683,7 +1737,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                 <div style={{ marginTop:14 }}>
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
                     <div style={{ ...s.secTitle, margin:0 }}>{t.invoiceList}</div>
-                    <span style={{ fontSize:12, color:"#f97316", fontWeight:700, background:"#451a03", padding:"3px 10px", borderRadius:20 }}>
+                    <span style={{ fontSize:12, color:"#f97316", fontWeight:700, background:th.accentDim, padding:"3px 10px", borderRadius:20 }}>
                       {items.length}{lang==="bn"?"টি":""}
                     </span>
                   </div>
@@ -1701,7 +1755,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                       <div key={item.id} style={s.invRow}>
                         <span style={{ ...s.invSerial, width:22, flexShrink:0 }}>{idx+1}</span>
                         <div style={{ flex:1, minWidth:0 }}>
-                          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                             {item.name}
                           </div>
                           {item.brand&&(
@@ -1725,7 +1779,14 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
 
                   {/* Note + Send */}
                   <textarea style={{ ...s.ta, marginTop:10 }} placeholder={t.noteP} value={note} onChange={e=>setNote(e.target.value)} rows={2} />
-                  <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
+                  {editingOrderId&&(
+                    <button style={{ ...s.stBtn, marginBottom:6, width:"100%" }} onClick={cancelEditOrder}>
+                      ✕ {lang==="bn"?"এডিট বাতিল করুন":"Cancel Edit"}
+                    </button>
+                  )}
+                  <button style={{ ...s.sendBtn, background:editingOrderId?"#0e7490":undefined }} onClick={sendOrder}>
+                    {editingOrderId?(lang==="bn"?"✅ অর্ডার আপডেট করুন":"✅ Update Order"):t.sendOrder}
+                  </button>
                 </div>
               )}
 
@@ -1746,7 +1807,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
             <div style={{ position:"relative", marginBottom:12 }}>
               <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
               <input
-                style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+                style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
                 placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
                 value={searchQ}
                 onChange={e=>setSearchQ(e.target.value)}
@@ -1785,7 +1846,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
           <div style={{ position:"relative", marginBottom:12 }}>
             <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
             <input
-              style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+              style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
               placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
               value={searchQ}
               onChange={e=>setSearchQ(e.target.value)}
@@ -1816,32 +1877,32 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
         </div>
       )}
 
-      {isOwner&&tab==="products"&&(
+      {(isOwner||can("viewProducts"))&&tab==="products"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
 
           {/* ── PRODUCT DETAIL MODAL ── */}
           {pmDetailId&&pmDetail&&(
             <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:200, overflowY:"auto", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 12px 40px" }}>
-              <div style={{ width:"100%", maxWidth:560, background:"#18181b", borderRadius:16, border:"1px solid #27272a", overflow:"hidden" }}>
+              <div style={{ width:"100%", maxWidth:560, background:th.bgCard, borderRadius:16, border:`1px solid ${th.border}`, overflow:"hidden" }}>
                 {/* Modal header */}
-                <div style={{ background:"#09090b", padding:"14px 16px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid #27272a" }}>
-                  <div style={{ width:44, height:44, background:"#27272a", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📦</div>
+                <div style={{ background:th.bgInp, padding:"14px 16px", display:"flex", alignItems:"center", gap:10, borderBottom:`1px solid ${th.border}` }}>
+                  <div style={{ width:44, height:44, background:th.border, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📦</div>
                   <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:800, color:"#f4f4f5", lineHeight:1.2 }}>{pmDetail.name}</div>
+                    <div style={{ fontSize:15, fontWeight:800, color:th.txtPrimary, lineHeight:1.2 }}>{pmDetail.name}</div>
                     {pmDetail.category&&<div style={{ fontSize:11, color:"#f97316", marginTop:2 }}>🗂️ {pmDetail.category}</div>}
                   </div>
                   <div style={{ display:"flex", gap:6 }}>
-                    <button style={s.edBtn} onClick={()=>{ setPmForm({name:pmDetail.name,code:pmDetail.code||"",barcode:pmDetail.barcode||"",ean:pmDetail.ean||"",brand:pmDetail.brand||"",category:pmDetail.category||"",subcategory:pmDetail.subcategory||"",landingCost:pmDetail.landingCost||"",vatPerc:pmDetail.vatPerc||"",vatExclusive:pmDetail.vatExclusive||"",vatInclusive:pmDetail.vatInclusive||"",mrp:pmDetail.mrp||"",openingStock:pmDetail.openingStock||"",unit:pmDetail.unit||"Pcs",description:pmDetail.description||""}); setPmEditId(pmDetail.id); setPmShowAdd(false); }}>✏️</button>
-                    <button style={s.dlBtn} onClick={()=>deleteProduct(pmDetail.id)}>🗑️</button>
+                    {isOwner&&<><button style={s.edBtn} onClick={()=>{ setPmForm({name:pmDetail.name,code:pmDetail.code||"",barcode:pmDetail.barcode||"",ean:pmDetail.ean||"",brand:pmDetail.brand||"",category:pmDetail.category||"",subcategory:pmDetail.subcategory||"",landingCost:pmDetail.landingCost||"",vatPerc:pmDetail.vatPerc||"",vatExclusive:pmDetail.vatExclusive||"",vatInclusive:pmDetail.vatInclusive||"",mrp:pmDetail.mrp||"",openingStock:pmDetail.openingStock||"",unit:pmDetail.unit||"Pcs",description:pmDetail.description||""}); setPmEditId(pmDetail.id); setPmShowAdd(false); }}>✏️</button>
+                    <button style={s.dlBtn} onClick={()=>deleteProduct(pmDetail.id)}>🗑️</button></>}
                     <button style={{ ...s.stBtn, padding:"6px 12px" }} onClick={()=>{ setPmDetailId(null); setPmEditId(null); pmReset(); }}>✕</button>
                   </div>
                 </div>
 
                 {/* Edit form inside modal */}
-                {pmEditId===pmDetail.id?(
+                {isOwner&&pmEditId===pmDetail.id?(
                   <div style={{ padding:16 }}>
                     <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:12 }}>✏️ {t.editTitle}</div>
-                    <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} />
+                    <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} th={th} />
                     <div style={s.row}>
                       <button style={{ ...s.sendBtn, flex:1 }} onClick={()=>editProduct(pmDetail.id)}>{t.saveEdit}</button>
                       <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmEditId(null); pmReset(); }}>{t.cancel}</button>
@@ -1859,14 +1920,14 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                         { lbl:lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category", val:pmDetail.subcategory, icon:"🗂️" },
                         { lbl:lang==="bn"?"ইউনিট":"Unit", val:pmDetail.unit, icon:"📐" },
                       ].map(({lbl,val,icon})=> val?(
-                        <div key={lbl} style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                        <div key={lbl} style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
                           <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>{icon} {lbl}</div>
-                          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{val}</div>
+                          <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{val}</div>
                         </div>
                       ):null)}
                     </div>
                     {/* Pricing section */}
-                    <div style={{ background:"#09090b", borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
+                    <div style={{ background:th.bgInp, borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
                       <div style={{ fontSize:11, color:"#f97316", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>💰 {lang==="bn"?"মূল্য তথ্য":"Pricing Info"}</div>
                       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
                         {[
@@ -1877,7 +1938,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                           { lbl:"MRP", val:pmDetail.mrp, color:"#f97316" },
                           { lbl:lang==="bn"?"Opening Stock":"Opening Stock", val:pmDetail.openingStock, color:"#a855f7" },
                         ].map(({lbl,val,color})=>(
-                          <div key={lbl} style={{ textAlign:"center", padding:"8px 6px", background:"#18181b", borderRadius:8 }}>
+                          <div key={lbl} style={{ textAlign:"center", padding:"8px 6px", background:th.bgCard, borderRadius:8 }}>
                             <div style={{ fontSize:9, color:"#71717a", marginBottom:4, textTransform:"uppercase" }}>{lbl}</div>
                             <div style={{ fontSize:14, fontWeight:800, color: val?color:"#3f3f46" }}>{val||"—"}</div>
                           </div>
@@ -1885,7 +1946,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                       </div>
                     </div>
                     {pmDetail.description&&(
-                      <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                      <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
                         <div style={{ fontSize:10, color:"#71717a", marginBottom:4 }}>📝 {lang==="bn"?"বিবরণ":"Description"}</div>
                         <div style={{ fontSize:12, color:"#d4d4d8" }}>{pmDetail.description}</div>
                       </div>
@@ -1901,7 +1962,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
             <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }} onClick={fetchProducts} disabled={productsLoading}>{productsLoading?"⏳":"🔄"}</button>
-              {products.length>0&&(
+              {isOwner&&products.length>0&&(
                 <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
                   onClick={async()=>{
                     if (!window.confirm(lang==="bn"?`সব ${products.length}টি পণ্য মুছে ফেলবেন?`:`Delete all ${products.length} products?`)) return;
@@ -1916,761 +1977,4 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
                       toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
                     } catch(e){ hErr(e); }
                   }}>🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}</button>
-              )}
-              <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>
-                📥 Import
-                <input type="file" accept=".csv" style={{ display:"none" }} onChange={async (e)=>{
-                  const file=e.target.files[0]; if (!file) return; e.target.value='';
-                  if (products.length>0&&!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`${products.length} products exist. Clear first. Continue anyway?`)) return;
-                  toast(lang==="bn"?"📥 ফাইল পড়া হচ্ছে...":"📥 Reading file...");
-                  try {
-                    const text=await file.text();
-                    const lines=text.split('\n').filter(l=>l.trim());
-                    if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data","err");
-                    const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').toLowerCase());
-                    const fi=(kws)=>h.findIndex(x=>kws.some(k=>x.includes(k)));
-                    const idx={
-                      name:fi(['productname','name']), code:fi(['productcode','code','model']),
-                      barcode:fi(['barcode']), ean:fi(['ean']),
-                      brand:fi(['company','brand']), category:fi(['category']),
-                      subcategory:fi(['subcategory']), landingCost:fi(['landingcost','landing']),
-                      vatPerc:fi(['vat_perc','vatperc','vat%']), vatExclusive:fi(['vatexclusive','exclusive']),
-                      vatInclusive:fi(['vatinclusive','inclusive']), mrp:fi(['mrp']),
-                      openingStock:fi(['openingstock','opening']), unit:fi(['unit']),
-                      description:fi(['description']),
-                    };
-                    if (idx.name<0) return toast(lang==="bn"?"'ProductName' column নেই":"'ProductName' column not found","err");
-                    const seen=new Set(); const rows=[];
-                    for (const line of lines.slice(1)) {
-                      const c=line.split(',').map(x=>x.trim().replace(/^"|"$/g,''));
-                      const name=(c[idx.name]||'').trim(); if (!name||name==='nan') continue;
-                      const code=(idx.code>=0?c[idx.code]||'':'').trim();
-                      const key=`${name}||${code}`.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
-                      const clean=(i,zeroEmpty=false)=>{ if (i<0) return ''; let v=(c[i]||'').trim(); if (v==='UNAVAILABLE'||v==='nan') return ''; if (zeroEmpty) { try { if (parseFloat(v)===0) return ''; } catch{} } return v; };
-                      rows.push({ shopId, name, code, barcode:clean(idx.barcode), ean:clean(idx.ean),
-                        brand:clean(idx.brand), category:clean(idx.category), subcategory:clean(idx.subcategory),
-                        landingCost:clean(idx.landingCost,true), vatPerc:clean(idx.vatPerc,true),
-                        vatExclusive:clean(idx.vatExclusive,true), vatInclusive:clean(idx.vatInclusive,true),
-                        mrp:clean(idx.mrp,true), openingStock:clean(idx.openingStock,true),
-                        unit:['Nos','nan',''].includes(clean(idx.unit))?'Pcs':clean(idx.unit),
-                        description:clean(idx.description),
-                      });
-                    }
-                    if (!rows.length) return toast(lang==="bn"?"কোনো valid product নেই":"No valid products","err");
-                    toast(lang==="bn"?`📥 ${rows.length}টি import হচ্ছে...`:`📥 Importing ${rows.length}...`);
-                    let done=0;
-                    for (let i=0;i<rows.length;i+=500) {
-                      const batch=writeBatch(db);
-                      rows.slice(i,i+500).forEach(p=>batch.set(doc(collection(db,"products")),{...p,createdAt:serverTimestamp()}));
-                      await batch.commit(); done+=Math.min(500,rows.length-i);
-                      toast(`📥 ${done}/${rows.length}...`);
-                    }
-                    await fetchProducts();
-                    toast(lang==="bn"?`✅ ${done}টি পণ্য import সম্পন্ন!`:`✅ ${done} products imported!`);
-                  } catch(err){ toast(err.message||"Import failed","err"); }
-                }} />
-              </label>
-              <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); setPmDetailId(null); }}>
-                {pmShowAdd?`✕ ${t.cancel}`:t.pmAdd}
-              </button>
-            </div>
-          </div>
-
-          {/* ── ADD FORM ── */}
-          {pmShowAdd&&(
-            <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:12 }}>➕ {t.pmAdd}</div>
-              <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} />
-              <div style={s.row}>
-                <button style={{ ...s.sendBtn, flex:1 }} onClick={addProduct}>{t.addBtn}</button>
-                <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmShowAdd(false); pmReset(); }}>{t.cancel}</button>
-              </div>
-            </div>
-          )}
-
-          {/* ── SEARCH + CATEGORY FILTER ── */}
-          <div style={{ position:"relative", marginBottom:10 }}>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-            <input style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
-              placeholder={t.pmSearch} value={pmSearch} onChange={e=>setPmSearch(e.target.value)} />
-            {pmSearch&&<button onClick={()=>setPmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16 }}>✕</button>}
-          </div>
-
-          {/* Category filter pills */}
-          {!pmSearch&&products.length>0&&(()=>{
-            const cats = ["ALL",...[...new Set(products.map(p=>p.category).filter(Boolean))].sort()];
-            return (
-              <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:10, marginBottom:6 }}>
-                {cats.map(cat=>(
-                  <button key={cat} onClick={()=>setPmCatFilter(cat)}
-                    style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit",
-                      background:pmCatFilter===cat?"#f97316":"transparent",
-                      borderColor:pmCatFilter===cat?"#f97316":"#3f3f46",
-                      color:pmCatFilter===cat?"#fff":"#a1a1aa" }}>
-                    {cat==="ALL"?(lang==="bn"?"সব":"All"):cat}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-
-          {/* ── PRODUCT LIST ── */}
-          {productsLoading&&<div style={s.empty}><div style={{ fontSize:36 }}>⏳</div><div>{lang==="bn"?"লোড হচ্ছে...":"Loading..."}</div></div>}
-          {!productsLoading&&products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
-          {!productsLoading&&(()=>{
-            const filtered = products.filter(p=>{
-              const q = pmSearch.toLowerCase();
-              const refs = (p.moreBarcodes||[]).join(' ');
-              const matchQ = !q || (p.name+' '+(p.code||'')+' '+(p.barcode||'')+' '+(p.ean||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+refs).toLowerCase().includes(q);
-              const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
-              return matchQ && matchCat;
-            });
-            if (filtered.length===0) return <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results"}</div></div>;
-            return filtered.map(p=>(
-              <div key={p.id} style={{ ...s.card, cursor:"pointer", transition:"border-color 0.15s" }}
-                onClick={()=>{ setPmDetailId(p.id); setPmEditId(null); pmReset(); }}>
-                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  {/* Color dot by category */}
-                  <div style={{ width:42, height:42, borderRadius:12, background:"#09090b", border:"1px solid #27272a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                    <div style={{ fontSize:11, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:6 }}>
-                      {p.code&&<span>📋 {p.code}</span>}
-                      {p.brand&&<span>🏷️ {p.brand}</span>}
-                      {p.barcode&&<span>🔢 {p.barcode}</span>}
-                    </div>
-                    <div style={{ display:"flex", gap:6, marginTop:5, flexWrap:"wrap", alignItems:"center" }}>
-                      {p.category&&<span style={{ fontSize:10, background:"#1c1917", color:"#f97316", padding:"2px 8px", borderRadius:20, border:"1px solid #451a03" }}>{p.category}</span>}
-                      {p.vatExclusive&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>৳{p.vatExclusive}</span>}
-                      {p.mrp&&parseFloat(p.mrp)>0&&<span style={{ fontSize:10, color:"#71717a" }}>MRP {p.mrp}</span>}
-                      {p.openingStock&&parseFloat(p.openingStock)>0&&<span style={{ fontSize:10, color:"#818cf8" }}>Stock: {p.openingStock}</span>}
-                      <span style={{ fontSize:10, color:"#52525b", marginLeft:"auto" }}>{p.unit}</span>
-                    </div>
-                  </div>
-                  <span style={{ fontSize:20, color:"#3f3f46", flexShrink:0 }}>›</span>
-                </div>
-              </div>
-            ));
-          })()}
-        </div>
-      )}
-
-      {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
-        <div style={isDesktop?s.desktopPanel:s.panel}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-            <div style={s.secTitle}>{t.coList}</div>
-            <button style={s.addCoBtn} onClick={()=>setShowAdd(!showAdd)}>{showAdd?`✕ ${t.cancel}`:t.addNew}</button>
-          </div>
-          {showAdd&&(
-            <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:10 }}>{t.addCoTitle}</div>
-              <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.coName} value={newNm} onChange={e=>setNewNm(e.target.value)} />
-              <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.waNum} value={newPh} onChange={e=>setNewPh(e.target.value)} />
-              <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}>{t.waHint}</div>
-              <div style={s.row}>
-                <button style={{ ...s.sendBtn, flex:1, padding:"10px" }} onClick={addCo}>{t.addBtn}</button>
-                <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setShowAdd(false); setNewNm(""); setNewPh(""); }}>{t.cancel}</button>
-              </div>
-            </div>
-          )}
-          {cos.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>🏢</div><div>{t.noCo}</div></div>}
-          {cos.map(c=>(
-            <div key={c.id} style={s.card}>
-              {editId===c.id?(
-                <div>
-                  <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:10 }}>{t.editTitle}</div>
-                  <input style={{ ...s.inp, marginBottom:8 }} value={editNm} onChange={e=>setEditNm(e.target.value)} />
-                  <input style={{ ...s.inp, marginBottom:10 }} value={editPh} onChange={e=>setEditPh(e.target.value)} />
-                  <div style={s.row}>
-                    <button style={{ ...s.savBtn, flex:1, padding:"10px" }} onClick={()=>saveEdit(c.id)}>{t.saveEdit}</button>
-                    <button style={{ ...s.stBtn, flex:1 }} onClick={cancelEdit}>{t.cancel}</button>
-                  </div>
-                </div>
-              ):(
-                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={s.coIcon}>🏢</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{c.name}</div>
-                    <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{c.phone?`📱 +${c.phone}`:t.noPhone}</div>
-                  </div>
-                  <div style={{ display:"flex", gap:6 }}>
-                    {c.phone&&<a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" style={{ ...s.waBtn, padding:"6px 10px" }}>💬</a>}
-                    <button style={s.edBtn} onClick={()=>startEdit(c)}>✏️</button>
-                    <button style={s.dlBtn} onClick={()=>delCo(c.id)}>🗑️</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab==="settings"&&(
-        <div style={isDesktop?s.desktopPanel:s.panel}>
-          {/* ── SETTINGS MENU ── */}
-          {!settingsPage&&(
-            <>
-              <div style={s.secTitle}>{t.settingsTitle}</div>
-
-              {/* Profile row */}
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("profile")}>
-                <span style={s.settingsRowIcon}>👤</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{t.profileTitle}</div>
-                  <div style={s.settingsRowSub}>{profile.personName}</div>
-                </div>
-                <span style={s.settingsArrow}>›</span>
-              </button>
-
-              {/* Shop info row */}
-              {localShop&&(
-                <button style={s.settingsRow} onClick={()=>setSettingsPage("shop")}>
-                  <span style={s.settingsRowIcon}>🏢</span>
-                  <div style={{ flex:1 }}>
-                    <div style={s.settingsRowLabel}>{t.shopInfoTitle}</div>
-                    <div style={s.settingsRowSub}>{localShop.companyName}</div>
-                  </div>
-                  <span style={s.settingsArrow}>›</span>
-                </button>
-              )}
-
-              {/* Invite codes (owner only) */}
-              {isOwner&&(
-                <button style={s.settingsRow} onClick={()=>setSettingsPage("invite")}>
-                  <span style={s.settingsRowIcon}>🔗</span>
-                  <div style={{ flex:1 }}>
-                    <div style={s.settingsRowLabel}>{t.inviteCodeTitle}</div>
-                    <div style={s.settingsRowSub}>{inviteCodes.filter(c=>!c.used).length} {lang==="bn"?"টি active":"active"}</div>
-                  </div>
-                  <span style={s.settingsArrow}>›</span>
-                </button>
-              )}
-
-              {/* Positions (owner only) */}
-              {isOwner&&(
-                <button style={s.settingsRow} onClick={()=>setSettingsPage("positions")}>
-                  <span style={s.settingsRowIcon}>📋</span>
-                  <div style={{ flex:1 }}>
-                    <div style={s.settingsRowLabel}>{t.managePositionsTitle}</div>
-                    <div style={s.settingsRowSub}>{(localShop?.positions||[]).length} {lang==="bn"?"টি পদবী":"positions"}</div>
-                  </div>
-                  <span style={s.settingsArrow}>›</span>
-                </button>
-              )}
-
-              {/* Team members */}
-              {team.length>0&&(
-                <button style={s.settingsRow} onClick={()=>setSettingsPage("team")}>
-                  <span style={s.settingsRowIcon}>👥</span>
-                  <div style={{ flex:1 }}>
-                    <div style={s.settingsRowLabel}>{t.teamTitle}</div>
-                    <div style={s.settingsRowSub}>{team.length} {lang==="bn"?"জন সদস্য":"members"}</div>
-                  </div>
-                  <span style={s.settingsArrow}>›</span>
-                </button>
-              )}
-
-              {/* WA style - owner only */}
-              {isOwner&&(
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("wastyle")}>
-                <span style={s.settingsRowIcon}>💬</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{lang==="bn"?"WhatsApp Message Style":"WhatsApp Message Style"}</div>
-                  <div style={s.settingsRowSub}>{WA_STYLES.find(s=>s.id===waStyle)?.[lang==="bn"?"labelBn":"labelEn"]||""}</div>
-                </div>
-                <span style={s.settingsArrow}>›</span>
-              </button>
-              )}
-
-              {/* Theme */}
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("theme")}>
-                <span style={s.settingsRowIcon}>{theme==="dark"?"🌙":"☀️"}</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{lang==="bn"?"থিম / রঙ":"Theme"}</div>
-                  <div style={s.settingsRowSub}>{theme==="dark"?(lang==="bn"?"ডার্ক মোড":"Dark Mode"):(lang==="bn"?"লাইট মোড":"Light Mode")}</div>
-                </div>
-                <span style={s.settingsArrow}>›</span>
-              </button>
-
-              {/* Sync status */}
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("sync")}>
-                <span style={s.settingsRowIcon}>{syncState==="connected"?"🟢":syncState==="offline"?"🔴":"🟡"}</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{t.syncStatus}</div>
-                  <div style={s.settingsRowSub}>{syncState==="connected"?"Online":syncState==="offline"?"Offline":"Connecting..."}</div>
-                </div>
-              </button>
-
-              {/* Logout */}
-              <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
-            </>
-          )}
-
-          {/* ── SUB PAGES ── */}
-          {settingsPage&&(
-            <button style={s.backRowBtn} onClick={()=>setSettingsPage(null)}>
-              ← {lang==="bn"?"সেটিংস":"Settings"}
-            </button>
-          )}
-
-          {settingsPage==="profile"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.profileTitle}</div>
-              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{profile.personName}</div>
-                  <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-                  <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {settingsPage==="shop"&&localShop&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
-              <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5", marginBottom:4 }}>🏢 {localShop.companyName}</div>
-              <div style={{ fontSize:12, color:"#71717a" }}>{t.ownerLabel}: {localShop.ownerName}</div>
-              <div style={{ fontSize:12, color:"#71717a" }}>📍 {localShop.area}</div>
-            </div>
-          )}
-
-          {settingsPage==="invite"&&isOwner&&(
-            <div style={{ ...s.card, border:"1px solid #f97316" }}>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
-                <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
-                <button style={s.addCoBtn} onClick={generateNewCode}>{lang==="bn"?"+ নতুন Code":"+ New Code"}</button>
-              </div>
-              <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:12 }}>{t.inviteCodeDesc}</div>
-              {inviteCodes.filter(c=>!c.used).length===0&&(
-                <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
-                  {lang==="bn"?"কোনো active code নেই। নতুন তৈরি করুন।":"No active codes. Generate one above."}
-                </div>
-              )}
-              {inviteCodes.filter(c=>!c.used).map(c=>(
-                <InviteCodeRow key={c.code} c={c} lang={lang} t={t} onDelete={deleteInviteCode} />
-              ))}
-              {inviteCodes.filter(c=>c.used).length>0&&(
-                <div style={{ marginTop:12, paddingTop:10, borderTop:"1px solid #27272a" }}>
-                  <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:8 }}>
-                    {lang==="bn"?"ব্যবহৃত Codes":"Used Codes"} ({inviteCodes.filter(c=>c.used).length})
-                  </div>
-                  {inviteCodes.filter(c=>c.used).map(c=>(
-                    <div key={c.code} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderTop:"1px solid #1f1f23" }}>
-                      <span style={{ fontSize:13, fontWeight:700, color:"#3f3f46", fontFamily:"monospace", flex:1, letterSpacing:1 }}>{c.code}</span>
-                      <span style={{ fontSize:11, color:"#52525b" }}>✅ {c.usedByName||"—"}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {settingsPage==="positions"&&isOwner&&(
-            <div style={s.card}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                <div style={s.settingsLbl}>{t.managePositionsTitle}</div>
-                <button style={s.addCoBtn} onClick={()=>setShowAddPos(!showAddPos)}>{showAddPos?`✕ ${t.cancel}`:t.addPositionBtn}</button>
-              </div>
-              {showAddPos&&(
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>{lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
-                    {PRESET_POSITIONS[lang].map(p=>(
-                      <button key={p} onClick={()=>setNewPosition(p)}
-                        style={{ padding:"5px 11px", borderRadius:20, border:"1px solid #3f3f46", background:newPosition===p?"#f97316":"transparent", color:newPosition===p?"#fff":"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:600 }}>
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={s.row}>
-                    <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP} value={newPosition}
-                      onChange={e=>setNewPosition(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPosition()} />
-                    <button style={s.savBtn} onClick={addPosition}>{t.addBtn}</button>
-                  </div>
-                </div>
-              )}
-              {(!localShop?.positions||localShop.positions.length===0)
-                ? <div style={{ fontSize:12, color:"#71717a" }}>{t.noPositions}</div>
-                : localShop.positions.map((pos,i)=>(
-                    <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"7px 0", borderTop:i>0?"1px solid #27272a":"none" }}>
-                      <span style={{ fontSize:13, color:"#d4d4d8" }}>👤 {pos}</span>
-                      <button style={s.dlBtn} onClick={()=>deletePosition(pos)}>🗑️</button>
-                    </div>
-                  ))
-              }
-            </div>
-          )}
-
-          {settingsPage==="team"&&team.length>0&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
-              {team.map((m,idx)=>(
-                <div key={m.id} style={{ padding:"10px 0", borderTop:idx>0?"1px solid #27272a":"none" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&m.uid!==user.uid?10:0 }}>
-                    <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"🏢":"👨‍💼"}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
-                      <div style={{ fontSize:11, color:"#71717a" }}>
-                        {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)}
-                        {m.mobile&&<span> · 📱 {m.mobile}</span>}
-                        {m.area&&<span> · {m.area}</span>}
-                      </div>
-                    </div>
-                  </div>
-                  {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
-                    <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
-                      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>{t.positionLbl}</span>
-                        <select style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
-                          value={m.position||"Salesman"}
-                          onChange={async e=>{ try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); } catch(err) { hErr(err); } }}>
-                          <option value="Salesman">{t.defaultPosition}</option>
-                          {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
-                        </select>
-                      </div>
-                      <div style={{ height:1, background:"#1f1f23", marginBottom:8 }} />
-                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>{t.permissionsTitle}</div>
-                      {PERMISSIONS_LIST.map((perm,pi)=>{
-                        const mPerms = m.permissions||DEFAULT_PERMISSIONS;
-                        const isOn   = mPerms[perm.key]===true;
-                        return (
-                          <div key={perm.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderTop:pi>0?"1px solid #1f1f23":"none" }}>
-                            <span style={{ fontSize:12, color:"#d4d4d8" }}>{perm[lang]}</span>
-                            <PermToggle isOn={isOn} onToggle={()=>{ savePermissions(m.id,{ ...mPerms, [perm.key]:!isOn }); }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {settingsPage==="wastyle"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"💬 WhatsApp Message Style":"💬 WhatsApp Message Style"}</div>
-              <div style={{ fontSize:11, color:"#71717a", marginBottom:12 }}>
-                {lang==="bn"?"কোম্পানিকে WhatsApp করার সময় কোন style-এ message যাবে বেছে নিন":"Choose how messages look when sending to companies"}
-              </div>
-              {WA_STYLES.map(st=>(
-                <button key={st.id} onClick={()=>setWaStyle(st.id)}
-                  style={{ width:"100%", textAlign:"left", background:waStyle===st.id?"#1c1917":"#09090b",
-                    border:`1px solid ${waStyle===st.id?"#f97316":"#27272a"}`, borderRadius:10,
-                    padding:"10px 12px", marginBottom:8, cursor:"pointer", fontFamily:"inherit" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                    <span style={{ fontSize:12, fontWeight:700, color:waStyle===st.id?"#f97316":"#a1a1aa" }}>
-                      {waStyle===st.id?"✅ ":""}{lang==="bn"?st.labelBn:st.labelEn}
-                    </span>
-                  </div>
-                  <pre style={{ fontSize:11, color:"#71717a", margin:0, fontFamily:"monospace", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
-                    {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._ 🙏 Thanks`}
-                  </pre>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {settingsPage==="language"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.languageLbl}</div>
-              <div style={s.langSw}>
-                <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="bn"?s.lBtnA:{}) }} onClick={()=>setLang("bn")}>বাংলা</button>
-                <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
-              </div>
-            </div>
-          )}
-
-          {settingsPage==="theme"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"🎨 থিম বেছে নিন":"🎨 Choose Theme"}</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                <button onClick={()=>setTheme("dark")}
-                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
-                    border:`2px solid ${theme==="dark"?"#f97316":"#3f3f46"}`,
-                    background:theme==="dark"?"rgba(249,115,22,0.08)":"transparent",
-                    cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
-                  <span style={{ fontSize:28 }}>🌙</span>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"ডার্ক মোড":"Dark Mode"}</div>
-                    <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"চোখে আরামদায়ক অন্ধকার থিম":"Easy on the eyes dark theme"}</div>
-                  </div>
-                  {theme==="dark"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
-                </button>
-                <button onClick={()=>setTheme("light")}
-                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
-                    border:`2px solid ${theme==="light"?"#f97316":"#3f3f46"}`,
-                    background:theme==="light"?"rgba(249,115,22,0.08)":"transparent",
-                    cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
-                  <span style={{ fontSize:28 }}>☀️</span>
-                  <div>
-                    <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"লাইট মোড":"Light Mode"}</div>
-                    <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"উজ্জ্বল সাদা থিম":"Bright white theme"}</div>
-                  </div>
-                  {theme==="light"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {settingsPage==="sync"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.syncStatus}</div>
-              <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
-                {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  );
-
-  return (
-    <div style={s.root}>
-      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}>
-        <div style={s.tabs}>
-          {visibleTabs.map(([k,label])=>(
-            <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
-              {label}
-              {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.badge}>{unread}</span>}
-            </button>
-          ))}
-        </div>
-      </Header>
-
-      {isDesktop ? (
-        <div style={s.desktopLayout}>
-          <div style={s.sidebar}>
-            <div style={s.sideProfile}>
-              <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:2 }}>{profile.personName}</div>
-              <div style={{ fontSize:11, color:"#71717a" }}>{isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-              {localShop&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, fontWeight:600 }}>🏪 {localShop.companyName}</div>}
-            </div>
-            <div style={s.sideNav}>
-              {visibleTabs.map(([k,label])=>(
-                <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
-                  <span style={{ flex:1, textAlign:"left" }}>{label}</span>
-                  {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.sideBadge}>{unread}</span>}
-                </button>
-              ))}
-            </div>
-            <div style={{ flex:1 }} />
-            <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
-              {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
-            </div>
-            <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
-          </div>
-          <div style={s.desktopContent}>{tabContent}</div>
-        </div>
-      ) : tabContent}
-    </div>
-  );
-}
-
-// ─── ROOT ────────────────────────────────────────────────────
-export default function App() {
-  const [lang,setLangState]=useState(loadLang());
-  const setLang = (l) => { setLangState(l); saveLang(l); };
-  const t = TR[lang];
-
-  const [theme,setThemeState]=useState(loadTheme());
-  const setTheme = (v) => { setThemeState(v); saveTheme(v); };
-  const th = THEMES[theme]||THEMES.dark;
-  const s  = getStyles(th);
-
-  const [user,setUser]=useState(null);
-  const [profile,setProfile]=useState(null);
-  const [shop,setShop]=useState(null);
-  const [authReady,setAuthReady]=useState(false);
-  const [authScreen,setAuthScreen]=useState("login");
-  const [signupRole,setSignupRole]=useState(null);
-  const [notif,setNotif]=useState(null);
-  const [profileError,setProfileError]=useState(null);
-  const toastTimer=useRef(null);
-
-  const toast = (msg,type="ok") => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    setNotif({msg,type});
-    toastTimer.current = setTimeout(()=>setNotif(null),3500);
-  };
-
-  const loadProfile = async (u) => {
-    setProfileError(null);
-    if (!u) { setProfile(null); setShop(null); return; }
-    try { await u.getIdToken(true); } catch(e) { console.warn(e); }
-    let lastErr=null;
-    for (let attempt=0; attempt<5; attempt++) {
-      try {
-        const profSnap = await getDoc(doc(db,"users",u.uid));
-        if (profSnap.exists()) {
-          const prof = profSnap.data(); setProfile(prof);
-          if (prof.shopId) {
-            const shopSnap = await getDoc(doc(db,"shops",prof.shopId));
-            if (shopSnap.exists()) setShop({id:shopSnap.id,...shopSnap.data()});
-          }
-          return;
-        }
-      } catch(e) { lastErr=e; console.error(`Attempt ${attempt+1} failed:`,e); }
-      await new Promise(r=>setTimeout(r,1500));
-    }
-    setProfileError(lastErr?.message||"Profile not found");
-  };
-
-  useEffect(() => {
-    if (!FIREBASE_READY||!auth) { setAuthReady(true); return; }
-    const unsub = onAuthStateChanged(auth, async (u) => {
-      setUser(u); await loadProfile(u); setAuthReady(true);
-    });
-    return ()=>unsub();
-  },[]);
-
-  useEffect(()=>()=>{ if (toastTimer.current) clearTimeout(toastTimer.current); },[]);
-
-  if (!FIREBASE_READY||!auth||!db) return <SetupScreen t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />;
-
-  const Notif = notif&&(
-    <div style={{ ...s.notif, background:notif.type==="err"?"#450a0a":"#052e16", borderColor:notif.type==="err"?"#ef4444":"#22c55e", color:notif.type==="err"?"#ef4444":"#22c55e" }}>{notif.msg}</div>
-  );
-
-  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
-
-  if (!user) {
-    let screen;
-    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
-    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} s={s} theme={theme} setTheme={setTheme} />;
-    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
-    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
-    return <>{Notif}{screen}</>;
-  }
-
-  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} s={s} theme={theme} setTheme={setTheme} /></>;
-
-  if (!profile) {
-    return (
-      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />
-        <div style={s.welcomeWrap}>
-          {profileError?(
-            <>
-              <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
-              <div style={{ ...s.authTitle, color:"#ef4444" }}>{lang==="bn"?"প্রোফাইল পাওয়া যায়নি":"Profile not found"}</div>
-              <div style={{ ...s.authSub, marginBottom:8 }}>{lang==="bn"?"আপনার প্রোফাইল ডেটা পাওয়া যায়নি। নতুন করে সাইন আপ করুন।":"Profile data missing. Please sign up again."}</div>
-              <div style={{ fontSize:11, color:th.txtMuted, marginBottom:20 }}>{profileError}</div>
-              <button style={s.sendBtn} onClick={()=>loadProfile(user)}>{lang==="bn"?"🔄 আবার চেষ্টা করুন":"🔄 Retry"}</button>
-              <button style={{ ...s.linkBtn, marginTop:12 }} onClick={()=>signOut(auth)}>{lang==="bn"?"🚪 লগআউট":"🚪 Logout"}</button>
-            </>
-          ):(
-            <>
-              <div style={{ fontSize:48, marginBottom:12 }}>⏳</div>
-              <div style={s.authTitle}>{lang==="bn"?"প্রোফাইল লোড হচ্ছে...":"Loading profile..."}</div>
-              <div style={s.authSub}>{lang==="bn"?"একটু অপেক্ষা করুন":"Please wait"}</div>
-            </>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} /></>;
-}
-
-// ─── STYLES FUNCTION ─────────────────────────────────────────
-function getStyles(th) { return {
-  root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
-  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
-  hLeft:       { display:"flex", alignItems:"center", gap:10 },
-  title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
-  sub:         { fontSize:10, color:th.txtMuted },
-  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
-  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
-  lBtnA:       { background:th.accent, color:"#fff" },
-  tabs:        { display:"flex", gap:5 },
-  tab:         { padding:"7px 11px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
-  tabA:        { background:th.accent, color:"#fff", border:`1px solid ${th.accent}` },
-  badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
-  panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
-  secTitle:    { fontSize:14, fontWeight:700, color:th.accent, marginBottom:10 },
-  card:        { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:14, marginBottom:10 },
-  inp:         { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
-  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
-  sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
-  addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.08)", color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
-  invoiceCard: { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, overflow:"hidden", marginBottom:4 },
-  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:`1px solid ${th.border}` },
-  invSerial:   { fontSize:12, fontWeight:800, color:th.accent },
-  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
-  oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
-  oId:         { fontSize:14, fontWeight:800, color:th.txtPrimary },
-  sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
-  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:`1px solid ${th.border}`, flexWrap:"wrap" },
-  iName:       { fontSize:13, color:th.txtSecondary, fontWeight:600 },
-  iMeta:       { fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
-  iQty:        { fontSize:12, color:th.txtMuted },
-  iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
-  empty:       { textAlign:"center", padding:"50px 20px", color:th.txtFaint, fontSize:14 },
-  nBadge:      { fontSize:10, background:th.accentDim, color:th.accent, padding:"2px 7px", borderRadius:10, fontWeight:700 },
-  div:         { height:1, background:th.border, margin:"10px 0" },
-  oiCard:      { background:th.bgOiCard, borderRadius:10, padding:12, marginBottom:8, border:`1px solid ${th.border}` },
-  row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
-  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgSel, color:th.txtPrimary, fontSize:14, outline:"none", fontFamily:"inherit" },
-  waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
-  savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
-  sRow:        { display:"flex", gap:7, marginBottom:7 },
-  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtMuted, fontSize:12, fontWeight:700, cursor:"pointer" },
-  stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
-  stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
-  delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
-  delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
-  flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
-  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:`1px solid ${th.accent}`, background:"transparent", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700 },
-  coIcon:      { width:40, height:40, background:th.border, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
-  edBtn:       { padding:"6px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtSecondary, cursor:"pointer", fontSize:13 },
-  dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
-  authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
-  welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
-  authIcon:    { fontSize:48, marginBottom:8 },
-  headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
-  bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
-  authTitle:   { fontSize:24, fontWeight:800, color:th.accent, marginBottom:6 },
-  authSub:     { fontSize:13, color:th.txtMuted, marginBottom:20 },
-  authCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:16, textAlign:"left" },
-  authFooter:  { fontSize:12, color:th.txtMuted, marginTop:16 },
-  linkBtn:     { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
-  linkBtnInline:{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
-  roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
-  roleCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"22px 18px", cursor:"pointer", color:th.txtSecondary, textAlign:"left", fontFamily:"inherit" },
-  roleEmoji:   { fontSize:38, marginBottom:8 },
-  roleName:    { fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:4 },
-  roleDesc:    { fontSize:12, color:th.txtMuted },
-  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  inviteBox:   { fontSize:22, fontWeight:800, color:th.accent, textAlign:"center", padding:"16px", background:th.bgInp, borderRadius:10, border:`2px dashed ${th.accent}`, letterSpacing:2, fontFamily:"monospace" },
-  logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
-  desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
-  desktopContent: { flex:1, overflowY:"auto", background:th.bgRoot },
-  desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
-  sidebar:        { width:230, minWidth:230, background:th.bgSidebar, borderRight:`1px solid ${th.border}`, display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
-  sideProfile:    { background:th.bgInp, borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:`1px solid ${th.border}` },
-  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
-  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
-  sideTabA:       { background:th.accent, color:"#fff" },
-  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
-  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-  dayHeader:      { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:`1px solid ${th.border}` },
-  dayDot:         { width:8, height:8, borderRadius:"50%", background:th.accent, flexShrink:0 },
-  dayLabel:       { fontSize:13, fontWeight:700, color:th.accent, flex:1 },
-  dayCount:       { fontSize:11, color:th.txtMuted, background:th.border, padding:"2px 8px", borderRadius:10 },
-  settingsRow:    { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
-  settingsRowIcon:{ fontSize:22, flexShrink:0, width:32, textAlign:"center" },
-  settingsRowLabel:{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
-  settingsRowSub: { fontSize:11, color:th.txtMuted },
-  settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
-  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
-};}
-
-// Fallback styles (dark) used by components before theme prop arrives
-const _globalS = getStyles(THEMES.dark);
+             
