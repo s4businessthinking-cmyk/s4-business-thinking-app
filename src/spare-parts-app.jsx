@@ -22,6 +22,7 @@ import {
   getDoc,
   getDocs,
   runTransaction,
+  writeBatch,
   serverTimestamp,
 } from "firebase/firestore";
 import {
@@ -98,9 +99,14 @@ const TR = {
     confirmLogout:"লগআউট করতে চান?",
     tabShop:"🏪 দোকান", tabOwner:"👤 অর্ডার", tabCompany:"🏢 কোম্পানি",
     newOrder:"📋 নতুন Purchase Order",
-    itemName:"আইটেমের নাম", code:"কোড / মডেল / সাইজ", brand:"ব্র্যান্ডের নাম",
-    qty:"পরিমাণ", unitPcs:"পিস", unitSet:"সেট",
-    addItem:"+ আরো আইটেম", noteP:"বিশেষ নোট (ঐচ্ছিক)...",
+    itemName:"আইটেমের নাম *", code:"কোড / মডেল / সাইজ", brand:"ব্র্যান্ডের নাম",
+    qty:"পরিমাণ *", unitPcs:"পিস", unitSet:"সেট",
+    addItem:"✚ Invoice-এ যোগ করুন",
+    invoiceList:"📄 Invoice তালিকা",
+    invoiceEmpty:"এখনো কোনো আইটেম যোগ হয়নি",
+    noItemName:"আইটেমের নাম দিন!",
+    noQty:"পরিমাণ দিন!",
+    noteP:"বিশেষ নোট (ঐচ্ছিক)...",
     sendOrder:"📤 অর্ডার পাঠান", sentOrders:"📜 পাঠানো অর্ডারসমূহ",
     noOrders:"কোনো অর্ডার আসেনি এখনো",
     selectCo:"কোম্পানি বেছে নিন", price:"কোম্পানির দাম (৳)", save:"সেভ",
@@ -140,6 +146,16 @@ const TR = {
     permSaved:"পারমিশন আপডেট হয়েছে ✅",
     positionAdded:"পদবী যোগ হয়েছে ✅", positionDeleted:"পদবী মুছে ফেলা হয়েছে।",
     defaultPosition:"সেলসম্যান (ডিফল্ট)",
+    tabProducts:"📦 পণ্য",
+    pmTitle:"📦 Product Master",
+    pmAdd:"+ নতুন পণ্য",
+    pmName:"পণ্যের নাম *", pmCode:"কোড / মডেল", pmBrand:"ব্র্যান্ড",
+    pmCategory:"ক্যাটাগরি", pmPrice:"দাম (৳)", pmUnit:"ইউনিট",
+    pmSearch:"পণ্য খুঁজুন...",
+    pmNoProducts:"কোনো পণ্য নেই। যোগ করুন।",
+    pmAdded:"পণ্য যোগ হয়েছে ✅", pmUpdated:"পণ্য আপডেট হয়েছে ✅", pmDeleted:"পণ্য মুছে ফেলা হয়েছে।",
+    pmSelectHint:"পণ্য বেছে নিন বা নিজে লিখুন",
+    pmFromMaster:"📦 Product Master থেকে বেছে নিন",
   },
   en: {
     appSub:"Parts Order Management",
@@ -176,9 +192,14 @@ const TR = {
     confirmLogout:"Do you want to logout?",
     tabShop:"🏪 Shop", tabOwner:"👤 Orders", tabCompany:"🏢 Companies",
     newOrder:"📋 New Purchase Order",
-    itemName:"Item Name", code:"Code / Model / Size", brand:"Brand Name",
-    qty:"Quantity", unitPcs:"Pcs", unitSet:"Set",
-    addItem:"+ Add Item", noteP:"Special note (optional)...",
+    itemName:"Item Name *", code:"Code / Model / Size", brand:"Brand Name",
+    qty:"Quantity *", unitPcs:"Pcs", unitSet:"Set",
+    addItem:"✚ Add to Invoice",
+    invoiceList:"📄 Invoice List",
+    invoiceEmpty:"No items added yet",
+    noItemName:"Please enter item name!",
+    noQty:"Please enter quantity!",
+    noteP:"Special note (optional)...",
     sendOrder:"📤 Send Order", sentOrders:"📜 Sent Orders",
     noOrders:"No orders yet",
     selectCo:"Select Company", price:"Company price (৳)", save:"Save",
@@ -218,6 +239,16 @@ const TR = {
     permSaved:"Permissions updated ✅",
     positionAdded:"Position added ✅", positionDeleted:"Position deleted.",
     defaultPosition:"Salesman (Default)",
+    tabProducts:"📦 Products",
+    pmTitle:"📦 Product Master",
+    pmAdd:"+ New Product",
+    pmName:"Product Name *", pmCode:"Code / Model", pmBrand:"Brand",
+    pmCategory:"Category", pmPrice:"Price (৳)", pmUnit:"Unit",
+    pmSearch:"Search products...",
+    pmNoProducts:"No products yet. Add one.",
+    pmAdded:"Product added ✅", pmUpdated:"Product updated ✅", pmDeleted:"Product deleted.",
+    pmSelectHint:"Select a product or type manually",
+    pmFromMaster:"📦 Select from Product Master",
   },
 };
 
@@ -235,9 +266,57 @@ const SC = {
 };
 
 const LANG_KEY = "sparetrack-lang";
+const WA_STYLE_KEY = "wa-msg-style";
+const THEME_KEY    = "s4-theme";
 const ORDER_PREFIX = "S4-";
-const loadLang = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
-const saveLang = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
+const loadLang     = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
+const saveLang     = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
+const loadWaStyle  = () => { try { return localStorage.getItem(WA_STYLE_KEY)||"1"; } catch { return "1"; } };
+const saveWaStyle  = (v) => { try { localStorage.setItem(WA_STYLE_KEY,v); } catch {} };
+const loadTheme    = () => { try { return localStorage.getItem(THEME_KEY)||"dark"; } catch { return "dark"; } };
+const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {} };
+
+// ─── THEME PALETTES ──────────────────────────────────────────
+const THEMES = {
+  dark: {
+    bgRoot:"#09090b", bgCard:"#18181b", bgInp:"#09090b", bgSel:"#18181b",
+    bgHdr:"#18181b", bgSidebar:"#18181b", bgOiCard:"#09090b",
+    border:"#27272a", borderMid:"#3f3f46",
+    txtPrimary:"#f4f4f5", txtSecondary:"#e4e4e7", txtMuted:"#71717a", txtFaint:"#52525b",
+    accent:"#f97316", accentDim:"#451a03",
+  },
+  light: {
+    bgRoot:"#f1f5f9", bgCard:"#ffffff", bgInp:"#f8fafc", bgSel:"#ffffff",
+    bgHdr:"#ffffff", bgSidebar:"#ffffff", bgOiCard:"#f8fafc",
+    border:"#e2e8f0", borderMid:"#cbd5e1",
+    txtPrimary:"#0f172a", txtSecondary:"#1e293b", txtMuted:"#64748b", txtFaint:"#94a3b8",
+    accent:"#f97316", accentDim:"#fff7ed",
+  },
+};
+
+// ─── WA STYLES ───────────────────────────────────────────────
+const WA_STYLES = [
+  {
+    id:"1", labelBn:"বুলেট", labelEn:"Bullet",
+    previewBn:"▪️ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n▪️ *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"▪️ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n▪️ *Air Filter* | AF-456 | Honda | 1 Set",
+  },
+  {
+    id:"2", labelBn:"নম্বর", labelEn:"Numbered",
+    previewBn:"1️⃣ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2️⃣ *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"1️⃣ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2️⃣ *Air Filter* | AF-456 | Honda | 1 Set",
+  },
+  {
+    id:"3", labelBn:"ডায়মন্ড", labelEn:"Diamond",
+    previewBn:"🔸 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n🔸 *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"🔸 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n🔸 *Air Filter* | AF-456 | Honda | 1 Set",
+  },
+  {
+    id:"4", labelBn:"লাইন", labelEn:"Lined",
+    previewBn:"──────────────\n▪️ *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n▪️ *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
+    previewEn:"──────────────\n▪️ *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n▪️ *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
+  },
+];
 const newItem  = () => ({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name:"", code:"", brand:"", qty:"", unit:"Pcs" });
 
 // ─── RESPONSIVE HOOK ─────────────────────────────────────────
@@ -251,18 +330,57 @@ function useWindowWidth() {
   return width;
 }
 
-// ─── HEADER ──────────────────────────────────────────────────
-function Header({ t, lang, setLang, children, isDesktop }) {
+// ─── PRICE CELL ──────────────────────────────────────────────
+function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }) {
+  const [val, setVal] = useState(initialValue ?? "");
+  const prevRef = useRef(initialValue);
+  useEffect(() => {
+    if (prevRef.current !== initialValue) {
+      prevRef.current = initialValue;
+      setVal(initialValue ?? "");
+    }
+  }, [initialValue]);
+  const stop = (e) => e.stopPropagation();
   return (
-    <div style={s.hdr}>
-      <div style={s.hLeft}>
-        <img src={LOGO_URL} alt="S4" style={s.headerLogo} />
-        <div><div style={s.title}>{APP_NAME}</div><div style={s.sub}>{t.appSub}</div></div>
+    <div style={{ display:"flex", gap:7, marginBottom:7, alignItems:"center" }}
+      onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}>
+      <input style={s.inp} placeholder={placeholder} inputMode="numeric"
+        disabled={disabled} value={val}
+        onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}
+        onChange={e => setVal(e.target.value)} />
+      {!disabled && <button style={s.savBtn} onClick={() => onSave(val)}>{saveBtnLabel}</button>}
+    </div>
+  );
+}
+
+// ─── HEADER ──────────────────────────────────────────────────
+function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
+  const _s = s || _globalS;
+  return (
+    <div style={_s.hdr}>
+      <div style={_s.hLeft}>
+        <img src={LOGO_URL} alt="S4" style={_s.headerLogo} />
+        <div><div style={_s.title}>{APP_NAME}</div><div style={_s.sub}>{t.appSub}</div></div>
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-        <div style={s.langSw}>
-          <button style={{ ...s.lBtn, ...(lang==="bn"?s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
-          <button style={{ ...s.lBtn, ...(lang==="en"?s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
+        {setTheme && (
+          <button
+            onClick={() => setTheme(theme==="dark"?"light":"dark")}
+            title={theme==="dark"?"Light Mode":"Dark Mode"}
+            style={{
+              width:34, height:34, borderRadius:8,
+              border:`1px solid ${theme==="dark"?"#3f3f46":"#cbd5e1"}`,
+              background:theme==="dark"?"#27272a":"#f1f5f9",
+              cursor:"pointer", fontSize:16, display:"flex",
+              alignItems:"center", justifyContent:"center",
+              flexShrink:0, transition:"all 0.2s",
+            }}>
+            {theme==="dark" ? "☀️" : "🌙"}
+          </button>
+        )}
+        <div style={_s.langSw}>
+          <button style={{ ..._s.lBtn, ...(lang==="bn"?_s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
+          <button style={{ ..._s.lBtn, ...(lang==="en"?_s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
         </div>
         {!isDesktop && children}
       </div>
@@ -271,20 +389,22 @@ function Header({ t, lang, setLang, children, isDesktop }) {
 }
 
 // ─── SETUP ───────────────────────────────────────────────────
-function SetupScreen({ t, lang, setLang }) {
+function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
+  const _s = sp||_globalS;
   return (
-    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
-      <div style={s.authWrap}>
-        <div style={s.authIcon}>🔥</div>
-        <div style={{ ...s.authTitle, color:"#f97316" }}>Firebase Setup Required</div>
-        <div style={s.authSub}>SETUP.md ফাইল দেখে Firebase config যোগ করুন।</div>
+    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={_s.authWrap}>
+        <div style={_s.authIcon}>🔥</div>
+        <div style={{ ..._s.authTitle, color:"#f97316" }}>Firebase Setup Required</div>
+        <div style={_s.authSub}>SETUP.md ফাইল দেখে Firebase config যোগ করুন।</div>
       </div>
     </div>
   );
 }
 
 // ─── LOGIN ───────────────────────────────────────────────────
-function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast }) {
+function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast, s:sp, theme, setTheme }) {
+  const _s = sp||_globalS;
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -295,19 +415,19 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
     finally { setBusy(false); }
   };
   return (
-    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
-      <div style={s.authWrap}>
-        <img src={LOGO_URL} alt={APP_NAME} style={s.bigLogo} />
-        <div style={s.authTitle}>{t.welcomeBack}</div>
-        <div style={s.authSub}>{t.welcomeBackSub}</div>
-        <form onSubmit={submit} style={s.authCard}>
-          <input style={{ ...s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <input style={{ ...s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
-          <button type="submit" style={s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
-          <button type="button" style={s.linkBtn} onClick={onSwitchToReset}>{t.forgotPw}</button>
+    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={_s.authWrap}>
+        <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
+        <div style={_s.authTitle}>{t.welcomeBack}</div>
+        <div style={_s.authSub}>{t.welcomeBackSub}</div>
+        <form onSubmit={submit} style={_s.authCard}>
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
+          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
+          <button type="button" style={_s.linkBtn} onClick={onSwitchToReset}>{t.forgotPw}</button>
         </form>
-        <div style={s.authFooter}>{t.noAccount}{" "}
-          <button style={s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
+        <div style={_s.authFooter}>{t.noAccount}{" "}
+          <button style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
         </div>
       </div>
     </div>
@@ -315,7 +435,8 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
 }
 
 // ─── PASSWORD RESET ──────────────────────────────────────────
-function ResetScreen({ t, lang, setLang, onBack, toast }) {
+function ResetScreen({ t, lang, setLang, onBack, toast, s:sp, theme, setTheme }) {
+  const _s = sp||_globalS;
   const [email,setEmail]=useState(""); const [busy,setBusy]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -326,43 +447,44 @@ function ResetScreen({ t, lang, setLang, onBack, toast }) {
     finally { setBusy(false); }
   };
   return (
-    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
-      <div style={s.authWrap}>
-        <div style={s.authIcon}>🔑</div>
-        <div style={s.authTitle}>{t.resetTitle}</div>
-        <div style={s.authSub}>{t.resetMsg}</div>
-        <form onSubmit={submit} style={s.authCard}>
-          <input style={{ ...s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} />
-          <button type="submit" style={s.sendBtn} disabled={busy}>{busy?"...":t.resetBtn}</button>
+    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={_s.authWrap}>
+        <div style={_s.authIcon}>🔑</div>
+        <div style={_s.authTitle}>{t.resetTitle}</div>
+        <div style={_s.authSub}>{t.resetMsg}</div>
+        <form onSubmit={submit} style={_s.authCard}>
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} />
+          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.resetBtn}</button>
         </form>
-        <button style={{ ...s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
+        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
       </div>
     </div>
   );
 }
 
 // ─── ROLE PICKER ─────────────────────────────────────────────
-function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin }) {
+function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:sp, theme, setTheme }) {
+  const _s = sp||_globalS;
   return (
-    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
-      <div style={s.authWrap}>
-        <img src={LOGO_URL} alt={APP_NAME} style={s.bigLogo} />
-        <div style={s.authTitle}>{t.chooseRole}</div>
-        <div style={s.authSub}>{t.chooseRoleSub}</div>
-        <div style={{ ...s.roleGrid, marginTop:24 }}>
-          <button style={s.roleCard} onClick={() => onPick("owner")}>
-            <div style={s.roleEmoji}>🏢</div>
-            <div style={s.roleName}>{t.roleOwnerCard}</div>
-            <div style={s.roleDesc}>{t.roleOwnerDesc}</div>
+    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={_s.authWrap}>
+        <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
+        <div style={_s.authTitle}>{t.chooseRole}</div>
+        <div style={_s.authSub}>{t.chooseRoleSub}</div>
+        <div style={{ ..._s.roleGrid, marginTop:24 }}>
+          <button style={_s.roleCard} onClick={() => onPick("owner")}>
+            <div style={_s.roleEmoji}>🏢</div>
+            <div style={_s.roleName}>{t.roleOwnerCard}</div>
+            <div style={_s.roleDesc}>{t.roleOwnerDesc}</div>
           </button>
-          <button style={s.roleCard} onClick={() => onPick("salesman")}>
-            <div style={s.roleEmoji}>👨‍💼</div>
-            <div style={s.roleName}>{t.roleSalesCard}</div>
-            <div style={s.roleDesc}>{t.roleSalesDesc}</div>
+          <button style={_s.roleCard} onClick={() => onPick("salesman")}>
+            <div style={_s.roleEmoji}>👨‍💼</div>
+            <div style={_s.roleName}>{t.roleSalesCard}</div>
+            <div style={_s.roleDesc}>{t.roleSalesDesc}</div>
           </button>
         </div>
-        <div style={{ ...s.authFooter, marginTop:24 }}>{t.haveAccount}{" "}
-          <button style={s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
+        <div style={{ ..._s.authFooter, marginTop:24 }}>{t.haveAccount}{" "}
+          <button style={_s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
         </div>
       </div>
     </div>
@@ -370,7 +492,8 @@ function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin }) {
 }
 
 // ─── SIGNUP FORM ─────────────────────────────────────────────
-function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) {
+function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme }) {
+  const _s = sp||_globalS;
   const [companyName,setCompanyName]=useState("");
   const [personName,setPersonName]=useState("");
   const [country,setCountry]=useState("BD");
@@ -397,10 +520,15 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
     try {
       let shopId=null, shopData=null;
       if (!isOwner) {
-        const q = query(collection(db,"shops"), where("inviteCode","==",inviteCode.trim().toUpperCase()));
-        const snap = await getDocs(q);
-        if (snap.empty) throw { code:"invite/not-found" };
-        shopId=snap.docs[0].id; shopData=snap.docs[0].data();
+        // ── Single-use invite code lookup ──
+        const codeRef = doc(db,"inviteCodes", inviteCode.trim().toUpperCase());
+        const codeSnap = await getDoc(codeRef);
+        if (!codeSnap.exists()) throw { code:"invite/not-found" };
+        if (codeSnap.data().used === true) throw { code:"invite/already-used" };
+        shopId = codeSnap.data().shopId;
+        const shopSnap2 = await getDoc(doc(db,"shops",shopId));
+        if (!shopSnap2.exists()) throw { code:"invite/not-found" };
+        shopData = shopSnap2.data();
       }
       const cred = await createUserWithEmailAndPassword(auth,email.trim(),pw);
       const uid = cred.user.uid;
@@ -424,33 +552,53 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
           await setDoc(doc(db,"shops",shopId),{
             companyName:companyName.trim(), ownerName:personName.trim(), ownerUid:uid,
             country, area:area.trim(), mobile:mobile.trim(), email:email.trim(),
-            inviteCode:generateInviteCode(),
             positions:[],
             createdAt:serverTimestamp(),
           });
+          // ── Create 3 initial single-use invite codes ──
+          for (let i=0; i<3; i++) {
+            const code = generateInviteCode();
+            await setDoc(doc(db,"inviteCodes",code),{
+              shopId:uid, used:false, createdAt:serverTimestamp(),
+            });
+          }
         } catch(e) {
           if (userCreated) { try { await deleteDoc(doc(db,"users",uid)); } catch {} }
           try { await cred.user.delete(); } catch {}
           throw {code:"shop/create-failed",message:e.message};
         }
+      } else {
+        // ── Mark this invite code as used ──
+        try {
+          await updateDoc(doc(db,"inviteCodes",inviteCode.trim().toUpperCase()),{
+            used:true, usedBy:uid, usedByName:personName.trim(), usedAt:serverTimestamp(),
+          });
+        } catch(e) { console.warn("Could not mark code used:",e); }
       }
       try { await sendEmailVerification(cred.user); } catch(e) { console.warn(e); }
       toast(t.n9);
-    } catch(err) { toast(friendlyAuthError(err,lang),"err"); }
+    } catch(err) {
+      // Handle invite/already-used error with friendly message
+      if (err.code === "invite/already-used") {
+        toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
+      } else {
+        toast(friendlyAuthError(err,lang),"err");
+      }
+    }
     finally { setBusy(false); }
   };
 
   return (
-    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
-      <div style={s.authWrap}>
-        <div style={s.authIcon}>{isOwner?"🏢":"👨‍💼"}</div>
-        <div style={s.authTitle}>{isOwner?t.roleOwnerCard:t.roleSalesCard}</div>
-        <form onSubmit={submit} style={s.authCard}>
-          {isOwner && <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.companyName} value={companyName} onChange={e=>setCompanyName(e.target.value)} />}
+    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={_s.authWrap}>
+        <div style={_s.authIcon}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div style={_s.authTitle}>{isOwner?t.roleOwnerCard:t.roleSalesCard}</div>
+        <form onSubmit={submit} style={_s.authCard}>
+          {isOwner && <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.companyName} value={companyName} onChange={e=>setCompanyName(e.target.value)} />}
           {!isOwner && (
             <>
               <input
-                style={{ ...s.inp, marginBottom:4, textTransform:"uppercase", fontWeight:700, letterSpacing:1 }}
+                style={{ ..._s.inp, marginBottom:4, textTransform:"uppercase", fontWeight:700, letterSpacing:1 }}
                 placeholder="INVITE CODE"
                 value={inviteCode}
                 onChange={e=>setInviteCode(e.target.value.toUpperCase())}
@@ -458,20 +606,20 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
               <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}>💡 {t.inviteCodeLbl}</div>
             </>
           )}
-          <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
-          <select style={{ ...s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
+          <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
+          <select style={{ ..._s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
             {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
           </select>
-          <input style={{ ...s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
-          <input style={{ ...s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
-          <input style={{ ...s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
-          <input style={{ ...s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
-          <input style={{ ...s.inp, marginBottom:12 }} type="password" placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
-          <button type="submit" style={s.sendBtn} disabled={busy}>{busy?t.creatingAccount:t.createAccount}</button>
+          <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="password" placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
+          <input style={{ ..._s.inp, marginBottom:12 }} type="password" placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
+          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.creatingAccount:t.createAccount}</button>
         </form>
-        <button style={{ ...s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
-        <div style={{ ...s.authFooter, marginTop:8 }}>{t.haveAccount}{" "}
-          <button style={s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
+        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
+        <div style={{ ..._s.authFooter, marginTop:8 }}>{t.haveAccount}{" "}
+          <button style={_s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
         </div>
       </div>
     </div>
@@ -479,7 +627,8 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast }) 
 }
 
 // ─── VERIFY GATE ─────────────────────────────────────────────
-function VerifyGate({ t, lang, setLang, user, toast, onLogout }) {
+function VerifyGate({ t, lang, setLang, user, toast, onLogout, s:sp, theme, setTheme }) {
+  const _s = sp||_globalS;
   const [busy,setBusy]=useState(false);
   const recheck = async () => {
     setBusy(true);
@@ -494,18 +643,18 @@ function VerifyGate({ t, lang, setLang, user, toast, onLogout }) {
     finally { setBusy(false); }
   };
   return (
-    <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
-      <div style={s.authWrap}>
-        <div style={s.authIcon}>📧</div>
-        <div style={s.authTitle}>{t.verifyTitle}</div>
-        <div style={s.authSub}>{t.verifyMsg}</div>
-        <div style={{ ...s.card, marginTop:16, textAlign:"center" }}>
+    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={_s.authWrap}>
+        <div style={_s.authIcon}>📧</div>
+        <div style={_s.authTitle}>{t.verifyTitle}</div>
+        <div style={_s.authSub}>{t.verifyMsg}</div>
+        <div style={{ ..._s.card, marginTop:16, textAlign:"center" }}>
           <div style={{ fontSize:14, fontWeight:700, color:"#f97316", marginBottom:4 }}>{user.email}</div>
           <div style={{ fontSize:12, color:"#71717a", marginBottom:16 }}>{t.verifyMsg2}</div>
-          <button style={{ ...s.sendBtn, marginBottom:10 }} onClick={recheck} disabled={busy}>{t.verifyCheckBtn}</button>
-          <button style={{ ...s.stBtn, width:"100%" }} onClick={resend} disabled={busy}>{t.resendVerify}</button>
+          <button style={{ ..._s.sendBtn, marginBottom:10 }} onClick={recheck} disabled={busy}>{t.verifyCheckBtn}</button>
+          <button style={{ ..._s.stBtn, width:"100%" }} onClick={resend} disabled={busy}>{t.resendVerify}</button>
         </div>
-        <button style={{ ...s.linkBtn, marginTop:16 }} onClick={onLogout}>{t.logout}</button>
+        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onLogout}>{t.logout}</button>
       </div>
     </div>
   );
@@ -527,8 +676,178 @@ function PermToggle({ isOn, onToggle }) {
   );
 }
 
+// ─── INVITE CODE ROW ─────────────────────────────────────────
+function InviteCodeRow({ c, lang, t, onDelete }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(c.code); setCopied(true); setTimeout(()=>setCopied(false),2000); }
+    catch { alert(c.code); }
+  };
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:"1px solid #27272a" }}>
+      <span style={{ fontSize:16, fontWeight:800, color:"#f97316", fontFamily:"monospace", flex:1, letterSpacing:2 }}>{c.code}</span>
+      <button style={{ padding:"6px 12px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", cursor:"pointer", fontSize:12, fontWeight:700 }}
+        onClick={copy}>{copied?(lang==="bn"?"✅ কপি":"✅ Copied"):(lang==="bn"?"📋 কপি":"📋 Copy")}</button>
+      <button style={{ padding:"6px 8px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12 }}
+        onClick={()=>onDelete(c.code)}>🗑️</button>
+    </div>
+  );
+}
+
+// ─── PRODUCT FORM COMPONENT ──────────────────────────────────
+function PmForm({ pmForm, pmUpd, t, lang }) {
+  const inp  = { padding:"9px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  const calcInp = { ...inp, background:"#0d1117", color:"#22c55e", fontWeight:700 };
+  const lbl  = { fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:3, display:"block" };
+  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:"1px solid #27272a", marginBottom:10 };
+  const g2   = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 };
+
+  // More barcodes state
+  const [newRef, setNewRef] = useState("");
+  const mbs = pmForm.moreBarcodes||[];
+
+  return (
+    <div>
+      {/* ── Basic Info ── */}
+      <div style={{ marginBottom:8 }}>
+        <label style={lbl}>{t.pmName} *</label>
+        <input style={inp} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
+      </div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>{t.pmCode}</label>
+          <input style={inp} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>{t.pmBrand}</label>
+          <input style={inp} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
+        </div>
+      </div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>{t.pmCategory}</label>
+          <input style={inp} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>{lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category"}</label>
+          <input style={inp} value={pmForm.subcategory||""} onChange={e=>pmUpd("subcategory",e.target.value)} />
+        </div>
+      </div>
+
+      {/* ── Barcode Section ── */}
+      <div style={sec}>🔢 Barcode / Reference</div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Barcode</label>
+          <input style={inp} value={pmForm.barcode||""} onChange={e=>pmUpd("barcode",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>EAN Code</label>
+          <input style={inp} value={pmForm.ean||""} onChange={e=>pmUpd("ean",e.target.value)} />
+        </div>
+      </div>
+      {/* More Barcodes */}
+      <div style={{ marginBottom:8 }}>
+        <label style={lbl}>More Barcodes / Reference Numbers</label>
+        <div style={{ display:"flex", gap:6, marginBottom:6 }}>
+          <input style={{ ...inp, flex:1 }} placeholder={lang==="bn"?"Reference নম্বর লিখুন...":"Enter reference number..."} value={newRef} onChange={e=>setNewRef(e.target.value)}
+            onKeyDown={e=>{ if(e.key==="Enter"&&newRef.trim()){ pmUpd("moreBarcodes",[...mbs,newRef.trim()]); setNewRef(""); } }} />
+          <button onClick={()=>{ if(newRef.trim()){ pmUpd("moreBarcodes",[...mbs,newRef.trim()]); setNewRef(""); } }}
+            style={{ padding:"9px 14px", borderRadius:8, border:"none", background:"#f97316", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:700, flexShrink:0 }}>+</button>
+        </div>
+        {mbs.length>0&&(
+          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+            {mbs.map((r,i)=>(
+              <span key={i} style={{ background:"#1c1917", border:"1px solid #451a03", color:"#f97316", borderRadius:20, padding:"3px 10px", fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
+                {r}
+                <button onClick={()=>pmUpd("moreBarcodes",mbs.filter((_,j)=>j!==i))} style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Tax Settings ── */}
+      <div style={sec}>🧾 Tax Settings</div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Sales VAT %</label>
+          <select style={{ ...inp, background:"#18181b" }} value={pmForm.salesVat||"0"} onChange={e=>pmUpd("salesVat",e.target.value)}>
+            <option value="0">0%</option>
+            <option value="5">5%</option>
+          </select>
+        </div>
+        <div>
+          <label style={lbl}>Purchase VAT %</label>
+          <select style={{ ...inp, background:"#18181b" }} value={pmForm.purchaseVat||"0"} onChange={e=>pmUpd("purchaseVat",e.target.value)}>
+            <option value="0">0%</option>
+            <option value="5">5%</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ── Pricing ── */}
+      <div style={sec}>💰 Pricing</div>
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Landing Cost</label>
+          <input style={inp} inputMode="decimal" value={pmForm.landingCost||""} onChange={e=>pmUpd("landingCost",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>Margin %</label>
+          <input style={inp} inputMode="decimal" value={pmForm.marginPerc||""} onChange={e=>pmUpd("marginPerc",e.target.value)} />
+        </div>
+      </div>
+      <div style={g2}>
+        <div>
+          <label style={{ ...lbl, color:"#22c55e" }}>Margin Amount 🟢 auto</label>
+          <input style={calcInp} inputMode="decimal" value={pmForm.marginAmount||""} onChange={e=>pmUpd("marginAmount",e.target.value)} />
+        </div>
+        <div>
+          <label style={{ ...lbl, color:"#22c55e" }}>VAT Exclusive Rate 🟢 auto</label>
+          <input style={calcInp} inputMode="decimal" value={pmForm.vatExclusive||""} onChange={e=>pmUpd("vatExclusive",e.target.value)} />
+        </div>
+      </div>
+      <div style={g2}>
+        <div>
+          <label style={{ ...lbl, color:"#06b6d4" }}>VAT Inclusive Rate 🔵 auto</label>
+          <input style={{ ...calcInp, color:"#06b6d4" }} inputMode="decimal" value={pmForm.vatInclusive||""} onChange={e=>pmUpd("vatInclusive",e.target.value)} />
+        </div>
+        <div>
+          {/* VAT on MRP checkbox above MRP box */}
+          <label style={{ display:"flex", alignItems:"center", gap:7, cursor:"pointer", marginBottom:5 }}>
+            <input type="checkbox" checked={!!pmForm.vatOnMrp} onChange={e=>pmUpd("vatOnMrp",e.target.checked)}
+              style={{ width:16, height:16, accentColor:"#f97316", cursor:"pointer" }} />
+            <span style={{ fontSize:11, color:"#f97316", fontWeight:700 }}>✅ VAT on MRP</span>
+          </label>
+          <label style={lbl}>MRP</label>
+          <input style={inp} inputMode="decimal" value={pmForm.mrp||""} onChange={e=>pmUpd("mrp",e.target.value)} />
+        </div>
+      </div>
+
+      {/* ── Other ── */}
+      <div style={g2}>
+        <div>
+          <label style={lbl}>Opening Stock</label>
+          <input style={inp} inputMode="decimal" value={pmForm.openingStock||""} onChange={e=>pmUpd("openingStock",e.target.value)} />
+        </div>
+        <div>
+          <label style={lbl}>{t.pmUnit}</label>
+          <select style={{ ...inp, background:"#18181b" }} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
+            {["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr"].map(u=><option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style={lbl}>{lang==="bn"?"বিবরণ":"Description"}</label>
+        <input style={inp} value={pmForm.description||""} onChange={e=>pmUpd("description",e.target.value)} />
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────
-function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
+function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
   const isOwner = profile.role==="owner";
   const isSalesman = !isOwner;
   const shopId  = profile.shopId;
@@ -539,23 +858,38 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   const [orders,setOrders]=useState([]);
   const [cos,setCos]=useState([]);
   const [team,setTeam]=useState([]);
+  const [inviteCodes,setInviteCodes]=useState([]);
+  const [products,setProducts]=useState([]);
   const [syncState,setSyncState]=useState("connecting");
   const [localShop,setLocalShop]=useState(shopProp);
 
   const [tab,setTab]=useState(isOwner?"owner":"shop");
-  const [items,setItems]=useState([newItem()]);
+
+  // ── INVOICE STATE ──
+  // items = confirmed invoice list (locked rows)
+  // currentItem = the form being filled right now
+  const [items,setItems]=useState([]);
+  const [currentItem,setCurrentItem]=useState(newItem());
   const [note,setNote]=useState("");
+  const nameRef = useRef(null);
+
   const [selOrder,setSelOrder]=useState(null);
-  const [prices,setPrices]=useState({});
 
   const [editId,setEditId]=useState(null);
   const [editNm,setEditNm]=useState(""); const [editPh,setEditPh]=useState("");
   const [newNm,setNewNm]=useState(""); const [newPh,setNewPh]=useState("");
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
+  const [searchQ,setSearchQ]=useState("");
+  const [waStyle,setWaStyleState]=useState(loadWaStyle());
+  const setWaStyle = (v) => { setWaStyleState(v); saveWaStyle(v); };
+
+  const windowWidth = useWindowWidth();
+  const isDesktop = windowWidth >= 768;
 
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
+  const [settingsPage,setSettingsPage]=useState(null); // null = menu list
 
   useEffect(() => {
     if (!shopId) return;
@@ -591,18 +925,180 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   },[shopId]);
 
+  // ── Invite codes listener (owner only) ──
+  useEffect(() => {
+    if (!isOwner) return;
+    return onSnapshot(
+      query(collection(db,"inviteCodes"), where("shopId","==",shopId)),
+      snap => setInviteCodes(snap.docs.map(d=>({...d.data(), code:d.id}))),
+      err  => console.error(err)
+    );
+  },[shopId, isOwner]);
+
+  // ── Products — one-time fetch (not real-time, too heavy for 3000+ items) ──
+  const [productsLoading,setProductsLoading]=useState(false);
+  const fetchProducts = async () => {
+    setProductsLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId), orderBy("name")));
+      setProducts(snap.docs.map(d=>({...d.data(),id:d.id})));
+    } catch(e) { console.error(e); }
+    finally { setProductsLoading(false); }
+  };
+  useEffect(() => { fetchProducts(); },[shopId]);
+
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
-  const addIt = () => setItems(p=>[...p,newItem()]);
+
+  // ── Generate a new single-use invite code ──
+  const generateNewCode = async () => {
+    try {
+      const code = generateInviteCode();
+      await setDoc(doc(db,"inviteCodes",code),{
+        shopId, used:false, createdAt:serverTimestamp(),
+      });
+      toast(lang==="bn"?"✅ নতুন Invite Code তৈরি হয়েছে!":"✅ New invite code created!");
+    } catch(e) { hErr(e); }
+  };
+
+  const deleteInviteCode = async (code) => {
+    try { await deleteDoc(doc(db,"inviteCodes",code)); }
+    catch(e) { hErr(e); }
+  };
+
+  // ── PRODUCT MASTER STATE ──
+  const emptyPmForm = {
+    name:"", code:"", barcode:"", ean:"", moreBarcodes:[],
+    brand:"", category:"", subcategory:"",
+    salesVat:"0", purchaseVat:"0",
+    landingCost:"", marginPerc:"", marginAmount:"",
+    vatExclusive:"", vatInclusive:"", vatOnMrp:false, mrp:"",
+    openingStock:"", unit:"Pcs", description:""
+  };
+  const [pmSearch,setPmSearch]=useState("");
+  const [pmCatFilter,setPmCatFilter]=useState("ALL");
+  const [pmShowAdd,setPmShowAdd]=useState(false);
+  const [pmEditId,setPmEditId]=useState(null);
+  const [pmForm,setPmForm]=useState(emptyPmForm);
+  const [pmDetailId,setPmDetailId]=useState(null); // full detail modal
+  const [showProductPicker,setShowProductPicker]=useState(false);
+  const [productPickerQ,setProductPickerQ]=useState("");
+
+  const pmReset = () => setPmForm(emptyPmForm);
+  const pmDetail = products.find(p=>p.id===pmDetailId)||null;
+
+  // Smart pmUpd — triggers auto-calculations
+  const pmUpd = (field, val) => {
+    setPmForm(prev => {
+      const next = { ...prev, [field]: val };
+      const n = (v) => parseFloat(v)||0;
+
+      if (field==="landingCost"||field==="marginPerc"||field==="marginAmount"||field==="vatExclusive"||field==="salesVat"||field==="vatOnMrp") {
+        const lc = n(field==="landingCost"?val:next.landingCost);
+        let mp = n(field==="marginPerc"?val:next.marginPerc);
+        let ma = n(field==="marginAmount"?val:next.marginAmount);
+        let ve = n(field==="vatExclusive"?val:next.vatExclusive);
+        const sv = n(field==="salesVat"?val:next.salesVat);
+
+        if (field==="landingCost"||field==="marginPerc") {
+          // LC or MP changed → recalc MA and VE
+          ma = lc>0 && mp>0 ? parseFloat((lc*mp/100).toFixed(4)) : ma;
+          ve = lc>0 ? parseFloat((lc+ma).toFixed(4)) : ve;
+          next.marginAmount = ma||ma===0 ? String(ma) : "";
+          next.vatExclusive = ve ? String(ve) : "";
+        } else if (field==="marginAmount") {
+          // MA changed → recalc MP and VE
+          mp = lc>0 ? parseFloat((ma/lc*100).toFixed(4)) : 0;
+          ve = parseFloat((lc+ma).toFixed(4));
+          next.marginPerc = mp ? String(mp) : "";
+          next.vatExclusive = ve ? String(ve) : "";
+        } else if (field==="vatExclusive") {
+          // VE changed manually → recalc MA and MP
+          ma = parseFloat((ve-lc).toFixed(4));
+          mp = lc>0 ? parseFloat((ma/lc*100).toFixed(4)) : 0;
+          next.marginAmount = ma ? String(ma) : "";
+          next.marginPerc = mp ? String(mp) : "";
+        }
+
+        // Always recalc VAT Inclusive from current VE
+        const currentVe = n(next.vatExclusive);
+        if (currentVe>0) {
+          const vi = parseFloat((currentVe + currentVe*sv/100).toFixed(4));
+          next.vatInclusive = String(vi);
+          // MRP auto-fill based on vatOnMrp
+          const vatOn = field==="vatOnMrp"?val:next.vatOnMrp;
+          next.mrp = vatOn ? String(vi) : String(currentVe);
+        }
+      }
+
+      // vatInclusive manually typed
+      if (field==="vatInclusive") {
+        // keep as typed, don't override
+      }
+
+      // vatOnMrp toggled → update MRP
+      if (field==="vatOnMrp") {
+        const vi = n(next.vatInclusive);
+        const ve = n(next.vatExclusive);
+        next.mrp = val ? (vi?String(vi):"") : (ve?String(ve):"");
+      }
+
+      return next;
+    });
+  };
+
+  const addProduct = async () => {
+    if (!pmForm.name.trim()) return toast(t.e3,"err");
+    try {
+      await addDoc(collection(db,"products"),{ shopId, ...pmForm, name:pmForm.name.trim(), createdAt:serverTimestamp() });
+      pmReset(); setPmShowAdd(false); toast(t.pmAdded);
+      await fetchProducts();
+    } catch(e) { hErr(e); }
+  };
+
+  const editProduct = async (id) => {
+    if (!pmForm.name.trim()) return toast(t.e3,"err");
+    try {
+      await updateDoc(doc(db,"products",id),{ ...pmForm, name:pmForm.name.trim() });
+      pmReset(); setPmEditId(null); setPmDetailId(null); toast(t.pmUpdated);
+      await fetchProducts();
+    } catch(e) { hErr(e); }
+  };
+
+  const deleteProduct = async (id) => {
+    if (!window.confirm(lang==="bn"?"এই পণ্যটি মুছে ফেলবেন?":"Delete this product?")) return;
+    try {
+      await deleteDoc(doc(db,"products",id));
+      setProducts(p=>p.filter(x=>x.id!==id));
+      setPmDetailId(null); toast(t.pmDeleted,"err");
+    } catch(e) { hErr(e); }
+  };
+
+  const selectProductToOrder = (prod) => {
+    setCurrentItem(p=>({...p, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs"}));
+    setShowProductPicker(false); setProductPickerQ("");
+  };
+
+  // ── INVOICE ITEM FUNCTIONS ──
+  const updCurrentItem = (field, val) => {
+    const value = (field==="name" && typeof val==="string" && val.length>0)
+      ? (val.charAt(0).toUpperCase()+val.slice(1))
+      : val;
+    setCurrentItem(p=>({...p,[field]:value}));
+  };
+
+  const addItToInvoice = () => {
+    if (!currentItem.name.trim()) return toast(t.noItemName,"err");
+    if (!currentItem.qty.toString().trim()) return toast(t.noQty,"err");
+    setItems(p=>[...p, { ...currentItem, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
+    setCurrentItem(newItem());
+    // Auto-focus the name field for fast entry
+    setTimeout(()=>{ nameRef.current?.focus(); },50);
+  };
+
   const delIt = (id) => setItems(p=>p.filter(it=>it.id!==id));
-  const updIt = (id,f,v) => setItems(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
-  const handleEnterNextField = (e) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    const block = e.currentTarget.closest('[data-item-block="1"]');
-    if (!block) return;
-    const fields = block.querySelectorAll("input, select, textarea");
-    const idx = Array.from(fields).indexOf(e.currentTarget);
-    if (idx >= 0 && idx < fields.length - 1) fields[idx + 1].focus();
+
+  const handleEnterAdd = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); addItToInvoice(); }
   };
 
   const sendOrder = async () => {
@@ -622,8 +1118,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         });
         orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
       } catch (serialErr) {
-        // Fallback: if shop counter update is blocked by Firestore rules,
-        // still allow order creation with sequential order number.
         console.warn("Serial transaction failed, using fallback order number", serialErr);
         const recentSnap = await getDocs(query(
           collection(db, "orders"),
@@ -646,39 +1140,30 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         items:valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
         note:note||"", createdAt:serverTimestamp(), overall:"pending", read:false,
       });
-      setItems([newItem()]); setNote(""); toast(t.n1);
+      setItems([]); setCurrentItem(newItem()); setNote(""); toast(t.n1);
     } catch(e) { hErr(e); }
   };
 
-  const savePrice = async (oId,iIdx) => {
+  const savePrice = async (oId, iIdx, directVal) => {
     if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
     if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
-    const p = prices[`${oId}-${iIdx}`]??"";
-    const upd = order.items.map((it,x)=>x===iIdx?{...it,price:p}:it);
+    const upd = order.items.map((it,x)=>x===iIdx?{...it,price:String(directVal??"")}:it);
     try { await updateDoc(doc(db,"orders",oId),{items:upd}); toast(t.n2); } catch(e) { hErr(e); }
   };
 
   const setItemStatus = async (oId,iIdx,status) => {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
-    // A fully cancelled order is immutable. A fully delivered order only allows
-    // rechecking no-stock items — nothing else can change.
     if (order.overall==="cancelled") return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered"||current.status==="cancelled") return;
-    // Allow recheck (out_of_stock → order_confirmed) at ANY stage including delivered,
-    // because no-stock items must never be permanently locked.
     const isRecheck = current.status==="out_of_stock" && status==="order_confirmed";
     const isEditableItemState = ["pending","order_confirmed","out_of_stock"].includes(current.status);
     if (!isRecheck && !isEditableItemState) return;
-
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
-    // If this recheck moves an item out of out_of_stock and the overall was "delivered",
-    // reopen the overall status to "order_confirmed" so the re-ordered item can flow
-    // through the pipeline again.
     let newOverall = order.overall;
     if (isRecheck && order.overall!=="cancelled") newOverall = "order_confirmed";
     try { await updateDoc(doc(db,"orders",oId),{overall:newOverall,items:upd}); } catch(e) { hErr(e); }
@@ -690,17 +1175,10 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (isSalesman&&!can("markDelivery")&&order.createdBy!==user.uid) return;
     const target = order.items[iIdx];
     if (!target || target.status!=="out_for_branch") return;
-
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status:"delivered"}:it);
-    // Only mark overall as "delivered" if ALL non-cancelled items are delivered.
-    // Items with status "out_of_stock" are intentionally excluded — they must remain
-    // re-orderable and must NEVER cause the overall order to lock as delivered.
-    const activeItems = upd.filter(it=>it.status!=="cancelled");
-    const hasNoStock  = activeItems.some(it=>it.status==="out_of_stock");
+    const activeItems = upd.filter(it=>it.status!=="cancelled" && it.status!=="out_of_stock");
     const allDelivered = activeItems.length>0 && activeItems.every(it=>it.status==="delivered");
-    // If no-stock items still exist, keep overall as "out_for_branch" so the order
-    // remains in an unlocked state that allows re-ordering those items.
-    const overall = allDelivered ? "delivered" : hasNoStock ? "out_for_branch" : order.overall;
+    const overall = allDelivered ? "delivered" : order.overall;
     try { await updateDoc(doc(db,"orders",oId),{overall,items:upd}); toast(t.n3); } catch(e) { hErr(e); }
   };
 
@@ -709,7 +1187,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (!window.confirm(t.delConfirm)) return;
     try {
       await deleteDoc(doc(db,"orders",oId));
-      setPrices(p=>{ const n={...p}; Object.keys(n).forEach(k=>{if(k.startsWith(`${oId}-`)) delete n[k];}); return n; });
       if (selOrder===oId) setSelOrder(null); toast(t.n7,"err");
     } catch(e) { hErr(e); }
   };
@@ -779,14 +1256,26 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (Number.isFinite(order.serialNo)) return `${ORDER_PREFIX}${String(order.serialNo).padStart(4, "0")}`;
     return shortId(order.id);
   };
-  const waLink   = (phone,order,item) => {
-    const codeLine  = item.code  ? (lang==="bn"?`কোড/মডেল: ${item.code}\n`:`Code/Model: ${item.code}\n`) : "";
-    const brandLine = item.brand ? (lang==="bn"?`ব্র্যান্ড: ${item.brand}\n`:`Brand: ${item.brand}\n`) : "";
-    const txt = encodeURIComponent(lang==="bn"
-      ? `🔧 PO #${getOrderDisplayNo(order)}\n\nআইটেম: ${item.name}\n${codeLine}${brandLine}পরিমাণ: ${item.qty} ${item.unit}\n\nদয়া করে দাম ও স্টক জানান।`
-      : `🔧 PO #${getOrderDisplayNo(order)}\n\nItem: ${item.name}\n${codeLine}${brandLine}Qty: ${item.qty} ${item.unit}\n\nPlease share price and stock availability.`
-    );
-    return `https://wa.me/${phone}?text=${txt}`;
+  // ── WA MESSAGE BUILDER (grouped, style-aware) ──
+  const waLinkGroup = (phone, items) => {
+    const isBn = lang === "bn";
+    const title = isBn ? "*পণ্যের তালিকা:*" : "*Product List:*";
+    const footer = isBn
+      ? "_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ"
+      : "_Please share price and stock availability._ 🙏 Thank you";
+    const nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+    let lines = "";
+    items.forEach((it, i) => {
+      const name = `*${it.name}*`;
+      const meta = [it.code, it.brand, `${it.qty} ${it.unit}`].filter(Boolean).join(" | ");
+      if (waStyle==="1") lines += `▪️ ${name} | ${meta}\n`;
+      else if (waStyle==="2") lines += `${nums[i]||`${i+1}.`} ${name} | ${meta}\n`;
+      else if (waStyle==="3") lines += `🔸 ${name} | ${meta}\n`;
+      else if (waStyle==="4") lines += `──────────────\n▪️ ${name}\n   ${meta}\n`;
+    });
+    if (waStyle==="4") lines += "──────────────";
+    const msg = `${title}\n${lines}\n${footer}`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
   const handleLogout = async () => {
@@ -803,8 +1292,45 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
 
+  // ── SEARCH FILTER ──
+  const filterOrders = (list) => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter(o => {
+      const noMatch = getOrderDisplayNo(o).toLowerCase().includes(q);
+      const itemMatch = o.items?.some(it =>
+        it.name?.toLowerCase().includes(q) ||
+        it.brand?.toLowerCase().includes(q) ||
+        it.code?.toLowerCase().includes(q)
+      );
+      const d = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+      // Match against several date formats so user can type e.g. "9 may", "09/05", "2026"
+      const dateFormats = [
+        d.toLocaleDateString("bn-BD", { day:"numeric", month:"long", year:"numeric" }),
+        d.toLocaleDateString("en-GB",  { day:"numeric", month:"long", year:"numeric" }),
+        d.toLocaleDateString("en-GB",  { day:"2-digit", month:"2-digit", year:"numeric" }), // 09/05/2026
+        d.toLocaleDateString("en-GB",  { day:"numeric", month:"short" }),                   // 9 May
+        String(d.getFullYear()),
+      ];
+      const dateMatch = dateFormats.some(f => f.toLowerCase().includes(q));
+      return noMatch || itemMatch || dateMatch;
+    });
+  };
+
+  // ── DAILY GROUP ──
+  const groupByDay = (list) => {
+    const groups = {};
+    list.forEach(o => {
+      const d = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
+      const key = d.toLocaleDateString(lang==="bn"?"bn-BD":"en-GB", { day:"numeric", month:"long", year:"numeric" });
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(o);
+    });
+    return Object.entries(groups); // [ [dateStr, [orders]], ... ]
+  };
+
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["settings",t.tabSettings]]
+    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["settings",t.tabSettings]]
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
@@ -816,20 +1342,27 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     if (!isOwner&&!can("setStatus")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
     if (order.overall==="cancelled") return;
-    // After a recheck reopens a delivered order, allow it to flow forward again.
-    // But a fully-delivered order with no no-stock items cannot be moved.
     const hasRecheckableItems = order.items.some(it=>it.status==="order_confirmed"||it.status==="pending");
     if (order.overall==="delivered" && !hasRecheckableItems) return;
     if (newStatus==="ordered_supplier") {
-      // Only validate price for items that are actually being re-ordered (not out_of_stock/delivered/cancelled)
-      const missingPrice = order.items.some(it =>
-        it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered" &&
-        !String(it.price||"").trim()
+      const activeItems = order.items.filter(it =>
+        it.status!=="out_of_stock" && it.status!=="cancelled" && it.status!=="delivered"
       );
-      if (missingPrice) return toast(lang==="bn" ? "আগে সব প্রোডাক্টের দাম সেট করুন" : "Set price for all products before ordering supplier", "err");
+      const missingCo = activeItems.some(it => !it.co);
+      if (missingCo) return toast(
+        lang==="bn"
+          ? "❌ সব আইটেমে কোম্পানি সিলেক্ট করুন, তারপর এগিয়ে যান"
+          : "❌ Select a company for every item before ordering supplier",
+        "err"
+      );
+      const missingPrice = activeItems.some(it => !String(it.price||"").trim());
+      if (missingPrice) return toast(
+        lang==="bn"
+          ? "❌ সব আইটেমের দাম সেট করুন, তারপর এগিয়ে যান"
+          : "❌ Set price for all items before ordering supplier",
+        "err"
+      );
     }
-    // Only propagate the new status to items that are actively in-flow.
-    // Items with status "out_of_stock", "delivered", or "cancelled" are never touched.
     const updatable = new Set(["order_confirmed","ordered_supplier","waiting_delivery","arrived_main_shop","out_for_branch"]);
     const newItems = updatable.has(newStatus)
       ? order.items.map(it =>
@@ -843,12 +1376,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
   };
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
-  const windowWidth = useWindowWidth();
-  const isDesktop = windowWidth >= 768;
 
   // ── RENDER ORDER ITEMS (expanded detail view) ──
   const renderOrderItems = (order) => {
-    const showItemControls = isOwner || can("manageCompanies") || can("setPrices") || can("setStatus");
     return (
       <>
         {order.items.map((it,iIdx)=>{
@@ -863,8 +1393,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                 {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
                 <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
               </div>
-
-              {/* কোম্পানি select + WhatsApp */}
               {(isOwner||can("manageCompanies"))&&(
                 <div style={s.row}>
                   <select
@@ -875,39 +1403,25 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     <option value="">{t.selectCo}</option>
                     {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
-                  {selectedCo&&selectedCo.phone&&canEditProc&&(
-                    <a href={waLink(selectedCo.phone,order,it)} target="_blank" rel="noreferrer" style={s.waBtn}>💬 WA</a>
-                  )}
                 </div>
               )}
-
-              {/* দাম সেভ */}
               {(isOwner||can("setPrices"))&&(
-                <div
-                  style={s.row}
-                  onClick={e=>e.stopPropagation()}
-                  onMouseDown={e=>e.stopPropagation()}
-                  onPointerDown={e=>e.stopPropagation()}
-                  onTouchStart={e=>e.stopPropagation()}>
-                  <input style={s.inp} placeholder={t.price} inputMode="numeric"
-                    disabled={!canEditProc}
-                    value={prices[`${order.id}-${iIdx}`]??it.price??""}
-                    onClick={e=>e.stopPropagation()}
-                    onFocus={e=>e.stopPropagation()}
-                    onMouseDown={e=>e.stopPropagation()}
-                    onPointerDown={e=>e.stopPropagation()}
-                    onTouchStart={e=>e.stopPropagation()}
-                    onChange={e=>setPrices(p=>({...p,[`${order.id}-${iIdx}`]:e.target.value}))} />
-                  {canEditProc&&(
-                    <button style={s.savBtn} onClick={()=>savePrice(order.id,iIdx)}>{t.save}</button>
-                  )}
-                </div>
+                <PriceCell
+                  initialValue={it.price ?? ""}
+                  disabled={!canEditProc}
+                  placeholder={t.price}
+                  saveBtnLabel={t.save}
+                  onSave={(val) => savePrice(order.id, iIdx, val)}
+                />
               )}
-
-              {/* Item-level status (Confirmed / No Stock / Recheck) */}
               {(isOwner||can("setStatus"))&&(
                 <div style={s.sRow}>
-                  {canEditProc&&(
+                  {it.status==="out_of_stock" && !itemLocked && order.overall!=="cancelled" ? (
+                    <button style={{ ...s.stBtn, flex:1, background:"#1d4ed8", color:"#fff", border:"1px solid #1d4ed8" }}
+                      onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
+                      🔁 {lang==="bn"?"আবার চেক":"Recheck"}
+                    </button>
+                  ) : canEditProc && (
                     <>
                       <button style={{ ...s.stBtn, ...(it.status==="order_confirmed"?s.stBtnC:{}) }}
                         onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>{t.confirmed}</button>
@@ -915,16 +1429,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                         onClick={()=>setItemStatus(order.id,iIdx,"out_of_stock")}>{t.noStock}</button>
                     </>
                   )}
-                  {it.status==="out_of_stock" && order.overall!=="cancelled" && itemLocked===false&&(
-                    <button style={{ ...s.stBtn, background:"#1d4ed8", color:"#fff" }}
-                      onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
-                      {lang==="bn"?"🔁 আবার চেক":"🔁 Recheck"}
-                    </button>
-                  )}
                 </div>
               )}
-
-              {/* Salesman / authorized: Mark Delivered for items in out_for_branch */}
               {(isSalesman&&order.createdBy===user.uid&&it.status==="out_for_branch")&&(
                 <div style={{ marginTop:8 }}>
                   <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
@@ -938,14 +1444,38 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           );
         })}
-
-        {/* OWNER STATUS FLOW BUTTONS */}
+        {/* ── Grouped WA buttons per company ── */}
+        {(isOwner||can("manageCompanies"))&&(()=>{
+          const groups = {};
+          order.items.forEach(it => {
+            if (!it.co || it.status==="cancelled") return;
+            const co = cos.find(c=>c.id===it.co);
+            if (!co?.phone) return;
+            if (!groups[it.co]) groups[it.co] = { co, items:[] };
+            groups[it.co].items.push(it);
+          });
+          const entries = Object.values(groups);
+          if (!entries.length) return null;
+          return (
+            <div style={{ marginTop:10, marginBottom:4 }}>
+              <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:6 }}>
+                {lang==="bn"?"💬 WhatsApp-এ পাঠান":"💬 Send via WhatsApp"}
+              </div>
+              {entries.map(({co, items})=>(
+                <a key={co.id} href={waLinkGroup(co.phone, items)} target="_blank" rel="noreferrer"
+                  style={{ ...s.waBtn, display:"flex", justifyContent:"space-between", marginBottom:7, textDecoration:"none", borderRadius:10 }}>
+                  <span>💬 {co.name}</span>
+                  <span style={{ opacity:0.8, fontSize:11 }}>{items.length} {lang==="bn"?"টি পণ্য":"items"}</span>
+                </a>
+              ))}
+            </div>
+          );
+        })()}
         {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&(
           <div style={{ marginTop:10 }}>
             <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
               {lang==="bn"?"স্ট্যাটাস আপডেট করুন":"Update Status"}
             </div>
-
             {order.overall==="pending"&&(
               <button style={{ ...s.flowBtn, background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" }}
                 onClick={()=>setOrderStatus(order.id,"order_confirmed")}>
@@ -983,8 +1513,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                   : "⏳ Waiting for salesman to confirm receipt"}
               </div>
             )}
-            {/* When overall is "delivered" but some items were rechecked (out_of_stock → order_confirmed),
-                the order reopens and the owner must push those items through the flow again. */}
             {order.overall==="delivered"&&order.items.some(it=>it.status==="order_confirmed")&&(
               <div style={{ background:"#1c1917", border:"1px solid #f97316", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
                 <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:8 }}>
@@ -998,8 +1526,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             )}
           </div>
         )}
-
-        {/* Delete order button */}
         {can("deleteOrder")&&(
           <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>🗑️ {t.delOrder}</button>
         )}
@@ -1071,92 +1597,466 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
     );
   };
 
-  // ── TAB CONTENT RENDERER ──
-  const renderTabContent = () => (
+  // ── TAB CONTENT ──
+  const tabContent = (
     <>
-      {/* ── SALESMAN SHOP TAB ── */}
       {!isOwner&&tab==="shop"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
           {can("sendOrder")&&(
             <>
               <div style={s.secTitle}>{t.newOrder}</div>
-              <div style={s.card}>
-                {items.map((item,i)=>(
-                  <div key={item.id} style={s.itemBlock} data-item-block="1">
-                    <div style={s.itemHead}>
-                      <div style={s.iNum}>{i+1}</div>
-                      <input
-                        style={{ ...s.inp, flex:1 }}
-                        placeholder={t.itemName}
-                        value={item.name}
-                        onChange={e=>updIt(item.id,"name",e.target.value)}
-                        onKeyDown={handleEnterNextField}
-                      />
-                      {items.length>1&&<button style={s.rmBtn} onClick={()=>delIt(item.id)}>✕</button>}
-                    </div>
-                    <input
-                      style={{ ...s.inp, marginTop:6 }}
-                      placeholder={t.code}
-                      value={item.code}
-                      onChange={e=>updIt(item.id,"code",e.target.value)}
-                      onKeyDown={handleEnterNextField}
-                    />
-                    <input
-                      style={{ ...s.inp, marginTop:6 }}
-                      placeholder={t.brand}
-                      value={item.brand}
-                      onChange={e=>updIt(item.id,"brand",e.target.value)}
-                      onKeyDown={handleEnterNextField}
-                    />
-                    <div style={{ display:"flex", gap:7, marginTop:6 }}>
-                      <input
-                        style={{ ...s.inp, flex:2 }}
-                        placeholder={t.qty}
-                        inputMode="numeric"
-                        value={item.qty}
-                        onChange={e=>updIt(item.id,"qty",e.target.value)}
-                        onKeyDown={handleEnterNextField}
-                      />
-                      <select
-                        style={{ ...s.sel, flex:1 }}
-                        value={item.unit}
-                        onChange={e=>updIt(item.id,"unit",e.target.value)}
-                        onKeyDown={handleEnterNextField}>
-                        <option value="Pcs">{t.unitPcs}</option>
-                        <option value="Set">{t.unitSet}</option>
-                      </select>
-                    </div>
+
+              {/* ── ITEM ENTRY FORM ── */}
+              <div style={{ ...s.card, border:"1px solid #3f3f46" }}>
+                {/* Product picker trigger */}
+                {products.length>0&&(
+                  <div style={{ marginBottom:8 }}>
+                    <button style={{ ...s.addInvoiceBtn, background:"rgba(99,102,241,0.08)", borderColor:"#6366f1", color:"#818cf8", padding:"9px" }}
+                      onClick={()=>{ setShowProductPicker(!showProductPicker); setProductPickerQ(""); }}>
+                      📦 {t.pmFromMaster}
+                    </button>
+                    {showProductPicker&&(
+                      <div style={{ background:"#09090b", border:"1px solid #3f3f46", borderRadius:10, marginTop:6, overflow:"hidden" }}>
+                        <input autoFocus style={{ ...s.inp, borderRadius:0, borderLeft:"none", borderRight:"none", borderTop:"none", borderColor:"#27272a" }}
+                          placeholder={t.pmSearch} value={productPickerQ}
+                          onChange={e=>setProductPickerQ(e.target.value)} />
+                        <div style={{ maxHeight:200, overflowY:"auto" }}>
+                          {products
+                            .filter(p=> !productPickerQ || (p.name+' '+(p.code||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+(p.barcode||'')+' '+(p.moreBarcodes||[]).join(' ')).toLowerCase().includes(productPickerQ.toLowerCase()))
+                            .map(p=>(
+                              <button key={p.id} onClick={()=>selectProductToOrder(p)}
+                                style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:"1px solid #27272a", color:"#e4e4e7", cursor:"pointer", fontFamily:"inherit" }}>
+                                <div style={{ fontSize:13, fontWeight:700 }}>{p.name}</div>
+                                <div style={{ fontSize:11, color:"#71717a" }}>
+                                  {[p.code,p.brand,p.category].filter(Boolean).join(" · ")}
+                                  {p.price&&<span style={{ color:"#22c55e", marginLeft:6 }}>৳{p.price}</span>}
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ))}
-                <button style={s.addBtn} onClick={addIt}>{t.addItem}</button>
-                <textarea style={s.ta} placeholder={t.noteP} value={note} onChange={e=>setNote(e.target.value)} rows={2} />
-                <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
+                )}
+                <input
+                  ref={nameRef}
+                  style={{ ...s.inp, marginBottom:8, fontSize:15, fontWeight:600 }}
+                  placeholder={t.itemName}
+                  value={currentItem.name}
+                  onChange={e=>updCurrentItem("name",e.target.value)}
+                  onKeyDown={handleEnterAdd}
+                />
+                <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                  <input style={{ ...s.inp, flex:1 }} placeholder={t.code}
+                    value={currentItem.code}
+                    onChange={e=>updCurrentItem("code",e.target.value)}
+                    onKeyDown={handleEnterAdd}
+                  />
+                  <input style={{ ...s.inp, flex:1 }} placeholder={t.brand}
+                    value={currentItem.brand}
+                    onChange={e=>updCurrentItem("brand",e.target.value)}
+                    onKeyDown={handleEnterAdd}
+                  />
+                </div>
+                <div style={{ display:"flex", gap:7, marginBottom:10 }}>
+                  <input
+                    style={{ ...s.inp, flex:2 }}
+                    placeholder={t.qty}
+                    inputMode="numeric"
+                    value={currentItem.qty}
+                    onChange={e=>updCurrentItem("qty",e.target.value)}
+                    onKeyDown={handleEnterAdd}
+                  />
+                  <select style={{ ...s.sel, flex:1 }} value={currentItem.unit}
+                    onChange={e=>updCurrentItem("unit",e.target.value)}>
+                    <option value="Pcs">{t.unitPcs}</option>
+                    <option value="Set">{t.unitSet}</option>
+                  </select>
+                </div>
+                <button style={s.addInvoiceBtn} onClick={addItToInvoice}>
+                  {t.addItem}
+                </button>
               </div>
+
+              {/* ── INVOICE LIST ── */}
+              {items.length > 0 && (
+                <div style={{ marginTop:14 }}>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                    <div style={{ ...s.secTitle, margin:0 }}>{t.invoiceList}</div>
+                    <span style={{ fontSize:12, color:"#f97316", fontWeight:700, background:"#451a03", padding:"3px 10px", borderRadius:20 }}>
+                      {items.length}{lang==="bn"?"টি":""}
+                    </span>
+                  </div>
+                  <div style={s.invoiceCard}>
+                    {/* Header row */}
+                    <div style={s.invHeader}>
+                      <span style={{ width:22, flexShrink:0 }}>#</span>
+                      <span style={{ flex:1 }}>{lang==="bn"?"নাম":"Name"}</span>
+                      <span style={{ width:70, textAlign:"center" }}>{lang==="bn"?"কোড":"Code"}</span>
+                      <span style={{ width:60, textAlign:"center" }}>{lang==="bn"?"পরিমাণ":"Qty"}</span>
+                      <span style={{ width:26, flexShrink:0 }}></span>
+                    </div>
+                    {/* Item rows */}
+                    {items.map((item, idx) => (
+                      <div key={item.id} style={s.invRow}>
+                        <span style={{ ...s.invSerial, width:22, flexShrink:0 }}>{idx+1}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
+                          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                            {item.name}
+                          </div>
+                          {item.brand&&(
+                            <div style={{ fontSize:11, color:"#71717a" }}>🏷️ {item.brand}</div>
+                          )}
+                        </div>
+                        <div style={{ width:70, textAlign:"center" }}>
+                          {item.code
+                            ? <span style={{ fontSize:11, color:"#a1a1aa", fontFamily:"monospace" }}>{item.code}</span>
+                            : <span style={{ color:"#3f3f46" }}>—</span>
+                          }
+                        </div>
+                        <div style={{ width:60, textAlign:"center" }}>
+                          <span style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{item.qty}</span>
+                          <span style={{ fontSize:10, color:"#71717a", marginLeft:2 }}>{item.unit}</span>
+                        </div>
+                        <button style={s.invDelBtn} onClick={()=>delIt(item.id)} title="Remove">✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Note + Send */}
+                  <textarea style={{ ...s.ta, marginTop:10 }} placeholder={t.noteP} value={note} onChange={e=>setNote(e.target.value)} rows={2} />
+                  <button style={s.sendBtn} onClick={sendOrder}>{t.sendOrder}</button>
+                </div>
+              )}
+
+              {/* If no items yet, show empty state hint */}
+              {items.length === 0 && (
+                <div style={{ textAlign:"center", padding:"18px 0 4px", color:"#52525b", fontSize:12 }}>
+                  ↑ {lang==="bn"?"আইটেম যোগ করুন, তারপর অর্ডার পাঠান":"Add items above, then send order"}
+                </div>
+              )}
             </>
           )}
+
+          {orders.length>0&&(<>
+            <div style={{ ...s.secTitle, marginTop:20 }}>{t.sentOrders}</div>
+          </>)}
+          {/* Search box - always visible */}
           {orders.length>0&&(
-            <>
-              <div style={{ ...s.secTitle, marginTop:18 }}>{t.sentOrders}</div>
-              {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
-            </>
+            <div style={{ position:"relative", marginBottom:12 }}>
+              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+              <input
+                style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+                placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+                value={searchQ}
+                onChange={e=>setSearchQ(e.target.value)}
+              />
+              {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+            </div>
           )}
+          {/* Daily grouped orders */}
+          {(() => {
+              const filtered = filterOrders(orders);
+              if (!filtered.length && !searchQ) return null;
+              if (!filtered.length) return (
+                <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+              );
+              const groups = groupByDay(filtered);
+              return groups.map(([dateStr, dayOrders]) => (
+                <div key={dateStr}>
+                  <div style={s.dayHeader}>
+                    <span style={s.dayDot} />
+                    <span style={s.dayLabel}>📅 {dateStr}</span>
+                    <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                  </div>
+                  {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
+                </div>
+              ));
+            })()}
           {orders.length===0&&!can("sendOrder")&&(
             <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
           )}
         </div>
       )}
 
-      {/* ── OWNER ORDERS TAB ── */}
       {isOwner&&tab==="owner"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
-          {orders.length===0&&<div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>}
-          {orders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+        <div style={isDesktop?s.desktopPanel:s.panel}>
+          {/* Search box */}
+          <div style={{ position:"relative", marginBottom:12 }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+            <input
+              style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+              placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+              value={searchQ}
+              onChange={e=>setSearchQ(e.target.value)}
+            />
+            {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+          </div>
+          {/* Daily grouped orders */}
+          {orders.length===0
+            ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+            : (() => {
+                const filtered = filterOrders(orders);
+                if (!filtered.length) return (
+                  <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+                );
+                const groups = groupByDay(filtered);
+                return groups.map(([dateStr, dayOrders]) => (
+                  <div key={dateStr}>
+                    <div style={s.dayHeader}>
+                      <span style={s.dayDot} />
+                      <span style={s.dayLabel}>📅 {dateStr}</span>
+                      <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                    </div>
+                    {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+                  </div>
+                ));
+              })()
+          }
         </div>
       )}
 
-      {/* ── COMPANIES TAB ── */}
+      {isOwner&&tab==="products"&&(
+        <div style={isDesktop?s.desktopPanel:s.panel}>
+
+          {/* ── PRODUCT DETAIL MODAL ── */}
+          {pmDetailId&&pmDetail&&(
+            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:200, overflowY:"auto", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 12px 40px" }}>
+              <div style={{ width:"100%", maxWidth:560, background:"#18181b", borderRadius:16, border:"1px solid #27272a", overflow:"hidden" }}>
+                {/* Modal header */}
+                <div style={{ background:"#09090b", padding:"14px 16px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid #27272a" }}>
+                  <div style={{ width:44, height:44, background:"#27272a", borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📦</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:15, fontWeight:800, color:"#f4f4f5", lineHeight:1.2 }}>{pmDetail.name}</div>
+                    {pmDetail.category&&<div style={{ fontSize:11, color:"#f97316", marginTop:2 }}>🗂️ {pmDetail.category}</div>}
+                  </div>
+                  <div style={{ display:"flex", gap:6 }}>
+                    <button style={s.edBtn} onClick={()=>{ setPmForm({name:pmDetail.name,code:pmDetail.code||"",barcode:pmDetail.barcode||"",ean:pmDetail.ean||"",brand:pmDetail.brand||"",category:pmDetail.category||"",subcategory:pmDetail.subcategory||"",landingCost:pmDetail.landingCost||"",vatPerc:pmDetail.vatPerc||"",vatExclusive:pmDetail.vatExclusive||"",vatInclusive:pmDetail.vatInclusive||"",mrp:pmDetail.mrp||"",openingStock:pmDetail.openingStock||"",unit:pmDetail.unit||"Pcs",description:pmDetail.description||""}); setPmEditId(pmDetail.id); setPmShowAdd(false); }}>✏️</button>
+                    <button style={s.dlBtn} onClick={()=>deleteProduct(pmDetail.id)}>🗑️</button>
+                    <button style={{ ...s.stBtn, padding:"6px 12px" }} onClick={()=>{ setPmDetailId(null); setPmEditId(null); pmReset(); }}>✕</button>
+                  </div>
+                </div>
+
+                {/* Edit form inside modal */}
+                {pmEditId===pmDetail.id?(
+                  <div style={{ padding:16 }}>
+                    <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:12 }}>✏️ {t.editTitle}</div>
+                    <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} />
+                    <div style={s.row}>
+                      <button style={{ ...s.sendBtn, flex:1 }} onClick={()=>editProduct(pmDetail.id)}>{t.saveEdit}</button>
+                      <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmEditId(null); pmReset(); }}>{t.cancel}</button>
+                    </div>
+                  </div>
+                ):(
+                  <div style={{ padding:16 }}>
+                    {/* Info grid */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                      {[
+                        { lbl:lang==="bn"?"কোড / মডেল":"Code / Model", val:pmDetail.code, icon:"📋" },
+                        { lbl:"Barcode", val:pmDetail.barcode, icon:"🔢" },
+                        { lbl:"EAN Code", val:pmDetail.ean, icon:"📊" },
+                        { lbl:lang==="bn"?"ব্র্যান্ড":"Brand", val:pmDetail.brand, icon:"🏷️" },
+                        { lbl:lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category", val:pmDetail.subcategory, icon:"🗂️" },
+                        { lbl:lang==="bn"?"ইউনিট":"Unit", val:pmDetail.unit, icon:"📐" },
+                      ].map(({lbl,val,icon})=> val?(
+                        <div key={lbl} style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                          <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>{icon} {lbl}</div>
+                          <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{val}</div>
+                        </div>
+                      ):null)}
+                    </div>
+                    {/* Pricing section */}
+                    <div style={{ background:"#09090b", borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
+                      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>💰 {lang==="bn"?"মূল্য তথ্য":"Pricing Info"}</div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                        {[
+                          { lbl:lang==="bn"?"Landing Cost":"Landing Cost", val:pmDetail.landingCost, color:"#a1a1aa" },
+                          { lbl:lang==="bn"?"VAT %":"VAT %", val:pmDetail.vatPerc?`${pmDetail.vatPerc}%`:null, color:"#f59e0b" },
+                          { lbl:lang==="bn"?"VAT Excl.":"VAT Excl.", val:pmDetail.vatExclusive, color:"#22c55e" },
+                          { lbl:lang==="bn"?"VAT Incl.":"VAT Incl.", val:pmDetail.vatInclusive, color:"#06b6d4" },
+                          { lbl:"MRP", val:pmDetail.mrp, color:"#f97316" },
+                          { lbl:lang==="bn"?"Opening Stock":"Opening Stock", val:pmDetail.openingStock, color:"#a855f7" },
+                        ].map(({lbl,val,color})=>(
+                          <div key={lbl} style={{ textAlign:"center", padding:"8px 6px", background:"#18181b", borderRadius:8 }}>
+                            <div style={{ fontSize:9, color:"#71717a", marginBottom:4, textTransform:"uppercase" }}>{lbl}</div>
+                            <div style={{ fontSize:14, fontWeight:800, color: val?color:"#3f3f46" }}>{val||"—"}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {pmDetail.description&&(
+                      <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
+                        <div style={{ fontSize:10, color:"#71717a", marginBottom:4 }}>📝 {lang==="bn"?"বিবরণ":"Description"}</div>
+                        <div style={{ fontSize:12, color:"#d4d4d8" }}>{pmDetail.description}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── HEADER ── */}
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+            <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }} onClick={fetchProducts} disabled={productsLoading}>{productsLoading?"⏳":"🔄"}</button>
+              {products.length>0&&(
+                <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
+                  onClick={async()=>{
+                    if (!window.confirm(lang==="bn"?`সব ${products.length}টি পণ্য মুছে ফেলবেন?`:`Delete all ${products.length} products?`)) return;
+                    toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
+                    try {
+                      for (let i=0;i<products.length;i+=500) {
+                        const batch=writeBatch(db);
+                        products.slice(i,i+500).forEach(p=>batch.delete(doc(db,"products",p.id)));
+                        await batch.commit();
+                      }
+                      setProducts([]);
+                      toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
+                    } catch(e){ hErr(e); }
+                  }}>🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}</button>
+              )}
+              <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>
+                📥 Import
+                <input type="file" accept=".csv" style={{ display:"none" }} onChange={async (e)=>{
+                  const file=e.target.files[0]; if (!file) return; e.target.value='';
+                  if (products.length>0&&!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`${products.length} products exist. Clear first. Continue anyway?`)) return;
+                  toast(lang==="bn"?"📥 ফাইল পড়া হচ্ছে...":"📥 Reading file...");
+                  try {
+                    const text=await file.text();
+                    const lines=text.split('\n').filter(l=>l.trim());
+                    if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data","err");
+                    const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').toLowerCase());
+                    const fi=(kws)=>h.findIndex(x=>kws.some(k=>x.includes(k)));
+                    const idx={
+                      name:fi(['productname','name']), code:fi(['productcode','code','model']),
+                      barcode:fi(['barcode']), ean:fi(['ean']),
+                      brand:fi(['company','brand']), category:fi(['category']),
+                      subcategory:fi(['subcategory']), landingCost:fi(['landingcost','landing']),
+                      vatPerc:fi(['vat_perc','vatperc','vat%']), vatExclusive:fi(['vatexclusive','exclusive']),
+                      vatInclusive:fi(['vatinclusive','inclusive']), mrp:fi(['mrp']),
+                      openingStock:fi(['openingstock','opening']), unit:fi(['unit']),
+                      description:fi(['description']),
+                    };
+                    if (idx.name<0) return toast(lang==="bn"?"'ProductName' column নেই":"'ProductName' column not found","err");
+                    const seen=new Set(); const rows=[];
+                    for (const line of lines.slice(1)) {
+                      const c=line.split(',').map(x=>x.trim().replace(/^"|"$/g,''));
+                      const name=(c[idx.name]||'').trim(); if (!name||name==='nan') continue;
+                      const code=(idx.code>=0?c[idx.code]||'':'').trim();
+                      const key=`${name}||${code}`.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
+                      const clean=(i,zeroEmpty=false)=>{ if (i<0) return ''; let v=(c[i]||'').trim(); if (v==='UNAVAILABLE'||v==='nan') return ''; if (zeroEmpty) { try { if (parseFloat(v)===0) return ''; } catch{} } return v; };
+                      rows.push({ shopId, name, code, barcode:clean(idx.barcode), ean:clean(idx.ean),
+                        brand:clean(idx.brand), category:clean(idx.category), subcategory:clean(idx.subcategory),
+                        landingCost:clean(idx.landingCost,true), vatPerc:clean(idx.vatPerc,true),
+                        vatExclusive:clean(idx.vatExclusive,true), vatInclusive:clean(idx.vatInclusive,true),
+                        mrp:clean(idx.mrp,true), openingStock:clean(idx.openingStock,true),
+                        unit:['Nos','nan',''].includes(clean(idx.unit))?'Pcs':clean(idx.unit),
+                        description:clean(idx.description),
+                      });
+                    }
+                    if (!rows.length) return toast(lang==="bn"?"কোনো valid product নেই":"No valid products","err");
+                    toast(lang==="bn"?`📥 ${rows.length}টি import হচ্ছে...`:`📥 Importing ${rows.length}...`);
+                    let done=0;
+                    for (let i=0;i<rows.length;i+=500) {
+                      const batch=writeBatch(db);
+                      rows.slice(i,i+500).forEach(p=>batch.set(doc(collection(db,"products")),{...p,createdAt:serverTimestamp()}));
+                      await batch.commit(); done+=Math.min(500,rows.length-i);
+                      toast(`📥 ${done}/${rows.length}...`);
+                    }
+                    await fetchProducts();
+                    toast(lang==="bn"?`✅ ${done}টি পণ্য import সম্পন্ন!`:`✅ ${done} products imported!`);
+                  } catch(err){ toast(err.message||"Import failed","err"); }
+                }} />
+              </label>
+              <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); setPmDetailId(null); }}>
+                {pmShowAdd?`✕ ${t.cancel}`:t.pmAdd}
+              </button>
+            </div>
+          </div>
+
+          {/* ── ADD FORM ── */}
+          {pmShowAdd&&(
+            <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:12 }}>➕ {t.pmAdd}</div>
+              <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} />
+              <div style={s.row}>
+                <button style={{ ...s.sendBtn, flex:1 }} onClick={addProduct}>{t.addBtn}</button>
+                <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmShowAdd(false); pmReset(); }}>{t.cancel}</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── SEARCH + CATEGORY FILTER ── */}
+          <div style={{ position:"relative", marginBottom:10 }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+            <input style={{ ...s.inp, paddingLeft:36, background:"#18181b" }}
+              placeholder={t.pmSearch} value={pmSearch} onChange={e=>setPmSearch(e.target.value)} />
+            {pmSearch&&<button onClick={()=>setPmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16 }}>✕</button>}
+          </div>
+
+          {/* Category filter pills */}
+          {!pmSearch&&products.length>0&&(()=>{
+            const cats = ["ALL",...[...new Set(products.map(p=>p.category).filter(Boolean))].sort()];
+            return (
+              <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:10, marginBottom:6 }}>
+                {cats.map(cat=>(
+                  <button key={cat} onClick={()=>setPmCatFilter(cat)}
+                    style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit",
+                      background:pmCatFilter===cat?"#f97316":"transparent",
+                      borderColor:pmCatFilter===cat?"#f97316":"#3f3f46",
+                      color:pmCatFilter===cat?"#fff":"#a1a1aa" }}>
+                    {cat==="ALL"?(lang==="bn"?"সব":"All"):cat}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* ── PRODUCT LIST ── */}
+          {productsLoading&&<div style={s.empty}><div style={{ fontSize:36 }}>⏳</div><div>{lang==="bn"?"লোড হচ্ছে...":"Loading..."}</div></div>}
+          {!productsLoading&&products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
+          {!productsLoading&&(()=>{
+            const filtered = products.filter(p=>{
+              const q = pmSearch.toLowerCase();
+              const refs = (p.moreBarcodes||[]).join(' ');
+              const matchQ = !q || (p.name+' '+(p.code||'')+' '+(p.barcode||'')+' '+(p.ean||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+refs).toLowerCase().includes(q);
+              const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
+              return matchQ && matchCat;
+            });
+            if (filtered.length===0) return <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results"}</div></div>;
+            return filtered.map(p=>(
+              <div key={p.id} style={{ ...s.card, cursor:"pointer", transition:"border-color 0.15s" }}
+                onClick={()=>{ setPmDetailId(p.id); setPmEditId(null); pmReset(); }}>
+                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                  {/* Color dot by category */}
+                  <div style={{ width:42, height:42, borderRadius:12, background:"#09090b", border:"1px solid #27272a", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
+                    <div style={{ fontSize:11, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:6 }}>
+                      {p.code&&<span>📋 {p.code}</span>}
+                      {p.brand&&<span>🏷️ {p.brand}</span>}
+                      {p.barcode&&<span>🔢 {p.barcode}</span>}
+                    </div>
+                    <div style={{ display:"flex", gap:6, marginTop:5, flexWrap:"wrap", alignItems:"center" }}>
+                      {p.category&&<span style={{ fontSize:10, background:"#1c1917", color:"#f97316", padding:"2px 8px", borderRadius:20, border:"1px solid #451a03" }}>{p.category}</span>}
+                      {p.vatExclusive&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>৳{p.vatExclusive}</span>}
+                      {p.mrp&&parseFloat(p.mrp)>0&&<span style={{ fontSize:10, color:"#71717a" }}>MRP {p.mrp}</span>}
+                      {p.openingStock&&parseFloat(p.openingStock)>0&&<span style={{ fontSize:10, color:"#818cf8" }}>Stock: {p.openingStock}</span>}
+                      <span style={{ fontSize:10, color:"#52525b", marginLeft:"auto" }}>{p.unit}</span>
+                    </div>
+                  </div>
+                  <span style={{ fontSize:20, color:"#3f3f46", flexShrink:0 }}>›</span>
+                </div>
+              </div>
+            ));
+          })()}
+        </div>
+      )}
+
       {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={s.secTitle}>{t.coList}</div>
             <button style={s.addCoBtn} onClick={()=>setShowAdd(!showAdd)}>{showAdd?`✕ ${t.cancel}`:t.addNew}</button>
@@ -1205,56 +2105,177 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
         </div>
       )}
 
-      {/* ── SETTINGS TAB ── */}
       {tab==="settings"&&(
-        <div style={isDesktop ? s.desktopPanel : s.panel}>
-          <div style={s.secTitle}>{t.settingsTitle}</div>
+        <div style={isDesktop?s.desktopPanel:s.panel}>
+          {/* ── SETTINGS MENU ── */}
+          {!settingsPage&&(
+            <>
+              <div style={s.secTitle}>{t.settingsTitle}</div>
 
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{t.profileTitle}</div>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{profile.personName}</div>
-                <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>
-                  {profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}
+              {/* Profile row */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("profile")}>
+                <span style={s.settingsRowIcon}>👤</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.profileTitle}</div>
+                  <div style={s.settingsRowSub}>{profile.personName}</div>
                 </div>
-                <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Shop info row */}
+              {localShop&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("shop")}>
+                  <span style={s.settingsRowIcon}>🏢</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.shopInfoTitle}</div>
+                    <div style={s.settingsRowSub}>{localShop.companyName}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* Invite codes (owner only) */}
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("invite")}>
+                  <span style={s.settingsRowIcon}>🔗</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.inviteCodeTitle}</div>
+                    <div style={s.settingsRowSub}>{inviteCodes.filter(c=>!c.used).length} {lang==="bn"?"টি active":"active"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* Positions (owner only) */}
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("positions")}>
+                  <span style={s.settingsRowIcon}>📋</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.managePositionsTitle}</div>
+                    <div style={s.settingsRowSub}>{(localShop?.positions||[]).length} {lang==="bn"?"টি পদবী":"positions"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* Team members */}
+              {team.length>0&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("team")}>
+                  <span style={s.settingsRowIcon}>👥</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{t.teamTitle}</div>
+                    <div style={s.settingsRowSub}>{team.length} {lang==="bn"?"জন সদস্য":"members"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
+              {/* WA style - owner only */}
+              {isOwner&&(
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("wastyle")}>
+                <span style={s.settingsRowIcon}>💬</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{lang==="bn"?"WhatsApp Message Style":"WhatsApp Message Style"}</div>
+                  <div style={s.settingsRowSub}>{WA_STYLES.find(s=>s.id===waStyle)?.[lang==="bn"?"labelBn":"labelEn"]||""}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+              )}
+
+              {/* Theme */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("theme")}>
+                <span style={s.settingsRowIcon}>{theme==="dark"?"🌙":"☀️"}</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{lang==="bn"?"থিম / রঙ":"Theme"}</div>
+                  <div style={s.settingsRowSub}>{theme==="dark"?(lang==="bn"?"ডার্ক মোড":"Dark Mode"):(lang==="bn"?"লাইট মোড":"Light Mode")}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Sync status */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("sync")}>
+                <span style={s.settingsRowIcon}>{syncState==="connected"?"🟢":syncState==="offline"?"🔴":"🟡"}</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.syncStatus}</div>
+                  <div style={s.settingsRowSub}>{syncState==="connected"?"Online":syncState==="offline"?"Offline":"Connecting..."}</div>
+                </div>
+              </button>
+
+              {/* Logout */}
+              <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
+            </>
+          )}
+
+          {/* ── SUB PAGES ── */}
+          {settingsPage&&(
+            <button style={s.backRowBtn} onClick={()=>setSettingsPage(null)}>
+              ← {lang==="bn"?"সেটিংস":"Settings"}
+            </button>
+          )}
+
+          {settingsPage==="profile"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.profileTitle}</div>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5" }}>{profile.personName}</div>
+                  <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
+                  <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
-          {localShop&&(
+          {settingsPage==="shop"&&localShop&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
               <div style={{ fontSize:15, fontWeight:700, color:"#f4f4f5", marginBottom:4 }}>🏢 {localShop.companyName}</div>
               <div style={{ fontSize:12, color:"#71717a" }}>{t.ownerLabel}: {localShop.ownerName}</div>
-              <div style={{ fontSize:12, color:"#71717a" }}>📱 {localShop.mobile} · {localShop.area}</div>
+              <div style={{ fontSize:12, color:"#71717a" }}>📍 {localShop.area}</div>
             </div>
           )}
 
-          {isOwner&&localShop?.inviteCode&&(
+          {settingsPage==="invite"&&isOwner&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
-              <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+                <div style={s.settingsLbl}>{t.inviteCodeTitle}</div>
+                <button style={s.addCoBtn} onClick={generateNewCode}>{lang==="bn"?"+ নতুন Code":"+ New Code"}</button>
+              </div>
               <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:12 }}>{t.inviteCodeDesc}</div>
-              <div style={s.inviteBox}>{localShop.inviteCode}</div>
-              <button style={{ ...s.sendBtn, marginTop:10 }} onClick={copyCode}>{copyState?t.codeCopied:t.copyCode}</button>
+              {inviteCodes.filter(c=>!c.used).length===0&&(
+                <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
+                  {lang==="bn"?"কোনো active code নেই। নতুন তৈরি করুন।":"No active codes. Generate one above."}
+                </div>
+              )}
+              {inviteCodes.filter(c=>!c.used).map(c=>(
+                <InviteCodeRow key={c.code} c={c} lang={lang} t={t} onDelete={deleteInviteCode} />
+              ))}
+              {inviteCodes.filter(c=>c.used).length>0&&(
+                <div style={{ marginTop:12, paddingTop:10, borderTop:"1px solid #27272a" }}>
+                  <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:8 }}>
+                    {lang==="bn"?"ব্যবহৃত Codes":"Used Codes"} ({inviteCodes.filter(c=>c.used).length})
+                  </div>
+                  {inviteCodes.filter(c=>c.used).map(c=>(
+                    <div key={c.code} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderTop:"1px solid #1f1f23" }}>
+                      <span style={{ fontSize:13, fontWeight:700, color:"#3f3f46", fontFamily:"monospace", flex:1, letterSpacing:1 }}>{c.code}</span>
+                      <span style={{ fontSize:11, color:"#52525b" }}>✅ {c.usedByName||"—"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {isOwner&&(
+          {settingsPage==="positions"&&isOwner&&(
             <div style={s.card}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
                 <div style={s.settingsLbl}>{t.managePositionsTitle}</div>
-                <button style={s.addCoBtn} onClick={()=>setShowAddPos(!showAddPos)}>
-                  {showAddPos?`✕ ${t.cancel}`:t.addPositionBtn}
-                </button>
+                <button style={s.addCoBtn} onClick={()=>setShowAddPos(!showAddPos)}>{showAddPos?`✕ ${t.cancel}`:t.addPositionBtn}</button>
               </div>
               {showAddPos&&(
                 <div style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>
-                    {lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}
-                  </div>
+                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>{lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}</div>
                   <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
                     {PRESET_POSITIONS[lang].map(p=>(
                       <button key={p} onClick={()=>setNewPosition(p)}
@@ -1264,9 +2285,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
                     ))}
                   </div>
                   <div style={s.row}>
-                    <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP}
-                      value={newPosition} onChange={e=>setNewPosition(e.target.value)}
-                      onKeyDown={e=>e.key==="Enter"&&addPosition()} />
+                    <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP} value={newPosition}
+                      onChange={e=>setNewPosition(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPosition()} />
                     <button style={s.savBtn} onClick={addPosition}>{t.addBtn}</button>
                   </div>
                 </div>
@@ -1283,57 +2303,42 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           )}
 
-          {team.length>0&&(
+          {settingsPage==="team"&&team.length>0&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
               {team.map((m,idx)=>(
                 <div key={m.id} style={{ padding:"10px 0", borderTop:idx>0?"1px solid #27272a":"none" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&m.uid!==user.uid?10:0 }}>
-                    <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                      {m.role==="owner"?"🏢":"👨‍💼"}
-                    </div>
+                    <div style={{ width:34, height:34, borderRadius:"50%", background:"#27272a", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"🏢":"👨‍💼"}</div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>
-                        {m.personName}
-                        {m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}
-                      </div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5" }}>{m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
                       <div style={{ fontSize:11, color:"#71717a" }}>
-                        {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)} · {m.email}
+                        {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)}
+                        {m.mobile&&<span> · 📱 {m.mobile}</span>}
+                        {m.area&&<span> · {m.area}</span>}
                       </div>
                     </div>
                   </div>
-
                   {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
                     <div style={{ background:"#09090b", borderRadius:10, padding:"10px 12px" }}>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>
-                          {t.positionLbl}
-                        </span>
-                        <select
-                          style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
+                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>{t.positionLbl}</span>
+                        <select style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
                           value={m.position||"Salesman"}
-                          onChange={async e=>{
-                            try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); }
-                            catch(err) { hErr(err); }
-                          }}>
+                          onChange={async e=>{ try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); } catch(err) { hErr(err); } }}>
                           <option value="Salesman">{t.defaultPosition}</option>
                           {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
                         </select>
                       </div>
                       <div style={{ height:1, background:"#1f1f23", marginBottom:8 }} />
-                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
-                        {t.permissionsTitle}
-                      </div>
+                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>{t.permissionsTitle}</div>
                       {PERMISSIONS_LIST.map((perm,pi)=>{
                         const mPerms = m.permissions||DEFAULT_PERMISSIONS;
                         const isOn   = mPerms[perm.key]===true;
                         return (
                           <div key={perm.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderTop:pi>0?"1px solid #1f1f23":"none" }}>
                             <span style={{ fontSize:12, color:"#d4d4d8" }}>{perm[lang]}</span>
-                            <PermToggle isOn={isOn} onToggle={()=>{
-                              const newPerms = { ...mPerms, [perm.key]:!isOn };
-                              savePermissions(m.id,newPerms);
-                            }} />
+                            <PermToggle isOn={isOn} onToggle={()=>{ savePermissions(m.id,{ ...mPerms, [perm.key]:!isOn }); }} />
                           </div>
                         );
                       })}
@@ -1344,64 +2349,88 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
             </div>
           )}
 
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{t.languageLbl}</div>
-            <div style={s.langSw}>
-              <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="bn"?s.lBtnA:{}) }} onClick={()=>setLang("bn")}>বাংলা</button>
-              <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
+          {settingsPage==="wastyle"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{lang==="bn"?"💬 WhatsApp Message Style":"💬 WhatsApp Message Style"}</div>
+              <div style={{ fontSize:11, color:"#71717a", marginBottom:12 }}>
+                {lang==="bn"?"কোম্পানিকে WhatsApp করার সময় কোন style-এ message যাবে বেছে নিন":"Choose how messages look when sending to companies"}
+              </div>
+              {WA_STYLES.map(st=>(
+                <button key={st.id} onClick={()=>setWaStyle(st.id)}
+                  style={{ width:"100%", textAlign:"left", background:waStyle===st.id?"#1c1917":"#09090b",
+                    border:`1px solid ${waStyle===st.id?"#f97316":"#27272a"}`, borderRadius:10,
+                    padding:"10px 12px", marginBottom:8, cursor:"pointer", fontFamily:"inherit" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:waStyle===st.id?"#f97316":"#a1a1aa" }}>
+                      {waStyle===st.id?"✅ ":""}{lang==="bn"?st.labelBn:st.labelEn}
+                    </span>
+                  </div>
+                  <pre style={{ fontSize:11, color:"#71717a", margin:0, fontFamily:"monospace", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
+                    {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._ 🙏 Thanks`}
+                  </pre>
+                </button>
+              ))}
             </div>
-          </div>
+          )}
 
-          <div style={s.card}>
-            <div style={s.settingsLbl}>{t.syncStatus}</div>
-            <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
-              {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
+          {settingsPage==="language"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.languageLbl}</div>
+              <div style={s.langSw}>
+                <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="bn"?s.lBtnA:{}) }} onClick={()=>setLang("bn")}>বাংলা</button>
+                <button style={{ ...s.lBtn, padding:"10px 18px", flex:1, ...(lang==="en"?s.lBtnA:{}) }} onClick={()=>setLang("en")}>English</button>
+              </div>
             </div>
-          </div>
+          )}
 
-          {!isDesktop&&(
-            <button style={s.logoutBtn} onClick={handleLogout}>🚪 {t.logout}</button>
+          {settingsPage==="theme"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{lang==="bn"?"🎨 থিম বেছে নিন":"🎨 Choose Theme"}</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                <button onClick={()=>setTheme("dark")}
+                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
+                    border:`2px solid ${theme==="dark"?"#f97316":"#3f3f46"}`,
+                    background:theme==="dark"?"rgba(249,115,22,0.08)":"transparent",
+                    cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
+                  <span style={{ fontSize:28 }}>🌙</span>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"ডার্ক মোড":"Dark Mode"}</div>
+                    <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"চোখে আরামদায়ক অন্ধকার থিম":"Easy on the eyes dark theme"}</div>
+                  </div>
+                  {theme==="dark"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
+                </button>
+                <button onClick={()=>setTheme("light")}
+                  style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
+                    border:`2px solid ${theme==="light"?"#f97316":"#3f3f46"}`,
+                    background:theme==="light"?"rgba(249,115,22,0.08)":"transparent",
+                    cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
+                  <span style={{ fontSize:28 }}>☀️</span>
+                  <div>
+                    <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"লাইট মোড":"Light Mode"}</div>
+                    <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"উজ্জ্বল সাদা থিম":"Bright white theme"}</div>
+                  </div>
+                  {theme==="light"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {settingsPage==="sync"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.syncStatus}</div>
+              <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
+                {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
+              </div>
+            </div>
           )}
         </div>
       )}
     </>
   );
 
-  // ── DESKTOP SIDEBAR ──
-  const renderSidebar = () => (
-    <div style={s.sidebar}>
-      <div style={s.sideProfile}>
-        <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
-        <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:2 }}>{profile.personName}</div>
-        <div style={{ fontSize:11, color:"#71717a" }}>{isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-        {localShop&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, fontWeight:600 }}>🏪 {localShop.companyName}</div>}
-      </div>
-
-      <div style={s.sideNav}>
-        {visibleTabs.map(([k,label])=>(
-          <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
-            <span style={{ flex:1, textAlign:"left" }}>{label}</span>
-            {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&(
-              <span style={s.sideBadge}>{unread}</span>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ flex:1 }} />
-
-      <div style={{ padding:"8px 0" }}>
-        <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", marginBottom:12, textAlign:"center" }}>
-          {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
-        </div>
-        <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
-      </div>
-    </div>
-  );
-
   return (
     <div style={s.root}>
-      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop}>
+      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}>
         <div style={s.tabs}>
           {visibleTabs.map(([k,label])=>(
             <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
@@ -1414,12 +2443,30 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast }) {
 
       {isDesktop ? (
         <div style={s.desktopLayout}>
-          {renderSidebar()}
-          <div style={s.desktopContent}>
-            {renderTabContent()}
+          <div style={s.sidebar}>
+            <div style={s.sideProfile}>
+              <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f4f4f5", marginBottom:2 }}>{profile.personName}</div>
+              <div style={{ fontSize:11, color:"#71717a" }}>{isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
+              {localShop&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:4, fontWeight:600 }}>🏪 {localShop.companyName}</div>}
+            </div>
+            <div style={s.sideNav}>
+              {visibleTabs.map(([k,label])=>(
+                <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
+                  <span style={{ flex:1, textAlign:"left" }}>{label}</span>
+                  {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.sideBadge}>{unread}</span>}
+                </button>
+              ))}
+            </div>
+            <div style={{ flex:1 }} />
+            <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
+              {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
+            </div>
+            <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
           </div>
+          <div style={s.desktopContent}>{tabContent}</div>
         </div>
-      ) : renderTabContent()}
+      ) : tabContent}
     </div>
   );
 }
@@ -1429,6 +2476,11 @@ export default function App() {
   const [lang,setLangState]=useState(loadLang());
   const setLang = (l) => { setLangState(l); saveLang(l); };
   const t = TR[lang];
+
+  const [theme,setThemeState]=useState(loadTheme());
+  const setTheme = (v) => { setThemeState(v); saveTheme(v); };
+  const th = THEMES[theme]||THEMES.dark;
+  const s  = getStyles(th);
 
   const [user,setUser]=useState(null);
   const [profile,setProfile]=useState(null);
@@ -1478,35 +2530,35 @@ export default function App() {
 
   useEffect(()=>()=>{ if (toastTimer.current) clearTimeout(toastTimer.current); },[]);
 
-  if (!FIREBASE_READY||!auth||!db) return <SetupScreen t={t} lang={lang} setLang={setLang} />;
+  if (!FIREBASE_READY||!auth||!db) return <SetupScreen t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />;
 
   const Notif = notif&&(
     <div style={{ ...s.notif, background:notif.type==="err"?"#450a0a":"#052e16", borderColor:notif.type==="err"?"#ef4444":"#22c55e", color:notif.type==="err"?"#ef4444":"#22c55e" }}>{notif.msg}</div>
   );
 
-  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
+  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
 
   if (!user) {
     let screen;
-    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} />;
-    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} />;
-    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} />;
-    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} />;
+    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
+    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} s={s} theme={theme} setTheme={setTheme} />;
+    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
+    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
     return <>{Notif}{screen}</>;
   }
 
-  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} /></>;
+  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} s={s} theme={theme} setTheme={setTheme} /></>;
 
   if (!profile) {
     return (
-      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} />
+      <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />
         <div style={s.welcomeWrap}>
           {profileError?(
             <>
               <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
               <div style={{ ...s.authTitle, color:"#ef4444" }}>{lang==="bn"?"প্রোফাইল পাওয়া যায়নি":"Profile not found"}</div>
               <div style={{ ...s.authSub, marginBottom:8 }}>{lang==="bn"?"আপনার প্রোফাইল ডেটা পাওয়া যায়নি। নতুন করে সাইন আপ করুন।":"Profile data missing. Please sign up again."}</div>
-              <div style={{ fontSize:11, color:"#71717a", marginBottom:20 }}>{profileError}</div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginBottom:20 }}>{profileError}</div>
               <button style={s.sendBtn} onClick={()=>loadProfile(user)}>{lang==="bn"?"🔄 আবার চেষ্টা করুন":"🔄 Retry"}</button>
               <button style={{ ...s.linkBtn, marginTop:12 }} onClick={()=>signOut(auth)}>{lang==="bn"?"🚪 লগআউট":"🚪 Logout"}</button>
             </>
@@ -1522,93 +2574,103 @@ export default function App() {
     );
   }
 
-  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} /></>;
+  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} /></>;
 }
 
-// ─── STYLES ──────────────────────────────────────────────────
-const s = {
-  root:        { minHeight:"100vh", background:"#09090b", color:"#e4e4e7", fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.5)" },
-  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:"1px solid #27272a", background:"#18181b", position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
+// ─── STYLES FUNCTION ─────────────────────────────────────────
+function getStyles(th) { return {
+  root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
+  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
   hLeft:       { display:"flex", alignItems:"center", gap:10 },
-  title:       { fontSize:14, fontWeight:800, color:"#f97316", lineHeight:1.1 },
-  sub:         { fontSize:10, color:"#71717a" },
-  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:"1px solid #3f3f46" },
-  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:700 },
-  lBtnA:       { background:"#f97316", color:"#fff" },
+  title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
+  sub:         { fontSize:10, color:th.txtMuted },
+  langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
+  lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
+  lBtnA:       { background:th.accent, color:"#fff" },
   tabs:        { display:"flex", gap:5 },
-  tab:         { padding:"7px 11px", borderRadius:8, border:"1px solid #3f3f46", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
-  tabA:        { background:"#f97316", color:"#fff", border:"1px solid #f97316" },
+  tab:         { padding:"7px 11px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
+  tabA:        { background:th.accent, color:"#fff", border:`1px solid ${th.accent}` },
   badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
   panel:       { maxWidth:660, margin:"0 auto", padding:"18px 14px 60px" },
-  secTitle:    { fontSize:14, fontWeight:700, color:"#f97316", marginBottom:10 },
-  card:        { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:14, marginBottom:10 },
-  itemBlock:   { background:"#0f0f12", border:"1px solid #27272a", borderRadius:10, padding:10, marginBottom:10 },
-  itemHead:    { display:"flex", alignItems:"center", gap:8 },
-  iNum:        { width:22, height:22, borderRadius:"50%", background:"#27272a", color:"#f97316", fontSize:11, fontWeight:800, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 },
-  inp:         { padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
-  rmBtn:       { padding:"7px 9px", borderRadius:8, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, flexShrink:0 },
-  addBtn:      { width:"100%", padding:"8px", borderRadius:8, border:"1px dashed #3f3f46", background:"transparent", color:"#71717a", cursor:"pointer", fontSize:12, marginBottom:8 },
-  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#09090b", color:"#e4e4e7", fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
+  secTitle:    { fontSize:14, fontWeight:700, color:th.accent, marginBottom:10 },
+  card:        { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:14, marginBottom:10 },
+  inp:         { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" },
+  ta:          { width:"100%", padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", marginBottom:8, boxSizing:"border-box", fontFamily:"inherit" },
   sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
+  addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.08)", color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
+  invoiceCard: { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, overflow:"hidden", marginBottom:4 },
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:`1px solid ${th.border}` },
+  invSerial:   { fontSize:12, fontWeight:800, color:th.accent },
+  invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
   oHdr:        { display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 },
-  oId:         { fontSize:14, fontWeight:800, color:"#f4f4f5" },
+  oId:         { fontSize:14, fontWeight:800, color:th.txtPrimary },
   sBadge:      { padding:"3px 9px", borderRadius:20, fontSize:11, fontWeight:700 },
-  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:"1px solid #27272a", flexWrap:"wrap" },
-  iName:       { fontSize:13, color:"#d4d4d8", fontWeight:600 },
-  iMeta:       { fontSize:10, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
-  iQty:        { fontSize:12, color:"#71717a" },
+  iSum:        { display:"flex", gap:8, alignItems:"center", padding:"5px 0", borderTop:`1px solid ${th.border}`, flexWrap:"wrap" },
+  iName:       { fontSize:13, color:th.txtSecondary, fontWeight:600 },
+  iMeta:       { fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", flexWrap:"wrap", gap:4 },
+  iQty:        { fontSize:12, color:th.txtMuted },
   iPrice:      { fontSize:13, fontWeight:700, color:"#22c55e" },
-  empty:       { textAlign:"center", padding:"50px 20px", color:"#52525b", fontSize:14 },
-  nBadge:      { fontSize:10, background:"#451a03", color:"#f97316", padding:"2px 7px", borderRadius:10, fontWeight:700 },
-  div:         { height:1, background:"#27272a", margin:"10px 0" },
-  oiCard:      { background:"#09090b", borderRadius:10, padding:12, marginBottom:8, border:"1px solid #27272a" },
+  empty:       { textAlign:"center", padding:"50px 20px", color:th.txtFaint, fontSize:14 },
+  nBadge:      { fontSize:10, background:th.accentDim, color:th.accent, padding:"2px 7px", borderRadius:10, fontWeight:700 },
+  div:         { height:1, background:th.border, margin:"10px 0" },
+  oiCard:      { background:th.bgOiCard, borderRadius:10, padding:12, marginBottom:8, border:`1px solid ${th.border}` },
   row:         { display:"flex", gap:7, marginBottom:7, alignItems:"center" },
-  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#e4e4e7", fontSize:14, outline:"none", fontFamily:"inherit" },
+  sel:         { flex:1, padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgSel, color:th.txtPrimary, fontSize:14, outline:"none", fontFamily:"inherit" },
   waBtn:       { display:"flex", alignItems:"center", gap:4, padding:"8px 12px", borderRadius:8, background:"#15803d", color:"#fff", textDecoration:"none", fontSize:12, fontWeight:700, whiteSpace:"nowrap", flexShrink:0 },
   savBtn:      { padding:"8px 14px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 },
   sRow:        { display:"flex", gap:7, marginBottom:7 },
-  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:"1px solid #3f3f46", background:"#18181b", color:"#a1a1aa", fontSize:12, fontWeight:700, cursor:"pointer" },
+  stBtn:       { flex:1, padding:"10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtMuted, fontSize:12, fontWeight:700, cursor:"pointer" },
   stBtnC:      { background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" },
   stBtnN:      { background:"#450a0a", color:"#ef4444", border:"1px solid #ef4444" },
   delBtn:      { width:"100%", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #4f46e5, #7c3aed)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", marginTop:4 },
   delOrderBtn: { width:"100%", padding:"10px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:12, fontWeight:700, cursor:"pointer", marginTop:8 },
   flowBtn:     { width:"100%", padding:"11px", borderRadius:10, fontSize:13, fontWeight:700, cursor:"pointer", marginBottom:6 },
-  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:"1px solid #f97316", background:"transparent", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700 },
-  coIcon:      { width:40, height:40, background:"#27272a", borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
-  edBtn:       { padding:"6px 10px", borderRadius:8, border:"1px solid #3f3f46", background:"#27272a", color:"#e4e4e7", cursor:"pointer", fontSize:13 },
+  addCoBtn:    { padding:"7px 14px", borderRadius:8, border:`1px solid ${th.accent}`, background:"transparent", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700 },
+  coIcon:      { width:40, height:40, background:th.border, borderRadius:10, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 },
+  edBtn:       { padding:"6px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtSecondary, cursor:"pointer", fontSize:13 },
   dlBtn:       { padding:"6px 9px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 },
   authWrap:    { maxWidth:440, margin:"0 auto", padding:"32px 18px 60px", textAlign:"center" },
   welcomeWrap: { maxWidth:440, margin:"0 auto", padding:"60px 18px", textAlign:"center" },
   authIcon:    { fontSize:48, marginBottom:8 },
   headerLogo:  { width:36, height:36, borderRadius:8, objectFit:"cover" },
   bigLogo:     { width:130, height:130, borderRadius:20, objectFit:"cover", marginBottom:16, boxShadow:"0 4px 20px rgba(0,0,0,0.4)" },
-  authTitle:   { fontSize:24, fontWeight:800, color:"#f97316", marginBottom:6 },
-  authSub:     { fontSize:13, color:"#a1a1aa", marginBottom:20 },
-  authCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:12, padding:16, textAlign:"left" },
-  authFooter:  { fontSize:12, color:"#a1a1aa", marginTop:16 },
-  linkBtn:     { background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
-  linkBtnInline:{ background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
+  authTitle:   { fontSize:24, fontWeight:800, color:th.accent, marginBottom:6 },
+  authSub:     { fontSize:13, color:th.txtMuted, marginBottom:20 },
+  authCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:16, textAlign:"left" },
+  authFooter:  { fontSize:12, color:th.txtMuted, marginTop:16 },
+  linkBtn:     { background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:"10px", marginTop:8, fontFamily:"inherit" },
+  linkBtnInline:{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, padding:0, fontFamily:"inherit", textDecoration:"underline" },
   roleGrid:    { display:"flex", flexDirection:"column", gap:12 },
-  roleCard:    { background:"#18181b", border:"1px solid #27272a", borderRadius:14, padding:"22px 18px", cursor:"pointer", color:"#e4e4e7", textAlign:"left", fontFamily:"inherit", transition:"border-color 0.2s" },
+  roleCard:    { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"22px 18px", cursor:"pointer", color:th.txtSecondary, textAlign:"left", fontFamily:"inherit" },
   roleEmoji:   { fontSize:38, marginBottom:8 },
-  roleName:    { fontSize:16, fontWeight:700, color:"#f4f4f5", marginBottom:4 },
-  roleDesc:    { fontSize:12, color:"#a1a1aa" },
-  settingsLbl: { fontSize:11, color:"#71717a", marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
-  inviteBox:   { fontSize:22, fontWeight:800, color:"#f97316", textAlign:"center", padding:"16px", background:"#09090b", borderRadius:10, border:"2px dashed #f97316", letterSpacing:2, fontFamily:"monospace" },
+  roleName:    { fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:4 },
+  roleDesc:    { fontSize:12, color:th.txtMuted },
+  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  inviteBox:   { fontSize:22, fontWeight:800, color:th.accent, textAlign:"center", padding:"16px", background:th.bgInp, borderRadius:10, border:`2px dashed ${th.accent}`, letterSpacing:2, fontFamily:"monospace" },
   logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
-
-  // ── DESKTOP LAYOUT ──
   desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
-  desktopContent: { flex:1, overflowY:"auto", background:"#09090b" },
+  desktopContent: { flex:1, overflowY:"auto", background:th.bgRoot },
   desktopPanel:   { maxWidth:900, margin:"0 auto", padding:"24px 28px 60px" },
+  sidebar:        { width:230, minWidth:230, background:th.bgSidebar, borderRight:`1px solid ${th.border}`, display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
+  sideProfile:    { background:th.bgInp, borderRadius:12, padding:14, marginBottom:16, textAlign:"center", border:`1px solid ${th.border}` },
+  sideNav:        { display:"flex", flexDirection:"column", gap:6 },
+  sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
+  sideTabA:       { background:th.accent, color:"#fff" },
+  sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
+  sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
+  dayHeader:      { display:"flex", alignItems:"center", gap:8, margin:"18px 0 8px", paddingBottom:6, borderBottom:`1px solid ${th.border}` },
+  dayDot:         { width:8, height:8, borderRadius:"50%", background:th.accent, flexShrink:0 },
+  dayLabel:       { fontSize:13, fontWeight:700, color:th.accent, flex:1 },
+  dayCount:       { fontSize:11, color:th.txtMuted, background:th.border, padding:"2px 8px", borderRadius:10 },
+  settingsRow:    { width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px", background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, marginBottom:8, cursor:"pointer", fontFamily:"inherit", textAlign:"left" },
+  settingsRowIcon:{ fontSize:22, flexShrink:0, width:32, textAlign:"center" },
+  settingsRowLabel:{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
+  settingsRowSub: { fontSize:11, color:th.txtMuted },
+  settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
+  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
+};}
 
-  // ── SIDEBAR ──
-  sidebar:     { width:230, minWidth:230, background:"#18181b", borderRight:"1px solid #27272a", display:"flex", flexDirection:"column", padding:"20px 14px 16px", overflowY:"auto" },
-  sideProfile: { background:"#09090b", borderRadius:12, padding:"14px", marginBottom:16, textAlign:"center", border:"1px solid #27272a" },
-  sideNav:     { display:"flex", flexDirection:"column", gap:6 },
-  sideTab:     { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:"#a1a1aa", cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit", textAlign:"left", transition:"background 0.15s" },
-  sideTabA:    { background:"#f97316", color:"#fff" },
-  sideBadge:   { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
-  sideLogout:  { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },
-};
+// Fallback styles (dark) used by components before theme prop arrives
+const _globalS = getStyles(THEMES.dark);
