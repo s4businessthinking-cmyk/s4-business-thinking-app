@@ -1114,13 +1114,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
     if (e.key === "Enter") { e.preventDefault(); addItToInvoice(); }
   };
 
-  const startEditOrder = (order) => {
-    setItems(order.items.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs"})));
-    setNote(order.note||"");
-    setEditingOrderId(order.id);
-    setSelOrder(null);
-    window.scrollTo({top:0,behavior:"smooth"});
-  };
+  // ✅ নতুন কোড
+const startEditOrder = (order) => {
+  setItems(order.items.map(it=>({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`, // ← এটা যোগ করুন
+    name:it.name, code:it.code||"", brand:it.brand||"",
+    qty:it.qty||"", unit:it.unit||"Pcs"
+  })));
+  setNote(order.note||"");
+  setEditingOrderId(order.id);
+  setSelOrder(null);
+  window.scrollTo({top:0,behavior:"smooth"});
+};
 
   const cancelEditOrder = () => {
     setEditingOrderId(null);
