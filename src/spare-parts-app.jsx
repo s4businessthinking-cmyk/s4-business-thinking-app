@@ -893,6 +893,41 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [newNm,setNewNm]=useState(""); const [newPh,setNewPh]=useState("");
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
+  const [vendors, setVendors] = useState([]);
+const [showVendorModal, setShowVendorModal] = useState(false);
+
+const emptyVendor = {
+  vendorName: "",
+  vendorCode: "",
+  contactPerson: "",
+
+  mobileNumber: "",
+  phoneNumber: "",
+  whatsappNumber: "",
+  email: "",
+
+  address: "",
+  area: "",
+  city: "",
+
+  tradeLicenseNumber: "",
+  tinNumber: "",
+  binNumber: "",
+  vatNumber: "",
+
+  bankName: "",
+  bankBranch: "",
+  accountName: "",
+  accountNumber: "",
+
+  creditLimit: "",
+  openingBalance: "",
+
+  notes: "",
+  status: "active",
+};
+
+const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [searchQ,setSearchQ]=useState("");
   const [waStyle,setWaStyleState]=useState(loadWaStyle());
   const setWaStyle = (v) => { setWaStyleState(v); saveWaStyle(v); };
@@ -929,6 +964,28 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
       err  => console.error(err)
     );
   },[shopId]);
+  
+  useEffect(() => {
+  if (!shopId) return;
+
+  return onSnapshot(
+    query(
+      collection(db, "vendors"),
+      where("shopId", "==", shopId),
+      orderBy("vendorName")
+    ),
+    (snap) => {
+      setVendors(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+      );
+    },
+    (err) => console.error(err)
+  );
+
+}, [shopId]);
 
   useEffect(() => {
     return onSnapshot(
@@ -1277,6 +1334,75 @@ const startEditOrder = (order) => {
       setNewNm(""); setNewPh(""); setShowAdd(false); toast(t.n4);
     } catch(e) { hErr(e); }
   };
+
+
+  const saveVendor = async () => {
+
+  if (!vendorForm.vendorName.trim()) {
+    return toast("Vendor name required", "err");
+  }
+
+  if (!vendorForm.mobileNumber.trim()) {
+    return toast("Mobile number required", "err");
+  }
+
+  try {
+
+    await addDoc(collection(db, "vendors"), {
+
+      shopId,
+
+      vendorName: vendorForm.vendorName,
+      vendorCode: vendorForm.vendorCode,
+
+      contactPerson: vendorForm.contactPerson,
+
+      mobileNumber: vendorForm.mobileNumber,
+      phoneNumber: vendorForm.phoneNumber,
+      whatsappNumber: vendorForm.whatsappNumber,
+
+      email: vendorForm.email,
+
+      address: vendorForm.address,
+      area: vendorForm.area,
+      city: vendorForm.city,
+
+      tradeLicenseNumber: vendorForm.tradeLicenseNumber,
+      tinNumber: vendorForm.tinNumber,
+      binNumber: vendorForm.binNumber,
+      vatNumber: vendorForm.vatNumber,
+
+      bankName: vendorForm.bankName,
+      bankBranch: vendorForm.bankBranch,
+      accountName: vendorForm.accountName,
+      accountNumber: vendorForm.accountNumber,
+
+      creditLimit: Number(vendorForm.creditLimit || 0),
+      openingBalance: Number(vendorForm.openingBalance || 0),
+
+      notes: vendorForm.notes,
+
+      status: "active",
+
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+
+    });
+
+    toast("Vendor Created");
+
+    setVendorForm(emptyVendor);
+
+    setShowVendorModal(false);
+
+  } catch (e) {
+
+    console.error(e);
+
+    toast(e.message, "err");
+  }
+};
+  
 
   const addPosition = async () => {
     if (!newPosition.trim()) return;
@@ -2124,23 +2250,103 @@ const startEditOrder = (order) => {
       )}
 
       {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
-        <div style={isDesktop?s.desktopPanel:s.panel}>
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-            <div style={s.secTitle}>{t.coList}</div>
-            <button style={s.addCoBtn} onClick={()=>setShowAdd(!showAdd)}>{showAdd?`✕ ${t.cancel}`:t.addNew}</button>
-          </div>
-          {showAdd&&(
-            <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:10 }}>{t.addCoTitle}</div>
-              <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.coName} value={newNm} onChange={e=>setNewNm(e.target.value)} />
-              <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.waNum} value={newPh} onChange={e=>setNewPh(e.target.value)} />
-              <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}>{t.waHint}</div>
-              <div style={s.row}>
-                <button style={{ ...s.sendBtn, flex:1, padding:"10px" }} onClick={addCo}>{t.addBtn}</button>
-                <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setShowAdd(false); setNewNm(""); setNewPh(""); }}>{t.cancel}</button>
-              </div>
-            </div>
-          )}
+  <div style={isDesktop?s.desktopPanel:s.panel}>
+
+    <div style={{
+      display:"flex",
+      alignItems:"center",
+      justifyContent:"space-between",
+      marginBottom:14,
+      gap:10,
+      flexWrap:"wrap"
+    }}>
+
+      <div style={s.secTitle}>
+        {t.coList}
+      </div>
+
+      <div style={{
+        display:"flex",
+        gap:10,
+        flexWrap:"wrap"
+      }}>
+
+        <button
+          style={s.addCoBtn}
+          onClick={() => setShowVendorModal(true)}
+        >
+          + Vendor
+        </button>
+
+        <button
+          style={s.addCoBtn}
+          onClick={()=>setShowAdd(!showAdd)}
+        >
+          {showAdd ? `✕ ${t.cancel}` : t.addNew}
+        </button>
+
+      </div>
+
+    </div>
+
+    {showAdd&&(
+      <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
+
+        <div style={{
+          fontSize:13,
+          fontWeight:700,
+          color:"#f97316",
+          marginBottom:10
+        }}>
+          {t.addCoTitle}
+        </div>
+
+        <input
+          style={{ ...s.inp, marginBottom:8 }}
+          placeholder={t.coName}
+          value={newNm}
+          onChange={e=>setNewNm(e.target.value)}
+        />
+
+        <input
+          style={{ ...s.inp, marginBottom:8 }}
+          placeholder={t.waNum}
+          value={newPh}
+          onChange={e=>setNewPh(e.target.value)}
+        />
+
+        <div style={{
+          fontSize:11,
+          color:"#71717a",
+          marginBottom:10
+        }}>
+          {t.waHint}
+        </div>
+
+        <div style={s.row}>
+
+          <button
+            style={{ ...s.sendBtn, flex:1, padding:"10px" }}
+            onClick={addCo}
+          >
+            {t.addBtn}
+          </button>
+
+          <button
+            style={{ ...s.stBtn, flex:1 }}
+            onClick={()=>{
+              setShowAdd(false);
+              setNewNm("");
+              setNewPh("");
+            }}
+          >
+            {t.cancel}
+          </button>
+
+        </div>
+
+      </div>
+    )}
           {cos.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>🏢</div><div>{t.noCo}</div></div>}
           {cos.map(c=>(
             <div key={c.id} style={s.card}>
@@ -2173,6 +2379,297 @@ const startEditOrder = (order) => {
         </div>
       )}
 
+
+      {/* ───────── VENDOR MODAL ───────── */}
+
+{showVendorModal && (
+
+  <div style={s.modalOverlay}>
+
+    <div style={s.vendorModal}>
+
+      <div style={s.vendorHeader}>
+
+        <div style={s.vendorTitle}>
+          Create Vendor
+        </div>
+
+        <button
+          style={s.modalCloseBtn}
+          onClick={() => setShowVendorModal(false)}
+        >
+          ✕
+        </button>
+
+      </div>
+
+      <div style={s.vendorGrid}>
+
+        <input
+          style={s.inp}
+          placeholder="Vendor Name"
+          value={vendorForm.vendorName}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              vendorName: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Vendor Code"
+          value={vendorForm.vendorCode}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              vendorCode: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Contact Person"
+          value={vendorForm.contactPerson}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              contactPerson: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Mobile Number"
+          value={vendorForm.mobileNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              mobileNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Phone Number"
+          value={vendorForm.phoneNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              phoneNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="WhatsApp Number"
+          value={vendorForm.whatsappNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              whatsappNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Email"
+          value={vendorForm.email}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              email: e.target.value
+            })
+          }
+        />
+
+        <textarea
+          style={s.ta}
+          placeholder="Address"
+          value={vendorForm.address}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              address: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Area"
+          value={vendorForm.area}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              area: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="City"
+          value={vendorForm.city}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              city: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Trade License"
+          value={vendorForm.tradeLicenseNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              tradeLicenseNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="TIN Number"
+          value={vendorForm.tinNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              tinNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="BIN Number"
+          value={vendorForm.binNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              binNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="VAT Number"
+          value={vendorForm.vatNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              vatNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Bank Name"
+          value={vendorForm.bankName}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              bankName: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Bank Branch"
+          value={vendorForm.bankBranch}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              bankBranch: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Account Name"
+          value={vendorForm.accountName}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              accountName: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Account Number"
+          value={vendorForm.accountNumber}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              accountNumber: e.target.value
+            })
+          }
+        />
+
+        <input
+          style={s.inp}
+          placeholder="Credit Limit"
+          value={vendorForm.creditLimit}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              creditLimit: e.target.value
+            })
+          }
+        />
+
+        <textarea
+          style={s.ta}
+          placeholder="Notes"
+          value={vendorForm.notes}
+          onChange={(e) =>
+            setVendorForm({
+              ...vendorForm,
+              notes: e.target.value
+            })
+          }
+        />
+
+      </div>
+
+      <div style={s.vendorFooter}>
+
+        <button
+          style={s.stBtn}
+          onClick={() => setShowVendorModal(false)}
+        >
+          Cancel
+        </button>
+
+        <button
+          style={s.sendBtn}
+          onClick={saveVendor}
+        >
+          Save Vendor
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+)}
       {tab==="settings"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           {/* ── SETTINGS MENU ── */}
@@ -2737,7 +3234,77 @@ function getStyles(th) { return {
   settingsRowLabel:{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:2 },
   settingsRowSub: { fontSize:11, color:th.txtMuted },
   settingsArrow:  { fontSize:20, color:th.borderMid, flexShrink:0 },
-  backRowBtn:     { display:"flex", alignItems:"center", gap:8, background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:"inherit", padding:"0 0 14px 0" },
+  backRowBtn: {
+  display:"flex",
+  alignItems:"center",
+  gap:8,
+  background:"transparent",
+  border:"none",
+  color:th.accent,
+  cursor:"pointer",
+  fontSize:13,
+  fontWeight:700,
+  fontFamily:"inherit",
+  padding:"0 0 14px 0"
+},
+
+modalOverlay: {
+  position:"fixed",
+  inset:0,
+  background:"rgba(0,0,0,0.7)",
+  zIndex:9999,
+  display:"flex",
+  justifyContent:"center",
+  alignItems:"center",
+  padding:20,
+},
+
+vendorModal: {
+  width:"100%",
+  maxWidth:1200,
+  background:"#18181b",
+  borderRadius:18,
+  padding:20,
+  maxHeight:"95vh",
+  overflowY:"auto",
+},
+
+vendorHeader: {
+  display:"flex",
+  justifyContent:"space-between",
+  alignItems:"center",
+  marginBottom:20,
+},
+
+vendorTitle: {
+  fontSize:24,
+  fontWeight:700,
+  color:"#fff",
+},
+
+modalCloseBtn: {
+  width:40,
+  height:40,
+  borderRadius:10,
+  border:"none",
+  cursor:"pointer",
+  background:"#27272a",
+  color:"#fff",
+},
+
+vendorGrid: {
+  display:"grid",
+  gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",
+  gap:12,
+},
+
+vendorFooter: {
+  display:"flex",
+  justifyContent:"flex-end",
+  gap:10,
+  marginTop:20,
+},
+
 };}
 
 // Fallback styles (dark) used by components before theme prop arrives
