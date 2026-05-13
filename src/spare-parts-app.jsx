@@ -2347,6 +2347,125 @@ const startEditOrder = (order) => {
 
       </div>
     )}
+
+
+    {/* ───────── VENDORS LIST ───────── */}
+
+{vendors.length > 0 && (
+
+  <div style={{ marginTop:20 }}>
+
+    <div style={s.secTitle}>
+      Vendors
+    </div>
+
+    {vendors.map(v => (
+
+      <div
+        key={v.id}
+        style={s.card}
+      >
+
+        <div
+          style={{
+            display:"flex",
+            justifyContent:"space-between",
+            gap:12,
+            alignItems:"flex-start"
+          }}
+        >
+
+          <div style={{ flex:1 }}>
+
+            <div
+              style={{
+                fontSize:16,
+                fontWeight:700,
+                color:th.txtPrimary,
+                marginBottom:4
+              }}
+            >
+              {v.vendorName}
+            </div>
+
+            <div
+              style={{
+                fontSize:12,
+                color:"#71717a",
+                marginBottom:2
+              }}
+            >
+              Code: {v.vendorCode || "-"}
+            </div>
+
+            <div
+              style={{
+                fontSize:12,
+                color:"#71717a",
+                marginBottom:2
+              }}
+            >
+              📱 {v.mobileNumber || "-"}
+            </div>
+
+            <div
+              style={{
+                fontSize:12,
+                color:"#71717a",
+                marginBottom:2
+              }}
+            >
+              ✉️ {v.email || "-"}
+            </div>
+
+            <div
+              style={{
+                fontSize:12,
+                color:"#71717a"
+              }}
+            >
+              🏢 {v.address || "-"}
+            </div>
+
+          </div>
+
+          <div
+            style={{
+              display:"flex",
+              gap:6
+            }}
+          >
+
+            {v.mobileNumber && (
+
+              <a
+                href={`https://wa.me/${v.mobileNumber}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  ...s.waBtn,
+                  padding:"6px 10px"
+                }}
+              >
+                💬
+              </a>
+
+            )}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    ))}
+
+  </div>
+
+)}
+
+
+    
           {cos.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>🏢</div><div>{t.noCo}</div></div>}
           {cos.map(c=>(
             <div key={c.id} style={s.card}>
@@ -2391,16 +2510,15 @@ const startEditOrder = (order) => {
       <div style={s.vendorHeader}>
 
         <div style={s.vendorTitle}>
-          Create Vendor
-        </div>
+  Create Vendor
+</div>
 
-        <button
-          style={s.modalCloseBtn}
-          onClick={() => setShowVendorModal(false)}
-        >
-          ✕
-        </button>
-
+<button
+  style={s.modalCloseBtn}
+  onClick={() => setShowVendorModal(false)}
+>
+  ✕
+</button>
       </div>
 
       <div style={s.vendorGrid}>
