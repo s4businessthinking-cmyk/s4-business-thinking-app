@@ -218,6 +218,12 @@ const TR = {
     pi_totalAmount:"মোট ক্রয়",
     pi_totalPaid:"মোট পরিশোধ",
     pi_totalDue:"মোট বাকি",
+    pi_supplierInvoiceNo:"সরবরাহকারীর ইনভয়েস নং",
+    pi_supplierInvoiceNoPh:"ভেন্ডরের ইনভয়েস/চালান নম্বর",
+    pi_salePrice:"বিক্রয় মূল্য (৳)",
+    pi_salePricePh:"Sale Price",
+    pi_vat:"VAT %",
+    pi_indexErr:"⚠️ Firestore Index তৈরি করুন। Firebase Console → Firestore → Indexes এ যান।",
     pi_fullPay:"সম্পূর্ণ পরিশোধ",
     pi_cancelBtn:"🚫 বাতিল করুন",
     pi_editBtn:"✏️ এডিট",
@@ -377,6 +383,12 @@ const TR = {
     pi_totalAmount:"Total Purchase",
     pi_totalPaid:"Total Paid",
     pi_totalDue:"Total Due",
+    pi_supplierInvoiceNo:"Supplier Invoice No.",
+    pi_supplierInvoiceNoPh:"Vendor's invoice / challan number",
+    pi_salePrice:"Sale Price (৳)",
+    pi_salePricePh:"Sale Price",
+    pi_vat:"VAT %",
+    pi_indexErr:"⚠️ Firestore Index missing. Go to Firebase Console → Firestore → Indexes to create it.",
     pi_fullPay:"Full Payment",
     pi_cancelBtn:"🚫 Cancel Invoice",
     pi_editBtn:"✏️ Edit",
@@ -1020,10 +1032,10 @@ function piCalcTotals(items) {
   return { sub, disc, tax, grand };
 }
 function piEmptyLine() {
-  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"0" };
+  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
 }
 function piEmptyForm() {
-  return { invoiceDate:piToday(), vendorId:"", vendorName:"", vendorMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
+  return { invoiceDate:piToday(), supplierInvoiceNo:"", vendorId:"", vendorName:"", vendorMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
 }
 
 // ─── PI: STATUS BADGE ─────────────────────────────────────────
@@ -1125,7 +1137,11 @@ function PiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
         <div><div style={lbl}>{t.pi_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
-        <div><div style={lbl}>{t.pi_taxPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></div>
+        <div><div style={lbl}>{t.pi_vat} (default 5%)</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></div>
+      </div>
+      <div style={{ marginTop:6 }}>
+        <div style={lbl}>💰 {t.pi_salePrice}</div>
+        <input style={{ ...inp(), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder={t.pi_salePricePh} value={item.salePrice} onChange={e=>onUpdate(item.id,"salePrice",e.target.value)} />
       </div>
       <div style={{ marginTop:8, padding:"7px 10px", background:"rgba(249,115,22,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{t.pi_lineTotal}</span>
@@ -1156,7 +1172,8 @@ function PiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th }) {
       <td style={{ padding:"8px 6px", width:80 }}><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></td>
       <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitCost} onChange={e=>onUpdate(item.id,"unitCost",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:100 }}><input style={{ ...inp({ textAlign:"right" }), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder="0.00" value={item.salePrice} onChange={e=>onUpdate(item.id,"salePrice",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
         <span style={{ fontSize:13, fontWeight:700, color:total>0?"#f97316":th.txtFaint }}>৳ {piFmt2(total)}</span>
         {(piN2(item.discountPerc)>0||piN2(item.taxPerc)>0)&&(
@@ -1215,6 +1232,7 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
           <div>
             <div style={{ fontSize:22, fontWeight:900, color:"#f97316", letterSpacing:1 }}>{invoice.invoiceNo}</div>
+            {invoice.supplierInvoiceNo&&<div style={{ fontSize:12, color:"#a855f7", fontWeight:700, marginTop:2 }}>🧾 {invoice.supplierInvoiceNo}</div>}
             <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>{t.pi_date}: {invoice.invoiceDate}</div>
           </div>
           <PiStatusBadge status={invoice.status} lang={lang} />
@@ -1245,7 +1263,8 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
                   {it.code&&<span>📋 {it.code}</span>}
                   {it.brand&&<span>🏷️ {it.brand}</span>}
                   {piN2(it.discountPerc)>0&&<span style={{ color:"#ef4444" }}>Disc {it.discountPerc}% (-{piFmt2(d)})</span>}
-                  {piN2(it.taxPerc)>0&&<span style={{ color:"#06b6d4" }}>Tax {it.taxPerc}% (+{piFmt2(tx)})</span>}
+                  {piN2(it.taxPerc)>0&&<span style={{ color:"#06b6d4" }}>VAT {it.taxPerc}% (+{piFmt2(tx)})</span>}
+                  {it.salePrice>0&&<span style={{ color:"#22c55e", fontWeight:700 }}>💰 Sale: ৳{piFmt2(it.salePrice)}</span>}
                 </div>
               </div>
               <span style={{ width:60, textAlign:"center", fontSize:12, color:th.txtPrimary, flexShrink:0 }}>{it.qty} {it.unit}</span>
@@ -1314,15 +1333,26 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [piSearch,setPiSearch]       = useState("");
   const [piStatusF,setPiStatusF]     = useState("ALL");
 
-  // ── Real-time listener ──
+  // ── Real-time listener (fallback if index missing) ──
   useEffect(()=>{
     if (!shopId) return;
     setPiLoading(true);
+    let unsub2=null;
     const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
-    return onSnapshot(q,snap=>{
+    const unsub1=onSnapshot(q,snap=>{
       setInvoices(snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() })));
       setPiLoading(false);
-    },err=>{ console.error(err); setPiLoading(false); });
+    },()=>{
+      // Index নেই — orderBy ছাড়া fallback query, client-side sort
+      const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
+      unsub2=onSnapshot(q2,snap=>{
+        const docs=snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() }));
+        docs.sort((a,b)=>b.createdAt-a.createdAt);
+        setInvoices(docs);
+        setPiLoading(false);
+      },err2=>{ console.error(err2); setPiLoading(false); });
+    });
+    return ()=>{ unsub1(); unsub2&&unsub2(); };
   },[shopId]);
 
   // ── Generate invoice no ──
@@ -1350,8 +1380,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ── Open edit form ──
   const piOpenEdit = (inv) => {
     setPiInvoiceNo(inv.invoiceNo);
-    setPiForm({ invoiceDate:inv.invoiceDate, vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
-    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc||"0"), taxPerc:String(it.taxPerc||"0") })));
+    setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
+    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc||"0"), taxPerc:String(it.taxPerc||"5"), salePrice:String(it.salePrice||"") })));
     setEditInvoiceId(inv.id); setPiView("form");
   };
 
@@ -1362,7 +1392,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piDelLine=(id)=>setPiLines(p=>p.filter(it=>it.id!==id));
 
   const piSelectProduct=(prod,idx)=>{
-    setPiLines(p=>p.map((it,i)=>i===idx?{ ...it, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||it.unitCost }:it));
+    setPiLines(p=>p.map((it,i)=>i===idx?{ ...it, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||it.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||it.salePrice, taxPerc:prod.salesVat||prod.purchaseVat||it.taxPerc||"5" }:it));
     setPickerTarget(null);
   };
 
@@ -1382,11 +1412,11 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       if (!it.qty.toString().trim()||piN2(it.qty)<=0){ toast(t.pi_errQty,"err"); return null; }
       if (piN2(it.unitCost)<0){ toast(t.pi_errCost,"err"); return null; }
     }
-    const builtItems=valid.map(it=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)) }; });
+    const builtItems=valid.map(it=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null }; });
     const { sub, disc, tax, grand } = piCalcTotals(piLines);
     const paid=piN2(piForm.amountPaid), balanceDue=Math.max(0,grand-paid);
     const derivedStatus = status==="confirmed" ? (balanceDue<0.01?"paid":paid>0?"partial":"confirmed") : status;
-    return { shopId, invoiceNo:piInvoiceNo, invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+    return { shopId, invoiceNo:piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
   // ── Save ──
@@ -1514,6 +1544,10 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           </div>
         </div>
         <div style={secLbl}>🏭 {t.pi_vendor}</div>
+        <div style={{ marginBottom:10 }}>
+          <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.pi_supplierInvoiceNo}</div>
+          <input style={{ ...inp(), borderColor:"#a855f7", color:"#a855f7" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />
+        </div>
         {vendors.length>0&&(
           <select style={{ ...inp(), background:th.bgCard, marginBottom:8 }} value={piForm.vendorId} onChange={piHandleVendor}>
             <option value="">{t.pi_vendorSelect}</option>
@@ -1536,7 +1570,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
             <thead>
               <tr style={{ background:th.bgInp }}>
-                {["#",`${t.pi_itemName}`,t.pi_qty,t.pi_unit,t.pi_unitCost,t.pi_discPerc,t.pi_taxPerc,t.pi_lineTotal,""].map((h,i)=>(
+                {["#",`${t.pi_itemName}`,t.pi_qty,t.pi_unit,t.pi_unitCost,t.pi_discPerc,`VAT%`,`💰 Sale`,t.pi_lineTotal,""].map((h,i)=>(
                   <th key={i} style={{ padding:"7px 6px", fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, textAlign:i>1?"center":"left", letterSpacing:0.4 }}>{h}</th>
                 ))}
               </tr>
