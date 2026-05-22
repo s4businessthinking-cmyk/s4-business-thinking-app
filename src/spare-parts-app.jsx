@@ -160,6 +160,74 @@ const TR = {
     pmFromMaster:"📦 Product Master থেকে বেছে নিন",
     tabPurchase:"🧾 ক্রয় ইনভয়েস",
     tabVendor:"🏭 ভেন্ডর মাস্টার",
+    tabCustomer:"👥 কাস্টমার মাস্টার",
+    cm_title:"👥 কাস্টমার মাস্টার",
+    cm_new:"+ নতুন কাস্টমার",
+    cm_edit:"✏️ কাস্টমার এডিট",
+    cm_backToList:"← তালিকায় ফিরুন",
+    cm_save:"✅ সেভ করুন",
+    cm_cancel:"বাতিল",
+    cm_delete:"🗑️ মুছুন",
+    cm_confirmDelete:"এই কাস্টমারটি মুছে ফেলবেন?",
+    cm_editBtn:"✏️ এডিট",
+    cm_searchPh:"নাম, কোড, মোবাইল বা TRN খুঁজুন...",
+    cm_allStatus:"সব",
+    cm_noCustomers:"এখনো কোনো কাস্টমার নেই।",
+    cm_noResults:"কিছু পাওয়া যায়নি",
+    cm_loading:"লোড হচ্ছে...",
+    cm_saved:"✅ কাস্টমার সেভ হয়েছে!",
+    cm_updated:"✅ কাস্টমার আপডেট হয়েছে!",
+    cm_deleted:"কাস্টমার মুছে ফেলা হয়েছে।",
+    cm_errName:"কাস্টমারের নাম দিন!",
+    cm_errMobile:"মোবাইল নম্বর দিন!",
+    cm_secBasic:"📋 মূল তথ্য",
+    cm_secContact:"📱 যোগাযোগ",
+    cm_secAddress:"📍 ঠিকানা",
+    cm_secTax:"🧾 ট্যাক্স ও লাইসেন্স",
+    cm_secBank:"🏦 ব্যাংক তথ্য",
+    cm_secCredit:"💳 ক্রেডিট তথ্য",
+    cm_secSales:"💰 বিক্রয় তথ্য",
+    cm_secNotes:"📝 নোট",
+    cm_customerName:"কাস্টমারের নাম *",
+    cm_customerCode:"কাস্টমার কোড",
+    cm_customerType:"কাস্টমার ধরন",
+    cm_status:"স্ট্যাটাস",
+    cm_contactPerson:"যোগাযোগ ব্যক্তি",
+    cm_mobile:"মোবাইল নং *",
+    cm_phone:"ফোন নং",
+    cm_whatsapp:"WhatsApp নং",
+    cm_email:"ইমেইল",
+    cm_address:"ঠিকানা",
+    cm_area:"এলাকা",
+    cm_city:"শহর",
+    cm_country:"দেশ",
+    cm_mapLink:"ম্যাপ লিংক",
+    cm_trnNumber:"TRN নম্বর",
+    cm_tradeLicense:"ট্রেড লাইসেন্স নং",
+    cm_tinNumber:"TIN নম্বর",
+    cm_binNumber:"BIN নম্বর",
+    cm_vatNumber:"VAT নম্বর",
+    cm_bankName:"ব্যাংকের নাম",
+    cm_bankBranch:"শাখা",
+    cm_accountName:"অ্যাকাউন্টের নাম",
+    cm_accountNumber:"অ্যাকাউন্ট নম্বর",
+    cm_iban:"IBAN নম্বর",
+    cm_swift:"SWIFT কোড",
+    cm_creditLimit:"ক্রেডিট লিমিট (৳)",
+    cm_openingBalance:"শুরুর ব্যালেন্স (৳)",
+    cm_paymentTerms:"পেমেন্ট শর্ত (দিন)",
+    cm_discountPerc:"ডিফল্ট ছাড় (%)",
+    cm_assignedSalesman:"নির্ধারিত সেলসম্যান",
+    cm_notes:"বিশেষ নোট",
+    cm_totalCustomers:"মোট কাস্টমার",
+    cm_activeCustomers:"সক্রিয়",
+    cm_totalCreditLimit:"মোট ক্রেডিট লিমিট",
+    cm_cashCustomer:"নগদ",
+    cm_creditCustomer:"ক্রেডিট",
+    cm_types:["রিটেইল","হোলসেল","কর্পোরেট","VIP","সরকারি","প্রজেক্ট","অন্যান্য"],
+    cm_paymentType:"পেমেন্ট ধরন",
+    cm_cash:"নগদ গ্রাহক",
+    cm_credit:"ক্রেডিট গ্রাহক",
     vm_title:"🏭 ভেন্ডর মাস্টার",
     vm_new:"+ নতুন ভেন্ডর",
     vm_edit:"✏️ ভেন্ডর এডিট",
@@ -408,6 +476,74 @@ const TR = {
     pmFromMaster:"📦 Select from Product Master",
     tabPurchase:"🧾 Purchase Invoice",
     tabVendor:"🏭 Vendor Master",
+    tabCustomer:"👥 Customer Master",
+    cm_title:"👥 Customer Master",
+    cm_new:"+ New Customer",
+    cm_edit:"✏️ Edit Customer",
+    cm_backToList:"← Back to List",
+    cm_save:"✅ Save",
+    cm_cancel:"Cancel",
+    cm_delete:"🗑️ Delete",
+    cm_confirmDelete:"Delete this customer?",
+    cm_editBtn:"✏️ Edit",
+    cm_searchPh:"Search by name, code, mobile or TRN...",
+    cm_allStatus:"All",
+    cm_noCustomers:"No customers yet. Add your first customer.",
+    cm_noResults:"No results found",
+    cm_loading:"Loading...",
+    cm_saved:"✅ Customer saved!",
+    cm_updated:"✅ Customer updated!",
+    cm_deleted:"Customer deleted.",
+    cm_errName:"Enter customer name!",
+    cm_errMobile:"Enter mobile number!",
+    cm_secBasic:"📋 Basic Info",
+    cm_secContact:"📱 Contact",
+    cm_secAddress:"📍 Address",
+    cm_secTax:"🧾 Tax & License",
+    cm_secBank:"🏦 Bank Info",
+    cm_secCredit:"💳 Credit Info",
+    cm_secSales:"💰 Sales Info",
+    cm_secNotes:"📝 Notes",
+    cm_customerName:"Customer Name *",
+    cm_customerCode:"Customer Code",
+    cm_customerType:"Customer Type",
+    cm_status:"Status",
+    cm_contactPerson:"Contact Person",
+    cm_mobile:"Mobile No. *",
+    cm_phone:"Phone No.",
+    cm_whatsapp:"WhatsApp No.",
+    cm_email:"Email",
+    cm_address:"Address",
+    cm_area:"Area",
+    cm_city:"City",
+    cm_country:"Country",
+    cm_mapLink:"Map Link",
+    cm_trnNumber:"TRN Number",
+    cm_tradeLicense:"Trade License No.",
+    cm_tinNumber:"TIN Number",
+    cm_binNumber:"BIN Number",
+    cm_vatNumber:"VAT Number",
+    cm_bankName:"Bank Name",
+    cm_bankBranch:"Branch",
+    cm_accountName:"Account Name",
+    cm_accountNumber:"Account Number",
+    cm_iban:"IBAN Number",
+    cm_swift:"SWIFT Code",
+    cm_creditLimit:"Credit Limit (৳)",
+    cm_openingBalance:"Opening Balance (৳)",
+    cm_paymentTerms:"Payment Terms (Days)",
+    cm_discountPerc:"Default Discount (%)",
+    cm_assignedSalesman:"Assigned Salesman",
+    cm_notes:"Special Notes",
+    cm_totalCustomers:"Total Customers",
+    cm_activeCustomers:"Active",
+    cm_totalCreditLimit:"Total Credit Limit",
+    cm_cashCustomer:"Cash",
+    cm_creditCustomer:"Credit",
+    cm_types:["Retail","Wholesale","Corporate","VIP","Government","Project","Other"],
+    cm_paymentType:"Payment Type",
+    cm_cash:"Cash Customer",
+    cm_credit:"Credit Customer",
     vm_title:"🏭 Vendor Master",
     vm_new:"+ New Vendor",
     vm_edit:"✏️ Edit Vendor",
@@ -1936,6 +2072,514 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
   );
 }
 
+// ─── CUSTOMER MASTER WINDOW ───────────────────────────────────
+const CM_STATUS = {
+  active:   { bn:"সক্রিয়",   en:"Active",   color:"#22c55e", bg:"#052e16" },
+  inactive: { bn:"নিষ্ক্রিয়", en:"Inactive", color:"#f59e0b", bg:"#451a03" },
+  blocked:  { bn:"ব্লক করা",  en:"Blocked",  color:"#ef4444", bg:"#450a0a" },
+};
+const CM_PAY = {
+  cash:   { bn:"নগদ",         en:"Cash",   color:"#22c55e", icon:"💵" },
+  credit: { bn:"ক্রেডিট",    en:"Credit", color:"#f97316", icon:"📅" },
+};
+
+const emptyCustomer = {
+  customerName:"", customerCode:"", customerType:"", status:"active",
+  paymentType:"cash",
+  contactPerson:"",
+  mobileNumber:"", phoneNumber:"", whatsappNumber:"", email:"",
+  address:"", area:"", city:"", country:"", mapLink:"",
+  trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
+  bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
+  creditLimit:"", openingBalance:"", paymentTerms:"",
+  discountPerc:"", assignedSalesman:"",
+  notes:"",
+};
+
+function CmStatusBadge({ status, lang }) {
+  const st = CM_STATUS[status]||CM_STATUS.active;
+  return <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, color:st.color, background:st.bg, whiteSpace:"nowrap" }}>{st[lang]}</span>;
+}
+
+function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toast, isDesktop }) {
+  const [cmView,setCmView]             = useState("list");
+  const [selCustomer,setSelCustomer]   = useState(null);
+  const [editCustomerId,setEditCustomerId] = useState(null);
+  const [cmForm,setCmForm]             = useState({...emptyCustomer});
+  const [cmSaving,setCmSaving]         = useState(false);
+  const [cmSearch,setCmSearch]         = useState("");
+  const [cmStatusF,setCmStatusF]       = useState("ALL");
+  const [cmPayF,setCmPayF]             = useState("ALL"); // ALL|cash|credit
+
+  const upd = (k,v) => setCmForm(p=>({...p,[k]:v}));
+
+  const panel = isDesktop
+    ? {maxWidth:860,margin:"0 auto",padding:"24px 28px 80px"}
+    : {maxWidth:640,margin:"0 auto",padding:"16px 14px 80px"};
+
+  const inp = (ex={}) => ({
+    padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`,
+    background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none",
+    width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...ex,
+  });
+  const taStyle = { ...inp(), minHeight:52, resize:"none", overflow:"hidden", lineHeight:1.6 };
+  const secLbl = (icon, label) => (
+    <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase",
+      letterSpacing:0.5, padding:"8px 0 8px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>
+      {icon} {label}
+    </div>
+  );
+  const fw = (label, node, full=false) => (
+    <div style={{ gridColumn:full?"1/-1":"auto" }}>
+      <div style={{ fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4 }}>{label}</div>
+      {node}
+    </div>
+  );
+  const grid2 = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:4 };
+  const card  = { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 };
+
+  // ── filter ──
+  const cmFiltered = customers.filter(c=>{
+    const matchSt  = cmStatusF==="ALL" || c.status===cmStatusF;
+    const matchPay = cmPayF==="ALL"    || c.paymentType===cmPayF;
+    const hay = [c.customerName,c.customerCode,c.mobileNumber,c.trnNumber,c.city,c.contactPerson,c.email].filter(Boolean).join(" ");
+    return matchSt && matchPay && nsmatch(hay, cmSearch.trim());
+  });
+
+  const kpi = {
+    total:  customers.length,
+    active: customers.filter(c=>c.status==="active").length,
+    credit: customers.filter(c=>c.paymentType==="credit").length,
+    totalCL: customers.reduce((s,c)=>s+(c.creditLimit||0),0),
+  };
+
+  // ── save ──
+  const cmSave = async () => {
+    if (!cmForm.customerName.trim()) { toast(t.cm_errName,"err"); return; }
+    if (!cmForm.mobileNumber.trim()) { toast(t.cm_errMobile,"err"); return; }
+    setCmSaving(true);
+    const payload = {
+      shopId, updatedBy:user.uid, updatedAt:serverTimestamp(),
+      customerName:cmForm.customerName.trim(), customerCode:cmForm.customerCode.trim(),
+      customerType:cmForm.customerType||"", status:cmForm.status||"active",
+      paymentType:cmForm.paymentType||"cash",
+      contactPerson:cmForm.contactPerson.trim(),
+      mobileNumber:cmForm.mobileNumber.trim(), phoneNumber:cmForm.phoneNumber.trim(),
+      whatsappNumber:cmForm.whatsappNumber.trim(), email:cmForm.email.trim(),
+      address:cmForm.address.trim(), area:cmForm.area.trim(),
+      city:cmForm.city.trim(), country:cmForm.country.trim(), mapLink:cmForm.mapLink.trim(),
+      trnNumber:cmForm.trnNumber.trim(), tradeLicenseNumber:cmForm.tradeLicenseNumber.trim(),
+      tinNumber:cmForm.tinNumber.trim(), binNumber:cmForm.binNumber.trim(), vatNumber:cmForm.vatNumber.trim(),
+      bankName:cmForm.bankName.trim(), bankBranch:cmForm.bankBranch.trim(),
+      accountName:cmForm.accountName.trim(), accountNumber:cmForm.accountNumber.trim(),
+      ibanNumber:cmForm.ibanNumber.trim(), swiftCode:cmForm.swiftCode.trim(),
+      creditLimit:Number(cmForm.creditLimit||0),
+      openingBalance:Number(cmForm.openingBalance||0),
+      paymentTerms:Number(cmForm.paymentTerms||0),
+      discountPerc:Number(cmForm.discountPerc||0),
+      assignedSalesman:cmForm.assignedSalesman.trim(),
+      notes:cmForm.notes.trim(),
+    };
+    try {
+      if (editCustomerId) {
+        await updateDoc(doc(db,"customers",editCustomerId),payload);
+        toast(t.cm_updated);
+        const updated = {...payload, id:editCustomerId};
+        setSelCustomer(updated);
+        setCmView("detail");
+      } else {
+        const ref = await addDoc(collection(db,"customers"),{...payload,createdBy:user.uid,createdAt:serverTimestamp()});
+        toast(t.cm_saved);
+        setSelCustomer({...payload, id:ref.id});
+        setCmView("detail");
+      }
+      setCmForm({...emptyCustomer});
+      setEditCustomerId(null);
+    } catch(e) { toast(e.message,"err"); }
+    finally { setCmSaving(false); }
+  };
+
+  const cmDelete = async (c) => {
+    if (!window.confirm(t.cm_confirmDelete)) return;
+    try {
+      await deleteDoc(doc(db,"customers",c.id));
+      toast(t.cm_deleted,"err");
+      setCmView("list"); setSelCustomer(null);
+    } catch(e) { toast(e.message,"err"); }
+  };
+
+  const openEdit = (c) => {
+    setCmForm({
+      customerName:c.customerName||"", customerCode:c.customerCode||"",
+      customerType:c.customerType||"", status:c.status||"active",
+      paymentType:c.paymentType||"cash",
+      contactPerson:c.contactPerson||"",
+      mobileNumber:c.mobileNumber||"", phoneNumber:c.phoneNumber||"",
+      whatsappNumber:c.whatsappNumber||"", email:c.email||"",
+      address:c.address||"", area:c.area||"", city:c.city||"",
+      country:c.country||"", mapLink:c.mapLink||"",
+      trnNumber:c.trnNumber||"", tradeLicenseNumber:c.tradeLicenseNumber||"",
+      tinNumber:c.tinNumber||"", binNumber:c.binNumber||"", vatNumber:c.vatNumber||"",
+      bankName:c.bankName||"", bankBranch:c.bankBranch||"",
+      accountName:c.accountName||"", accountNumber:c.accountNumber||"",
+      ibanNumber:c.ibanNumber||"", swiftCode:c.swiftCode||"",
+      creditLimit:String(c.creditLimit||""), openingBalance:String(c.openingBalance||""),
+      paymentTerms:String(c.paymentTerms||""), discountPerc:String(c.discountPerc||""),
+      assignedSalesman:c.assignedSalesman||"", notes:c.notes||"",
+    });
+    setEditCustomerId(c.id);
+    setCmView("form");
+  };
+
+  // ══════ LIST VIEW ══════
+  if (cmView==="list") return (
+    <div style={panel}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.cm_title}</div>
+        <button onClick={()=>{ setCmForm({...emptyCustomer}); setEditCustomerId(null); setCmView("form"); }}
+          style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+          {t.cm_new}
+        </button>
+      </div>
+
+      {/* KPI */}
+      {customers.length>0&&(
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:14 }}>
+          {[
+            { l:t.cm_totalCustomers, v:kpi.total,  c:"#a1a1aa" },
+            { l:t.cm_activeCustomers,v:kpi.active, c:"#22c55e" },
+            { l:lang==="bn"?"ক্রেডিট":"Credit",   v:kpi.credit,c:"#f97316" },
+            { l:lang==="bn"?"মোট ক্রেডিট":"Total CL", v:`৳${Math.round(kpi.totalCL/1000)}k`, c:"#06b6d4" },
+          ].map((k,i)=>(
+            <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
+              <div style={{ fontSize:15, fontWeight:900, color:k.c }}>{k.v}</div>
+              <div style={{ fontSize:8, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2, letterSpacing:0.3 }}>{k.l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Search */}
+      <div style={{ position:"relative", marginBottom:10 }}>
+        <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+        <input style={{ ...inp(), paddingLeft:38, background:th.bgCard }} placeholder={t.cm_searchPh}
+          value={cmSearch} onChange={e=>setCmSearch(e.target.value)} />
+        {cmSearch&&<button onClick={()=>setCmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16 }}>✕</button>}
+      </div>
+
+      {/* Filter pills */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:12 }}>
+        {/* Status */}
+        {["ALL","active","inactive","blocked"].map(st=>(
+          <button key={st} onClick={()=>setCmStatusF(st)} style={{ padding:"5px 12px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit", background:cmStatusF===st?"#f97316":"transparent", borderColor:cmStatusF===st?"#f97316":th.borderMid, color:cmStatusF===st?"#fff":th.txtMuted }}>
+            {st==="ALL"?t.cm_allStatus:(CM_STATUS[st]?.[lang]||st)}
+          </button>
+        ))}
+        <div style={{ width:1, background:th.border, margin:"0 4px" }} />
+        {/* Payment type */}
+        {["ALL","cash","credit"].map(pt=>(
+          <button key={pt} onClick={()=>setCmPayF(pt)} style={{ padding:"5px 12px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit", background:cmPayF===pt?(pt==="cash"?"#22c55e":pt==="credit"?"#f97316":"#6366f1"):"transparent", borderColor:cmPayF===pt?"transparent":th.borderMid, color:cmPayF===pt?"#fff":th.txtMuted }}>
+            {pt==="ALL"?(lang==="bn"?"সব ধরন":"All Types"):CM_PAY[pt]?.[lang]}
+          </button>
+        ))}
+      </div>
+
+      {/* Empty */}
+      {customers.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>👥</div><div>{t.cm_noCustomers}</div></div>}
+      {customers.length>0&&cmFiltered.length===0&&<div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.cm_noResults}</div></div>}
+
+      {/* Customer cards */}
+      {cmFiltered.map(c=>(
+        <div key={c.id} onClick={()=>{ setSelCustomer(c); setCmView("detail"); }}
+          style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
+          onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:5 }}>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:14, fontWeight:800, color:th.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{c.customerName}</div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:3, alignItems:"center" }}>
+                {c.customerCode&&<span style={{ fontSize:11, color:"#a1a1aa", fontFamily:"monospace" }}>#{c.customerCode}</span>}
+                {c.customerType&&<span style={{ fontSize:10, color:th.txtFaint, background:th.bgInp, padding:"1px 7px", borderRadius:10 }}>{c.customerType}</span>}
+                <span style={{ fontSize:11, fontWeight:700, color:CM_PAY[c.paymentType||"cash"]?.color }}>
+                  {CM_PAY[c.paymentType||"cash"]?.icon} {CM_PAY[c.paymentType||"cash"]?.[lang]}
+                </span>
+              </div>
+            </div>
+            <CmStatusBadge status={c.status||"active"} lang={lang} />
+          </div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginTop:5 }}>
+            {c.mobileNumber&&<span style={{ fontSize:12, color:th.txtMuted }}>📱 {c.mobileNumber}</span>}
+            {c.city&&<span style={{ fontSize:12, color:th.txtMuted }}>📍 {c.city}</span>}
+            {c.trnNumber&&<span style={{ fontSize:11, color:"#f59e0b", fontFamily:"monospace" }}>TRN: {c.trnNumber}</span>}
+            {c.paymentType==="credit"&&c.creditLimit>0&&<span style={{ fontSize:12, color:"#f97316", fontWeight:700 }}>💳 ৳{c.creditLimit.toLocaleString()}</span>}
+            {c.discountPerc>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>🏷️ {c.discountPerc}% off</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // ══════ DETAIL VIEW ══════
+  if (cmView==="detail"&&selCustomer) {
+    const c = customers.find(x=>x.id===selCustomer.id)||selCustomer;
+    const dr = { display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
+    const row = (label, val, color=th.txtPrimary) => val ? (
+      <div style={dr}>
+        <span style={{ fontSize:12, color:th.txtMuted, flexShrink:0, width:140 }}>{label}</span>
+        <span style={{ fontSize:13, fontWeight:600, color, textAlign:"right", wordBreak:"break-word", maxWidth:"58%" }}>{val}</span>
+      </div>
+    ) : null;
+    return (
+      <div style={panel}>
+        <button onClick={()=>{ setCmView("list"); setSelCustomer(null); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.cm_backToList}</button>
+
+        {/* Header */}
+        <div style={card}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+            <div>
+              <div style={{ fontSize:20, fontWeight:900, color:th.txtPrimary }}>{c.customerName}</div>
+              <div style={{ display:"flex", gap:8, marginTop:4, flexWrap:"wrap", alignItems:"center" }}>
+                {c.customerCode&&<span style={{ fontSize:12, color:"#a1a1aa", fontFamily:"monospace" }}>#{c.customerCode}</span>}
+                {c.customerType&&<span style={{ fontSize:11, color:th.txtFaint, background:th.bgInp, padding:"2px 8px", borderRadius:10 }}>{c.customerType}</span>}
+                <span style={{ fontSize:12, fontWeight:700, color:CM_PAY[c.paymentType||"cash"]?.color, background:`${CM_PAY[c.paymentType||"cash"]?.color}15`, padding:"2px 10px", borderRadius:10 }}>
+                  {CM_PAY[c.paymentType||"cash"]?.icon} {CM_PAY[c.paymentType||"cash"]?.[lang]}
+                </span>
+              </div>
+            </div>
+            <CmStatusBadge status={c.status||"active"} lang={lang} />
+          </div>
+          {row(t.cm_contactPerson, c.contactPerson)}
+          {row(t.cm_mobile, c.mobileNumber, "#06b6d4")}
+          {row(t.cm_phone, c.phoneNumber)}
+          {row(t.cm_whatsapp, c.whatsappNumber, "#22c55e")}
+          {row(t.cm_email, c.email)}
+        </div>
+
+        {/* Credit box — featured prominently */}
+        {(c.paymentType==="credit"||c.creditLimit>0)&&(
+          <div style={{ background:"linear-gradient(135deg,rgba(249,115,22,0.1),rgba(249,115,22,0.04))", border:"1.5px solid #f97316", borderRadius:14, padding:"14px 16px", marginBottom:12 }}>
+            <div style={{ fontSize:10, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>💳 {t.cm_secCredit}</div>
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+              <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
+                <div style={{ fontSize:16, fontWeight:900, color:"#f97316" }}>৳{(c.creditLimit||0).toLocaleString()}</div>
+                <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{t.cm_creditLimit}</div>
+              </div>
+              <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
+                <div style={{ fontSize:16, fontWeight:900, color:"#22c55e" }}>৳{(c.openingBalance||0).toLocaleString()}</div>
+                <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{t.cm_openingBalance}</div>
+              </div>
+              <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
+                <div style={{ fontSize:16, fontWeight:900, color:"#06b6d4" }}>{c.paymentTerms||0} {lang==="bn"?"দিন":"Days"}</div>
+                <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{t.cm_paymentTerms}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Address */}
+        {(c.address||c.city||c.country||c.mapLink)&&(
+          <div style={card}>
+            {secLbl("📍", t.cm_secAddress)}
+            {row(t.cm_address, c.address)}
+            {row(t.cm_area, c.area)}
+            {row(t.cm_city, c.city)}
+            {row(t.cm_country, c.country)}
+            {c.mapLink&&<div style={{ display:"flex", justifyContent:"space-between", padding:"8px 0" }}>
+              <span style={{ fontSize:12, color:th.txtMuted }}>{t.cm_mapLink}</span>
+              <a href={c.mapLink} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:"#6366f1" }}>🗺️ {lang==="bn"?"ম্যাপ দেখুন":"View Map"}</a>
+            </div>}
+          </div>
+        )}
+
+        {/* Tax */}
+        {(c.trnNumber||c.tradeLicenseNumber||c.tinNumber||c.binNumber||c.vatNumber)&&(
+          <div style={card}>
+            {secLbl("🧾", t.cm_secTax)}
+            {row(t.cm_trnNumber, c.trnNumber, "#f59e0b")}
+            {row(t.cm_tradeLicense, c.tradeLicenseNumber)}
+            {row(t.cm_tinNumber, c.tinNumber)}
+            {row(t.cm_binNumber, c.binNumber)}
+            {row(t.cm_vatNumber, c.vatNumber)}
+          </div>
+        )}
+
+        {/* Bank */}
+        {(c.bankName||c.accountNumber||c.ibanNumber)&&(
+          <div style={card}>
+            {secLbl("🏦", t.cm_secBank)}
+            {row(t.cm_bankName, c.bankName)}
+            {row(t.cm_bankBranch, c.bankBranch)}
+            {row(t.cm_accountName, c.accountName)}
+            {row(t.cm_accountNumber, c.accountNumber, "#06b6d4")}
+            {row(t.cm_iban, c.ibanNumber)}
+            {row(t.cm_swift, c.swiftCode)}
+          </div>
+        )}
+
+        {/* Sales info */}
+        {(c.discountPerc>0||c.assignedSalesman)&&(
+          <div style={card}>
+            {secLbl("💰", t.cm_secSales)}
+            {c.discountPerc>0&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{t.cm_discountPerc}</span><span style={{ fontSize:16, fontWeight:800, color:"#22c55e" }}>{c.discountPerc}%</span></div>}
+            {row(t.cm_assignedSalesman, c.assignedSalesman)}
+          </div>
+        )}
+
+        {/* Notes */}
+        {c.notes&&(
+          <div style={{ ...card, borderLeft:"3px solid #f97316" }}>
+            <div style={{ fontSize:10, color:"#f97316", fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>📝 {t.cm_secNotes}</div>
+            <div style={{ fontSize:13, color:th.txtSecondary, lineHeight:1.7 }}>{c.notes}</div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <button onClick={()=>openEdit(c)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.cm_editBtn}</button>
+          <button onClick={()=>cmDelete(c)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.cm_delete}</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════ FORM VIEW ══════
+  return (
+    <div style={panel}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <button onClick={()=>setCmView(editCustomerId?"detail":"list")} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.cm_backToList}</button>
+        <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{editCustomerId?t.cm_edit:t.cm_new}</div>
+      </div>
+
+      {/* Section 1: Basic + Payment Type */}
+      <div style={card}>
+        {secLbl("📋", t.cm_secBasic)}
+
+        {/* Cash / Credit toggle — prominent */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
+          {["cash","credit"].map(pt=>(
+            <button key={pt} onClick={()=>upd("paymentType",pt)} style={{ padding:"14px 10px", borderRadius:12, cursor:"pointer", fontFamily:"inherit", border:`2px solid ${cmForm.paymentType===pt?CM_PAY[pt].color:th.borderMid}`, background:cmForm.paymentType===pt?`${CM_PAY[pt].color}18`:"transparent", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+              <span style={{ fontSize:24 }}>{CM_PAY[pt].icon}</span>
+              <span style={{ fontSize:13, fontWeight:800, color:cmForm.paymentType===pt?CM_PAY[pt].color:th.txtMuted }}>{CM_PAY[pt][lang]}</span>
+              <span style={{ fontSize:10, color:th.txtFaint }}>{pt==="cash"?(lang==="bn"?"নগদে পেমেন্ট":"Pay on delivery"):(lang==="bn"?"বাকিতে বিক্রি":"Sell on credit")}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={grid2}>
+          {fw(t.cm_customerName, <input style={inp()} placeholder={lang==="bn"?"কাস্টমারের নাম...":"Customer name..."} value={cmForm.customerName} onChange={e=>upd("customerName",e.target.value)} />, false)}
+          {fw(t.cm_customerCode, <input style={inp()} placeholder="C-001" value={cmForm.customerCode} onChange={e=>upd("customerCode",e.target.value)} />)}
+          {fw(t.cm_customerType,
+            <select style={{ ...inp(), background:th.bgCard }} value={cmForm.customerType} onChange={e=>upd("customerType",e.target.value)}>
+              <option value="">{lang==="bn"?"ধরন বেছে নিন":"Select type"}</option>
+              {(t.cm_types||[]).map((c,i)=><option key={i} value={c}>{c}</option>)}
+            </select>
+          )}
+          {fw(t.cm_status,
+            <select style={{ ...inp(), background:th.bgCard }} value={cmForm.status} onChange={e=>upd("status",e.target.value)}>
+              <option value="active">{CM_STATUS.active[lang]}</option>
+              <option value="inactive">{CM_STATUS.inactive[lang]}</option>
+              <option value="blocked">{CM_STATUS.blocked[lang]}</option>
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Section 2: Contact */}
+      <div style={card}>
+        {secLbl("📱", t.cm_secContact)}
+        <div style={grid2}>
+          {fw(t.cm_contactPerson, <input style={inp()} placeholder={lang==="bn"?"যোগাযোগ ব্যক্তির নাম":"Contact person"} value={cmForm.contactPerson} onChange={e=>upd("contactPerson",e.target.value)} />, false)}
+          {fw(t.cm_mobile, <input style={inp()} inputMode="tel" placeholder="017XXXXXXXX" value={cmForm.mobileNumber} onChange={e=>upd("mobileNumber",e.target.value)} />)}
+          {fw(t.cm_phone, <input style={inp()} inputMode="tel" placeholder="02XXXXXXXX" value={cmForm.phoneNumber} onChange={e=>upd("phoneNumber",e.target.value)} />)}
+          {fw(t.cm_whatsapp, <input style={inp()} inputMode="tel" placeholder="017XXXXXXXX" value={cmForm.whatsappNumber} onChange={e=>upd("whatsappNumber",e.target.value)} />)}
+          {fw(t.cm_email, <input style={inp()} inputMode="email" placeholder="customer@email.com" value={cmForm.email} onChange={e=>upd("email",e.target.value)} />, false)}
+        </div>
+      </div>
+
+      {/* Section 3: Address */}
+      <div style={card}>
+        {secLbl("📍", t.cm_secAddress)}
+        <div style={{ marginBottom:10 }}>
+          {fw(t.cm_address, <AutoTA style={taStyle} placeholder={lang==="bn"?"সম্পূর্ণ ঠিকানা...":"Full address..."} value={cmForm.address} onChange={e=>upd("address",e.target.value)} />, true)}
+        </div>
+        <div style={grid2}>
+          {fw(t.cm_area,    <input style={inp()} placeholder={lang==="bn"?"এলাকা":"Area"} value={cmForm.area}    onChange={e=>upd("area",e.target.value)} />)}
+          {fw(t.cm_city,    <input style={inp()} placeholder={lang==="bn"?"শহর":"City"} value={cmForm.city}    onChange={e=>upd("city",e.target.value)} />)}
+          {fw(t.cm_country, <input style={inp()} placeholder="Bangladesh..." value={cmForm.country} onChange={e=>upd("country",e.target.value)} />)}
+          {fw(t.cm_mapLink, <input style={inp()} placeholder="https://maps.google.com/..." value={cmForm.mapLink} onChange={e=>upd("mapLink",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 4: Tax */}
+      <div style={card}>
+        {secLbl("🧾", t.cm_secTax)}
+        <div style={grid2}>
+          {fw(t.cm_trnNumber,    <input style={{ ...inp(), borderColor:"#f59e0b", fontFamily:"monospace" }} placeholder="100XXXXXXXXX" value={cmForm.trnNumber} onChange={e=>upd("trnNumber",e.target.value)} />, false)}
+          {fw(t.cm_tradeLicense, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="TL-XXXXXXXX" value={cmForm.tradeLicenseNumber} onChange={e=>upd("tradeLicenseNumber",e.target.value)} />)}
+          {fw(t.cm_tinNumber,    <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="TIN Number" value={cmForm.tinNumber} onChange={e=>upd("tinNumber",e.target.value)} />)}
+          {fw(t.cm_binNumber,    <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="BIN Number" value={cmForm.binNumber} onChange={e=>upd("binNumber",e.target.value)} />)}
+          {fw(t.cm_vatNumber,    <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="VAT Number" value={cmForm.vatNumber} onChange={e=>upd("vatNumber",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 5: Bank */}
+      <div style={card}>
+        {secLbl("🏦", t.cm_secBank)}
+        <div style={grid2}>
+          {fw(t.cm_bankName,      <input style={inp()} placeholder={lang==="bn"?"ব্যাংকের নাম":"Bank name"} value={cmForm.bankName} onChange={e=>upd("bankName",e.target.value)} />)}
+          {fw(t.cm_bankBranch,    <input style={inp()} placeholder={lang==="bn"?"শাখা":"Branch"} value={cmForm.bankBranch} onChange={e=>upd("bankBranch",e.target.value)} />)}
+          {fw(t.cm_accountName,   <input style={inp()} placeholder={lang==="bn"?"অ্যাকাউন্টের নাম":"Account name"} value={cmForm.accountName} onChange={e=>upd("accountName",e.target.value)} />, false)}
+          {fw(t.cm_accountNumber, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="Account number" value={cmForm.accountNumber} onChange={e=>upd("accountNumber",e.target.value)} />)}
+          {fw(t.cm_iban,  <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="AE070331234567890123456" value={cmForm.ibanNumber} onChange={e=>upd("ibanNumber",e.target.value)} />, false)}
+          {fw(t.cm_swift, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="BOMLAEADXXX" value={cmForm.swiftCode} onChange={e=>upd("swiftCode",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 6: Credit — only show if credit customer */}
+      {cmForm.paymentType==="credit"&&(
+        <div style={{ ...card, border:"1.5px solid #f97316" }}>
+          {secLbl("💳", t.cm_secCredit)}
+          <div style={grid2}>
+            {fw(t.cm_creditLimit,    <input style={{ ...inp(), borderColor:"#f97316" }} inputMode="numeric" placeholder="50000" value={cmForm.creditLimit} onChange={e=>upd("creditLimit",e.target.value)} />)}
+            {fw(t.cm_openingBalance, <input style={inp()} inputMode="numeric" placeholder="0" value={cmForm.openingBalance} onChange={e=>upd("openingBalance",e.target.value)} />)}
+            {fw(t.cm_paymentTerms,   <input style={inp()} inputMode="numeric" placeholder="30" value={cmForm.paymentTerms} onChange={e=>upd("paymentTerms",e.target.value)} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Section 7: Sales */}
+      <div style={card}>
+        {secLbl("💰", t.cm_secSales)}
+        <div style={grid2}>
+          {fw(t.cm_discountPerc, <input style={inp()} inputMode="numeric" placeholder="0" value={cmForm.discountPerc} onChange={e=>upd("discountPerc",e.target.value)} />)}
+          {fw(t.cm_assignedSalesman,
+            <select style={{ ...inp(), background:th.bgCard }} value={cmForm.assignedSalesman} onChange={e=>upd("assignedSalesman",e.target.value)}>
+              <option value="">{lang==="bn"?"সেলসম্যান বেছে নিন":"Select salesman"}</option>
+              {(team||[]).map(m=><option key={m.id} value={m.personName}>{m.personName} ({m.position||"Staff"})</option>)}
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Section 8: Notes */}
+      <div style={{ ...card, marginBottom:16 }}>
+        {secLbl("📝", t.cm_secNotes)}
+        <AutoTA style={taStyle} placeholder={lang==="bn"?"যেকোনো বিশেষ নোট...":"Any special notes..."} value={cmForm.notes} onChange={e=>upd("notes",e.target.value)} />
+      </div>
+
+      {/* Buttons */}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <button onClick={cmSave} disabled={cmSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:cmSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:15, fontWeight:800, cursor:cmSaving?"not-allowed":"pointer" }}>
+          {cmSaving?"...":t.cm_save}
+        </button>
+        <button onClick={()=>setCmView(editCustomerId?"detail":"list")} style={{ padding:"12px", borderRadius:12, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+          {t.cm_cancel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── PI: SUPPLIER LEDGER ──────────────────────────────────────
 function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
   const [selVendor,setSelVendor] = useState(null);
@@ -2652,6 +3296,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [showAdd,setShowAdd]=useState(false);
   const [copyState,setCopyState]=useState(false);
   const [vendors, setVendors] = useState([]);
+  const [customers, setCustomers] = useState([]);
 const [showVendorModal, setShowVendorModal] = useState(false);
 
 const [vendorForm, setVendorForm] = useState(emptyVendor);
@@ -2693,30 +3338,51 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   },[shopId]);
   
   useEffect(() => {
-  if (!shopId) return;
+    if (!shopId) return;
+    let unsub2 = null;
+    // orderBy("vendorName") needs Firestore index — fallback if missing
+    const unsub1 = onSnapshot(
+      query(collection(db,"vendors"), where("shopId","==",shopId), orderBy("vendorName")),
+      (snap) => {
+        setVendors(snap.docs.map(d => ({ id:d.id, ...d.data() })));
+      },
+      () => {
+        // fallback: no orderBy, sort client-side
+        unsub2 = onSnapshot(
+          query(collection(db,"vendors"), where("shopId","==",shopId)),
+          (snap) => {
+            const docs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+            docs.sort((a,b) => (a.vendorName||"").localeCompare(b.vendorName||""));
+            setVendors(docs);
+          },
+          (err) => console.error("vendors listener error:", err)
+        );
+      }
+    );
+    return () => { unsub1(); unsub2 && unsub2(); };
+  }, [shopId]);
 
-  return onSnapshot(
-    query(
-      collection(db, "vendors"),
-      where("shopId", "==", shopId),
-      orderBy("vendorName")
-    ),
-    (snap) => {
-      setVendors(
-        snap.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }))
-      );
-    },
-    (err) => console.error(err)
-  );
-
-}, [shopId]);
-
+  // ── Customers real-time listener ──
   useEffect(() => {
-    return onSnapshot(
-      query(collection(db,"users"), where("shopId","==",shopId)),
+    if (!shopId) return;
+    let unsub2 = null;
+    const unsub1 = onSnapshot(
+      query(collection(db,"customers"), where("shopId","==",shopId), orderBy("customerName")),
+      (snap) => setCustomers(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      () => {
+        unsub2 = onSnapshot(
+          query(collection(db,"customers"), where("shopId","==",shopId)),
+          (snap) => {
+            const docs = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+            docs.sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
+            setCustomers(docs);
+          },
+          (err) => console.error("customers listener:", err)
+        );
+      }
+    );
+    return () => { unsub1(); unsub2 && unsub2(); };
+  }, [shopId]);
       snap => setTeam(snap.docs.map(d=>({...d.data(),id:d.id}))),
       err  => console.error(err)
     );
@@ -3197,7 +3863,7 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["vendors",t.tabVendor],["settings",t.tabSettings]]
+    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["vendors",t.tabVendor],["customers",t.tabCustomer],["settings",t.tabSettings]]
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
@@ -4485,6 +5151,15 @@ const startEditOrder = (order) => {
   </div>
 
 )}
+      {isOwner&&tab==="customers"&&(
+        <CustomerMasterWindow
+          t={t} lang={lang} th={th}
+          shopId={shopId} user={user}
+          customers={customers} team={team}
+          toast={toast} isDesktop={isDesktop}
+        />
+      )}
+
       {isOwner&&tab==="vendors"&&(
         <VendorMasterWindow
           t={t} lang={lang} th={th}
