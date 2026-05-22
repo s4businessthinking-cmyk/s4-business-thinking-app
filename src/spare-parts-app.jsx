@@ -3758,7 +3758,17 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siDelLine=(id)=>setSiLines(p=>p.filter(it=>it.id!==id));
 
   const siSelectProduct=(prod,idx)=>{
-    setSiLines(p=>p.map((it,i)=>i===idx?{ ...it, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitPrice:prod.vatInclusive||prod.vatExclusive||prod.mrp||it.unitPrice, vatPerc:prod.salesVat||"5" }:it));
+    setSiLines(p=>p.map((it,i)=>i===idx?{
+      ...it,
+      productId: prod.id,
+      name:      prod.name,
+      code:      prod.code||prod.barcode||"",
+      brand:     prod.brand||"",
+      unit:      prod.unit||"Pcs",
+      // use ex-VAT selling price so VAT is added once only
+      unitPrice: prod.vatExclusive||prod.landingCost||prod.mrp||it.unitPrice,
+      vatPerc:   prod.salesVat||"5",
+    }:it));
     setPickerTarget(null);
   };
 
