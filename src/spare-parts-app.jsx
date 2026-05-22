@@ -229,6 +229,25 @@ const TR = {
     si_thankYou:"ব্যবসার জন্য ধন্যবাদ!",
     si_authorizedBy:"অনুমোদনকারী স্বাক্ষর",
     si_receivedBy:"গ্রাহক স্বাক্ষর",
+    si_invoiceType:"ইনভয়েস ধরন",
+    si_regular:"সাধারণ ইনভয়েস",
+    si_regularDesc:"কাস্টমার তথ্য, কোনো VAT/Tax নেই",
+    si_tax:"ট্যাক্স ইনভয়েস",
+    si_taxDesc:"TRN সহ পূর্ণ VAT বিবরণ",
+    si_deliveryNote:"ডেলিভারি নোট নং",
+    si_vehicleNo:"গাড়ির নম্বর",
+    si_deliverySection:"🚚 ডেলিভারি তথ্য",
+    si_vatNo:"VAT Registration No.",
+    si_trnNo:"TRN নম্বর",
+    si_vatExcl:"VAT বাদে",
+    si_vatAmt:"VAT পরিমাণ",
+    si_vatIncl:"VAT সহ মোট",
+    si_taxInvoiceLabel:"কর ইনভয়েস",
+    si_regularInvoiceLabel:"বিক্রয় ইনভয়েস",
+    si_showCodeLabel:"ইনভয়েসে মডেল/কোড/সাইজ দেখাও",
+    si_showCodeDesc:"সক্রিয় করলে ইনভয়েসে পণ্যের নামের সাথে কোড ও ব্র্যান্ড দেখাবে",
+    si_invoiceSettings:"📄 ইনভয়েস সেটিংস",
+    si_invoiceSettingsSub:"ইনভয়েস প্রদর্শন পছন্দ",
     tabVendor:"🏭 ভেন্ডর মাস্টার",
     tabCustomer:"👥 কাস্টমার মাস্টার",
     cm_title:"👥 কাস্টমার মাস্টার",
@@ -615,6 +634,25 @@ const TR = {
     si_thankYou:"Thank you for your business!",
     si_authorizedBy:"Authorized Signature",
     si_receivedBy:"Customer Signature",
+    si_invoiceType:"Invoice Type",
+    si_regular:"Regular Invoice",
+    si_regularDesc:"Customer details, no VAT/Tax",
+    si_tax:"Tax Invoice",
+    si_taxDesc:"Full VAT details with TRN",
+    si_deliveryNote:"Delivery Note No.",
+    si_vehicleNo:"Vehicle Number",
+    si_deliverySection:"🚚 Delivery Info",
+    si_vatNo:"VAT Registration No.",
+    si_trnNo:"TRN Number",
+    si_vatExcl:"Amount Excl. VAT",
+    si_vatAmt:"VAT Amount",
+    si_vatIncl:"Total Incl. VAT",
+    si_taxInvoiceLabel:"TAX INVOICE",
+    si_regularInvoiceLabel:"SALES INVOICE",
+    si_showCodeLabel:"Show Model / Code / Size in Invoice",
+    si_showCodeDesc:"When enabled, product code and brand will appear under product name in invoice",
+    si_invoiceSettings:"📄 Invoice Settings",
+    si_invoiceSettingsSub:"Invoice display preferences",
     tabVendor:"🏭 Vendor Master",
     tabCustomer:"👥 Customer Master",
     cm_title:"👥 Customer Master",
@@ -3430,140 +3468,77 @@ function siCalcTotals(items) {
   items.forEach(it=>{ const c=siCalcLine(it); sub+=c.gross; disc+=c.disc; vat+=c.vat; grand+=c.total; });
   return { sub, disc, vat, grand };
 }
+const SI_SHOW_CODE_KEY = "si-show-code";
+const loadSiShowCode = () => { try { return localStorage.getItem(SI_SHOW_CODE_KEY)==="true"; } catch { return false; } };
+const saveSiShowCode = (v) => { try { localStorage.setItem(SI_SHOW_CODE_KEY, v?"true":"false"); } catch {} };
+
 function siEmptyLine() {
   return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" };
 }
 function siEmptyForm() {
-  return { invoiceDate:siToday(), customerId:"", customerName:"", customerMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
+  return {
+    invoiceType:"regular",
+    invoiceDate:siToday(),
+    customerId:"", customerName:"", customerMobile:"", customerAddress:"", customerTrn:"",
+    paymentMethod:"cash", amountPaid:"",
+    deliveryNoteNo:"", vehicleNo:"",
+    note:"",
+  };
 }
 
 // ── Print / PDF Generator ──
-function generateSalesInvoiceHTML(invoice, shop, lang) {
-  const isBn = lang==="bn";
+function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
+  const isBn  = lang==="bn";
+  const isTax = invoice.invoiceType==="tax";
   const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[]);
   const balance = grand - (invoice.amountPaid||0);
+  const title = isTax?(isBn?"কর ইনভয়েস":"TAX INVOICE"):(isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
+  const headerColor = isTax?"#1d4ed8":"#16a34a";
+  const headerGrad  = isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":"linear-gradient(135deg,#16a34a,#15803d)";
+
   const rows = (invoice.items||[]).map((it,i)=>{
     const { disc:d, vat:v, total:tot } = siCalcLine(it);
-    return `<tr>
-      <td style="text-align:center">${i+1}</td>
-      <td><strong>${it.name}</strong>${it.code?`<br><span style="font-size:11px;color:#666">📋 ${it.code}</span>`:""}${it.brand?` <span style="font-size:11px;color:#666">🏷️ ${it.brand}</span>`:""}</td>
-      <td style="text-align:center">${it.qty} ${it.unit}</td>
-      <td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td>
-      <td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td>
-      <td style="text-align:center">${siN2(it.vatPerc)>0?it.vatPerc+"%":"—"}</td>
-      <td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td>
-    </tr>`;
+    const codeHtml = showCode&&(it.code||it.brand)
+      ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>`
+      : "";
+    if (isTax) {
+      const base = siN2(it.unitPrice)*siN2(it.qty) - d;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right">৳ ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">৳ ${siFmt2(v)}</td><td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td></tr>`;
+    } else {
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td></tr>`;
+    }
   }).join("");
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>${isBn?"বিক্রয় ইনভয়েস":"Sales Invoice"} - ${invoice.invoiceNo}</title>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:24px}
-  .invoice{max-width:800px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
-  .hdr{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:flex-start}
-  .shop-name{font-size:22px;font-weight:900;letter-spacing:0.5px}
-  .shop-sub{font-size:12px;opacity:0.85;margin-top:4px}
-  .inv-title{font-size:28px;font-weight:900;text-align:right;letter-spacing:1px}
-  .inv-no{font-size:13px;text-align:right;margin-top:4px;opacity:0.9}
-  .body{padding:20px 24px}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
-  .info-box{background:#f9fafb;border-radius:8px;padding:12px 14px;border:1px solid #e5e7eb}
-  .info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:4px}
-  .info-value{font-size:14px;font-weight:700;color:#111}
-  .info-sub{font-size:11px;color:#6b7280;margin-top:2px}
-  table{width:100%;border-collapse:collapse;margin-bottom:16px}
-  thead tr{background:#1f2937;color:#fff}
-  th{padding:9px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700}
-  td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
-  tbody tr:nth-child(even){background:#f9fafb}
-  .totals{display:flex;justify-content:flex-end;margin-bottom:20px}
-  .totals-box{width:280px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
-  .totals-row{display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #f3f4f6}
-  .totals-label{color:#6b7280;font-size:12px}
-  .totals-value{font-weight:700;font-size:12px}
-  .grand-row{display:flex;justify-content:space-between;padding:12px 14px;background:#f97316}
-  .grand-label{color:#fff;font-size:14px;font-weight:800}
-  .grand-value{color:#fff;font-size:18px;font-weight:900}
-  .payment-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:12px 14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
-  .balance-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:12px 14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
-  .note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#92400e}
-  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
-  .sig-line{border-top:1.5px solid #9ca3af;margin-top:40px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
-  .footer{text-align:center;padding:12px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#f97316;font-weight:700}
-  @media print{
-    body{padding:0}
-    .no-print{display:none!important}
-    .invoice{border:none;border-radius:0}
-  }
-</style>
-</head><body>
-<div class="no-print" style="text-align:center;margin-bottom:16px">
-  <button onclick="window.print()" style="padding:10px 28px;background:#f97316;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট করুন":"Print"}</button>
-  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
-</div>
-<div class="invoice">
-  <div class="hdr">
-    <div>
-      <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
-      <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
-      ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
-    </div>
-    <div>
-      <div class="inv-title">${isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE"}</div>
-      <div class="inv-no">${invoice.invoiceNo}</div>
-      <div class="inv-no">📅 ${invoice.invoiceDate}</div>
-    </div>
-  </div>
-  <div class="body">
-    <div class="info-grid">
-      <div class="info-box">
-        <div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div>
-        <div class="info-value">${invoice.customerName||"—"}</div>
-        ${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""}
-      </div>
-      <div class="info-box">
-        <div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div>
-        <div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div>
-        <div class="info-sub">👤 ${invoice.createdByName}</div>
-      </div>
-    </div>
-    <table>
-      <thead><tr>
-        <th style="width:36px">#</th>
-        <th>${isBn?"পণ্য":"Item"}</th>
-        <th style="text-align:center;width:80px">${isBn?"পরিমাণ":"Qty"}</th>
-        <th style="text-align:right;width:100px">${isBn?"একক মূল্য":"Unit Price"}</th>
-        <th style="text-align:center;width:60px">${isBn?"ছাড়":"Disc"}</th>
-        <th style="text-align:center;width:60px">VAT</th>
-        <th style="text-align:right;width:100px">${isBn?"মোট":"Total"}</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="totals">
-      <div class="totals-box">
-        <div class="totals-row"><span class="totals-label">${isBn?"সাব-টোটাল":"Subtotal"}</span><span class="totals-value">৳ ${siFmt2(sub)}</span></div>
-        ${disc>0?`<div class="totals-row"><span class="totals-label">${isBn?"মোট ছাড়":"Discount"}</span><span class="totals-value" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}
-        ${vat>0?`<div class="totals-row"><span class="totals-label">VAT</span><span class="totals-value" style="color:#0891b2">+ ৳ ${siFmt2(vat)}</span></div>`:""}
-        <div class="grand-row"><span class="grand-label">${isBn?"সর্বমোট":"Grand Total"}</span><span class="grand-value">৳ ${siFmt2(grand)}</span></div>
-      </div>
-    </div>
-    ${invoice.amountPaid>0?`<div class="payment-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:18px;font-weight:900;color:#15803d">৳ ${siFmt2(invoice.amountPaid)}</span></div>`:""}
-    ${balance>0.01?`<div class="balance-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:18px;font-weight:900;color:#dc2626">৳ ${siFmt2(balance)}</span></div>`:""}
-    ${invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
-    <div class="sigs">
-      <div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div>
-      <div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div>
-    </div>
-  </div>
-  <div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div>
-</div>
-</body></html>`;
+
+  const tableHeaders = isTax
+    ? `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"VAT বাদে":"Excl.VAT"}</th><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
+    : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
+
+  const totalsHTML = isTax
+    ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">৳ ${siFmt2(sub)}</span></div>${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ৳ ${siFmt2(vat)}</span></div><div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`
+    : `${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`;
+
+  const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
+
+  const deliveryHTML = (invoice.deliveryNoteNo||invoice.vehicleNo)?`<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>`:"";
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} - ${invoice.invoiceNo}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}.invoice{max-width:820px;margin:0 auto;border:2px solid ${headerColor};border-radius:12px;overflow:hidden}.hdr{background:${headerGrad};color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}.shop-name{font-size:20px;font-weight:900}.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}.inv-title{font-size:24px;font-weight:900;text-align:right;letter-spacing:2px}.inv-no{font-size:12px;text-align:right;margin-top:3px;opacity:0.9}.body{padding:18px 22px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}.info-value{font-size:14px;font-weight:700;color:#111}.info-sub{font-size:11px;color:#6b7280;margin-top:2px}table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}thead tr{background:#1f2937;color:#fff}th{padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:nth-child(even){background:#f9fafb}.totals{display:flex;justify-content:flex-end;margin-bottom:14px}.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}.tl{color:#6b7280;font-size:12px}.tv{font-weight:700;font-size:12px}.grand-row{display:flex;justify-content:space-between;padding:11px 13px;background:${headerColor}}.gl{color:#fff;font-size:13px;font-weight:800}.gv{color:#fff;font-size:17px;font-weight:900}.pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid ${headerColor};font-size:12px;color:${headerColor};font-weight:700}@media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0}}</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:14px"><button onclick="window.print()" style="padding:10px 28px;background:${headerColor};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button><button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button></div>
+<div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:700">TRN: ${shop.trnNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">📅 ${invoice.invoiceDate}</div><div class="inv-no">👤 ${invoice.createdByName}</div></div></div>
+<div class="body"><div class="info-grid">${custHTML}<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট তথ্য":"Payment Info"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div></div>
+${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
+<div class="totals"><div class="totals-box">${totalsHTML}</div></div>
+${invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">৳ ${siFmt2(invoice.amountPaid)}</span></div>`:""}
+${balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">৳ ${siFmt2(balance)}</span></div>`:""}
+${invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
+<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div></div>
+<div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div></div></body></html>`;
 }
 
-function printSalesInvoice(invoice, shop, lang) {
-  const html = generateSalesInvoiceHTML(invoice, shop, lang);
-  const w = window.open("","_blank","width=900,height=700");
-  if (!w) { alert(lang==="bn"?"Pop-up block করা আছে। Browser এ Pop-up allow করুন।":"Popup blocked. Please allow popups for this site."); return; }
+function printSalesInvoice(invoice, shop, lang, showCode) {
+  const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false);
+  const w = window.open("","_blank","width=950,height=750");
+  if (!w) { alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups."); return; }
   w.document.write(html);
   w.document.close();
   w.focus();
@@ -3702,7 +3677,7 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode }) {
   const isOwner = profile?.role==="owner";
 
   const [invoices,setInvoices]     = useState([]);
@@ -3772,7 +3747,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
   const siOpenEdit=(inv)=>{
     setSiInvoiceNo(inv.invoiceNo);
-    setSiForm({ invoiceDate:inv.invoiceDate, customerId:inv.customerId||"", customerName:inv.customerName||"", customerMobile:inv.customerMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
+    setSiForm({ invoiceType:inv.invoiceType||"regular", invoiceDate:inv.invoiceDate, customerId:inv.customerId||"", customerName:inv.customerName||"", customerMobile:inv.customerMobile||"", customerAddress:inv.customerAddress||"", customerTrn:inv.customerTrn||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", deliveryNoteNo:inv.deliveryNoteNo||"", vehicleNo:inv.vehicleNo||"", note:inv.note||"" });
     setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), vatPerc:String(it.vatPerc||"5") })));
     setEditInvId(inv.id); setSiView("form");
   };
@@ -3788,7 +3763,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   };
 
   const siSelectCustomer=(c)=>{
-    siUpd("customerId",c.id); siUpd("customerName",c.customerName); siUpd("customerMobile",c.mobileNumber||"");
+    siUpd("customerId",c.id); siUpd("customerName",c.customerName);
+    siUpd("customerMobile",c.mobileNumber||"");
+    siUpd("customerAddress",[c.address,c.area,c.city].filter(Boolean).join(", ")||"");
+    siUpd("customerTrn",c.trnNumber||"");
     setShowCustPicker(false);
   };
 
@@ -3803,7 +3781,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const { sub, disc, vat, grand } = siCalcTotals(siLines);
     const paid=siN2(siForm.amountPaid), bal=Math.max(0,grand-paid);
     const derivedStatus=status==="confirmed"?(bal<0.01?"paid":paid>0?"partial":"confirmed"):status;
-    return { shopId, invoiceNo:siInvoiceNo, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+    return { shopId, invoiceNo:siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
   const siSaveDraft=async()=>{ const p=siBuild("draft"); if (!p) return; setSiSaving(true); try { if (editInvId){ await updateDoc(doc(db,"salesInvoices",editInvId),{...p,updatedAt:serverTimestamp()}); toast(t.si_updated); } else { await addDoc(collection(db,"salesInvoices"),{...p,createdAt:serverTimestamp()}); toast(t.si_saved); } setSiView("list"); } catch(e){ toast(e.message,"err"); } finally{ setSiSaving(false); } };
@@ -3939,7 +3917,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
         {/* Actions */}
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button onClick={()=>printSalesInvoice(inv,shop,lang)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
+          <button onClick={()=>printSalesInvoice(inv,shop,lang,siShowCode)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
           {canEdit&&<button onClick={()=>siOpenEdit(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.si_edit}</button>}
           {canPay&&<button onClick={()=>siMarkPaid(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_markPaid}</button>}
           {["confirmed","partial","draft"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
@@ -3960,6 +3938,21 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{editInvId?t.si_edit:t.si_new}</div>
       </div>
 
+      {/* Invoice Type Toggle */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+        <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>📋 {t.si_invoiceType}</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          {[["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"],["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"]].map(([type,icon,label,desc,color])=>(
+            <button key={type} onClick={()=>siUpd("invoiceType",type)} style={{ padding:"14px 10px", borderRadius:12, cursor:"pointer", fontFamily:"inherit", border:`2px solid ${siForm.invoiceType===type?color:th.borderMid}`, background:siForm.invoiceType===type?`${color}18`:"transparent", display:"flex", flexDirection:"column", alignItems:"center", gap:4, transition:"all 0.15s" }}>
+              <span style={{ fontSize:28 }}>{icon}</span>
+              <span style={{ fontSize:13, fontWeight:800, color:siForm.invoiceType===type?color:th.txtMuted }}>{label}</span>
+              <span style={{ fontSize:10, color:th.txtFaint, textAlign:"center" }}>{desc}</span>
+              {siForm.invoiceType===type&&<span style={{ fontSize:11, color:color }}>✅</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Invoice No + Date + Customer */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={secLbl}>📄 {t.si_invoiceNo} & {t.si_date}</div>
@@ -3973,14 +3966,21 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             <input type="date" style={inp()} value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />
           </div>
         </div>
+
         <div style={secLbl}>👤 {t.si_customer}</div>
         <button onClick={()=>setShowCustPicker(true)} style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${siForm.customerName?"#22c55e":th.borderMid}`, background:th.bgInp, color:siForm.customerName?"#22c55e":th.txtMuted, fontSize:14, cursor:"pointer", fontFamily:"inherit", textAlign:"left", marginBottom:8, fontWeight:siForm.customerName?700:400 }}>
-          {siForm.customerName||t.si_selectCustomer}
+          {siForm.customerName?`✅ ${siForm.customerName}`:t.si_selectCustomer}
         </button>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
           <input style={inp()} placeholder={t.si_customerManual} value={siForm.customerName} onChange={e=>siUpd("customerName",e.target.value)} />
           <input style={inp()} placeholder="📱 Mobile" value={siForm.customerMobile} onChange={e=>siUpd("customerMobile",e.target.value)} inputMode="tel" />
         </div>
+        <div style={{ marginBottom: siForm.invoiceType==="tax"?8:0 }}>
+          <input style={inp()} placeholder={`📍 ${lang==="bn"?"ঠিকানা":"Address"}`} value={siForm.customerAddress} onChange={e=>siUpd("customerAddress",e.target.value)} />
+        </div>
+        {siForm.invoiceType==="tax"&&(
+          <input style={{ ...inp(), borderColor:"#f59e0b", fontFamily:"monospace", marginTop:8 }} placeholder={`TRN: 100XXXXXXXXX`} value={siForm.customerTrn} onChange={e=>siUpd("customerTrn",e.target.value)} />
+        )}
       </div>
 
       {/* Items */}
@@ -4036,6 +4036,21 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span>
           <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(balance)}</span>
         </div>}
+      </div>
+
+      {/* Delivery Note */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+        <div style={secLbl}>🚚 {t.si_deliverySection}</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+          <div>
+            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_deliveryNote}</div>
+            <input style={inp()} placeholder="DN-0001" value={siForm.deliveryNoteNo} onChange={e=>siUpd("deliveryNoteNo",e.target.value)} />
+          </div>
+          <div>
+            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_vehicleNo}</div>
+            <input style={inp()} placeholder="ABC-1234" value={siForm.vehicleNo} onChange={e=>siUpd("vehicleNo",e.target.value)} />
+          </div>
+        </div>
       </div>
 
       {/* Note */}
@@ -4097,6 +4112,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [searchQ,setSearchQ]=useState("");
   const [waStyle,setWaStyleState]=useState(loadWaStyle());
   const setWaStyle = (v) => { setWaStyleState(v); saveWaStyle(v); };
+  const [siShowCode,setSiShowCode] = useState(loadSiShowCode);
 
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
@@ -5991,6 +6007,7 @@ const startEditOrder = (order) => {
           shopId={shopId} user={user} profile={profile}
           customers={customers} products={products}
           shop={localShop} toast={toast} isDesktop={isDesktop}
+          siShowCode={siShowCode}
         />
       )}
 
@@ -6058,6 +6075,16 @@ const startEditOrder = (order) => {
                   <span style={s.settingsArrow}>›</span>
                 </button>
               )}
+
+              {/* Invoice settings */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("invoice")}>
+                <span style={s.settingsRowIcon}>📄</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.si_invoiceSettings}</div>
+                  <div style={s.settingsRowSub}>{siShowCode?(lang==="bn"?"কোড/মডেল দেখানো চালু":"Show code: ON"):(lang==="bn"?"শুধু পণ্যের নাম":"Product name only")}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
 
               {/* WA style - owner only */}
               {isOwner&&(
@@ -6235,6 +6262,32 @@ const startEditOrder = (order) => {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {settingsPage==="invoice"&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.si_invoiceSettings}</div>
+              {/* Show Code Toggle */}
+              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, padding:"14px 0", borderBottom:`1px solid ${th.border}` }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>{t.si_showCodeLabel}</div>
+                  <div style={{ fontSize:12, color:th.txtMuted }}>{t.si_showCodeDesc}</div>
+                  <div style={{ marginTop:8, padding:"8px 12px", background:siShowCode?"rgba(34,197,94,0.08)":"rgba(113,113,122,0.06)", borderRadius:8, fontSize:12, fontWeight:700, color:siShowCode?"#22c55e":th.txtMuted }}>
+                    {siShowCode
+                      ? (lang==="bn"?"✅ চালু — ইনভয়েসে কোড/মডেল দেখাবে":"✅ ON — Code/Model shows in invoice")
+                      : (lang==="bn"?"⬜ বন্ধ — শুধু পণ্যের নাম দেখাবে":"⬜ OFF — Only product name shows")}
+                  </div>
+                </div>
+                <button onClick={()=>{ const nv=!siShowCode; setSiShowCode(nv); saveSiShowCode(nv); }} style={{ width:52, height:30, borderRadius:15, border:"none", cursor:"pointer", background:siShowCode?"#22c55e":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s", marginTop:4 }}>
+                  <span style={{ position:"absolute", top:3, left:siShowCode?25:3, width:24, height:24, borderRadius:"50%", background:"#fff", transition:"left 0.15s", display:"block" }} />
+                </button>
+              </div>
+              <div style={{ marginTop:16, padding:"12px 14px", background:th.bgInp, borderRadius:10, border:`1px solid ${th.border}` }}>
+                <div style={{ fontSize:11, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{lang==="bn"?"উদাহরণ":"Example"}</div>
+                <div style={{ fontSize:13, color:th.txtPrimary, fontWeight:700 }}>Brake Pad</div>
+                {siShowCode&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📋 BP-123  🏷️ Toyota</div>}
+              </div>
             </div>
           )}
 
