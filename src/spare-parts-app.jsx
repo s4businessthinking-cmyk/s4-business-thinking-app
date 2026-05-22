@@ -159,6 +159,76 @@ const TR = {
     pmSelectHint:"পণ্য বেছে নিন বা নিজে লিখুন",
     pmFromMaster:"📦 Product Master থেকে বেছে নিন",
     tabPurchase:"🧾 ক্রয় ইনভয়েস",
+    tabSales:"🧾 বিক্রয় ইনভয়েস",
+    si_title:"🧾 বিক্রয় ইনভয়েস",
+    si_new:"+ নতুন ইনভয়েস",
+    si_edit:"✏️ এডিট",
+    si_backToList:"← তালিকায় ফিরুন",
+    si_invoiceNo:"ইনভয়েস নং",
+    si_date:"তারিখ",
+    si_customer:"কাস্টমার",
+    si_selectCustomer:"কাস্টমার বেছে নিন...",
+    si_customerManual:"কাস্টমারের নাম লিখুন",
+    si_items:"পণ্যের তালিকা",
+    si_addItem:"+ আইটেম যোগ করুন",
+    si_fromMaster:"📦 Product Master থেকে",
+    si_itemName:"পণ্যের নাম *",
+    si_code:"কোড",
+    si_brand:"ব্র্যান্ড",
+    si_qty:"পরিমাণ *",
+    si_unit:"ইউনিট",
+    si_unitPrice:"একক মূল্য (৳) *",
+    si_discPerc:"ছাড় %",
+    si_vatPerc:"VAT %",
+    si_lineTotal:"মোট",
+    si_subtotal:"সাব-টোটাল",
+    si_totalDiscount:"মোট ছাড়",
+    si_totalVat:"মোট VAT",
+    si_grandTotal:"সর্বমোট",
+    si_paymentMethod:"পেমেন্ট পদ্ধতি",
+    si_amountPaid:"পরিশোধিত (৳)",
+    si_balanceDue:"বাকি টাকা",
+    si_note:"নোট",
+    si_notePh:"যেকোনো মন্তব্য...",
+    si_saveDraft:"💾 ড্রাফট",
+    si_confirm:"✅ নিশ্চিত করুন",
+    si_markPaid:"💵 পরিশোধিত",
+    si_print:"🖨️ প্রিন্ট / PDF",
+    si_searchPh:"ইনভয়েস নং বা কাস্টমার খুঁজুন...",
+    si_allStatus:"সব",
+    si_noInvoices:"কোনো ইনভয়েস নেই।",
+    si_noResults:"কিছু পাওয়া যায়নি",
+    si_saved:"✅ ড্রাফট সেভ!",
+    si_confirmed:"✅ ইনভয়েস নিশ্চিত!",
+    si_updated:"✅ আপডেট হয়েছে!",
+    si_deleted:"ইনভয়েস মুছে ফেলা হয়েছে।",
+    si_paidMarked:"✅ পরিশোধিত!",
+    si_cancelledMsg:"🚫 বাতিল হয়েছে।",
+    si_errName:"পণ্যের নাম দিন!",
+    si_errQty:"পরিমাণ দিন!",
+    si_errPrice:"মূল্য দিন!",
+    si_errItems:"অন্তত একটি পণ্য যোগ করুন!",
+    si_confirmDelete:"ইনভয়েসটি মুছে ফেলবেন?",
+    si_confirmCancel:"ইনভয়েসটি বাতিল করবেন?",
+    si_summary:"হিসাব সারসংক্ষেপ",
+    si_payment:"পেমেন্ট",
+    si_fullPay:"সম্পূর্ণ পরিশোধ",
+    si_createdBy:"তৈরি করেছেন",
+    si_totalInvoices:"মোট",
+    si_totalSales:"মোট বিক্রয়",
+    si_totalPaid:"পরিশোধ",
+    si_totalDue:"বাকি",
+    si_cancelBtn:"🚫 বাতিল করুন",
+    si_deleteBtn:"🗑️ মুছুন",
+    si_cancelForm:"✕ বাতিল",
+    si_pmSearchPh:"পণ্য খুঁজুন...",
+    si_customerSearch:"কাস্টমার খুঁজুন...",
+    si_myInvoices:"আমার ইনভয়েস",
+    si_allInvoices:"সব ইনভয়েস",
+    si_invoiceTitle:"বিক্রয় ইনভয়েস",
+    si_thankYou:"ব্যবসার জন্য ধন্যবাদ!",
+    si_authorizedBy:"অনুমোদনকারী স্বাক্ষর",
+    si_receivedBy:"গ্রাহক স্বাক্ষর",
     tabVendor:"🏭 ভেন্ডর মাস্টার",
     tabCustomer:"👥 কাস্টমার মাস্টার",
     cm_title:"👥 কাস্টমার মাস্টার",
@@ -475,6 +545,76 @@ const TR = {
     pmSelectHint:"Select a product or type manually",
     pmFromMaster:"📦 Select from Product Master",
     tabPurchase:"🧾 Purchase Invoice",
+    tabSales:"🧾 Sales Invoice",
+    si_title:"🧾 Sales Invoice",
+    si_new:"+ New Invoice",
+    si_edit:"✏️ Edit",
+    si_backToList:"← Back to List",
+    si_invoiceNo:"Invoice No.",
+    si_date:"Date",
+    si_customer:"Customer",
+    si_selectCustomer:"Select customer...",
+    si_customerManual:"Type customer name",
+    si_items:"Item List",
+    si_addItem:"+ Add Item",
+    si_fromMaster:"📦 From Product Master",
+    si_itemName:"Item Name *",
+    si_code:"Code",
+    si_brand:"Brand",
+    si_qty:"Qty *",
+    si_unit:"Unit",
+    si_unitPrice:"Unit Price (৳) *",
+    si_discPerc:"Disc %",
+    si_vatPerc:"VAT %",
+    si_lineTotal:"Total",
+    si_subtotal:"Subtotal",
+    si_totalDiscount:"Total Discount",
+    si_totalVat:"Total VAT",
+    si_grandTotal:"Grand Total",
+    si_paymentMethod:"Payment Method",
+    si_amountPaid:"Amount Paid (৳)",
+    si_balanceDue:"Balance Due",
+    si_note:"Note",
+    si_notePh:"Any remarks...",
+    si_saveDraft:"💾 Save Draft",
+    si_confirm:"✅ Confirm",
+    si_markPaid:"💵 Mark Paid",
+    si_print:"🖨️ Print / PDF",
+    si_searchPh:"Search by invoice no or customer...",
+    si_allStatus:"All",
+    si_noInvoices:"No invoices yet.",
+    si_noResults:"No results found",
+    si_saved:"✅ Draft saved!",
+    si_confirmed:"✅ Invoice confirmed!",
+    si_updated:"✅ Updated!",
+    si_deleted:"Invoice deleted.",
+    si_paidMarked:"✅ Marked as paid!",
+    si_cancelledMsg:"🚫 Invoice cancelled.",
+    si_errName:"Enter item name!",
+    si_errQty:"Enter quantity!",
+    si_errPrice:"Enter unit price!",
+    si_errItems:"Add at least one item!",
+    si_confirmDelete:"Delete this invoice?",
+    si_confirmCancel:"Cancel this invoice?",
+    si_summary:"Invoice Summary",
+    si_payment:"Payment",
+    si_fullPay:"Full Payment",
+    si_createdBy:"Created by",
+    si_totalInvoices:"Total",
+    si_totalSales:"Total Sales",
+    si_totalPaid:"Paid",
+    si_totalDue:"Due",
+    si_cancelBtn:"🚫 Cancel",
+    si_deleteBtn:"🗑️ Delete",
+    si_cancelForm:"✕ Cancel",
+    si_pmSearchPh:"Search products...",
+    si_customerSearch:"Search customers...",
+    si_myInvoices:"My Invoices",
+    si_allInvoices:"All Invoices",
+    si_invoiceTitle:"Sales Invoice",
+    si_thankYou:"Thank you for your business!",
+    si_authorizedBy:"Authorized Signature",
+    si_receivedBy:"Customer Signature",
     tabVendor:"🏭 Vendor Master",
     tabCustomer:"👥 Customer Master",
     cm_title:"👥 Customer Master",
@@ -3260,6 +3400,660 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   );
 }
 
+// ─── SALES INVOICE ────────────────────────────────────────────
+const SI_PREFIX  = "SI-";
+const SI_UNITS   = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];
+const SI_PAY     = {
+  cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
+  bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
+  cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
+  credit: { bn:"বাকি (ক্রেডিট)",  en:"Credit",         icon:"📅" },
+};
+const SI_STATUSES = {
+  draft:     { bn:"ড্রাফট",        en:"Draft",     color:"#f59e0b", bg:"#451a03" },
+  confirmed: { bn:"নিশ্চিত",       en:"Confirmed", color:"#06b6d4", bg:"#083344" },
+  partial:   { bn:"আংশিক পরিশোধ", en:"Partial",   color:"#a855f7", bg:"#2e1065" },
+  paid:      { bn:"পরিশোধিত",     en:"Paid",      color:"#22c55e", bg:"#052e16" },
+  cancelled: { bn:"বাতিল",        en:"Cancelled", color:"#71717a", bg:"#27272a" },
+};
+const siFmt2 = (n) => (Math.round((parseFloat(n)||0)*100)/100).toFixed(2);
+const siN2   = (v) => parseFloat(v)||0;
+const siToday= () => new Date().toISOString().split("T")[0];
+
+function siCalcLine(it) {
+  const qty=siN2(it.qty), price=siN2(it.unitPrice), dp=siN2(it.discountPerc), vp=siN2(it.vatPerc);
+  const gross=qty*price, disc=gross*dp/100, base=gross-disc, vat=base*vp/100;
+  return { gross, disc, vat, total:base+vat };
+}
+function siCalcTotals(items) {
+  let sub=0,disc=0,vat=0,grand=0;
+  items.forEach(it=>{ const c=siCalcLine(it); sub+=c.gross; disc+=c.disc; vat+=c.vat; grand+=c.total; });
+  return { sub, disc, vat, grand };
+}
+function siEmptyLine() {
+  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" };
+}
+function siEmptyForm() {
+  return { invoiceDate:siToday(), customerId:"", customerName:"", customerMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
+}
+
+// ── Print / PDF Generator ──
+function generateSalesInvoiceHTML(invoice, shop, lang) {
+  const isBn = lang==="bn";
+  const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[]);
+  const balance = grand - (invoice.amountPaid||0);
+  const rows = (invoice.items||[]).map((it,i)=>{
+    const { disc:d, vat:v, total:tot } = siCalcLine(it);
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td><strong>${it.name}</strong>${it.code?`<br><span style="font-size:11px;color:#666">📋 ${it.code}</span>`:""}${it.brand?` <span style="font-size:11px;color:#666">🏷️ ${it.brand}</span>`:""}</td>
+      <td style="text-align:center">${it.qty} ${it.unit}</td>
+      <td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td>
+      <td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td>
+      <td style="text-align:center">${siN2(it.vatPerc)>0?it.vatPerc+"%":"—"}</td>
+      <td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td>
+    </tr>`;
+  }).join("");
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${isBn?"বিক্রয় ইনভয়েস":"Sales Invoice"} - ${invoice.invoiceNo}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:24px}
+  .invoice{max-width:800px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}
+  .hdr{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:20px 24px;display:flex;justify-content:space-between;align-items:flex-start}
+  .shop-name{font-size:22px;font-weight:900;letter-spacing:0.5px}
+  .shop-sub{font-size:12px;opacity:0.85;margin-top:4px}
+  .inv-title{font-size:28px;font-weight:900;text-align:right;letter-spacing:1px}
+  .inv-no{font-size:13px;text-align:right;margin-top:4px;opacity:0.9}
+  .body{padding:20px 24px}
+  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+  .info-box{background:#f9fafb;border-radius:8px;padding:12px 14px;border:1px solid #e5e7eb}
+  .info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:4px}
+  .info-value{font-size:14px;font-weight:700;color:#111}
+  .info-sub{font-size:11px;color:#6b7280;margin-top:2px}
+  table{width:100%;border-collapse:collapse;margin-bottom:16px}
+  thead tr{background:#1f2937;color:#fff}
+  th{padding:9px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700}
+  td{padding:8px 10px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tbody tr:nth-child(even){background:#f9fafb}
+  .totals{display:flex;justify-content:flex-end;margin-bottom:20px}
+  .totals-box{width:280px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+  .totals-row{display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid #f3f4f6}
+  .totals-label{color:#6b7280;font-size:12px}
+  .totals-value{font-weight:700;font-size:12px}
+  .grand-row{display:flex;justify-content:space-between;padding:12px 14px;background:#f97316}
+  .grand-label{color:#fff;font-size:14px;font-weight:800}
+  .grand-value{color:#fff;font-size:18px;font-weight:900}
+  .payment-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:12px 14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+  .balance-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:12px 14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+  .note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:12px;color:#92400e}
+  .sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
+  .sig-line{border-top:1.5px solid #9ca3af;margin-top:40px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
+  .footer{text-align:center;padding:12px 24px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:12px;color:#f97316;font-weight:700}
+  @media print{
+    body{padding:0}
+    .no-print{display:none!important}
+    .invoice{border:none;border-radius:0}
+  }
+</style>
+</head><body>
+<div class="no-print" style="text-align:center;margin-bottom:16px">
+  <button onclick="window.print()" style="padding:10px 28px;background:#f97316;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট করুন":"Print"}</button>
+  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
+</div>
+<div class="invoice">
+  <div class="hdr">
+    <div>
+      <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
+      <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
+      ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
+    </div>
+    <div>
+      <div class="inv-title">${isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE"}</div>
+      <div class="inv-no">${invoice.invoiceNo}</div>
+      <div class="inv-no">📅 ${invoice.invoiceDate}</div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div>
+        <div class="info-value">${invoice.customerName||"—"}</div>
+        ${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""}
+      </div>
+      <div class="info-box">
+        <div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div>
+        <div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div>
+        <div class="info-sub">👤 ${invoice.createdByName}</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:36px">#</th>
+        <th>${isBn?"পণ্য":"Item"}</th>
+        <th style="text-align:center;width:80px">${isBn?"পরিমাণ":"Qty"}</th>
+        <th style="text-align:right;width:100px">${isBn?"একক মূল্য":"Unit Price"}</th>
+        <th style="text-align:center;width:60px">${isBn?"ছাড়":"Disc"}</th>
+        <th style="text-align:center;width:60px">VAT</th>
+        <th style="text-align:right;width:100px">${isBn?"মোট":"Total"}</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals">
+      <div class="totals-box">
+        <div class="totals-row"><span class="totals-label">${isBn?"সাব-টোটাল":"Subtotal"}</span><span class="totals-value">৳ ${siFmt2(sub)}</span></div>
+        ${disc>0?`<div class="totals-row"><span class="totals-label">${isBn?"মোট ছাড়":"Discount"}</span><span class="totals-value" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}
+        ${vat>0?`<div class="totals-row"><span class="totals-label">VAT</span><span class="totals-value" style="color:#0891b2">+ ৳ ${siFmt2(vat)}</span></div>`:""}
+        <div class="grand-row"><span class="grand-label">${isBn?"সর্বমোট":"Grand Total"}</span><span class="grand-value">৳ ${siFmt2(grand)}</span></div>
+      </div>
+    </div>
+    ${invoice.amountPaid>0?`<div class="payment-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:18px;font-weight:900;color:#15803d">৳ ${siFmt2(invoice.amountPaid)}</span></div>`:""}
+    ${balance>0.01?`<div class="balance-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:18px;font-weight:900;color:#dc2626">৳ ${siFmt2(balance)}</span></div>`:""}
+    ${invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
+    <div class="sigs">
+      <div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div>
+      <div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div>
+    </div>
+  </div>
+  <div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div>
+</div>
+</body></html>`;
+}
+
+function printSalesInvoice(invoice, shop, lang) {
+  const html = generateSalesInvoiceHTML(invoice, shop, lang);
+  const w = window.open("","_blank","width=900,height=700");
+  if (!w) { alert(lang==="bn"?"Pop-up block করা আছে। Browser এ Pop-up allow করুন।":"Popup blocked. Please allow popups for this site."); return; }
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(), 600);
+}
+
+// ── SI Status Badge ──
+function SiStatusBadge({ status, lang }) {
+  const st = SI_STATUSES[status]||SI_STATUSES.draft;
+  return <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, color:st.color, background:st.bg, whiteSpace:"nowrap" }}>{st[lang]}</span>;
+}
+
+// ── SI Customer Picker ──
+function SiCustomerPicker({ customers, onSelect, onClose, t, th }) {
+  const [q,setQ]=useState("");
+  const filtered=customers.filter(c=>{ if (!q) return true; return nsmatch([c.customerName,c.customerCode,c.mobileNumber].filter(Boolean).join(" "),q); });
+  const inp={ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:10000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+      <div style={{ width:"100%", maxWidth:600, background:th.bgCard, borderRadius:"16px 16px 0 0", maxHeight:"70vh", display:"flex", flexDirection:"column", border:`1px solid ${th.border}` }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", borderBottom:`1px solid ${th.border}` }}>
+          <span style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>👥 {t.si_customer}</span>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:20 }}>✕</button>
+        </div>
+        <div style={{ padding:"10px 14px", borderBottom:`1px solid ${th.border}` }}>
+          <input autoFocus style={inp} placeholder={t.si_customerSearch} value={q} onChange={e=>setQ(e.target.value)} />
+        </div>
+        <div style={{ overflowY:"auto", flex:1 }}>
+          {filtered.length===0&&<div style={{ textAlign:"center", padding:"30px", color:th.txtFaint }}>{t.si_noResults}</div>}
+          {filtered.map(c=>(
+            <button key={c.id} onClick={()=>onSelect(c)} style={{ width:"100%", textAlign:"left", padding:"12px 16px", background:"transparent", border:"none", borderBottom:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit" }}>
+              <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{c.customerName}</div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8 }}>
+                {c.mobileNumber&&<span>📱 {c.mobileNumber}</span>}
+                {c.customerCode&&<span>#{c.customerCode}</span>}
+                {c.city&&<span>📍 {c.city}</span>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SI Line Item Mobile ──
+function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
+  const { disc, vat, total } = siCalcLine(item);
+  const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
+  const lbl={ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:2 };
+  return (
+    <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:12, marginBottom:8 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+        <span style={{ fontSize:12, fontWeight:800, color:"#22c55e" }}>#{idx+1}</span>
+        <div style={{ display:"flex", gap:6 }}>
+          <button onClick={()=>onPick(idx)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:11, fontWeight:700 }}>📦</button>
+          <button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 }}>✕</button>
+        </div>
+      </div>
+      <input style={{ ...inp(), marginBottom:6, fontSize:13, fontWeight:600 }} placeholder={t.si_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:6 }}>
+        <input style={inp()} placeholder={t.si_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
+        <input style={inp()} placeholder={t.si_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:6 }}>
+        <div><div style={lbl}>{t.si_qty}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></div>
+        <div><div style={lbl}>{t.si_unit}</div><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
+        <div><div style={lbl}>{t.si_unitPrice}</div><input style={inp()} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+        <div><div style={lbl}>{t.si_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
+        <div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>
+      </div>
+      <div style={{ marginTop:8, padding:"8px 10px", background:"rgba(34,197,94,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span style={{ fontSize:11, color:th.txtMuted }}>{t.si_lineTotal}</span>
+        <span style={{ fontSize:15, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── SI Line Item Desktop ──
+function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th }) {
+  const { disc, vat, total } = siCalcLine(item);
+  const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
+  return (
+    <tr style={{ borderBottom:`1px solid ${th.border}` }}>
+      <td style={{ padding:"8px 6px", fontSize:12, fontWeight:700, color:"#22c55e", textAlign:"center", width:30 }}>{idx+1}</td>
+      <td style={{ padding:"8px 6px" }}>
+        <div style={{ display:"flex", gap:4, marginBottom:4 }}>
+          <input style={{ ...inp(), flex:2 }} placeholder={t.si_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
+          <button onClick={()=>onPick(idx)} style={{ padding:"0 8px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:13, flexShrink:0 }}>📦</button>
+        </div>
+        <div style={{ display:"flex", gap:4 }}>
+          <input style={{ ...inp(), flex:1 }} placeholder={t.si_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
+          <input style={{ ...inp(), flex:1 }} placeholder={t.si_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
+        </div>
+      </td>
+      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:80 }}><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></td>
+      <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
+        <span style={{ fontSize:13, fontWeight:700, color:total>0?"#22c55e":th.txtFaint }}>৳ {siFmt2(total)}</span>
+        {(siN2(item.discountPerc)>0||siN2(item.vatPerc)>0)&&<div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>{siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{siFmt2(disc)} </span>}{siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>+{siFmt2(vat)}</span>}</div>}
+      </td>
+      <td style={{ padding:"8px 6px", width:36, textAlign:"center" }}><button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:700 }}>✕</button></td>
+    </tr>
+  );
+}
+
+// ── SI Invoice Card ──
+function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
+  const bal = invoice.grandTotal - invoice.amountPaid;
+  return (
+    <div onClick={onClick} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
+      onMouseEnter={e=>e.currentTarget.style.borderColor="#22c55e"}
+      onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{invoice.invoiceNo}</div>
+          <div style={{ fontSize:12, color:th.txtMuted, marginTop:1 }}>📅 {invoice.invoiceDate} · {invoice.createdByName}</div>
+        </div>
+        <SiStatusBadge status={invoice.status} lang={lang} />
+      </div>
+      <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>👤 {invoice.customerName||"—"}</div>
+      <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
+        <span style={{ fontSize:11, color:th.txtMuted }}>{invoice.items?.length||0} {lang==="bn"?"টি":""} items</span>
+        <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(invoice.grandTotal)}</span>
+        {invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ ৳ {siFmt2(invoice.amountPaid)}</span>}
+        {bal>0.01&&<span style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>⚠️ ৳ {siFmt2(bal)}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── SALES INVOICE TAB (main) ──
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop }) {
+  const isOwner = profile?.role==="owner";
+
+  const [invoices,setInvoices]     = useState([]);
+  const [siLoading,setSiLoading]   = useState(true);
+  const [siView,setSiView]         = useState("list");
+  const [selInv,setSelInv]         = useState(null);
+  const [editInvId,setEditInvId]   = useState(null);
+  const [siInvoiceNo,setSiInvoiceNo]= useState("");
+  const [siForm,setSiForm]         = useState(siEmptyForm());
+  const [siLines,setSiLines]       = useState([siEmptyLine()]);
+  const [pickerTarget,setPickerTarget]= useState(null);
+  const [showCustPicker,setShowCustPicker]= useState(false);
+  const [siSaving,setSiSaving]     = useState(false);
+  const [siSearch,setSiSearch]     = useState("");
+  const [siStatusF,setSiStatusF]   = useState("ALL");
+  const [siViewAll,setSiViewAll]   = useState(isOwner);
+
+  // Listener
+  useEffect(()=>{
+    if (!shopId) return;
+    setSiLoading(true);
+    let u2=null;
+    const baseQ = isOwner
+      ? query(collection(db,"salesInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"))
+      : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
+    const u1=onSnapshot(baseQ,snap=>{
+      setInvoices(snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()})));
+      setSiLoading(false);
+    },()=>{
+      const fbQ=isOwner
+        ? query(collection(db,"salesInvoices"),where("shopId","==",shopId))
+        : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid));
+      u2=onSnapshot(fbQ,snap=>{
+        const docs=snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()}));
+        docs.sort((a,b)=>b.createdAt-a.createdAt);
+        setInvoices(docs);
+        setSiLoading(false);
+      },err=>{ console.error(err); setSiLoading(false); });
+    });
+    return ()=>{ u1(); u2&&u2(); };
+  },[shopId,isOwner,user.uid]);
+
+  // Generate invoice no
+  const genSiNo = async () => {
+    try {
+      const serial=await runTransaction(db,async tx=>{
+        const shopRef=doc(db,"shops",shopId), shopSnap=await tx.get(shopRef);
+        const next=Number(shopSnap.data()?.lastSISerial||0)+1;
+        tx.update(shopRef,{lastSISerial:next}); return next;
+      });
+      return `${SI_PREFIX}${String(serial).padStart(4,"0")}`;
+    } catch(e1) {
+      try {
+        const snap=await getDocs(query(collection(db,"salesInvoices"),where("shopId","==",shopId)));
+        const max=snap.docs.reduce((mx,d)=>{ const m=String(d.data().invoiceNo||"").match(/SI-?(\d+)$/); return m?Math.max(mx,Number(m[1])):mx; },0);
+        return `${SI_PREFIX}${String(max+1).padStart(4,"0")}`;
+      } catch { return `${SI_PREFIX}${String(Date.now()).slice(-4)}`; }
+    }
+  };
+
+  const siOpenNew = async () => {
+    try {
+      const no=await genSiNo();
+      setSiInvoiceNo(no); setSiForm(siEmptyForm()); setSiLines([siEmptyLine()]); setEditInvId(null); setSiView("form");
+    } catch(e) { toast(lang==="bn"?"ইনভয়েস খুলতে সমস্যা!":"Failed to open form!","err"); }
+  };
+
+  const siOpenEdit=(inv)=>{
+    setSiInvoiceNo(inv.invoiceNo);
+    setSiForm({ invoiceDate:inv.invoiceDate, customerId:inv.customerId||"", customerName:inv.customerName||"", customerMobile:inv.customerMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
+    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), vatPerc:String(it.vatPerc||"5") })));
+    setEditInvId(inv.id); setSiView("form");
+  };
+
+  const siUpd=(k,v)=>setSiForm(p=>({...p,[k]:v}));
+  const siAddLine=()=>setSiLines(p=>[...p,siEmptyLine()]);
+  const siUpdLine=(id,f,v)=>setSiLines(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
+  const siDelLine=(id)=>setSiLines(p=>p.filter(it=>it.id!==id));
+
+  const siSelectProduct=(prod,idx)=>{
+    setSiLines(p=>p.map((it,i)=>i===idx?{ ...it, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitPrice:prod.vatInclusive||prod.vatExclusive||prod.mrp||it.unitPrice, vatPerc:prod.salesVat||"5" }:it));
+    setPickerTarget(null);
+  };
+
+  const siSelectCustomer=(c)=>{
+    siUpd("customerId",c.id); siUpd("customerName",c.customerName); siUpd("customerMobile",c.mobileNumber||"");
+    setShowCustPicker(false);
+  };
+
+  const siBuild=(status)=>{
+    const valid=siLines.filter(it=>it.name.trim());
+    if (!valid.length){ toast(t.si_errItems,"err"); return null; }
+    for (const it of valid){
+      if (!it.qty.toString().trim()||siN2(it.qty)<=0){ toast(t.si_errQty,"err"); return null; }
+      if (siN2(it.unitPrice)<0){ toast(t.si_errPrice,"err"); return null; }
+    }
+    const builtItems=valid.map(it=>{ const { disc, vat, total }=siCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:siN2(it.unitPrice), discountPerc:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:siN2(it.vatPerc), vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) }; });
+    const { sub, disc, vat, grand } = siCalcTotals(siLines);
+    const paid=siN2(siForm.amountPaid), bal=Math.max(0,grand-paid);
+    const derivedStatus=status==="confirmed"?(bal<0.01?"paid":paid>0?"partial":"confirmed"):status;
+    return { shopId, invoiceNo:siInvoiceNo, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+  };
+
+  const siSaveDraft=async()=>{ const p=siBuild("draft"); if (!p) return; setSiSaving(true); try { if (editInvId){ await updateDoc(doc(db,"salesInvoices",editInvId),{...p,updatedAt:serverTimestamp()}); toast(t.si_updated); } else { await addDoc(collection(db,"salesInvoices"),{...p,createdAt:serverTimestamp()}); toast(t.si_saved); } setSiView("list"); } catch(e){ toast(e.message,"err"); } finally{ setSiSaving(false); } };
+  const siConfirm=async()=>{ const p=siBuild("confirmed"); if (!p) return; setSiSaving(true); try { if (editInvId){ await updateDoc(doc(db,"salesInvoices",editInvId),{...p,updatedAt:serverTimestamp()}); toast(t.si_updated); } else { await addDoc(collection(db,"salesInvoices"),{...p,createdAt:serverTimestamp()}); toast(t.si_confirmed); } setSiView("list"); } catch(e){ toast(e.message,"err"); } finally{ setSiSaving(false); } };
+  const siMarkPaid=async(inv)=>{ try { await updateDoc(doc(db,"salesInvoices",inv.id),{amountPaid:inv.grandTotal,balanceDue:0,status:"paid",updatedAt:serverTimestamp()}); setSelInv(p=>({...p,amountPaid:inv.grandTotal,balanceDue:0,status:"paid"})); toast(t.si_paidMarked); } catch(e){ toast(e.message,"err"); } };
+  const siCancel=async(inv)=>{ if (!window.confirm(t.si_confirmCancel)) return; try { await updateDoc(doc(db,"salesInvoices",inv.id),{status:"cancelled",updatedAt:serverTimestamp()}); setSelInv(p=>({...p,status:"cancelled"})); toast(t.si_cancelledMsg,"err"); } catch(e){ toast(e.message,"err"); } };
+  const siDelete=async(inv)=>{ if (!window.confirm(t.si_confirmDelete)) return; try { await deleteDoc(doc(db,"salesInvoices",inv.id)); setSiView("list"); setSelInv(null); toast(t.si_deleted,"err"); } catch(e){ toast(e.message,"err"); } };
+
+  const siFiltered=invoices.filter(inv=>{
+    const matchSt=siStatusF==="ALL"||inv.status===siStatusF;
+    const q=siSearch.trim();
+    if (!q) return matchSt;
+    const hay=[inv.invoiceNo,inv.customerName,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
+    return matchSt&&nsmatch(hay,q);
+  });
+  const siKPIs=invoices.reduce((a,inv)=>{ a.total++; a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{total:0,amount:0,paid:0,due:0});
+
+  const panel=isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
+  const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
+  const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
+  const totals=siCalcTotals(siLines);
+  const paid=siN2(siForm.amountPaid), balance=Math.max(0,totals.grand-paid);
+
+  // ══ LIST ══
+  if (siView==="list") return (
+    <div style={panel}>
+      {pickerTarget!==null&&<PiProductPicker products={products} t={{ ...t, pi_fromMaster:t.si_fromMaster, pi_pmSearchPh:t.si_pmSearchPh, pi_noResults:t.si_noResults }} th={th} onSelect={p=>{ const idx=pickerTarget; setSiLines(prev=>prev.map((it,i)=>i===idx?{ ...it, productId:p.id, name:p.name, code:p.code||p.barcode||"", brand:p.brand||"", unit:p.unit||"Pcs", unitPrice:p.vatInclusive||p.vatExclusive||p.mrp||it.unitPrice, vatPerc:p.salesVat||"5" }:it)); setPickerTarget(null); }} onClose={()=>setPickerTarget(null)} />}
+      {showCustPicker&&<SiCustomerPicker customers={customers} t={t} th={th} onSelect={siSelectCustomer} onClose={()=>setShowCustPicker(false)} />}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div style={{ fontSize:16, fontWeight:800, color:"#22c55e" }}>{t.si_title}</div>
+        <button onClick={siOpenNew} disabled={siSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_new}</button>
+      </div>
+
+      {invoices.length>0&&(
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:14 }}>
+          {[{l:t.si_totalInvoices,v:siKPIs.total,c:"#a1a1aa",pre:""},{l:t.si_totalSales,v:siFmt2(siKPIs.amount),c:"#22c55e",pre:"৳ "},{l:t.si_totalPaid,v:siFmt2(siKPIs.paid),c:"#06b6d4",pre:"৳ "},{l:t.si_totalDue,v:siFmt2(siKPIs.due),c:siKPIs.due>0?"#ef4444":"#22c55e",pre:"৳ "}].map((k,i)=>(
+            <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
+              <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{k.pre}{k.v}</div>
+              <div style={{ fontSize:8, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ position:"relative", marginBottom:10 }}>
+        <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+        <input style={{ ...inp(), paddingLeft:38, background:th.bgCard }} placeholder={t.si_searchPh} value={siSearch} onChange={e=>setSiSearch(e.target.value)} />
+        {siSearch&&<button onClick={()=>setSiSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16 }}>✕</button>}
+      </div>
+
+      <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:8, marginBottom:8 }}>
+        {["ALL",...Object.keys(SI_STATUSES)].map(st=>(
+          <button key={st} onClick={()=>setSiStatusF(st)} style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit", background:siStatusF===st?"#22c55e":"transparent", borderColor:siStatusF===st?"#22c55e":th.borderMid, color:siStatusF===st?"#fff":th.txtMuted }}>
+            {st==="ALL"?t.si_allStatus:SI_STATUSES[st]?.[lang]}
+          </button>
+        ))}
+      </div>
+
+      {siLoading&&<div style={{ textAlign:"center", padding:"50px", color:th.txtFaint }}><div style={{ fontSize:36 }}>⏳</div></div>}
+      {!siLoading&&invoices.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>🧾</div><div>{t.si_noInvoices}</div></div>}
+      {!siLoading&&invoices.length>0&&siFiltered.length===0&&<div style={{ textAlign:"center", padding:"40px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.si_noResults}</div></div>}
+      {!siLoading&&siFiltered.map(inv=>(
+        <SiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang} onClick={()=>{ setSelInv(inv); setSiView("detail"); }} />
+      ))}
+    </div>
+  );
+
+  // ══ DETAIL ══
+  if (siView==="detail"&&selInv) {
+    const inv=invoices.find(x=>x.id===selInv.id)||selInv;
+    const { sub, disc, vat, grand } = siCalcTotals(inv.items||[]);
+    const bal=grand-inv.amountPaid;
+    const canEdit=["draft","confirmed"].includes(inv.status);
+    const canPay=["confirmed","partial"].includes(inv.status);
+    const dr={ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
+    return (
+      <div style={panel}>
+        <button onClick={()=>{ setSiView("list"); setSelInv(null); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#22c55e", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.si_backToList}</button>
+
+        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:10 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+            <div>
+              <div style={{ fontSize:22, fontWeight:900, color:"#22c55e", letterSpacing:1 }}>{inv.invoiceNo}</div>
+              <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📅 {inv.invoiceDate}</div>
+            </div>
+            <SiStatusBadge status={inv.status} lang={lang} />
+          </div>
+          <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>👤 {t.si_customer}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{inv.customerName||"—"}</span></div>
+          {inv.customerMobile&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📱</span><span style={{ fontSize:13, color:th.txtPrimary }}>{inv.customerMobile}</span></div>}
+          <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>👤 {t.si_createdBy}</span><span style={{ fontSize:12, color:th.txtMuted }}>{inv.createdByName}</span></div>
+          {inv.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #22c55e" }}>📝 {inv.note}</div>}
+        </div>
+
+        {/* Items */}
+        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10, overflowX:"auto" }}>
+          <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📦 {t.si_items} ({inv.items?.length||0})</div>
+          {(inv.items||[]).map((it,i)=>{
+            const { disc:d, vat:v, total:tot }=siCalcLine(it);
+            return (
+              <div key={i} style={{ display:"flex", alignItems:"flex-start", padding:"9px 0", borderBottom:i<inv.items.length-1?`1px solid ${th.border}`:"none", gap:6 }}>
+                <span style={{ width:24, fontSize:11, fontWeight:800, color:"#22c55e", flexShrink:0 }}>{i+1}</span>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{it.name}</div>
+                  <div style={{ fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", gap:6, flexWrap:"wrap" }}>
+                    {it.code&&<span>📋 {it.code}</span>}
+                    {it.brand&&<span>🏷️ {it.brand}</span>}
+                    {siN2(it.discountPerc)>0&&<span style={{ color:"#ef4444" }}>Disc {it.discountPerc}% (-{siFmt2(d)})</span>}
+                    {siN2(it.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>VAT {it.vatPerc}% (+{siFmt2(v)})</span>}
+                  </div>
+                </div>
+                <span style={{ width:60, textAlign:"center", fontSize:12, color:th.txtPrimary, flexShrink:0 }}>{it.qty} {it.unit}</span>
+                <span style={{ width:90, textAlign:"right", fontSize:12, color:th.txtMuted, flexShrink:0 }}>৳ {siFmt2(it.unitPrice)}</span>
+                <span style={{ width:100, textAlign:"right", fontSize:13, fontWeight:700, color:"#22c55e", flexShrink:0 }}>৳ {siFmt2(tot)}</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Totals */}
+        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
+          {[[t.si_subtotal,siFmt2(sub),th.txtPrimary],...(disc>0?[[t.si_totalDiscount,`- ${siFmt2(disc)}`,"#ef4444"]]:[]),...(vat>0?[["VAT",`+ ${siFmt2(vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
+            <div key={i} style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>৳ {v}</span></div>
+          ))}
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
+            <span style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>{t.si_grandTotal}</span>
+            <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(grand)}</span>
+          </div>
+          <div style={{ height:1, background:th.border, margin:"10px 0" }} />
+          <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.si_paymentMethod}</span><span style={{ fontSize:12, fontWeight:700, color:th.txtPrimary }}>{SI_PAY[inv.paymentMethod]?.icon} {SI_PAY[inv.paymentMethod]?.[lang]}</span></div>
+          <div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.si_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(inv.amountPaid)}</span></div>
+          <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span><span style={{ fontSize:16, fontWeight:900, color:bal>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(Math.max(0,bal))}</span></div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <button onClick={()=>printSalesInvoice(inv,shop,lang)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
+          {canEdit&&<button onClick={()=>siOpenEdit(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.si_edit}</button>}
+          {canPay&&<button onClick={()=>siMarkPaid(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_markPaid}</button>}
+          {["confirmed","partial","draft"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
+          {inv.status==="draft"&&<button onClick={()=>siDelete(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_deleteBtn}</button>}
+        </div>
+      </div>
+    );
+  }
+
+  // ══ FORM ══
+  return (
+    <div style={panel}>
+      {pickerTarget!==null&&<PiProductPicker products={products} t={{ ...t, pi_fromMaster:t.si_fromMaster, pi_pmSearchPh:t.si_pmSearchPh, pi_noResults:t.si_noResults }} th={th} onSelect={p=>siSelectProduct(p,pickerTarget)} onClose={()=>setPickerTarget(null)} />}
+      {showCustPicker&&<SiCustomerPicker customers={customers} t={t} th={th} onSelect={siSelectCustomer} onClose={()=>setShowCustPicker(false)} />}
+
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
+        <button onClick={()=>setSiView("list")} style={{ background:"transparent", border:"none", color:"#22c55e", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.si_backToList}</button>
+        <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{editInvId?t.si_edit:t.si_new}</div>
+      </div>
+
+      {/* Invoice No + Date + Customer */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+        <div style={secLbl}>📄 {t.si_invoiceNo} & {t.si_date}</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
+          <div>
+            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_invoiceNo}</div>
+            <div style={{ padding:"10px 12px", borderRadius:8, background:"rgba(34,197,94,0.08)", border:"1px solid #22c55e", fontSize:16, fontWeight:900, color:"#22c55e", letterSpacing:1, fontFamily:"monospace" }}>{siInvoiceNo}</div>
+          </div>
+          <div>
+            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_date}</div>
+            <input type="date" style={inp()} value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />
+          </div>
+        </div>
+        <div style={secLbl}>👤 {t.si_customer}</div>
+        <button onClick={()=>setShowCustPicker(true)} style={{ width:"100%", padding:"11px 14px", borderRadius:8, border:`1px solid ${siForm.customerName?"#22c55e":th.borderMid}`, background:th.bgInp, color:siForm.customerName?"#22c55e":th.txtMuted, fontSize:14, cursor:"pointer", fontFamily:"inherit", textAlign:"left", marginBottom:8, fontWeight:siForm.customerName?700:400 }}>
+          {siForm.customerName||t.si_selectCustomer}
+        </button>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+          <input style={inp()} placeholder={t.si_customerManual} value={siForm.customerName} onChange={e=>siUpd("customerName",e.target.value)} />
+          <input style={inp()} placeholder="📱 Mobile" value={siForm.customerMobile} onChange={e=>siUpd("customerMobile",e.target.value)} inputMode="tel" />
+        </div>
+      </div>
+
+      {/* Items */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12, overflowX:"auto" }}>
+        <div style={{ ...secLbl, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span>📦 {t.si_items}</span>
+          <span style={{ fontSize:11, color:"#22c55e" }}>{siLines.length}{lang==="bn"?"টি":""}</span>
+        </div>
+        {isDesktop?(
+          <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
+            <thead><tr style={{ background:th.bgInp }}>
+              {["#",t.si_itemName,t.si_qty,t.si_unit,t.si_unitPrice,t.si_discPerc,"VAT%",t.si_lineTotal,""].map((h,i)=>(
+                <th key={i} style={{ padding:"7px 6px", fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, textAlign:i>1?"center":"left", letterSpacing:0.4 }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {siLines.map((item,idx)=>(<SiLineItemDesktop key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} />))}
+            </tbody>
+          </table>
+        ):(
+          siLines.map((item,idx)=>(<SiLineItemMobile key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} />))
+        )}
+        <button onClick={siAddLine} style={{ width:"100%", marginTop:10, padding:"11px", borderRadius:10, border:"2px dashed #22c55e", background:"rgba(34,197,94,0.06)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_addItem}</button>
+      </div>
+
+      {/* Summary */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
+        <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📊 {t.si_summary}</div>
+        {[[t.si_subtotal,siFmt2(totals.sub),th.txtPrimary],...(totals.disc>0?[[t.si_totalDiscount,`- ${siFmt2(totals.disc)}`,"#ef4444"]]:[]),...(totals.vat>0?[["VAT",`+ ${siFmt2(totals.vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>৳ {v}</span></div>
+        ))}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
+          <span style={{ fontSize:15, fontWeight:800 }}>{t.si_grandTotal}</span>
+          <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(totals.grand)}</span>
+        </div>
+      </div>
+
+      {/* Payment */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+        <div style={secLbl}>💳 {t.si_payment}</div>
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, marginBottom:12 }}>
+          {Object.entries(SI_PAY).map(([key,pm])=>(
+            <button key={key} onClick={()=>siUpd("paymentMethod",key)} style={{ padding:"10px 8px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", border:`1.5px solid ${siForm.paymentMethod===key?"#22c55e":th.borderMid}`, background:siForm.paymentMethod===key?"rgba(34,197,94,0.12)":"transparent", color:siForm.paymentMethod===key?"#22c55e":th.txtMuted, fontSize:12, fontWeight:700, display:"flex", alignItems:"center", gap:6, justifyContent:"center" }}>
+              <span style={{ fontSize:16 }}>{pm.icon}</span><span>{pm[lang]}</span>
+              {siForm.paymentMethod===key&&<span style={{ marginLeft:"auto", fontSize:11 }}>✅</span>}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_amountPaid}</div>
+        <input style={inp()} inputMode="decimal" placeholder="0.00" value={siForm.amountPaid} onChange={e=>siUpd("amountPaid",e.target.value)} />
+        {totals.grand>0&&<div style={{ marginTop:6 }}><button onClick={()=>siUpd("amountPaid",siFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.si_fullPay} (৳ {siFmt2(totals.grand)})</button></div>}
+        {totals.grand>0&&<div style={{ marginTop:12, padding:"10px 14px", borderRadius:10, background:balance>0.01?"rgba(239,68,68,0.08)":"rgba(34,197,94,0.08)", border:`1px solid ${balance>0.01?"#ef4444":"#22c55e"}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span>
+          <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(balance)}</span>
+        </div>}
+      </div>
+
+      {/* Note */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:16 }}>
+        <div style={secLbl}>📝 {t.si_note}</div>
+        <AutoTA style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", overflow:"hidden", minHeight:60, boxSizing:"border-box", fontFamily:"inherit" }} placeholder={t.si_notePh} value={siForm.note} onChange={e=>siUpd("note",e.target.value)} />
+      </div>
+
+      {/* Actions */}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <button onClick={siConfirm} disabled={siSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:siSaving?"#14532d":"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:siSaving?"not-allowed":"pointer" }}>{siSaving?"...":t.si_confirm}</button>
+        <button onClick={siSaveDraft} disabled={siSaving} style={{ padding:"12px", borderRadius:12, border:`1.5px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_saveDraft}</button>
+        <button onClick={()=>setSiView("list")} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelForm}</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
   const isOwner = profile.role==="owner";
@@ -3867,11 +4661,12 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["vendors",t.tabVendor],["customers",t.tabCustomer],["settings",t.tabSettings]]
+    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["settings",t.tabSettings]]
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
+        ["sales", t.tabSales],
         ["purchase", lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info"],
         ["settings",t.tabSettings],
       ];
@@ -5188,6 +5983,15 @@ const startEditOrder = (order) => {
         <div style={isDesktop?s.desktopPanel:s.panel}>
           <PiSalesmanView t={t} lang={lang} th={th} shopId={shopId} />
         </div>
+      )}
+
+      {tab==="sales"&&(
+        <SalesInvoiceTab
+          t={t} lang={lang} th={th} s={s}
+          shopId={shopId} user={user} profile={profile}
+          customers={customers} products={products}
+          shop={localShop} toast={toast} isDesktop={isDesktop}
+        />
       )}
 
       {tab==="settings"&&(
