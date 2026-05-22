@@ -1512,6 +1512,17 @@ function VmStatusBadge({ status, lang }) {
 }
 
 // ─── VENDOR MASTER WINDOW ─────────────────────────────────────
+const emptyVendor = {
+  vendorName:"", vendorCode:"", category:"", status:"active",
+  contactPerson:"",
+  mobileNumber:"", phoneNumber:"", whatsappNumber:"", email:"",
+  address:"", area:"", city:"", country:"", mapLink:"",
+  trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
+  bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
+  creditLimit:"", openingBalance:"", paymentTerms:"",
+  notes:"",
+};
+
 function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDesktop, onGoToPurchase }) {
   const [vmView,setVmView]           = useState("list"); // list|form|detail
   const [selVendor,setSelVendor]     = useState(null);
@@ -2642,17 +2653,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [copyState,setCopyState]=useState(false);
   const [vendors, setVendors] = useState([]);
 const [showVendorModal, setShowVendorModal] = useState(false);
-
-const emptyVendor = {
-  vendorName:"", vendorCode:"", category:"", status:"active",
-  contactPerson:"",
-  mobileNumber:"", phoneNumber:"", whatsappNumber:"", email:"",
-  address:"", area:"", city:"", country:"", mapLink:"",
-  trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
-  bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
-  creditLimit:"", openingBalance:"", paymentTerms:"",
-  notes:"",
-};
 
 const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [searchQ,setSearchQ]=useState("");
