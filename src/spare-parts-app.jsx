@@ -3383,6 +3383,10 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     );
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
+
+  useEffect(() => {
+    return onSnapshot(
+      query(collection(db,"users"), where("shopId","==",shopId)),
       snap => setTeam(snap.docs.map(d=>({...d.data(),id:d.id}))),
       err  => console.error(err)
     );
