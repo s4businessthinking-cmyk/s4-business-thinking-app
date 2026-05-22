@@ -159,6 +159,70 @@ const TR = {
     pmSelectHint:"পণ্য বেছে নিন বা নিজে লিখুন",
     pmFromMaster:"📦 Product Master থেকে বেছে নিন",
     tabPurchase:"🧾 ক্রয় ইনভয়েস",
+    tabVendor:"🏭 ভেন্ডর মাস্টার",
+    vm_title:"🏭 ভেন্ডর মাস্টার",
+    vm_new:"+ নতুন ভেন্ডর",
+    vm_edit:"✏️ ভেন্ডর এডিট",
+    vm_backToList:"← তালিকায় ফিরুন",
+    vm_save:"✅ সেভ করুন",
+    vm_cancel:"বাতিল",
+    vm_delete:"🗑️ মুছুন",
+    vm_confirmDelete:"এই ভেন্ডরটি মুছে ফেলবেন?",
+    vm_createInvoice:"🧾 ক্রয় ইনভয়েস তৈরি করুন",
+    vm_editBtn:"✏️ এডিট",
+    vm_searchPh:"ভেন্ডর নাম, কোড বা TRN খুঁজুন...",
+    vm_allStatus:"সব",
+    vm_active:"সক্রিয়",
+    vm_inactive:"নিষ্ক্রিয়",
+    vm_blocked:"ব্লক করা",
+    vm_noVendors:"এখনো কোনো ভেন্ডর নেই। নতুন ভেন্ডর তৈরি করুন।",
+    vm_noResults:"কিছু পাওয়া যায়নি",
+    vm_loading:"লোড হচ্ছে...",
+    vm_saved:"✅ ভেন্ডর সেভ হয়েছে!",
+    vm_updated:"✅ ভেন্ডর আপডেট হয়েছে!",
+    vm_deleted:"ভেন্ডর মুছে ফেলা হয়েছে।",
+    vm_errName:"ভেন্ডরের নাম দিন!",
+    vm_errMobile:"মোবাইল নম্বর দিন!",
+    vm_secBasic:"📋 মূল তথ্য",
+    vm_secContact:"📱 যোগাযোগ",
+    vm_secAddress:"📍 ঠিকানা",
+    vm_secTax:"🧾 ট্যাক্স ও লাইসেন্স",
+    vm_secBank:"🏦 ব্যাংক তথ্য",
+    vm_secCredit:"💳 ক্রেডিট তথ্য",
+    vm_secNotes:"📝 নোট",
+    vm_vendorName:"ভেন্ডরের নাম *",
+    vm_vendorCode:"ভেন্ডর কোড",
+    vm_category:"ক্যাটাগরি",
+    vm_status:"স্ট্যাটাস",
+    vm_contactPerson:"যোগাযোগ ব্যক্তি",
+    vm_mobile:"মোবাইল নং *",
+    vm_phone:"ফোন নং",
+    vm_whatsapp:"WhatsApp নং",
+    vm_email:"ইমেইল",
+    vm_address:"ঠিকানা",
+    vm_area:"এলাকা",
+    vm_city:"শহর",
+    vm_country:"দেশ",
+    vm_mapLink:"ম্যাপ লিংক (Google Maps)",
+    vm_trnNumber:"TRN নম্বর (Tax Registration No.)",
+    vm_tradeLicense:"ট্রেড লাইসেন্স নং",
+    vm_tinNumber:"TIN নম্বর",
+    vm_binNumber:"BIN নম্বর",
+    vm_vatNumber:"VAT নম্বর",
+    vm_bankName:"ব্যাংকের নাম",
+    vm_bankBranch:"শাখা",
+    vm_accountName:"অ্যাকাউন্টের নাম",
+    vm_accountNumber:"অ্যাকাউন্ট নম্বর",
+    vm_iban:"IBAN নম্বর",
+    vm_swift:"SWIFT কোড",
+    vm_creditLimit:"ক্রেডিট লিমিট (৳)",
+    vm_openingBalance:"শুরুর ব্যালেন্স (৳)",
+    vm_paymentTerms:"পেমেন্ট শর্ত (দিন)",
+    vm_notes:"বিশেষ নোট",
+    vm_totalVendors:"মোট ভেন্ডর",
+    vm_activeVendors:"সক্রিয়",
+    vm_totalCredit:"মোট ক্রেডিট লিমিট",
+    vm_categories:["ম্যানুফ্যাকচারার","ডিস্ট্রিবিউটর","হোলসেলার","রিটেইলার","আমদানিকারক","সার্ভিস প্রোভাইডার","অন্যান্য"],
     pi_title:"🧾 ক্রয় ইনভয়েস",
     pi_new:"+ নতুন ইনভয়েস",
     pi_edit:"✏️ ইনভয়েস এডিট",
@@ -343,6 +407,70 @@ const TR = {
     pmSelectHint:"Select a product or type manually",
     pmFromMaster:"📦 Select from Product Master",
     tabPurchase:"🧾 Purchase Invoice",
+    tabVendor:"🏭 Vendor Master",
+    vm_title:"🏭 Vendor Master",
+    vm_new:"+ New Vendor",
+    vm_edit:"✏️ Edit Vendor",
+    vm_backToList:"← Back to List",
+    vm_save:"✅ Save",
+    vm_cancel:"Cancel",
+    vm_delete:"🗑️ Delete",
+    vm_confirmDelete:"Delete this vendor?",
+    vm_createInvoice:"🧾 Create Purchase Invoice",
+    vm_editBtn:"✏️ Edit",
+    vm_searchPh:"Search by name, code or TRN...",
+    vm_allStatus:"All",
+    vm_active:"Active",
+    vm_inactive:"Inactive",
+    vm_blocked:"Blocked",
+    vm_noVendors:"No vendors yet. Create your first vendor.",
+    vm_noResults:"No results found",
+    vm_loading:"Loading...",
+    vm_saved:"✅ Vendor saved!",
+    vm_updated:"✅ Vendor updated!",
+    vm_deleted:"Vendor deleted.",
+    vm_errName:"Enter vendor name!",
+    vm_errMobile:"Enter mobile number!",
+    vm_secBasic:"📋 Basic Info",
+    vm_secContact:"📱 Contact",
+    vm_secAddress:"📍 Address",
+    vm_secTax:"🧾 Tax & License",
+    vm_secBank:"🏦 Bank Info",
+    vm_secCredit:"💳 Credit Info",
+    vm_secNotes:"📝 Notes",
+    vm_vendorName:"Vendor Name *",
+    vm_vendorCode:"Vendor Code",
+    vm_category:"Category",
+    vm_status:"Status",
+    vm_contactPerson:"Contact Person",
+    vm_mobile:"Mobile No. *",
+    vm_phone:"Phone No.",
+    vm_whatsapp:"WhatsApp No.",
+    vm_email:"Email",
+    vm_address:"Address",
+    vm_area:"Area",
+    vm_city:"City",
+    vm_country:"Country",
+    vm_mapLink:"Map Link (Google Maps)",
+    vm_trnNumber:"TRN Number (Tax Registration No.)",
+    vm_tradeLicense:"Trade License No.",
+    vm_tinNumber:"TIN Number",
+    vm_binNumber:"BIN Number",
+    vm_vatNumber:"VAT Number",
+    vm_bankName:"Bank Name",
+    vm_bankBranch:"Branch",
+    vm_accountName:"Account Name",
+    vm_accountNumber:"Account Number",
+    vm_iban:"IBAN Number",
+    vm_swift:"SWIFT Code",
+    vm_creditLimit:"Credit Limit (৳)",
+    vm_openingBalance:"Opening Balance (৳)",
+    vm_paymentTerms:"Payment Terms (Days)",
+    vm_notes:"Special Notes",
+    vm_totalVendors:"Total Vendors",
+    vm_activeVendors:"Active",
+    vm_totalCredit:"Total Credit Limit",
+    vm_categories:["Manufacturer","Distributor","Wholesaler","Retailer","Importer","Service Provider","Other"],
     pi_title:"🧾 Purchase Invoice",
     pi_new:"+ New Invoice",
     pi_edit:"✏️ Edit Invoice",
@@ -1059,6 +1187,18 @@ const PI_STATUSES = {
 const piFmt2     = (n) => (Math.round((parseFloat(n)||0)*100)/100).toFixed(2);
 const piN2       = (v) => parseFloat(v)||0;
 const piToday    = () => new Date().toISOString().split("T")[0];
+
+// ─── GLOBAL SEARCH NORMALIZER ─────────────────────────────────
+// . - / \ space _ সরিয়ে lowercase করে — code search এর জন্য
+const nsq = (str) => String(str||"").replace(/[\.\-\/\\\s_,]+/g,"").toLowerCase();
+const nsmatch = (haystack, needle) => {
+  if (!needle) return true;
+  const n = nsq(needle);
+  // exact normalized match
+  if (nsq(haystack).includes(n)) return true;
+  // also try word-by-word raw lowercase match
+  return haystack.toLowerCase().includes(needle.toLowerCase());
+};
 function piCalcLine(it) {
   const qty=piN2(it.qty), cost=piN2(it.unitCost), dp=piN2(it.discountPerc), tp=piN2(it.taxPerc);
   const gross=qty*cost, disc=gross*dp/100, base=gross-disc, tax=base*tp/100;
@@ -1117,7 +1257,8 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
   const [q,setQ]=useState("");
   const filtered=products.filter(p=>{
     if (!q) return true;
-    return [p.name,p.code,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ").toLowerCase().includes(q.toLowerCase());
+    const hay = [p.name,p.code,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
+    return nsmatch(hay, q);
   });
   const inp={ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
   return (
@@ -1347,6 +1488,443 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
   );
 }
 
+// ─── AUTO-RESIZE TEXTAREA ────────────────────────────────────
+function AutoTA({ style, ...props }) {
+  const ref = useRef(null);
+  const resize = () => {
+    if (!ref.current) return;
+    ref.current.style.height = "auto";
+    ref.current.style.height = ref.current.scrollHeight + "px";
+  };
+  useEffect(()=>{ resize(); },[props.value]);
+  return <textarea ref={ref} style={{ resize:"none", overflow:"hidden", ...style }} onInput={resize} {...props} />;
+}
+
+// ─── VENDOR STATUS BADGE ─────────────────────────────────────
+const VM_STATUS = {
+  active:   { bn:"সক্রিয়",   en:"Active",   color:"#22c55e", bg:"#052e16" },
+  inactive: { bn:"নিষ্ক্রিয়", en:"Inactive", color:"#f59e0b", bg:"#451a03" },
+  blocked:  { bn:"ব্লক করা",  en:"Blocked",  color:"#ef4444", bg:"#450a0a" },
+};
+function VmStatusBadge({ status, lang }) {
+  const st = VM_STATUS[status]||VM_STATUS.active;
+  return <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, color:st.color, background:st.bg, whiteSpace:"nowrap" }}>{st[lang]}</span>;
+}
+
+// ─── VENDOR MASTER WINDOW ─────────────────────────────────────
+function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDesktop, onGoToPurchase }) {
+  const [vmView,setVmView]           = useState("list"); // list|form|detail
+  const [selVendor,setSelVendor]     = useState(null);
+  const [editVendorId,setEditVendorId] = useState(null);
+  const [vmForm,setVmForm]           = useState({...emptyVendor});
+  const [vmSaving,setVmSaving]       = useState(false);
+  const [vmSearch,setVmSearch]       = useState("");
+  const [vmStatusF,setVmStatusF]     = useState("ALL");
+
+  const upd = (k,v) => setVmForm(p=>({...p,[k]:v}));
+
+  const panel = isDesktop
+    ? {maxWidth:860,margin:"0 auto",padding:"24px 28px 80px"}
+    : {maxWidth:640,margin:"0 auto",padding:"16px 14px 80px"};
+
+  const inp = (ex={}) => ({
+    padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`,
+    background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none",
+    width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...ex,
+  });
+  const taStyle = {
+    ...inp(), minHeight:48, resize:"none", overflow:"hidden", lineHeight:1.5,
+  };
+  const secLabel = (icon, label) => (
+    <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase",
+      letterSpacing:0.5, padding:"10px 0 8px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>
+      {icon} {label}
+    </div>
+  );
+  const fieldWrap = (label, node, full=false) => (
+    <div style={{ gridColumn: full?"1/-1":"auto" }}>
+      <div style={{ fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4 }}>{label}</div>
+      {node}
+    </div>
+  );
+  const grid2 = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:4 };
+  const card  = { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 };
+
+  // ── filtered list ──
+  const q = vmSearch.trim();
+  const filtered = vendors.filter(v=>{
+    const matchSt = vmStatusF==="ALL" || v.status===vmStatusF;
+    if (!q) return matchSt;
+    const hay = [v.vendorName,v.vendorCode,v.mobileNumber,v.trnNumber,v.city,v.contactPerson,v.tradeLicenseNumber,v.tinNumber,v.binNumber,v.vatNumber].filter(Boolean).join(" ");
+    return matchSt && nsmatch(hay, q);
+  });
+  const kpi = {
+    total: vendors.length,
+    active: vendors.filter(v=>v.status==="active").length,
+    credit: vendors.reduce((s,v)=>s+(v.creditLimit||0),0),
+  };
+
+  // ── save / update ──
+  const vmSave = async () => {
+    if (!vmForm.vendorName.trim()) { toast(t.vm_errName,"err"); return; }
+    if (!vmForm.mobileNumber.trim()) { toast(t.vm_errMobile,"err"); return; }
+    setVmSaving(true);
+    const payload = {
+      shopId, updatedBy:user.uid, updatedAt:serverTimestamp(),
+      vendorName:vmForm.vendorName.trim(), vendorCode:vmForm.vendorCode.trim(),
+      category:vmForm.category||"", status:vmForm.status||"active",
+      contactPerson:vmForm.contactPerson.trim(),
+      mobileNumber:vmForm.mobileNumber.trim(), phoneNumber:vmForm.phoneNumber.trim(),
+      whatsappNumber:vmForm.whatsappNumber.trim(), email:vmForm.email.trim(),
+      address:vmForm.address.trim(), area:vmForm.area.trim(),
+      city:vmForm.city.trim(), country:vmForm.country.trim(), mapLink:vmForm.mapLink.trim(),
+      trnNumber:vmForm.trnNumber.trim(),
+      tradeLicenseNumber:vmForm.tradeLicenseNumber.trim(),
+      tinNumber:vmForm.tinNumber.trim(), binNumber:vmForm.binNumber.trim(), vatNumber:vmForm.vatNumber.trim(),
+      bankName:vmForm.bankName.trim(), bankBranch:vmForm.bankBranch.trim(),
+      accountName:vmForm.accountName.trim(), accountNumber:vmForm.accountNumber.trim(),
+      ibanNumber:vmForm.ibanNumber.trim(), swiftCode:vmForm.swiftCode.trim(),
+      creditLimit:Number(vmForm.creditLimit||0), openingBalance:Number(vmForm.openingBalance||0),
+      paymentTerms:Number(vmForm.paymentTerms||0), notes:vmForm.notes.trim(),
+    };
+    try {
+      if (editVendorId) {
+        await updateDoc(doc(db,"vendors",editVendorId),payload);
+        toast(t.vm_updated);
+        setSelVendor({...payload, id:editVendorId});
+        setVmView("detail");
+      } else {
+        const ref = await addDoc(collection(db,"vendors"),{...payload,createdBy:user.uid,createdAt:serverTimestamp()});
+        toast(t.vm_saved);
+        setSelVendor({...payload, id:ref.id});
+        setVmView("detail");
+      }
+      setVmForm({...emptyVendor});
+      setEditVendorId(null);
+    } catch(e) { toast(e.message,"err"); }
+    finally { setVmSaving(false); }
+  };
+
+  const vmDelete = async (v) => {
+    if (!window.confirm(t.vm_confirmDelete)) return;
+    try {
+      await deleteDoc(doc(db,"vendors",v.id));
+      toast(t.vm_deleted,"err");
+      setVmView("list"); setSelVendor(null);
+    } catch(e) { toast(e.message,"err"); }
+  };
+
+  const openEdit = (v) => {
+    setVmForm({
+      vendorName:v.vendorName||"", vendorCode:v.vendorCode||"",
+      category:v.category||"", status:v.status||"active",
+      contactPerson:v.contactPerson||"",
+      mobileNumber:v.mobileNumber||"", phoneNumber:v.phoneNumber||"",
+      whatsappNumber:v.whatsappNumber||"", email:v.email||"",
+      address:v.address||"", area:v.area||"", city:v.city||"",
+      country:v.country||"", mapLink:v.mapLink||"",
+      trnNumber:v.trnNumber||"", tradeLicenseNumber:v.tradeLicenseNumber||"",
+      tinNumber:v.tinNumber||"", binNumber:v.binNumber||"", vatNumber:v.vatNumber||"",
+      bankName:v.bankName||"", bankBranch:v.bankBranch||"",
+      accountName:v.accountName||"", accountNumber:v.accountNumber||"",
+      ibanNumber:v.ibanNumber||"", swiftCode:v.swiftCode||"",
+      creditLimit:String(v.creditLimit||""), openingBalance:String(v.openingBalance||""),
+      paymentTerms:String(v.paymentTerms||""), notes:v.notes||"",
+    });
+    setEditVendorId(v.id);
+    setVmView("form");
+  };
+
+  // ══════════════════════════════════
+  // LIST VIEW
+  // ══════════════════════════════════
+  if (vmView==="list") return (
+    <div style={panel}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.vm_title}</div>
+        <button onClick={()=>{ setVmForm({...emptyVendor}); setEditVendorId(null); setVmView("form"); }}
+          style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+          {t.vm_new}
+        </button>
+      </div>
+
+      {/* KPI */}
+      {vendors.length>0&&(
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
+          {[
+            { l:t.vm_totalVendors,  v:kpi.total,             c:"#a1a1aa", pre:"" },
+            { l:t.vm_activeVendors, v:kpi.active,            c:"#22c55e", pre:"" },
+            { l:t.vm_totalCredit,   v:`৳${(kpi.credit/1000).toFixed(0)}k`, c:"#f97316", pre:"" },
+          ].map((k,i)=>(
+            <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
+              <div style={{ fontSize:17, fontWeight:900, color:k.c }}>{k.pre}{k.v}</div>
+              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2, letterSpacing:0.4 }}>{k.l}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Search */}
+      <div style={{ position:"relative", marginBottom:10 }}>
+        <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+        <input style={{ ...inp(), paddingLeft:38, background:th.bgCard }} placeholder={t.vm_searchPh} value={vmSearch} onChange={e=>setVmSearch(e.target.value)} />
+        {vmSearch&&<button onClick={()=>setVmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16 }}>✕</button>}
+      </div>
+
+      {/* Status pills */}
+      <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginBottom:12 }}>
+        {["ALL","active","inactive","blocked"].map(st=>(
+          <button key={st} onClick={()=>setVmStatusF(st)} style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit", background:vmStatusF===st?"#f97316":"transparent", borderColor:vmStatusF===st?"#f97316":th.borderMid, color:vmStatusF===st?"#fff":th.txtMuted }}>
+            {st==="ALL"?t.vm_allStatus:(VM_STATUS[st]?.[lang]||st)}
+          </button>
+        ))}
+      </div>
+
+      {/* Empty states */}
+      {vendors.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>🏭</div><div>{t.vm_noVendors}</div></div>}
+      {vendors.length>0&&filtered.length===0&&<div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.vm_noResults}</div></div>}
+
+      {/* Vendor cards */}
+      {filtered.map(v=>(
+        <div key={v.id} onClick={()=>{ setSelVendor(v); setVmView("detail"); }}
+          style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
+          onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
+          onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:5 }}>
+            <div>
+              <div style={{ fontSize:14, fontWeight:800, color:th.txtPrimary }}>{v.vendorName}</div>
+              {v.vendorCode&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:1, fontFamily:"monospace" }}>#{v.vendorCode}</div>}
+            </div>
+            <VmStatusBadge status={v.status||"active"} lang={lang} />
+          </div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginTop:5 }}>
+            {v.mobileNumber&&<span style={{ fontSize:12, color:th.txtMuted }}>📱 {v.mobileNumber}</span>}
+            {v.city&&<span style={{ fontSize:12, color:th.txtMuted }}>📍 {v.city}</span>}
+            {v.trnNumber&&<span style={{ fontSize:12, color:"#f59e0b", fontFamily:"monospace" }}>TRN: {v.trnNumber}</span>}
+            {v.creditLimit>0&&<span style={{ fontSize:12, color:"#f97316", fontWeight:700 }}>💳 ৳{v.creditLimit.toLocaleString()}</span>}
+            {v.category&&<span style={{ fontSize:11, color:th.txtFaint, background:th.bgInp, padding:"2px 7px", borderRadius:6 }}>{v.category}</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // ══════════════════════════════════
+  // DETAIL VIEW
+  // ══════════════════════════════════
+  if (vmView==="detail"&&selVendor) {
+    const v = vendors.find(x=>x.id===selVendor.id)||selVendor;
+    const dr = { display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
+    const row = (label, val, color=th.txtPrimary) => val ? (
+      <div style={dr}>
+        <span style={{ fontSize:12, color:th.txtMuted, flexShrink:0, width:130 }}>{label}</span>
+        <span style={{ fontSize:13, fontWeight:600, color, textAlign:"right", wordBreak:"break-word", maxWidth:"60%" }}>{val}</span>
+      </div>
+    ) : null;
+    return (
+      <div style={panel}>
+        <button onClick={()=>{ setVmView("list"); setSelVendor(null); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.vm_backToList}</button>
+
+        {/* Header */}
+        <div style={card}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+            <div>
+              <div style={{ fontSize:20, fontWeight:900, color:th.txtPrimary }}>{v.vendorName}</div>
+              {v.vendorCode&&<div style={{ fontSize:12, color:"#a1a1aa", fontFamily:"monospace", marginTop:2 }}>#{v.vendorCode}</div>}
+              {v.category&&<div style={{ fontSize:11, color:th.txtFaint, marginTop:3 }}>{v.category}</div>}
+            </div>
+            <VmStatusBadge status={v.status||"active"} lang={lang} />
+          </div>
+          {row(t.vm_contactPerson, v.contactPerson)}
+          {row(t.vm_mobile, v.mobileNumber, "#06b6d4")}
+          {row(t.vm_phone, v.phoneNumber)}
+          {row(t.vm_whatsapp, v.whatsappNumber, "#22c55e")}
+          {row(t.vm_email, v.email)}
+        </div>
+
+        {/* Address */}
+        {(v.address||v.city||v.country||v.mapLink)&&(
+          <div style={card}>
+            {secLabel("📍", t.vm_secAddress)}
+            {row(t.vm_address, v.address)}
+            {row(t.vm_area, v.area)}
+            {row(t.vm_city, v.city)}
+            {row(t.vm_country, v.country)}
+            {v.mapLink&&<div style={{ ...dr, borderBottom:"none" }}>
+              <span style={{ fontSize:12, color:th.txtMuted }}>{t.vm_mapLink}</span>
+              <a href={v.mapLink} target="_blank" rel="noopener noreferrer" style={{ fontSize:12, color:"#6366f1" }}>🗺️ {lang==="bn"?"ম্যাপ দেখুন":"View Map"}</a>
+            </div>}
+          </div>
+        )}
+
+        {/* Tax */}
+        {(v.trnNumber||v.tradeLicenseNumber||v.tinNumber||v.binNumber||v.vatNumber)&&(
+          <div style={card}>
+            {secLabel("🧾", t.vm_secTax)}
+            {row(t.vm_trnNumber, v.trnNumber, "#f59e0b")}
+            {row(t.vm_tradeLicense, v.tradeLicenseNumber)}
+            {row(t.vm_tinNumber, v.tinNumber)}
+            {row(t.vm_binNumber, v.binNumber)}
+            {row(t.vm_vatNumber, v.vatNumber)}
+          </div>
+        )}
+
+        {/* Bank */}
+        {(v.bankName||v.accountNumber||v.ibanNumber)&&(
+          <div style={card}>
+            {secLabel("🏦", t.vm_secBank)}
+            {row(t.vm_bankName, v.bankName)}
+            {row(t.vm_bankBranch, v.bankBranch)}
+            {row(t.vm_accountName, v.accountName)}
+            {row(t.vm_accountNumber, v.accountNumber, "#06b6d4")}
+            {row(t.vm_iban, v.ibanNumber)}
+            {row(t.vm_swift, v.swiftCode)}
+          </div>
+        )}
+
+        {/* Credit */}
+        {(v.creditLimit>0||v.paymentTerms>0)&&(
+          <div style={card}>
+            {secLabel("💳", t.vm_secCredit)}
+            {v.creditLimit>0&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{t.vm_creditLimit}</span><span style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>৳{v.creditLimit.toLocaleString()}</span></div>}
+            {v.openingBalance>0&&row(t.vm_openingBalance, `৳${v.openingBalance.toLocaleString()}`)}
+            {v.paymentTerms>0&&row(t.vm_paymentTerms, `NET ${v.paymentTerms} ${lang==="bn"?"দিন":"Days"}`)}
+          </div>
+        )}
+
+        {/* Notes */}
+        {v.notes&&(
+          <div style={{ ...card, borderLeft:"3px solid #f97316" }}>
+            <div style={{ fontSize:10, color:"#f97316", fontWeight:700, textTransform:"uppercase", marginBottom:6 }}>📝 {t.vm_secNotes}</div>
+            <div style={{ fontSize:13, color:th.txtSecondary, lineHeight:1.6 }}>{v.notes}</div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          {onGoToPurchase&&<button onClick={()=>onGoToPurchase(v)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.vm_createInvoice}</button>}
+          <button onClick={()=>openEdit(v)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.vm_editBtn}</button>
+          <button onClick={()=>vmDelete(v)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.vm_delete}</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════
+  // FORM VIEW
+  // ══════════════════════════════════
+  return (
+    <div style={panel}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <button onClick={()=>{ setVmView(editVendorId?"detail":"list"); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.vm_backToList}</button>
+        <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{editVendorId?t.vm_edit:t.vm_new}</div>
+      </div>
+
+      {/* Section 1: Basic Info */}
+      <div style={card}>
+        {secLabel("📋", t.vm_secBasic)}
+        <div style={grid2}>
+          {fieldWrap(t.vm_vendorName, <input style={inp()} placeholder={lang==="bn"?"ভেন্ডরের নাম...":"Vendor name..."} value={vmForm.vendorName} onChange={e=>upd("vendorName",e.target.value)} />, false)}
+          {fieldWrap(t.vm_vendorCode, <input style={inp()} placeholder="V-001" value={vmForm.vendorCode} onChange={e=>upd("vendorCode",e.target.value)} />)}
+          {fieldWrap(t.vm_category,
+            <select style={{ ...inp(), background:th.bgCard }} value={vmForm.category} onChange={e=>upd("category",e.target.value)}>
+              <option value="">{lang==="bn"?"ক্যাটাগরি বেছে নিন":"Select category"}</option>
+              {(t.vm_categories||[]).map((c,i)=><option key={i} value={c}>{c}</option>)}
+            </select>
+          )}
+          {fieldWrap(t.vm_status,
+            <select style={{ ...inp(), background:th.bgCard }} value={vmForm.status} onChange={e=>upd("status",e.target.value)}>
+              <option value="active">{VM_STATUS.active[lang]}</option>
+              <option value="inactive">{VM_STATUS.inactive[lang]}</option>
+              <option value="blocked">{VM_STATUS.blocked[lang]}</option>
+            </select>
+          )}
+        </div>
+      </div>
+
+      {/* Section 2: Contact */}
+      <div style={card}>
+        {secLabel("📱", t.vm_secContact)}
+        <div style={grid2}>
+          {fieldWrap(t.vm_contactPerson, <input style={inp()} placeholder={lang==="bn"?"যোগাযোগ ব্যক্তির নাম":"Contact person name"} value={vmForm.contactPerson} onChange={e=>upd("contactPerson",e.target.value)} />, false)}
+          {fieldWrap(t.vm_mobile, <input style={inp()} inputMode="tel" placeholder="017XXXXXXXX" value={vmForm.mobileNumber} onChange={e=>upd("mobileNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_phone, <input style={inp()} inputMode="tel" placeholder="02XXXXXXXX" value={vmForm.phoneNumber} onChange={e=>upd("phoneNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_whatsapp, <input style={inp()} inputMode="tel" placeholder="017XXXXXXXX" value={vmForm.whatsappNumber} onChange={e=>upd("whatsappNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_email, <input style={inp()} inputMode="email" placeholder="vendor@email.com" value={vmForm.email} onChange={e=>upd("email",e.target.value)} />, false)}
+        </div>
+      </div>
+
+      {/* Section 3: Address */}
+      <div style={card}>
+        {secLabel("📍", t.vm_secAddress)}
+        <div style={{ marginBottom:10 }}>
+          {fieldWrap(t.vm_address,
+            <AutoTA style={taStyle} placeholder={lang==="bn"?"সম্পূর্ণ ঠিকানা লিখুন...":"Full address..."} value={vmForm.address} onChange={e=>upd("address",e.target.value)} />,
+            true
+          )}
+        </div>
+        <div style={grid2}>
+          {fieldWrap(t.vm_area, <input style={inp()} placeholder={lang==="bn"?"এলাকা":"Area"} value={vmForm.area} onChange={e=>upd("area",e.target.value)} />)}
+          {fieldWrap(t.vm_city, <input style={inp()} placeholder={lang==="bn"?"শহর":"City"} value={vmForm.city} onChange={e=>upd("city",e.target.value)} />)}
+          {fieldWrap(t.vm_country, <input style={inp()} placeholder="Bangladesh / UAE..." value={vmForm.country} onChange={e=>upd("country",e.target.value)} />)}
+          {fieldWrap(t.vm_mapLink, <input style={inp()} placeholder="https://maps.google.com/..." value={vmForm.mapLink} onChange={e=>upd("mapLink",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 4: Tax & Legal */}
+      <div style={card}>
+        {secLabel("🧾", t.vm_secTax)}
+        <div style={grid2}>
+          {fieldWrap(t.vm_trnNumber, <input style={{ ...inp(), borderColor:"#f59e0b", fontFamily:"monospace" }} placeholder="100XXXXXXXXX" value={vmForm.trnNumber} onChange={e=>upd("trnNumber",e.target.value)} />, false)}
+          {fieldWrap(t.vm_tradeLicense, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="TL-XXXXXXXX" value={vmForm.tradeLicenseNumber} onChange={e=>upd("tradeLicenseNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_tinNumber, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="TIN Number" value={vmForm.tinNumber} onChange={e=>upd("tinNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_binNumber, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="BIN Number" value={vmForm.binNumber} onChange={e=>upd("binNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_vatNumber, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="VAT Number" value={vmForm.vatNumber} onChange={e=>upd("vatNumber",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 5: Bank */}
+      <div style={card}>
+        {secLabel("🏦", t.vm_secBank)}
+        <div style={grid2}>
+          {fieldWrap(t.vm_bankName, <input style={inp()} placeholder={lang==="bn"?"ব্যাংকের নাম":"Bank name"} value={vmForm.bankName} onChange={e=>upd("bankName",e.target.value)} />)}
+          {fieldWrap(t.vm_bankBranch, <input style={inp()} placeholder={lang==="bn"?"শাখা":"Branch"} value={vmForm.bankBranch} onChange={e=>upd("bankBranch",e.target.value)} />)}
+          {fieldWrap(t.vm_accountName, <input style={inp()} placeholder={lang==="bn"?"অ্যাকাউন্টের নাম":"Account name"} value={vmForm.accountName} onChange={e=>upd("accountName",e.target.value)} />, false)}
+          {fieldWrap(t.vm_accountNumber, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="Account number" value={vmForm.accountNumber} onChange={e=>upd("accountNumber",e.target.value)} />)}
+          {fieldWrap(t.vm_iban, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="AE070331234567890123456" value={vmForm.ibanNumber} onChange={e=>upd("ibanNumber",e.target.value)} />, false)}
+          {fieldWrap(t.vm_swift, <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="BOMLAEADXXX" value={vmForm.swiftCode} onChange={e=>upd("swiftCode",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 6: Credit */}
+      <div style={card}>
+        {secLabel("💳", t.vm_secCredit)}
+        <div style={grid2}>
+          {fieldWrap(t.vm_creditLimit, <input style={inp()} inputMode="numeric" placeholder="50000" value={vmForm.creditLimit} onChange={e=>upd("creditLimit",e.target.value)} />)}
+          {fieldWrap(t.vm_openingBalance, <input style={inp()} inputMode="numeric" placeholder="0" value={vmForm.openingBalance} onChange={e=>upd("openingBalance",e.target.value)} />)}
+          {fieldWrap(t.vm_paymentTerms, <input style={inp()} inputMode="numeric" placeholder="30" value={vmForm.paymentTerms} onChange={e=>upd("paymentTerms",e.target.value)} />)}
+        </div>
+      </div>
+
+      {/* Section 7: Notes */}
+      <div style={{ ...card, marginBottom:16 }}>
+        {secLabel("📝", t.vm_secNotes)}
+        <AutoTA style={taStyle} placeholder={lang==="bn"?"যেকোনো বিশেষ নোট বা মন্তব্য...":"Any special notes or remarks..."} value={vmForm.notes} onChange={e=>upd("notes",e.target.value)} />
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+        <button onClick={vmSave} disabled={vmSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:vmSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:15, fontWeight:800, cursor:vmSaving?"not-allowed":"pointer" }}>
+          {vmSaving?"...":(editVendorId?t.vm_save:t.vm_save)}
+        </button>
+        <button onClick={()=>setVmView(editVendorId?"detail":"list")} style={{ padding:"12px", borderRadius:12, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:14, fontWeight:700, cursor:"pointer" }}>
+          {t.vm_cancel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── PI: SUPPLIER LEDGER ──────────────────────────────────────
 function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
   const [selVendor,setSelVendor] = useState(null);
@@ -1512,9 +2090,12 @@ function PiSalesmanView({ t, lang, th, shopId }) {
   });
 
   // search filter
-  const q = searchQ.trim().toLowerCase();
+  const q = searchQ.trim();
   const filtered = q
-    ? allItems.filter(it=>[it.name,it.code,it.brand].filter(Boolean).join(" ").toLowerCase().includes(q))
+    ? allItems.filter(it=>{
+        const hay = [it.name,it.code,it.brand].filter(Boolean).join(" ");
+        return nsmatch(hay, q);
+      })
     : allItems;
 
   const inp = { padding:"11px 14px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
@@ -1803,11 +2384,11 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── Filter ──
   const piFiltered = invoices.filter(inv=>{
-    const q=piSearch.trim().toLowerCase();
+    const q=piSearch.trim();
     const matchSt=piStatusF==="ALL"||inv.status===piStatusF;
     if (!q) return matchSt;
-    const hay=[inv.invoiceNo,inv.vendorName,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code)].join(" ").toLowerCase();
-    return matchSt&&hay.includes(q);
+    const hay=[inv.invoiceNo,inv.vendorName,inv.supplierInvoiceNo,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code+" "+it.brand)].filter(Boolean).join(" ");
+    return matchSt&&nsmatch(hay,q);
   });
   const piKPIs = invoices.reduce((a,inv)=>{ a.total++; a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{ total:0,amount:0,paid:0,due:0 });
 
@@ -2008,8 +2589,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       {/* Note */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:16 }}>
         <div style={secLbl}>📝 {t.pi_note}</div>
-        <textarea style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"vertical", minHeight:72, boxSizing:"border-box", fontFamily:"inherit" }}
-          placeholder={t.pi_notePh} value={piForm.note} onChange={e=>piUpd("note",e.target.value)} rows={3} />
+        <AutoTA style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", overflow:"hidden", minHeight:72, boxSizing:"border-box", fontFamily:"inherit" }}
+          placeholder={t.pi_notePh} value={piForm.note} onChange={e=>piUpd("note",e.target.value)} />
       </div>
 
       {/* Actions */}
@@ -2063,34 +2644,14 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
 const [showVendorModal, setShowVendorModal] = useState(false);
 
 const emptyVendor = {
-  vendorName: "",
-  vendorCode: "",
-  contactPerson: "",
-
-  mobileNumber: "",
-  phoneNumber: "",
-  whatsappNumber: "",
-  email: "",
-
-  address: "",
-  area: "",
-  city: "",
-
-  tradeLicenseNumber: "",
-  tinNumber: "",
-  binNumber: "",
-  vatNumber: "",
-
-  bankName: "",
-  bankBranch: "",
-  accountName: "",
-  accountNumber: "",
-
-  creditLimit: "",
-  openingBalance: "",
-
-  notes: "",
-  status: "active",
+  vendorName:"", vendorCode:"", category:"", status:"active",
+  contactPerson:"",
+  mobileNumber:"", phoneNumber:"", whatsappNumber:"", email:"",
+  address:"", area:"", city:"", country:"", mapLink:"",
+  trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
+  bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
+  creditLimit:"", openingBalance:"", paymentTerms:"",
+  notes:"",
 };
 
 const [vendorForm, setVendorForm] = useState(emptyVendor);
@@ -2502,72 +3063,43 @@ const startEditOrder = (order) => {
   };
 
 
-  const saveVendor = async () => {
-
-  if (!vendorForm.vendorName.trim()) {
-    return toast("Vendor name required", "err");
-  }
-
-  if (!vendorForm.mobileNumber.trim()) {
-    return toast("Mobile number required", "err");
-  }
-
-  try {
-
-    await addDoc(collection(db, "vendors"), {
-
+  const saveVendor = async (editId=null) => {
+    if (!vendorForm.vendorName.trim()) return toast(t.vm_errName||"Enter vendor name!","err");
+    if (!vendorForm.mobileNumber.trim()) return toast(t.vm_errMobile||"Enter mobile number!","err");
+    const payload = {
       shopId,
-
-      vendorName: vendorForm.vendorName,
-      vendorCode: vendorForm.vendorCode,
-
-      contactPerson: vendorForm.contactPerson,
-
-      mobileNumber: vendorForm.mobileNumber,
-      phoneNumber: vendorForm.phoneNumber,
-      whatsappNumber: vendorForm.whatsappNumber,
-
-      email: vendorForm.email,
-
-      address: vendorForm.address,
-      area: vendorForm.area,
-      city: vendorForm.city,
-
-      tradeLicenseNumber: vendorForm.tradeLicenseNumber,
-      tinNumber: vendorForm.tinNumber,
-      binNumber: vendorForm.binNumber,
-      vatNumber: vendorForm.vatNumber,
-
-      bankName: vendorForm.bankName,
-      bankBranch: vendorForm.bankBranch,
-      accountName: vendorForm.accountName,
-      accountNumber: vendorForm.accountNumber,
-
-      creditLimit: Number(vendorForm.creditLimit || 0),
-      openingBalance: Number(vendorForm.openingBalance || 0),
-
-      notes: vendorForm.notes,
-
-      status: "active",
-
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-
-    });
-
-    toast("Vendor Created");
-
-    setVendorForm(emptyVendor);
-
-    setShowVendorModal(false);
-
-  } catch (e) {
-
-    console.error(e);
-
-    toast(e.message, "err");
-  }
-};
+      vendorName:vendorForm.vendorName.trim(), vendorCode:vendorForm.vendorCode.trim(),
+      category:vendorForm.category, status:vendorForm.status||"active",
+      contactPerson:vendorForm.contactPerson.trim(),
+      mobileNumber:vendorForm.mobileNumber.trim(), phoneNumber:vendorForm.phoneNumber.trim(),
+      whatsappNumber:vendorForm.whatsappNumber.trim(), email:vendorForm.email.trim(),
+      address:vendorForm.address.trim(), area:vendorForm.area.trim(),
+      city:vendorForm.city.trim(), country:vendorForm.country.trim(), mapLink:vendorForm.mapLink.trim(),
+      trnNumber:vendorForm.trnNumber.trim(),
+      tradeLicenseNumber:vendorForm.tradeLicenseNumber.trim(),
+      tinNumber:vendorForm.tinNumber.trim(), binNumber:vendorForm.binNumber.trim(),
+      vatNumber:vendorForm.vatNumber.trim(),
+      bankName:vendorForm.bankName.trim(), bankBranch:vendorForm.bankBranch.trim(),
+      accountName:vendorForm.accountName.trim(), accountNumber:vendorForm.accountNumber.trim(),
+      ibanNumber:vendorForm.ibanNumber.trim(), swiftCode:vendorForm.swiftCode.trim(),
+      creditLimit:Number(vendorForm.creditLimit||0),
+      openingBalance:Number(vendorForm.openingBalance||0),
+      paymentTerms:Number(vendorForm.paymentTerms||0),
+      notes:vendorForm.notes.trim(),
+      updatedBy:user.uid, updatedAt:serverTimestamp(),
+    };
+    try {
+      if (editId) {
+        await updateDoc(doc(db,"vendors",editId),payload);
+        toast(t.vm_updated||"Vendor updated!");
+      } else {
+        await addDoc(collection(db,"vendors"),{...payload,createdBy:user.uid,createdAt:serverTimestamp()});
+        toast(t.vm_saved||"Vendor saved!");
+      }
+      setVendorForm(emptyVendor);
+      setShowVendorModal(false);
+    } catch(e) { console.error(e); toast(e.message,"err"); }
+  };
   
 
   const addPosition = async () => {
@@ -2631,14 +3163,12 @@ const startEditOrder = (order) => {
 
   // ── SEARCH FILTER ──
   const filterOrders = (list) => {
-    const q = searchQ.trim().toLowerCase();
+    const q = searchQ.trim();
     if (!q) return list;
     return list.filter(o => {
-      const noMatch = getOrderDisplayNo(o).toLowerCase().includes(q);
+      const noMatch = nsmatch(getOrderDisplayNo(o), q);
       const itemMatch = o.items?.some(it =>
-        it.name?.toLowerCase().includes(q) ||
-        it.brand?.toLowerCase().includes(q) ||
-        it.code?.toLowerCase().includes(q)
+        nsmatch([it.name,it.brand,it.code].filter(Boolean).join(" "), q)
       );
       const d = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
       // Match against several date formats so user can type e.g. "9 may", "09/05", "2026"
@@ -2667,7 +3197,7 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["settings",t.tabSettings]]
+    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["vendors",t.tabVendor],["settings",t.tabSettings]]
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
@@ -2974,7 +3504,7 @@ const startEditOrder = (order) => {
                           onChange={e=>setProductPickerQ(e.target.value)} />
                         <div style={{ maxHeight:200, overflowY:"auto" }}>
                           {products
-                            .filter(p=> !productPickerQ || (p.name+' '+(p.code||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+(p.barcode||'')+' '+(p.moreBarcodes||[]).join(' ')).toLowerCase().includes(productPickerQ.toLowerCase()))
+                          .filter(p=> nsmatch([p.name,p.code||'',p.brand||'',p.category||'',p.barcode||'',...(p.moreBarcodes||[])].filter(Boolean).join(' '), productPickerQ))
                             .map(p=>(
                               <button key={p.id} onClick={()=>selectProductToOrder(p)}
                                 style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:`1px solid ${th.border}`, color:th.txtSecondary, cursor:"pointer", fontFamily:"inherit" }}>
@@ -3380,9 +3910,9 @@ const startEditOrder = (order) => {
           {!productsLoading&&products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
           {!productsLoading&&(()=>{
             const filtered = products.filter(p=>{
-              const q = pmSearch.toLowerCase();
               const refs = (p.moreBarcodes||[]).join(' ');
-              const matchQ = !q || (p.name+' '+(p.code||'')+' '+(p.barcode||'')+' '+(p.ean||'')+' '+(p.brand||'')+' '+(p.category||'')+' '+refs).toLowerCase().includes(q);
+              const hay = [p.name,p.code,p.barcode,p.ean,p.brand,p.category,refs].filter(Boolean).join(' ');
+              const matchQ = nsmatch(hay, pmSearch);
               const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
               return matchQ && matchCat;
             });
@@ -3774,7 +4304,7 @@ const startEditOrder = (order) => {
           }
         />
 
-        <textarea
+        <AutoTA
           style={s.ta}
           placeholder="Address"
           value={vendorForm.address}
@@ -3918,7 +4448,7 @@ const startEditOrder = (order) => {
           }
         />
 
-        <textarea
+        <AutoTA
           style={s.ta}
           placeholder="Notes"
           value={vendorForm.notes}
@@ -3955,6 +4485,17 @@ const startEditOrder = (order) => {
   </div>
 
 )}
+      {isOwner&&tab==="vendors"&&(
+        <VendorMasterWindow
+          t={t} lang={lang} th={th}
+          shopId={shopId} user={user}
+          vendors={vendors} toast={toast} isDesktop={isDesktop}
+          onGoToPurchase={(vendor)=>{
+            setTab("purchase");
+          }}
+        />
+      )}
+
       {isOwner&&tab==="purchase"&&(
         <PurchaseInvoiceTab
           t={t} lang={lang} th={th} s={s}
