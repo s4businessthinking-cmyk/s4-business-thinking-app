@@ -3525,7 +3525,7 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} - ${invoice.invoiceNo}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}.invoice{max-width:820px;margin:0 auto;border:2px solid ${headerColor};border-radius:12px;overflow:hidden}.hdr{background:${headerGrad};color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}.shop-name{font-size:20px;font-weight:900}.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}.inv-title{font-size:24px;font-weight:900;text-align:right;letter-spacing:2px}.inv-no{font-size:12px;text-align:right;margin-top:3px;opacity:0.9}.body{padding:18px 22px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}.info-value{font-size:14px;font-weight:700;color:#111}.info-sub{font-size:11px;color:#6b7280;margin-top:2px}table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}thead tr{background:#1f2937;color:#fff}th{padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:nth-child(even){background:#f9fafb}.totals{display:flex;justify-content:flex-end;margin-bottom:14px}.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}.tl{color:#6b7280;font-size:12px}.tv{font-weight:700;font-size:12px}.grand-row{display:flex;justify-content:space-between;padding:11px 13px;background:${headerColor}}.gl{color:#fff;font-size:13px;font-weight:800}.gv{color:#fff;font-size:17px;font-weight:900}.pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid ${headerColor};font-size:12px;color:${headerColor};font-weight:700}@media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0}}</style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px"><button onclick="window.print()" style="padding:10px 28px;background:${headerColor};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button><button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button></div>
-<div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:700">TRN: ${shop.trnNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">📅 ${invoice.invoiceDate}</div><div class="inv-no">👤 ${invoice.createdByName}</div></div></div>
+<div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">📅 ${invoice.invoiceDate}</div><div class="inv-no">👤 ${invoice.createdByName}</div></div></div>
 <div class="body"><div class="info-grid">${custHTML}<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট তথ্য":"Payment Info"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div></div>
 ${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
 <div class="totals"><div class="totals-box">${totalsHTML}</div></div>
@@ -6156,14 +6156,72 @@ const startEditOrder = (order) => {
             </div>
           )}
 
-          {settingsPage==="shop"&&localShop&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
-              <div style={{ fontSize:15, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>🏢 {localShop.companyName}</div>
-              <div style={{ fontSize:12, color:"#71717a" }}>{t.ownerLabel}: {localShop.ownerName}</div>
-              <div style={{ fontSize:12, color:"#71717a" }}>📍 {localShop.area}</div>
-            </div>
-          )}
+          {settingsPage==="shop"&&localShop&&(()=>{
+            const [shopEdit,setShopEdit]=React.useState({
+              companyName: localShop.companyName||"",
+              trnNumber:   localShop.trnNumber||"",
+              vatNumber:   localShop.vatNumber||"",
+              mobile:      localShop.mobile||"",
+              email:       localShop.email||"",
+              area:        localShop.area||"",
+            });
+            const [shopSaving,setShopSaving]=React.useState(false);
+            const saveShop = async () => {
+              setShopSaving(true);
+              try {
+                await updateDoc(doc(db,"shops",shopId),{
+                  companyName: shopEdit.companyName.trim(),
+                  trnNumber:   shopEdit.trnNumber.trim(),
+                  vatNumber:   shopEdit.vatNumber.trim(),
+                  mobile:      shopEdit.mobile.trim(),
+                  email:       shopEdit.email.trim(),
+                  area:        shopEdit.area.trim(),
+                });
+                toast(lang==="bn"?"✅ দোকানের তথ্য আপডেট হয়েছে!":"✅ Shop info updated!");
+              } catch(e){ toast(e.message,"err"); }
+              finally { setShopSaving(false); }
+            };
+            const sinp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+            const slbl = { fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
+            return (
+              <div style={s.card}>
+                <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                  <div>
+                    <span style={slbl}>{lang==="bn"?"দোকানের নাম":"Shop Name"}</span>
+                    <input style={sinp} value={shopEdit.companyName} onChange={e=>setShopEdit(p=>({...p,companyName:e.target.value}))} />
+                  </div>
+                  <div>
+                    <span style={slbl}>{lang==="bn"?"TRN নম্বর (Tax Registration)":"TRN Number (Tax Registration)"}</span>
+                    <input style={{ ...sinp, borderColor:"#f59e0b", fontFamily:"monospace" }} placeholder="100XXXXXXXXX" value={shopEdit.trnNumber} onChange={e=>setShopEdit(p=>({...p,trnNumber:e.target.value}))} />
+                    {shopEdit.trnNumber&&<div style={{ fontSize:10, color:"#f59e0b", marginTop:4, fontWeight:700 }}>✅ Tax Invoice এ দেখাবে</div>}
+                  </div>
+                  <div>
+                    <span style={slbl}>{lang==="bn"?"VAT নম্বর":"VAT Number"}</span>
+                    <input style={{ ...sinp, fontFamily:"monospace" }} placeholder="VAT Number" value={shopEdit.vatNumber} onChange={e=>setShopEdit(p=>({...p,vatNumber:e.target.value}))} />
+                  </div>
+                  <div>
+                    <span style={slbl}>{lang==="bn"?"মোবাইল":"Mobile"}</span>
+                    <input style={sinp} inputMode="tel" value={shopEdit.mobile} onChange={e=>setShopEdit(p=>({...p,mobile:e.target.value}))} />
+                  </div>
+                  <div>
+                    <span style={slbl}>{lang==="bn"?"ইমেইল":"Email"}</span>
+                    <input style={sinp} inputMode="email" value={shopEdit.email} onChange={e=>setShopEdit(p=>({...p,email:e.target.value}))} />
+                  </div>
+                  <div>
+                    <span style={slbl}>{lang==="bn"?"এলাকা / শহর":"Area / City"}</span>
+                    <input style={sinp} value={shopEdit.area} onChange={e=>setShopEdit(p=>({...p,area:e.target.value}))} />
+                  </div>
+                  <div style={{ paddingTop:4, borderTop:`1px solid ${th.border}`, fontSize:12, color:th.txtMuted }}>
+                    👤 {lang==="bn"?"মালিক":"Owner"}: {localShop.ownerName}
+                  </div>
+                  <button onClick={saveShop} disabled={shopSaving} style={{ padding:"12px", borderRadius:10, border:"none", background:shopSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:shopSaving?"not-allowed":"pointer" }}>
+                    {shopSaving?"...":(lang==="bn"?"✅ সেভ করুন":"✅ Save")}
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {settingsPage==="invite"&&isOwner&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
