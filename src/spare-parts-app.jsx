@@ -3458,14 +3458,15 @@ const siFmt2 = (n) => (Math.round((parseFloat(n)||0)*100)/100).toFixed(2);
 const siN2   = (v) => parseFloat(v)||0;
 const siToday= () => new Date().toISOString().split("T")[0];
 
-function siCalcLine(it) {
-  const qty=siN2(it.qty), price=siN2(it.unitPrice), dp=siN2(it.discountPerc), vp=siN2(it.vatPerc);
+function siCalcLine(it, isTax=true) {
+  const qty=siN2(it.qty), price=siN2(it.unitPrice), dp=siN2(it.discountPerc);
+  const vp = isTax ? siN2(it.vatPerc) : 0; // Regular invoice: no VAT
   const gross=qty*price, disc=gross*dp/100, base=gross-disc, vat=base*vp/100;
   return { gross, disc, vat, total:base+vat };
 }
-function siCalcTotals(items) {
+function siCalcTotals(items, isTax=true) {
   let sub=0,disc=0,vat=0,grand=0;
-  items.forEach(it=>{ const c=siCalcLine(it); sub+=c.gross; disc+=c.disc; vat+=c.vat; grand+=c.total; });
+  items.forEach(it=>{ const c=siCalcLine(it,isTax); sub+=c.gross; disc+=c.disc; vat+=c.vat; grand+=c.total; });
   return { sub, disc, vat, grand };
 }
 const SI_SHOW_CODE_KEY = "si-show-code";
@@ -3490,14 +3491,14 @@ function siEmptyForm() {
 function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
   const isBn  = lang==="bn";
   const isTax = invoice.invoiceType==="tax";
-  const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[]);
+  const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[], isTax);
   const balance = grand - (invoice.amountPaid||0);
   const title = isTax?(isBn?"কর ইনভয়েস":"TAX INVOICE"):(isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
   const headerColor = isTax?"#1d4ed8":"#16a34a";
   const headerGrad  = isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":"linear-gradient(135deg,#16a34a,#15803d)";
 
   const rows = (invoice.items||[]).map((it,i)=>{
-    const { disc:d, vat:v, total:tot } = siCalcLine(it);
+    const { disc:d, vat:v, total:tot } = siCalcLine(it, isTax);
     const codeHtml = showCode&&(it.code||it.brand)
       ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>`
       : "";
@@ -3585,8 +3586,8 @@ function SiCustomerPicker({ customers, onSelect, onClose, t, th }) {
 }
 
 // ── SI Line Item Mobile ──
-function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
-  const { disc, vat, total } = siCalcLine(item);
+function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th, isTax }) {
+  const { disc, vat, total } = siCalcLine(item, isTax);
   const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   const lbl={ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:2 };
   return (
@@ -3608,9 +3609,9 @@ function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
         <div><div style={lbl}>{t.si_unit}</div><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
         <div><div style={lbl}>{t.si_unitPrice}</div><input style={inp()} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isTax?"1fr 1fr":"1fr", gap:6 }}>
         <div><div style={lbl}>{t.si_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
-        <div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>
+        {isTax&&<div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>}
       </div>
       <div style={{ marginTop:8, padding:"8px 10px", background:"rgba(34,197,94,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{t.si_lineTotal}</span>
@@ -3621,8 +3622,8 @@ function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
 }
 
 // ── SI Line Item Desktop ──
-function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th }) {
-  const { disc, vat, total } = siCalcLine(item);
+function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th, isTax }) {
+  const { disc, vat, total } = siCalcLine(item, isTax);
   const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   return (
     <tr style={{ borderBottom:`1px solid ${th.border}` }}>
@@ -3641,10 +3642,10 @@ function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th }) {
       <td style={{ padding:"8px 6px", width:80 }}><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></td>
       <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>
+      {isTax&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>}
       <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
         <span style={{ fontSize:13, fontWeight:700, color:total>0?"#22c55e":th.txtFaint }}>৳ {siFmt2(total)}</span>
-        {(siN2(item.discountPerc)>0||siN2(item.vatPerc)>0)&&<div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>{siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{siFmt2(disc)} </span>}{siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>+{siFmt2(vat)}</span>}</div>}
+        {isTax&&siN2(item.discountPerc)>0&&<div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>{siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{siFmt2(disc)} </span>}{siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>+{siFmt2(vat)}</span>}</div>}
       </td>
       <td style={{ padding:"8px 6px", width:36, textAlign:"center" }}><button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:700 }}>✕</button></td>
     </tr>
@@ -3787,8 +3788,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       if (!it.qty.toString().trim()||siN2(it.qty)<=0){ toast(t.si_errQty,"err"); return null; }
       if (siN2(it.unitPrice)<0){ toast(t.si_errPrice,"err"); return null; }
     }
-    const builtItems=valid.map(it=>{ const { disc, vat, total }=siCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:siN2(it.unitPrice), discountPerc:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:siN2(it.vatPerc), vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) }; });
-    const { sub, disc, vat, grand } = siCalcTotals(siLines);
+    const isTax = siForm.invoiceType==="tax";
+    const builtItems=valid.map(it=>{ const { disc, vat, total }=siCalcLine(it, isTax); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:siN2(it.unitPrice), discountPerc:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:isTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) }; });
+    const { sub, disc, vat, grand } = siCalcTotals(siLines, isTax);
     const paid=siN2(siForm.amountPaid), bal=Math.max(0,grand-paid);
     const derivedStatus=status==="confirmed"?(bal<0.01?"paid":paid>0?"partial":"confirmed"):status;
     return { shopId, invoiceNo:siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
@@ -3812,7 +3814,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const panel=isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
   const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
-  const totals=siCalcTotals(siLines);
+  const totals=siCalcTotals(siLines, siForm.invoiceType==="tax");
   const paid=siN2(siForm.amountPaid), balance=Math.max(0,totals.grand-paid);
 
   // ══ LIST ══
@@ -3862,7 +3864,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   // ══ DETAIL ══
   if (siView==="detail"&&selInv) {
     const inv=invoices.find(x=>x.id===selInv.id)||selInv;
-    const { sub, disc, vat, grand } = siCalcTotals(inv.items||[]);
+    const isTax = inv.invoiceType==="tax";
+    const { sub, disc, vat, grand } = siCalcTotals(inv.items||[], isTax);
     const bal=grand-inv.amountPaid;
     const canEdit=["draft","confirmed"].includes(inv.status);
     const canPay=["confirmed","partial"].includes(inv.status);
@@ -3889,7 +3892,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10, overflowX:"auto" }}>
           <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📦 {t.si_items} ({inv.items?.length||0})</div>
           {(inv.items||[]).map((it,i)=>{
-            const { disc:d, vat:v, total:tot }=siCalcLine(it);
+            const { disc:d, vat:v, total:tot }=siCalcLine(it, isTax);
             return (
               <div key={i} style={{ display:"flex", alignItems:"flex-start", padding:"9px 0", borderBottom:i<inv.items.length-1?`1px solid ${th.border}`:"none", gap:6 }}>
                 <span style={{ width:24, fontSize:11, fontWeight:800, color:"#22c55e", flexShrink:0 }}>{i+1}</span>
@@ -4002,16 +4005,16 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         {isDesktop?(
           <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
             <thead><tr style={{ background:th.bgInp }}>
-              {["#",t.si_itemName,t.si_qty,t.si_unit,t.si_unitPrice,t.si_discPerc,"VAT%",t.si_lineTotal,""].map((h,i)=>(
+              {["#",t.si_itemName,t.si_qty,t.si_unit,t.si_unitPrice,t.si_discPerc,...(siForm.invoiceType==="tax"?["VAT%"]:[]),(lang==="bn"?"মোট":"Total"),""].map((h,i)=>(
                 <th key={i} style={{ padding:"7px 6px", fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, textAlign:i>1?"center":"left", letterSpacing:0.4 }}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {siLines.map((item,idx)=>(<SiLineItemDesktop key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} />))}
+              {siLines.map((item,idx)=>(<SiLineItemDesktop key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} isTax={siForm.invoiceType==="tax"} />))}
             </tbody>
           </table>
         ):(
-          siLines.map((item,idx)=>(<SiLineItemMobile key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} />))
+          siLines.map((item,idx)=>(<SiLineItemMobile key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} isTax={siForm.invoiceType==="tax"} />))
         )}
         <button onClick={siAddLine} style={{ width:"100%", marginTop:10, padding:"11px", borderRadius:10, border:"2px dashed #22c55e", background:"rgba(34,197,94,0.06)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_addItem}</button>
       </div>
