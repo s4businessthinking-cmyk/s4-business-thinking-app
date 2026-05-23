@@ -234,6 +234,12 @@ const TR = {
     si_regularDesc:"কাস্টমার তথ্য, কোনো VAT/Tax নেই",
     si_tax:"ট্যাক্স ইনভয়েস",
     si_taxDesc:"TRN সহ পূর্ণ VAT বিবরণ",
+    si_delivery:"ডেলিভারি চালান",
+    si_deliveryDesc:"শুধু পণ্য ও পরিমাণ, কোনো মূল্য নেই",
+    si_deliveryChallan:"ডেলিভারি চালান",
+    si_delivery:"ডেলিভারি ইনভয়েস",
+    si_deliveryDesc:"ডেলিভারি চালান, কোনো ট্যাক্স নেই",
+    si_deliveryInvoiceLabel:"ডেলিভারি চালান",
     si_deliveryNote:"ডেলিভারি নোট নং",
     si_vehicleNo:"গাড়ির নম্বর",
     si_deliverySection:"🚚 ডেলিভারি তথ্য",
@@ -639,6 +645,12 @@ const TR = {
     si_regularDesc:"Customer details, no VAT/Tax",
     si_tax:"Tax Invoice",
     si_taxDesc:"Full VAT details with TRN",
+    si_delivery:"Delivery Challan",
+    si_deliveryDesc:"Items & quantity only, no prices",
+    si_deliveryChallan:"DELIVERY CHALLAN",
+    si_delivery:"Delivery Invoice",
+    si_deliveryDesc:"Delivery challan, no tax",
+    si_deliveryInvoiceLabel:"DELIVERY CHALLAN",
     si_deliveryNote:"Delivery Note No.",
     si_vehicleNo:"Vehicle Number",
     si_deliverySection:"🚚 Delivery Info",
@@ -3489,20 +3501,33 @@ function siEmptyForm() {
 
 // ── Print / PDF Generator ──
 function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
-  const isBn  = lang==="bn";
-  const isTax = invoice.invoiceType==="tax";
-  const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[], isTax);
+  const isBn       = lang==="bn";
+  const invType    = invoice.invoiceType||"regular";
+  const isTax      = invType==="tax";
+  const isDelivery = invType==="delivery";
+
+  // For delivery invoice: no price, no tax columns
+  const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[], isTax&&!isDelivery);
   const balance = grand - (invoice.amountPaid||0);
-  const title = isTax?(isBn?"কর ইনভয়েস":"TAX INVOICE"):(isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
-  const headerColor = isTax?"#1d4ed8":"#16a34a";
-  const headerGrad  = isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":"linear-gradient(135deg,#16a34a,#15803d)";
+
+  const title = isTax
+    ? (isBn?"কর ইনভয়েস":"TAX INVOICE")
+    : isDelivery
+      ? (isBn?"ডেলিভারি চালান":"DELIVERY CHALLAN")
+      : (isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
+
+  const headerColor = isTax?"#1d4ed8": isDelivery?"#7c3aed":"#16a34a";
+  const headerGrad  = isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":
+                      isDelivery?"linear-gradient(135deg,#7c3aed,#6d28d9)":
+                      "linear-gradient(135deg,#16a34a,#15803d)";
 
   const rows = (invoice.items||[]).map((it,i)=>{
-    const { disc:d, vat:v, total:tot } = siCalcLine(it, isTax);
+    const { disc:d, vat:v, total:tot } = siCalcLine(it, isTax&&!isDelivery);
     const codeHtml = showCode&&(it.code||it.brand)
-      ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>`
-      : "";
-    if (isTax) {
+      ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>` : "";
+    if (isDelivery) {
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:16px;font-weight:800;color:#7c3aed">${it.qty}</td><td style="text-align:center">${it.unit}</td><td style="text-align:center">${isBn?"পাঠানো হয়েছে":"Dispatched"}</td></tr>`;
+    } else if (isTax) {
       const base = siN2(it.unitPrice)*siN2(it.qty) - d;
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right">৳ ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">৳ ${siFmt2(v)}</td><td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td></tr>`;
     } else {
@@ -3510,30 +3535,39 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
     }
   }).join("");
 
-  const tableHeaders = isTax
-    ? `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"VAT বাদে":"Excl.VAT"}</th><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
-    : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
+  const tableHeaders = isDelivery
+    ? `<th style="width:36px">#</th><th>${isBn?"পণ্যের বিবরণ":"Item Description"}</th><th style="text-align:center;width:80px">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:center;width:70px">${isBn?"ইউনিট":"Unit"}</th><th style="text-align:center;width:120px">${isBn?"অবস্থা":"Status"}</th>`
+    : isTax
+      ? `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"VAT বাদে":"Excl.VAT"}</th><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
+      : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
 
-  const totalsHTML = isTax
+  const totalsHTML = isDelivery ? "" : isTax
     ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">৳ ${siFmt2(sub)}</span></div>${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ৳ ${siFmt2(vat)}</span></div><div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`
     : `${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`;
 
   const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
 
-  const deliveryHTML = (invoice.deliveryNoteNo||invoice.vehicleNo)?`<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>`:"";
+  const payInfoHTML = isDelivery
+    ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||"—"}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}<div class="info-sub">👤 ${invoice.createdByName}</div></div>`
+    : `<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div>`;
+
+  const deliveryHTML = !isDelivery&&(invoice.deliveryNoteNo||invoice.vehicleNo)
+    ? `<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>` : "";
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} - ${invoice.invoiceNo}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}.invoice{max-width:820px;margin:0 auto;border:2px solid ${headerColor};border-radius:12px;overflow:hidden}.hdr{background:${headerGrad};color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}.shop-name{font-size:20px;font-weight:900}.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}.inv-title{font-size:24px;font-weight:900;text-align:right;letter-spacing:2px}.inv-no{font-size:12px;text-align:right;margin-top:3px;opacity:0.9}.body{padding:18px 22px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}.info-value{font-size:14px;font-weight:700;color:#111}.info-sub{font-size:11px;color:#6b7280;margin-top:2px}table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}thead tr{background:#1f2937;color:#fff}th{padding:8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}td{padding:7px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:nth-child(even){background:#f9fafb}.totals{display:flex;justify-content:flex-end;margin-bottom:14px}.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}.tl{color:#6b7280;font-size:12px}.tv{font-weight:700;font-size:12px}.grand-row{display:flex;justify-content:space-between;padding:11px 13px;background:${headerColor}}.gl{color:#fff;font-size:13px;font-weight:800}.gv{color:#fff;font-size:17px;font-weight:900}.pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid ${headerColor};font-size:12px;color:${headerColor};font-weight:700}@media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0}}</style></head><body>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}.invoice{max-width:820px;margin:0 auto;border:2px solid ${headerColor};border-radius:12px;overflow:hidden}.hdr{background:${headerGrad};color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}.shop-name{font-size:20px;font-weight:900}.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}.inv-title{font-size:24px;font-weight:900;text-align:right;letter-spacing:2px}.inv-no{font-size:12px;text-align:right;margin-top:3px;opacity:0.9}.body{padding:18px 22px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}.info-value{font-size:14px;font-weight:700;color:#111}.info-sub{font-size:11px;color:#6b7280;margin-top:2px}table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}thead tr{background:#1f2937;color:#fff}th{padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}td{padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:nth-child(even){background:#f9fafb}.totals{display:flex;justify-content:flex-end;margin-bottom:14px}.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}.tl{color:#6b7280;font-size:12px}.tv{font-weight:700;font-size:12px}.grand-row{display:flex;justify-content:space-between;padding:11px 13px;background:${headerColor}}.gl{color:#fff;font-size:13px;font-weight:800}.gv{color:#fff;font-size:17px;font-weight:900}.pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}${isDelivery?`.recv-box{background:#f3e8ff;border:2px solid #7c3aed;border-radius:8px;padding:14px;margin-bottom:14px}.recv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}.recv-item{border-top:1.5px solid #9ca3af;margin-top:36px;padding-top:6px;font-size:11px;color:#6b7280}`:""}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid ${headerColor};font-size:12px;color:${headerColor};font-weight:700}@media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0}}</style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px"><button onclick="window.print()" style="padding:10px 28px;background:${headerColor};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button><button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button></div>
 <div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">📅 ${invoice.invoiceDate}</div><div class="inv-no">👤 ${invoice.createdByName}</div></div></div>
-<div class="body"><div class="info-grid">${custHTML}<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট তথ্য":"Payment Info"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div></div>
+<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>
 ${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
-<div class="totals"><div class="totals-box">${totalsHTML}</div></div>
-${invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">৳ ${siFmt2(invoice.amountPaid)}</span></div>`:""}
-${balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">৳ ${siFmt2(balance)}</span></div>`:""}
+${!isDelivery&&totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
+${!isDelivery&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">৳ ${siFmt2(invoice.amountPaid)}</span></div>`:""}
+${!isDelivery&&balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">৳ ${siFmt2(balance)}</span></div>`:""}
+${isDelivery?`<div class="recv-box"><div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">✅ ${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
 ${invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
-<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div></div>
-<div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div></div></body></html>`;
+${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
+</div><div class="footer">${isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
 }
 
 function printSalesInvoice(invoice, shop, lang, showCode) {
@@ -3586,14 +3620,14 @@ function SiCustomerPicker({ customers, onSelect, onClose, t, th }) {
 }
 
 // ── SI Line Item Mobile ──
-function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th, isTax }) {
+function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th, isTax, isDelivery }) {
   const { disc, vat, total } = siCalcLine(item, isTax);
   const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   const lbl={ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:2 };
   return (
     <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:12, marginBottom:8 }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-        <span style={{ fontSize:12, fontWeight:800, color:"#22c55e" }}>#{idx+1}</span>
+        <span style={{ fontSize:12, fontWeight:800, color:isDelivery?"#a855f7":"#22c55e" }}>#{idx+1}</span>
         <div style={{ display:"flex", gap:6 }}>
           <button onClick={()=>onPick(idx)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:11, fontWeight:700 }}>📦</button>
           <button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 }}>✕</button>
@@ -3604,30 +3638,34 @@ function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th, isTax 
         <input style={inp()} placeholder={t.si_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
         <input style={inp()} placeholder={t.si_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:6 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isDelivery?"1fr 1fr":"1fr 1fr 1fr", gap:6, marginBottom:isDelivery?0:6 }}>
         <div><div style={lbl}>{t.si_qty}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></div>
         <div><div style={lbl}>{t.si_unit}</div><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
-        <div><div style={lbl}>{t.si_unitPrice}</div><input style={inp()} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>
+        {!isDelivery&&<div><div style={lbl}>{t.si_unitPrice}</div><input style={inp()} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>}
       </div>
-      <div style={{ display:"grid", gridTemplateColumns:isTax?"1fr 1fr":"1fr", gap:6 }}>
-        <div><div style={lbl}>{t.si_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
-        {isTax&&<div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>}
-      </div>
-      <div style={{ marginTop:8, padding:"8px 10px", background:"rgba(34,197,94,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <span style={{ fontSize:11, color:th.txtMuted }}>{t.si_lineTotal}</span>
-        <span style={{ fontSize:15, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(total)}</span>
-      </div>
+      {!isDelivery&&(
+        <div style={{ display:"grid", gridTemplateColumns:isTax?"1fr 1fr":"1fr", gap:6 }}>
+          <div><div style={lbl}>{t.si_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
+          {isTax&&<div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>}
+        </div>
+      )}
+      {!isDelivery&&(
+        <div style={{ marginTop:8, padding:"8px 10px", background:"rgba(34,197,94,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:11, color:th.txtMuted }}>{t.si_lineTotal}</span>
+          <span style={{ fontSize:15, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(total)}</span>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── SI Line Item Desktop ──
-function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th, isTax }) {
+function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th, isTax, isDelivery }) {
   const { disc, vat, total } = siCalcLine(item, isTax);
   const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   return (
     <tr style={{ borderBottom:`1px solid ${th.border}` }}>
-      <td style={{ padding:"8px 6px", fontSize:12, fontWeight:700, color:"#22c55e", textAlign:"center", width:30 }}>{idx+1}</td>
+      <td style={{ padding:"8px 6px", fontSize:12, fontWeight:700, color:isDelivery?"#a855f7":"#22c55e", textAlign:"center", width:30 }}>{idx+1}</td>
       <td style={{ padding:"8px 6px" }}>
         <div style={{ display:"flex", gap:4, marginBottom:4 }}>
           <input style={{ ...inp(), flex:2 }} placeholder={t.si_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
@@ -3640,13 +3678,13 @@ function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th, isTax
       </td>
       <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:80 }}><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></td>
-      <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>
-      {isTax&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>}
-      <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
+      {!isDelivery&&<td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></td>}
+      {!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>}
+      {isTax&&!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>}
+      {!isDelivery&&<td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
         <span style={{ fontSize:13, fontWeight:700, color:total>0?"#22c55e":th.txtFaint }}>৳ {siFmt2(total)}</span>
         {isTax&&siN2(item.discountPerc)>0&&<div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>{siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{siFmt2(disc)} </span>}{siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>+{siFmt2(vat)}</span>}</div>}
-      </td>
+      </td>}
       <td style={{ padding:"8px 6px", width:36, textAlign:"center" }}><button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:700 }}>✕</button></td>
     </tr>
   );
@@ -3784,15 +3822,22 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siBuild=(status)=>{
     const valid=siLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.si_errItems,"err"); return null; }
+    const isDelivery = siForm.invoiceType==="delivery";
+    const isTax      = siForm.invoiceType==="tax";
     for (const it of valid){
       if (!it.qty.toString().trim()||siN2(it.qty)<=0){ toast(t.si_errQty,"err"); return null; }
-      if (siN2(it.unitPrice)<0){ toast(t.si_errPrice,"err"); return null; }
+      // delivery invoice: price not required
+      if (!isDelivery && siN2(it.unitPrice)<0){ toast(t.si_errPrice,"err"); return null; }
     }
-    const isTax = siForm.invoiceType==="tax";
-    const builtItems=valid.map(it=>{ const { disc, vat, total }=siCalcLine(it, isTax); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:siN2(it.unitPrice), discountPerc:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:isTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) }; });
-    const { sub, disc, vat, grand } = siCalcTotals(siLines, isTax);
-    const paid=siN2(siForm.amountPaid), bal=Math.max(0,grand-paid);
-    const derivedStatus=status==="confirmed"?(bal<0.01?"paid":paid>0?"partial":"confirmed"):status;
+    const effectiveIsTax = isTax && !isDelivery;
+    const builtItems=valid.map(it=>{
+      const item = isDelivery ? {...it, unitPrice:"0", discountPerc:"0", vatPerc:"0"} : it;
+      const { disc, vat, total }=siCalcLine(item, effectiveIsTax);
+      return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:isDelivery?0:siN2(it.unitPrice), discountPerc:isDelivery?0:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:effectiveIsTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) };
+    });
+    const { sub, disc, vat, grand } = siCalcTotals(siLines, effectiveIsTax);
+    const paid=isDelivery?0:siN2(siForm.amountPaid), bal=Math.max(0,grand-paid);
+    const derivedStatus=isDelivery?"confirmed":(status==="confirmed"?(bal<0.01?"paid":paid>0?"partial":"confirmed"):status);
     return { shopId, invoiceNo:siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
@@ -3814,7 +3859,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const panel=isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
   const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
-  const totals=siCalcTotals(siLines, siForm.invoiceType==="tax");
+  const formIsDelivery = siForm.invoiceType==="delivery";
+  const formIsTax      = siForm.invoiceType==="tax";
+  const totals=siCalcTotals(siLines, formIsTax&&!formIsDelivery);
   const paid=siN2(siForm.amountPaid), balance=Math.max(0,totals.grand-paid);
 
   // ══ LIST ══
@@ -3954,8 +4001,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       {/* Invoice Type Toggle */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>📋 {t.si_invoiceType}</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-          {[["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"],["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"]].map(([type,icon,label,desc,color])=>(
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+          {[["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"],["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"],["delivery","🚚",t.si_delivery,t.si_deliveryDesc,"#a855f7"]].map(([type,icon,label,desc,color])=>(
             <button key={type} onClick={()=>siUpd("invoiceType",type)} style={{ padding:"14px 10px", borderRadius:12, cursor:"pointer", fontFamily:"inherit", border:`2px solid ${siForm.invoiceType===type?color:th.borderMid}`, background:siForm.invoiceType===type?`${color}18`:"transparent", display:"flex", flexDirection:"column", alignItems:"center", gap:4, transition:"all 0.15s" }}>
               <span style={{ fontSize:28 }}>{icon}</span>
               <span style={{ fontSize:13, fontWeight:800, color:siForm.invoiceType===type?color:th.txtMuted }}>{label}</span>
@@ -4010,17 +4057,17 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               ))}
             </tr></thead>
             <tbody>
-              {siLines.map((item,idx)=>(<SiLineItemDesktop key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} isTax={siForm.invoiceType==="tax"} />))}
+              {siLines.map((item,idx)=>(<SiLineItemDesktop key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} isTax={formIsTax&&!formIsDelivery} isDelivery={formIsDelivery} />))}
             </tbody>
           </table>
         ):(
-          siLines.map((item,idx)=>(<SiLineItemMobile key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} isTax={siForm.invoiceType==="tax"} />))
+          siLines.map((item,idx)=>(<SiLineItemMobile key={item.id} item={item} idx={idx} onUpdate={siUpdLine} onDelete={siDelLine} onPick={i=>setPickerTarget(i)} t={t} th={th} isTax={formIsTax&&!formIsDelivery} isDelivery={formIsDelivery} />))
         )}
         <button onClick={siAddLine} style={{ width:"100%", marginTop:10, padding:"11px", borderRadius:10, border:"2px dashed #22c55e", background:"rgba(34,197,94,0.06)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_addItem}</button>
       </div>
 
-      {/* Summary */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
+      {/* Summary — hidden for delivery */}
+      {!formIsDelivery&&<div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
         <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📊 {t.si_summary}</div>
         {[[t.si_subtotal,siFmt2(totals.sub),th.txtPrimary],...(totals.disc>0?[[t.si_totalDiscount,`- ${siFmt2(totals.disc)}`,"#ef4444"]]:[]),...(totals.vat>0?[["VAT",`+ ${siFmt2(totals.vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
           <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>৳ {v}</span></div>
@@ -4029,10 +4076,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           <span style={{ fontSize:15, fontWeight:800 }}>{t.si_grandTotal}</span>
           <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(totals.grand)}</span>
         </div>
-      </div>
+      </div>}
 
-      {/* Payment */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+      {/* Payment — hidden for delivery */}
+      {!formIsDelivery&&<div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={secLbl}>💳 {t.si_payment}</div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, marginBottom:12 }}>
           {Object.entries(SI_PAY).map(([key,pm])=>(
@@ -4049,7 +4096,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span>
           <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(balance)}</span>
         </div>}
-      </div>
+      </div>}
 
       {/* Delivery Note */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
@@ -4077,6 +4124,77 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         <button onClick={siConfirm} disabled={siSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:siSaving?"#14532d":"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:siSaving?"not-allowed":"pointer" }}>{siSaving?"...":t.si_confirm}</button>
         <button onClick={siSaveDraft} disabled={siSaving} style={{ padding:"12px", borderRadius:12, border:`1.5px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_saveDraft}</button>
         <button onClick={()=>setSiView("list")} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelForm}</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── SHOP INFO SETTINGS ──────────────────────────────────────
+function ShopInfoSettings({ localShop, shopId, th, s, lang, toast }) {
+  const [shopEdit, setShopEdit] = useState({
+    companyName: localShop.companyName||"",
+    trnNumber:   localShop.trnNumber||"",
+    vatNumber:   localShop.vatNumber||"",
+    mobile:      localShop.mobile||"",
+    email:       localShop.email||"",
+    area:        localShop.area||"",
+  });
+  const [shopSaving, setShopSaving] = useState(false);
+
+  const saveShop = async () => {
+    setShopSaving(true);
+    try {
+      await updateDoc(doc(db,"shops",shopId),{
+        companyName: shopEdit.companyName.trim(),
+        trnNumber:   shopEdit.trnNumber.trim(),
+        vatNumber:   shopEdit.vatNumber.trim(),
+        mobile:      shopEdit.mobile.trim(),
+        email:       shopEdit.email.trim(),
+        area:        shopEdit.area.trim(),
+      });
+      toast(lang==="bn"?"✅ দোকানের তথ্য আপডেট হয়েছে!":"✅ Shop info updated!");
+    } catch(e) { toast(e.message,"err"); }
+    finally { setShopSaving(false); }
+  };
+
+  const sinp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  const slbl = { fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
+
+  return (
+    <div style={s.card}>
+      <div style={s.settingsLbl}>{lang==="bn"?"🏢 দোকানের তথ্য":"🏢 Shop Info"}</div>
+      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+        <div>
+          <span style={slbl}>{lang==="bn"?"দোকানের নাম":"Shop Name"}</span>
+          <input style={sinp} value={shopEdit.companyName} onChange={e=>setShopEdit(p=>({...p,companyName:e.target.value}))} />
+        </div>
+        <div>
+          <span style={slbl}>{lang==="bn"?"TRN নম্বর (Tax Registration)":"TRN Number (Tax Registration)"}</span>
+          <input style={{ ...sinp, borderColor:shopEdit.trnNumber?"#f59e0b":th.borderMid, fontFamily:"monospace" }} placeholder="100XXXXXXXXX" value={shopEdit.trnNumber} onChange={e=>setShopEdit(p=>({...p,trnNumber:e.target.value}))} />
+          {shopEdit.trnNumber&&<div style={{ fontSize:10, color:"#f59e0b", marginTop:4, fontWeight:700 }}>✅ {lang==="bn"?"Tax Invoice এ দেখাবে":"Shows in Tax Invoice"}</div>}
+        </div>
+        <div>
+          <span style={slbl}>{lang==="bn"?"VAT নম্বর":"VAT Number"}</span>
+          <input style={{ ...sinp, fontFamily:"monospace" }} placeholder="VAT Number" value={shopEdit.vatNumber} onChange={e=>setShopEdit(p=>({...p,vatNumber:e.target.value}))} />
+        </div>
+        <div>
+          <span style={slbl}>{lang==="bn"?"মোবাইল":"Mobile"}</span>
+          <input style={sinp} inputMode="tel" value={shopEdit.mobile} onChange={e=>setShopEdit(p=>({...p,mobile:e.target.value}))} />
+        </div>
+        <div>
+          <span style={slbl}>{lang==="bn"?"ইমেইল":"Email"}</span>
+          <input style={sinp} inputMode="email" value={shopEdit.email} onChange={e=>setShopEdit(p=>({...p,email:e.target.value}))} />
+        </div>
+        <div>
+          <span style={slbl}>{lang==="bn"?"এলাকা / শহর":"Area / City"}</span>
+          <input style={sinp} value={shopEdit.area} onChange={e=>setShopEdit(p=>({...p,area:e.target.value}))} />
+        </div>
+        <div style={{ paddingTop:8, borderTop:`1px solid ${th.border}`, fontSize:12, color:th.txtMuted }}>
+          👤 {lang==="bn"?"মালিক":"Owner"}: {localShop.ownerName}
+        </div>
+        <button onClick={saveShop} disabled={shopSaving} style={{ padding:"12px", borderRadius:10, border:"none", background:shopSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:shopSaving?"not-allowed":"pointer" }}>
+          {shopSaving?"...":(lang==="bn"?"✅ সেভ করুন":"✅ Save")}
+        </button>
       </div>
     </div>
   );
@@ -6156,72 +6274,12 @@ const startEditOrder = (order) => {
             </div>
           )}
 
-          {settingsPage==="shop"&&localShop&&(()=>{
-            const [shopEdit,setShopEdit]=React.useState({
-              companyName: localShop.companyName||"",
-              trnNumber:   localShop.trnNumber||"",
-              vatNumber:   localShop.vatNumber||"",
-              mobile:      localShop.mobile||"",
-              email:       localShop.email||"",
-              area:        localShop.area||"",
-            });
-            const [shopSaving,setShopSaving]=React.useState(false);
-            const saveShop = async () => {
-              setShopSaving(true);
-              try {
-                await updateDoc(doc(db,"shops",shopId),{
-                  companyName: shopEdit.companyName.trim(),
-                  trnNumber:   shopEdit.trnNumber.trim(),
-                  vatNumber:   shopEdit.vatNumber.trim(),
-                  mobile:      shopEdit.mobile.trim(),
-                  email:       shopEdit.email.trim(),
-                  area:        shopEdit.area.trim(),
-                });
-                toast(lang==="bn"?"✅ দোকানের তথ্য আপডেট হয়েছে!":"✅ Shop info updated!");
-              } catch(e){ toast(e.message,"err"); }
-              finally { setShopSaving(false); }
-            };
-            const sinp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
-            const slbl = { fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
-            return (
-              <div style={s.card}>
-                <div style={s.settingsLbl}>{t.shopInfoTitle}</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                  <div>
-                    <span style={slbl}>{lang==="bn"?"দোকানের নাম":"Shop Name"}</span>
-                    <input style={sinp} value={shopEdit.companyName} onChange={e=>setShopEdit(p=>({...p,companyName:e.target.value}))} />
-                  </div>
-                  <div>
-                    <span style={slbl}>{lang==="bn"?"TRN নম্বর (Tax Registration)":"TRN Number (Tax Registration)"}</span>
-                    <input style={{ ...sinp, borderColor:"#f59e0b", fontFamily:"monospace" }} placeholder="100XXXXXXXXX" value={shopEdit.trnNumber} onChange={e=>setShopEdit(p=>({...p,trnNumber:e.target.value}))} />
-                    {shopEdit.trnNumber&&<div style={{ fontSize:10, color:"#f59e0b", marginTop:4, fontWeight:700 }}>✅ Tax Invoice এ দেখাবে</div>}
-                  </div>
-                  <div>
-                    <span style={slbl}>{lang==="bn"?"VAT নম্বর":"VAT Number"}</span>
-                    <input style={{ ...sinp, fontFamily:"monospace" }} placeholder="VAT Number" value={shopEdit.vatNumber} onChange={e=>setShopEdit(p=>({...p,vatNumber:e.target.value}))} />
-                  </div>
-                  <div>
-                    <span style={slbl}>{lang==="bn"?"মোবাইল":"Mobile"}</span>
-                    <input style={sinp} inputMode="tel" value={shopEdit.mobile} onChange={e=>setShopEdit(p=>({...p,mobile:e.target.value}))} />
-                  </div>
-                  <div>
-                    <span style={slbl}>{lang==="bn"?"ইমেইল":"Email"}</span>
-                    <input style={sinp} inputMode="email" value={shopEdit.email} onChange={e=>setShopEdit(p=>({...p,email:e.target.value}))} />
-                  </div>
-                  <div>
-                    <span style={slbl}>{lang==="bn"?"এলাকা / শহর":"Area / City"}</span>
-                    <input style={sinp} value={shopEdit.area} onChange={e=>setShopEdit(p=>({...p,area:e.target.value}))} />
-                  </div>
-                  <div style={{ paddingTop:4, borderTop:`1px solid ${th.border}`, fontSize:12, color:th.txtMuted }}>
-                    👤 {lang==="bn"?"মালিক":"Owner"}: {localShop.ownerName}
-                  </div>
-                  <button onClick={saveShop} disabled={shopSaving} style={{ padding:"12px", borderRadius:10, border:"none", background:shopSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:shopSaving?"not-allowed":"pointer" }}>
-                    {shopSaving?"...":(lang==="bn"?"✅ সেভ করুন":"✅ Save")}
-                  </button>
-                </div>
-              </div>
-            );
-          })()}
+          {settingsPage==="shop"&&localShop&&(
+            <ShopInfoSettings
+              localShop={localShop} shopId={shopId}
+              th={th} s={s} lang={lang} toast={toast}
+            />
+          )}
 
           {settingsPage==="invite"&&isOwner&&(
             <div style={{ ...s.card, border:"1px solid #f97316" }}>
