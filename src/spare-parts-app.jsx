@@ -522,7 +522,7 @@ const TR = {
     noteP:"Special note (optional)...",
     sendOrder:"📤 Send Order", sentOrders:"📜 Sent Orders",
     noOrders:"No orders yet",
-    selectCo:"Select Company", price:"Company price (৳)", save:"Save",
+    selectCo:"Select Company", price:"Company price (AED)", save:"Save",
     confirmed:"✅ Confirmed", noStock:"❌ No Stock",
     deliver:"🚚 Mark Delivered", delOrder:"🗑️ Delete Order",
     coList:"🏢 Company List", addNew:"+ New Company",
@@ -531,7 +531,7 @@ const TR = {
     waHint:"💡 Include country code without 0.",
     addBtn:"✅ Add", editTitle:"Edit Company", saveEdit:"✅ Save",
     noPhone:"No number", noCo:"No companies yet",
-    items:" items", newTag:"🔔 New", cur:"৳",
+    items:" items", newTag:"🔔 New", cur:"AED",
     status:{
       pending:            "⏳ Pending",
       order_confirmed:    "✅ Order Confirmed",
@@ -563,7 +563,7 @@ const TR = {
     pmTitle:"📦 Product Master",
     pmAdd:"+ New Product",
     pmName:"Product Name *", pmCode:"Code / Model", pmBrand:"Brand",
-    pmCategory:"Category", pmPrice:"Price (৳)", pmUnit:"Unit",
+    pmCategory:"Category", pmPrice:"Price (AED)", pmUnit:"Unit",
     pmSearch:"Search products...",
     pmNoProducts:"No products yet. Add one.",
     pmAdded:"Product added ✅", pmUpdated:"Product updated ✅", pmDeleted:"Product deleted.",
@@ -588,7 +588,7 @@ const TR = {
     si_brand:"Brand",
     si_qty:"Qty *",
     si_unit:"Unit",
-    si_unitPrice:"Unit Price (৳) *",
+    si_unitPrice:"Unit Price (AED) *",
     si_discPerc:"Disc %",
     si_vatPerc:"VAT %",
     si_lineTotal:"Total",
@@ -597,7 +597,7 @@ const TR = {
     si_totalVat:"Total VAT",
     si_grandTotal:"Grand Total",
     si_paymentMethod:"Payment Method",
-    si_amountPaid:"Amount Paid (৳)",
+    si_amountPaid:"Amount Paid (AED)",
     si_balanceDue:"Balance Due",
     si_note:"Note",
     si_notePh:"Any remarks...",
@@ -719,8 +719,8 @@ const TR = {
     cm_accountNumber:"Account Number",
     cm_iban:"IBAN Number",
     cm_swift:"SWIFT Code",
-    cm_creditLimit:"Credit Limit (৳)",
-    cm_openingBalance:"Opening Balance (৳)",
+    cm_creditLimit:"Credit Limit (AED)",
+    cm_openingBalance:"Opening Balance (AED)",
     cm_paymentTerms:"Payment Terms (Days)",
     cm_discountPerc:"Default Discount (%)",
     cm_assignedSalesman:"Assigned Salesman",
@@ -789,8 +789,8 @@ const TR = {
     vm_accountNumber:"Account Number",
     vm_iban:"IBAN Number",
     vm_swift:"SWIFT Code",
-    vm_creditLimit:"Credit Limit (৳)",
-    vm_openingBalance:"Opening Balance (৳)",
+    vm_creditLimit:"Credit Limit (AED)",
+    vm_openingBalance:"Opening Balance (AED)",
     vm_paymentTerms:"Payment Terms (Days)",
     vm_notes:"Special Notes",
     vm_totalVendors:"Total Vendors",
@@ -813,7 +813,7 @@ const TR = {
     pi_brand:"Brand",
     pi_qty:"Qty *",
     pi_unit:"Unit",
-    pi_unitCost:"Unit Cost (৳) *",
+    pi_unitCost:"Unit Cost (AED) *",
     pi_discPerc:"Disc %",
     pi_taxPerc:"Tax %",
     pi_lineTotal:"Total",
@@ -822,7 +822,7 @@ const TR = {
     pi_totalTax:"Total Tax",
     pi_grandTotal:"Grand Total",
     pi_paymentMethod:"Payment Method",
-    pi_amountPaid:"Amount Paid (৳)",
+    pi_amountPaid:"Amount Paid (AED)",
     pi_balanceDue:"Balance Due",
     pi_note:"Special Note (Optional)",
     pi_notePh:"Any remarks or notes...",
@@ -858,7 +858,7 @@ const TR = {
     pi_totalDue:"Total Due",
     pi_supplierInvoiceNo:"Supplier Invoice No.",
     pi_supplierInvoiceNoPh:"Vendor's invoice / challan number",
-    pi_salePrice:"Sale Price (৳)",
+    pi_salePrice:"Sale Price (AED)",
     pi_salePricePh:"Sale Price",
     pi_vat:"VAT %",
     pi_indexErr:"⚠️ Firestore Index missing. Go to Firebase Console → Firestore → Indexes to create it.",
@@ -1556,22 +1556,22 @@ function PiSummaryBox({ items, amountPaid, th, t }) {
   return (
     <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
       <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📊 {t.pi_summary}</div>
-      <div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_subtotal}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>৳ {piFmt2(sub)}</span></div>
-      {disc>0&&<div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_totalDiscount}</span><span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>- ৳ {piFmt2(disc)}</span></div>}
-      {tax>0&&<div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_totalTax}</span><span style={{ fontSize:13, fontWeight:700, color:"#06b6d4" }}>+ ৳ {piFmt2(tax)}</span></div>}
+      <div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_subtotal}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{t.cur} {piFmt2(sub)}</span></div>
+      {disc>0&&<div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_totalDiscount}</span><span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>- {t.cur} {piFmt2(disc)}</span></div>}
+      {tax>0&&<div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_totalTax}</span><span style={{ fontSize:13, fontWeight:700, color:"#06b6d4" }}>+ {t.cur} {piFmt2(tax)}</span></div>}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
         <span style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>{t.pi_grandTotal}</span>
-        <span style={{ fontSize:20, fontWeight:900, color:"#f97316" }}>৳ {piFmt2(grand)}</span>
+        <span style={{ fontSize:20, fontWeight:900, color:"#f97316" }}>{t.cur} {piFmt2(grand)}</span>
       </div>
       {paid>0&&(<>
         <div style={{ height:1, background:th.border, margin:"8px 0" }} />
         <div style={{ display:"flex", justifyContent:"space-between", padding:"4px 0" }}>
           <span style={{ fontSize:12, fontWeight:700, color:"#22c55e" }}>{t.pi_amountPaid}</span>
-          <span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>৳ {piFmt2(paid)}</span>
+          <span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>{t.cur} {piFmt2(paid)}</span>
         </div>
         <div style={{ display:"flex", justifyContent:"space-between", padding:"4px 0" }}>
           <span style={{ fontSize:13, fontWeight:700, color:balance>0.001?"#ef4444":"#22c55e" }}>{t.pi_balanceDue}</span>
-          <span style={{ fontSize:15, fontWeight:900, color:balance>0.001?"#ef4444":"#22c55e" }}>৳ {piFmt2(Math.max(0,balance))}</span>
+          <span style={{ fontSize:15, fontWeight:900, color:balance>0.001?"#ef4444":"#22c55e" }}>{t.cur} {piFmt2(Math.max(0,balance))}</span>
         </div>
       </>)}
     </div>
@@ -1606,7 +1606,7 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
                 {p.code&&<span>📋 {p.code}</span>}
                 {p.brand&&<span>🏷️ {p.brand}</span>}
                 {p.category&&<span>🗂️ {p.category}</span>}
-                {p.vatExclusive&&<span style={{ color:"#22c55e" }}>৳{p.vatExclusive}</span>}
+                {p.vatExclusive&&<span style={{ color:"#22c55e" }}>{t.cur}{p.vatExclusive}</span>}
               </div>
             </button>
           ))}
@@ -1650,7 +1650,7 @@ function PiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
       </div>
       <div style={{ marginTop:8, padding:"7px 10px", background:"rgba(249,115,22,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{t.pi_lineTotal}</span>
-        <span style={{ fontSize:15, fontWeight:800, color:"#f97316" }}>৳ {piFmt2(total)}</span>
+        <span style={{ fontSize:15, fontWeight:800, color:"#f97316" }}>{t.cur} {piFmt2(total)}</span>
       </div>
     </div>
   );
@@ -1680,7 +1680,7 @@ function PiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th }) {
       <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:100 }}><input style={{ ...inp({ textAlign:"right" }), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder="0.00" value={item.salePrice} onChange={e=>onUpdate(item.id,"salePrice",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
-        <span style={{ fontSize:13, fontWeight:700, color:total>0?"#f97316":th.txtFaint }}>৳ {piFmt2(total)}</span>
+        <span style={{ fontSize:13, fontWeight:700, color:total>0?"#f97316":th.txtFaint }}>{t.cur} {piFmt2(total)}</span>
         {(piN2(item.discountPerc)>0||piN2(item.taxPerc)>0)&&(
           <div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>
             {piN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{piFmt2(disc)} </span>}
@@ -1712,9 +1712,9 @@ function PiInvoiceCard({ invoice, onClick, t, th, lang }) {
       <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>🏭 {invoice.vendorName||"—"}</div>
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center", marginTop:6 }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{invoice.items?.length||0}{lang==="bn"?t.pi_itemsCount:t.pi_itemsCount}</span>
-        <span style={{ fontSize:14, fontWeight:800, color:"#f97316" }}>৳ {piFmt2(invoice.grandTotal)}</span>
-        {invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ ৳ {piFmt2(invoice.amountPaid)}</span>}
-        {balance>0.01&&<span style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>⚠️ ৳ {piFmt2(balance)}</span>}
+        <span style={{ fontSize:14, fontWeight:800, color:"#f97316" }}>{t.cur} {piFmt2(invoice.grandTotal)}</span>
+        {invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ {t.cur} {piFmt2(invoice.amountPaid)}</span>}
+        {balance>0.01&&<span style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>⚠️ {t.cur} {piFmt2(balance)}</span>}
       </div>
     </div>
   );
@@ -1769,12 +1769,12 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
                   {it.brand&&<span>🏷️ {it.brand}</span>}
                   {piN2(it.discountPerc)>0&&<span style={{ color:"#ef4444" }}>Disc {it.discountPerc}% (-{piFmt2(d)})</span>}
                   {piN2(it.taxPerc)>0&&<span style={{ color:"#06b6d4" }}>VAT {it.taxPerc}% (+{piFmt2(tx)})</span>}
-                  {it.salePrice>0&&<span style={{ color:"#22c55e", fontWeight:700 }}>💰 Sale: ৳{piFmt2(it.salePrice)}</span>}
+                  {it.salePrice>0&&<span style={{ color:"#22c55e", fontWeight:700 }}>💰 Sale: {t.cur}{piFmt2(it.salePrice)}</span>}
                 </div>
               </div>
               <span style={{ width:60, textAlign:"center", fontSize:12, color:th.txtPrimary, flexShrink:0 }}>{it.qty} {it.unit}</span>
-              <span style={{ width:90, textAlign:"right", fontSize:12, color:th.txtMuted, flexShrink:0 }}>৳ {piFmt2(it.unitCost)}</span>
-              <span style={{ width:100, textAlign:"right", fontSize:13, fontWeight:700, color:"#f97316", flexShrink:0 }}>৳ {piFmt2(tot)}</span>
+              <span style={{ width:90, textAlign:"right", fontSize:12, color:th.txtMuted, flexShrink:0 }}>{t.cur} {piFmt2(it.unitCost)}</span>
+              <span style={{ width:100, textAlign:"right", fontSize:13, fontWeight:700, color:"#f97316", flexShrink:0 }}>{t.cur} {piFmt2(tot)}</span>
             </div>
           );
         })}
@@ -1786,18 +1786,18 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
           ...(disc>0?[[t.pi_totalDiscount,`- ${piFmt2(disc)}`,"#ef4444"]]:[]),
           ...(tax>0?[[t.pi_totalTax,`+ ${piFmt2(tax)}`,"#06b6d4"]]:[]),
         ].map(([label,val,col],i)=>(
-          <div key={i} style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{label}</span><span style={{ fontSize:13, fontWeight:700, color:col }}>৳ {val}</span></div>
+          <div key={i} style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{label}</span><span style={{ fontSize:13, fontWeight:700, color:col }}>{t.cur} {val}</span></div>
         ))}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
           <span style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>{t.pi_grandTotal}</span>
-          <span style={{ fontSize:20, fontWeight:900, color:"#f97316" }}>৳ {piFmt2(grand)}</span>
+          <span style={{ fontSize:20, fontWeight:900, color:"#f97316" }}>{t.cur} {piFmt2(grand)}</span>
         </div>
         <div style={{ height:1, background:th.border, margin:"10px 0" }} />
         <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.pi_paymentMethod}</span><span style={{ fontSize:12, fontWeight:700, color:th.txtPrimary }}>{PI_PAY_METHODS[invoice.paymentMethod]?.icon} {PI_PAY_METHODS[invoice.paymentMethod]?.[lang]}</span></div>
-        <div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.pi_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {piFmt2(invoice.amountPaid)}</span></div>
+        <div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.pi_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {piFmt2(invoice.amountPaid)}</span></div>
         <div style={{ ...dr, borderBottom:"none" }}>
           <span style={{ fontSize:13, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.pi_balanceDue}</span>
-          <span style={{ fontSize:16, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {piFmt2(Math.max(0,balance))}</span>
+          <span style={{ fontSize:16, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.cur} {piFmt2(Math.max(0,balance))}</span>
         </div>
       </div>
 
@@ -1991,7 +1991,7 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
           {[
             { l:t.vm_totalVendors,  v:kpi.total,             c:"#a1a1aa", pre:"" },
             { l:t.vm_activeVendors, v:kpi.active,            c:"#22c55e", pre:"" },
-            { l:t.vm_totalCredit,   v:`৳${(kpi.credit/1000).toFixed(0)}k`, c:"#f97316", pre:"" },
+            { l:t.vm_totalCredit,   v:`${t.cur}${(kpi.credit/1000).toFixed(0)}k`, c:"#f97316", pre:"" },
           ].map((k,i)=>(
             <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
               <div style={{ fontSize:17, fontWeight:900, color:k.c }}>{k.pre}{k.v}</div>
@@ -2038,7 +2038,7 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
             {v.mobileNumber&&<span style={{ fontSize:12, color:th.txtMuted }}>📱 {v.mobileNumber}</span>}
             {v.city&&<span style={{ fontSize:12, color:th.txtMuted }}>📍 {v.city}</span>}
             {v.trnNumber&&<span style={{ fontSize:12, color:"#f59e0b", fontFamily:"monospace" }}>TRN: {v.trnNumber}</span>}
-            {v.creditLimit>0&&<span style={{ fontSize:12, color:"#f97316", fontWeight:700 }}>💳 ৳{v.creditLimit.toLocaleString()}</span>}
+            {v.creditLimit>0&&<span style={{ fontSize:12, color:"#f97316", fontWeight:700 }}>💳 {t.cur}{v.creditLimit.toLocaleString()}</span>}
             {v.category&&<span style={{ fontSize:11, color:th.txtFaint, background:th.bgInp, padding:"2px 7px", borderRadius:6 }}>{v.category}</span>}
           </div>
         </div>
@@ -2123,8 +2123,8 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
         {(v.creditLimit>0||v.paymentTerms>0)&&(
           <div style={card}>
             {secLabel("💳", t.vm_secCredit)}
-            {v.creditLimit>0&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{t.vm_creditLimit}</span><span style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>৳{v.creditLimit.toLocaleString()}</span></div>}
-            {v.openingBalance>0&&row(t.vm_openingBalance, `৳${v.openingBalance.toLocaleString()}`)}
+            {v.creditLimit>0&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{t.vm_creditLimit}</span><span style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.cur}{v.creditLimit.toLocaleString()}</span></div>}
+            {v.openingBalance>0&&row(t.vm_openingBalance, `{t.cur}${v.openingBalance.toLocaleString()}`)}
             {v.paymentTerms>0&&row(t.vm_paymentTerms, `NET ${v.paymentTerms} ${lang==="bn"?"দিন":"Days"}`)}
           </div>
         )}
@@ -2439,7 +2439,7 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
             { l:t.cm_totalCustomers, v:kpi.total,  c:"#a1a1aa" },
             { l:t.cm_activeCustomers,v:kpi.active, c:"#22c55e" },
             { l:lang==="bn"?"ক্রেডিট":"Credit",   v:kpi.credit,c:"#f97316" },
-            { l:lang==="bn"?"মোট ক্রেডিট":"Total CL", v:`৳${Math.round(kpi.totalCL/1000)}k`, c:"#06b6d4" },
+            { l:lang==="bn"?"মোট ক্রেডিট":"Total CL", v:`${t.cur}${Math.round(kpi.totalCL/1000)}k`, c:"#06b6d4" },
           ].map((k,i)=>(
             <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
               <div style={{ fontSize:15, fontWeight:900, color:k.c }}>{k.v}</div>
@@ -2501,7 +2501,7 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
             {c.mobileNumber&&<span style={{ fontSize:12, color:th.txtMuted }}>📱 {c.mobileNumber}</span>}
             {c.city&&<span style={{ fontSize:12, color:th.txtMuted }}>📍 {c.city}</span>}
             {c.trnNumber&&<span style={{ fontSize:11, color:"#f59e0b", fontFamily:"monospace" }}>TRN: {c.trnNumber}</span>}
-            {c.paymentType==="credit"&&c.creditLimit>0&&<span style={{ fontSize:12, color:"#f97316", fontWeight:700 }}>💳 ৳{c.creditLimit.toLocaleString()}</span>}
+            {c.paymentType==="credit"&&c.creditLimit>0&&<span style={{ fontSize:12, color:"#f97316", fontWeight:700 }}>💳 {t.cur}{c.creditLimit.toLocaleString()}</span>}
             {c.discountPerc>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>🏷️ {c.discountPerc}% off</span>}
           </div>
         </div>
@@ -2551,11 +2551,11 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
             <div style={{ fontSize:10, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>💳 {t.cm_secCredit}</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
               <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
-                <div style={{ fontSize:16, fontWeight:900, color:"#f97316" }}>৳{(c.creditLimit||0).toLocaleString()}</div>
+                <div style={{ fontSize:16, fontWeight:900, color:"#f97316" }}>{t.cur}{(c.creditLimit||0).toLocaleString()}</div>
                 <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{t.cm_creditLimit}</div>
               </div>
               <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
-                <div style={{ fontSize:16, fontWeight:900, color:"#22c55e" }}>৳{(c.openingBalance||0).toLocaleString()}</div>
+                <div style={{ fontSize:16, fontWeight:900, color:"#22c55e" }}>{t.cur}{(c.openingBalance||0).toLocaleString()}</div>
                 <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{t.cm_openingBalance}</div>
               </div>
               <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
@@ -2804,7 +2804,7 @@ function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
             { l:lang==="bn"?"বাকি":"Balance",       v:piFmt2(vd.balance), c:vd.balance>0?"#ef4444":"#22c55e" },
           ].map((k,i)=>(
             <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 10px", textAlign:"center" }}>
-              <div style={{ fontSize:14, fontWeight:900, color:k.c }}>৳{k.v}</div>
+              <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{t.cur}{k.v}</div>
               <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
             </div>
           ))}
@@ -2820,9 +2820,9 @@ function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
             </div>
             <div style={{ fontSize:11, color:"#a1a1aa" }}>📅 {inv.invoiceDate} · {inv.items?.length||0}{lang==="bn"?"টি পণ্য":" items"}</div>
             <div style={{ display:"flex", gap:10, marginTop:6, flexWrap:"wrap" }}>
-              <span style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>৳{piFmt2(inv.grandTotal)}</span>
-              {inv.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e" }}>✅ ৳{piFmt2(inv.amountPaid)}</span>}
-              {inv.balanceDue>0.01&&<span style={{ fontSize:11, color:"#ef4444" }}>⚠️ ৳{piFmt2(inv.balanceDue)}</span>}
+              <span style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{t.cur}{piFmt2(inv.grandTotal)}</span>
+              {inv.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e" }}>✅ {t.cur}{piFmt2(inv.amountPaid)}</span>}
+              {inv.balanceDue>0.01&&<span style={{ fontSize:11, color:"#ef4444" }}>⚠️ {t.cur}{piFmt2(inv.balanceDue)}</span>}
             </div>
           </div>
         ))}
@@ -2861,15 +2861,15 @@ function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
             {/* 3 KPI boxes */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:10 }}>
               <div style={{ textAlign:"center", padding:"8px 6px", background:th.bgInp, borderRadius:8 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>৳{piFmt2(vd.total)}</div>
+                <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{t.cur}{piFmt2(vd.total)}</div>
                 <div style={{ fontSize:9, color:"#a1a1aa", fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{lang==="bn"?"মোট ক্রয়":"Total"}</div>
               </div>
               <div style={{ textAlign:"center", padding:"8px 6px", background:"rgba(34,197,94,0.06)", borderRadius:8 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>৳{piFmt2(vd.paid)}</div>
+                <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{t.cur}{piFmt2(vd.paid)}</div>
                 <div style={{ fontSize:9, color:"#a1a1aa", fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{lang==="bn"?"পরিশোধ":"Paid"}</div>
               </div>
               <div style={{ textAlign:"center", padding:"8px 6px", background:vd.balance>0?"rgba(239,68,68,0.06)":"rgba(34,197,94,0.06)", borderRadius:8, border:vd.balance>0?"1px solid rgba(239,68,68,0.2)":"none" }}>
-                <div style={{ fontSize:13, fontWeight:800, color:vd.balance>0?"#ef4444":"#22c55e" }}>৳{piFmt2(vd.balance)}</div>
+                <div style={{ fontSize:13, fontWeight:800, color:vd.balance>0?"#ef4444":"#22c55e" }}>{t.cur}{piFmt2(vd.balance)}</div>
                 <div style={{ fontSize:9, color:"#a1a1aa", fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{lang==="bn"?"বাকি":"Balance"}</div>
               </div>
             </div>
@@ -2879,7 +2879,7 @@ function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
               <span style={{ fontSize:9, color:"#22c55e", fontWeight:700 }}>{paidPerc.toFixed(0)}% {lang==="bn"?"পরিশোধ":"paid"}</span>
-              {vd.balance>0&&<span style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{lang==="bn"?"বাকি আছে":"outstanding"} ৳{piFmt2(vd.balance)}</span>}
+              {vd.balance>0&&<span style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{lang==="bn"?"বাকি আছে":"outstanding"} {t.cur}{piFmt2(vd.balance)}</span>}
             </div>
           </div>
         );
@@ -3032,7 +3032,7 @@ function PiSalesmanView({ t, lang, th, shopId }) {
                   {t.pi_purchasePrice}
                 </div>
                 <div style={{ fontSize:20, fontWeight:900, color:"#a1a1aa" }}>
-                  ৳ {piFmt2(it.unitCost)}
+                  t.cur {piFmt2(it.unitCost)}
                 </div>
               </div>
             </div>
@@ -3045,23 +3045,23 @@ function PiSalesmanView({ t, lang, th, shopId }) {
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                   <span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_saleExVat}</span>
-                  <span style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>৳ {piFmt2(saleEx)}</span>
+                  <span style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{t.cur} {piFmt2(saleEx)}</span>
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
                   <span style={{ fontSize:12, color:"#06b6d4" }}>🧾 {t.pi_vatAmount} ({vatPerc}%)</span>
-                  <span style={{ fontSize:14, fontWeight:700, color:"#06b6d4" }}>+ ৳ {piFmt2(vatAmt)}</span>
+                  <span style={{ fontSize:14, fontWeight:700, color:"#06b6d4" }}>+ {t.cur} {piFmt2(vatAmt)}</span>
                 </div>
                 <div style={{ height:1, background:"rgba(34,197,94,0.3)", marginBottom:8 }} />
                 {/* Total inc VAT — the big number */}
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{t.pi_saleIncVat}</span>
-                  <span style={{ fontSize:26, fontWeight:900, color:"#22c55e", letterSpacing:0.5 }}>৳ {piFmt2(saleInc)}</span>
+                  <span style={{ fontSize:26, fontWeight:900, color:"#22c55e", letterSpacing:0.5 }}>{t.cur} {piFmt2(saleInc)}</span>
                 </div>
                 {/* Margin info */}
                 {margin>0&&(
                   <div style={{ marginTop:8, padding:"5px 10px", background:"rgba(34,197,94,0.1)", borderRadius:8, display:"flex", justifyContent:"space-between" }}>
                     <span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>{t.pi_margin}</span>
-                    <span style={{ fontSize:12, fontWeight:800, color:"#22c55e" }}>৳ {piFmt2(margin)} ({marginPerc}%)</span>
+                    <span style={{ fontSize:12, fontWeight:800, color:"#22c55e" }}>{t.cur} {piFmt2(margin)} ({marginPerc}%)</span>
                   </div>
                 )}
               </div>
@@ -3277,9 +3277,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))", gap:8, marginBottom:14 }}>
             {[
               { label:t.pi_totalInvoices, value:piKPIs.total, color:"#a1a1aa", pre:"" },
-              { label:t.pi_totalAmount,   value:piFmt2(piKPIs.amount), color:"#f97316", pre:"৳ " },
-              { label:t.pi_totalPaid,     value:piFmt2(piKPIs.paid),   color:"#22c55e", pre:"৳ " },
-              { label:t.pi_totalDue,      value:piFmt2(piKPIs.due),    color:piKPIs.due>0?"#ef4444":"#22c55e", pre:"৳ " },
+              { label:t.pi_totalAmount,   value:piFmt2(piKPIs.amount), color:"#f97316", pre:t.cur+" " },
+              { label:t.pi_totalPaid,     value:piFmt2(piKPIs.paid),   color:"#22c55e", pre:t.cur+" " },
+              { label:t.pi_totalDue,      value:piFmt2(piKPIs.due),    color:piKPIs.due>0?"#ef4444":"#22c55e", pre:t.cur+" " },
             ].map((k,i)=>(
               <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 12px", textAlign:"center" }}>
                 <div style={{ fontSize:15, fontWeight:800, color:k.color }}>{k.pre}{k.value}</div>
@@ -3419,14 +3419,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         {totals.grand>0&&(
           <div style={{ marginTop:6 }}>
             <button onClick={()=>piUpd("amountPaid",piFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>
-              {t.pi_fullPay} (৳ {piFmt2(totals.grand)})
+              {t.pi_fullPay} (t.cur {piFmt2(totals.grand)})
             </button>
           </div>
         )}
         {totals.grand>0&&(
           <div style={{ marginTop:12, padding:"10px 14px", borderRadius:10, background:balance>0.01?"rgba(239,68,68,0.08)":"rgba(34,197,94,0.08)", border:`1px solid ${balance>0.01?"#ef4444":"#22c55e"}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.pi_balanceDue}</span>
-            <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {piFmt2(balance)}</span>
+            <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.cur} {piFmt2(balance)}</span>
           </div>
         )}
       </div>
@@ -3511,6 +3511,7 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
 
   // Delivery note keeps amount columns, but VAT/Tax is not applied.
   const effectiveTax = isTax && !isDelivery;
+  const cur = isBn ? "৳" : "AED";
   const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[], effectiveTax);
   const balance = grand - (invoice.amountPaid||0);
 
@@ -3538,12 +3539,12 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
     const codeHtml = showCode&&(it.code||it.brand)
       ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>` : "";
     if (isDelivery) {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800;color:#7c3aed">${it.qty} ${it.unit}</td><td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800;color:#7c3aed">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     } else if (isTax) {
       const base = siN2(it.unitPrice)*siN2(it.qty) - d;
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right">৳ ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">৳ ${siFmt2(v)}</td><td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right">${cur} ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${cur} ${siFmt2(v)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     } else {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">৳ ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right"><strong>৳ ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     }
   }).join("");
 
@@ -3554,10 +3555,10 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
       : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
 
   const totalsHTML = isDelivery
-    ? `<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`
+    ? `<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
     : isTax
-      ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">৳ ${siFmt2(sub)}</span></div>${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ৳ ${siFmt2(vat)}</span></div><div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`
-    : `${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ৳ ${siFmt2(disc)}</span></div>`:""}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">৳ ${siFmt2(grand)}</span></div>`;
+      ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">${cur} ${siFmt2(sub)}</span></div>${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(disc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ${cur} ${siFmt2(vat)}</span></div><div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
+    : `${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(disc)}</span></div>`:""}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`;
 
   const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
 
@@ -3617,8 +3618,8 @@ ${isDelivery?`.recv-box{background:${colorPrint?"#f3e8ff":"#f8f9fa"};border:2px 
 <div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>
 ${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
 ${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
-${!isDelivery&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">৳ ${siFmt2(invoice.amountPaid)}</span></div>`:""}
-${!isDelivery&&balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">৳ ${siFmt2(balance)}</span></div>`:""}
+${!isDelivery&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">${cur} ${siFmt2(invoice.amountPaid)}</span></div>`:""}
+${!isDelivery&&balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">${cur} ${siFmt2(balance)}</span></div>`:""}
 ${isDelivery?`<div class="recv-box"><div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">✅ ${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
 ${invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
 ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
@@ -3739,7 +3740,7 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
                 <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
                   {p.code&&<span>📋 {p.code}</span>}
                   {p.brand&&<span>🏷️ {p.brand}</span>}
-                  {p.vatExclusive&&<span style={{ color:"#22c55e", fontWeight:700 }}>৳{p.vatExclusive}</span>}
+                  {p.vatExclusive&&<span style={{ color:"#22c55e", fontWeight:700 }}>{t.cur}{p.vatExclusive}</span>}
                 </div>
               </div>
               {/* The ✚ Add button */}
@@ -3786,7 +3787,7 @@ function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th, isTax,
       )}
       <div style={{ marginTop:8, padding:"8px 10px", background:isDelivery?"rgba(168,85,247,0.08)":"rgba(34,197,94,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <span style={{ fontSize:11, color:th.txtMuted }}>{t.si_lineTotal}</span>
-          <span style={{ fontSize:15, fontWeight:800, color:isDelivery?"#a855f7":"#22c55e" }}>৳ {siFmt2(total)}</span>
+          <span style={{ fontSize:15, fontWeight:800, color:isDelivery?"#a855f7":"#22c55e" }}>{t.cur} {siFmt2(total)}</span>
         </div>
     </div>
   );
@@ -3816,7 +3817,7 @@ function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th, isTax
       {!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>}
       {isTax&&!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>}
       <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
-        <span style={{ fontSize:13, fontWeight:700, color:total>0?"#22c55e":th.txtFaint }}>৳ {siFmt2(total)}</span>
+        <span style={{ fontSize:13, fontWeight:700, color:total>0?"#22c55e":th.txtFaint }}>{t.cur} {siFmt2(total)}</span>
         {effectiveTax&&siN2(item.discountPerc)>0&&<div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>{siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{siFmt2(disc)} </span>}{siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>+{siFmt2(vat)}</span>}</div>}
       </td>
       <td style={{ padding:"8px 6px", width:36, textAlign:"center" }}><button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:700 }}>✕</button></td>
@@ -3841,9 +3842,9 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
       <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>👤 {invoice.customerName||"—"}</div>
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{invoice.items?.length||0} {lang==="bn"?"টি":""} items</span>
-        <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(invoice.grandTotal)}</span>
-        {invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ ৳ {siFmt2(invoice.amountPaid)}</span>}
-        {bal>0.01&&<span style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>⚠️ ৳ {siFmt2(bal)}</span>}
+        <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {siFmt2(invoice.grandTotal)}</span>
+        {invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ {t.cur} {siFmt2(invoice.amountPaid)}</span>}
+        {bal>0.01&&<span style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>⚠️ {t.cur} {siFmt2(bal)}</span>}
       </div>
     </div>
   );
@@ -4056,7 +4057,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
       {invoices.length>0&&(
         <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:14 }}>
-          {[{l:t.si_totalInvoices,v:siKPIs.total,c:"#a1a1aa",pre:""},{l:t.si_totalSales,v:siFmt2(siKPIs.amount),c:"#22c55e",pre:"৳ "},{l:t.si_totalPaid,v:siFmt2(siKPIs.paid),c:"#06b6d4",pre:"৳ "},{l:t.si_totalDue,v:siFmt2(siKPIs.due),c:siKPIs.due>0?"#ef4444":"#22c55e",pre:"৳ "}].map((k,i)=>(
+          {[{l:t.si_totalInvoices,v:siKPIs.total,c:"#a1a1aa",pre:""},{l:t.si_totalSales,v:siFmt2(siKPIs.amount),c:"#22c55e",pre:t.cur+" "},{l:t.si_totalPaid,v:siFmt2(siKPIs.paid),c:"#06b6d4",pre:t.cur+" "},{l:t.si_totalDue,v:siFmt2(siKPIs.due),c:siKPIs.due>0?"#ef4444":"#22c55e",pre:t.cur+" "}].map((k,i)=>(
             <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
               <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{k.pre}{k.v}</div>
               <div style={{ fontSize:8, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
@@ -4136,8 +4137,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                   </div>
                 </div>
                 <span style={{ width:60, textAlign:"center", fontSize:12, color:th.txtPrimary, flexShrink:0 }}>{it.qty} {it.unit}</span>
-                <span style={{ width:90, textAlign:"right", fontSize:12, color:th.txtMuted, flexShrink:0 }}>৳ {siFmt2(it.unitPrice)}</span>
-                <span style={{ width:100, textAlign:"right", fontSize:13, fontWeight:700, color:"#22c55e", flexShrink:0 }}>৳ {siFmt2(tot)}</span>
+                <span style={{ width:90, textAlign:"right", fontSize:12, color:th.txtMuted, flexShrink:0 }}>{t.cur} {siFmt2(it.unitPrice)}</span>
+                <span style={{ width:100, textAlign:"right", fontSize:13, fontWeight:700, color:"#22c55e", flexShrink:0 }}>{t.cur} {siFmt2(tot)}</span>
               </div>
             );
           })}
@@ -4146,17 +4147,17 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         {/* Totals */}
         <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
           {[[t.si_subtotal,siFmt2(sub),th.txtPrimary],...(disc>0?[[t.si_totalDiscount,`- ${siFmt2(disc)}`,"#ef4444"]]:[]),...(vat>0?[["VAT",`+ ${siFmt2(vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
-            <div key={i} style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>৳ {v}</span></div>
+            <div key={i} style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>{t.cur} {v}</span></div>
           ))}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
             <span style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>{t.si_grandTotal}</span>
-            <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(grand)}</span>
+            <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {siFmt2(grand)}</span>
           </div>
           <div style={{ height:1, background:th.border, margin:"10px 0" }} />
           <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.si_paymentMethod}</span><span style={{ fontSize:12, fontWeight:700, color:th.txtPrimary }}>{SI_PAY[inv.paymentMethod]?.icon} {SI_PAY[inv.paymentMethod]?.[lang]}</span></div>
-          {!isInvDelivery&&<div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.si_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(inv.amountPaid)}</span></div>}
+          {!isInvDelivery&&<div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.si_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {siFmt2(inv.amountPaid)}</span></div>}
           {/* Balance due — only for non-cash, non-delivery */}
-          {!isInvCash&&!isInvDelivery&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span><span style={{ fontSize:16, fontWeight:900, color:bal>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(Math.max(0,bal))}</span></div>}
+          {!isInvCash&&!isInvDelivery&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span><span style={{ fontSize:16, fontWeight:900, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.cur} {siFmt2(Math.max(0,bal))}</span></div>}
           {isInvCash&&<div style={{ padding:"8px 0" }}><span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>✅ {lang==="bn"?"নগদে সম্পূর্ণ পরিশোধিত":"Fully Paid (Cash)"}</span></div>}
         </div>
 
@@ -4295,7 +4296,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           {/* Live total preview */}
           {(siN2(siCurrent.qty)>0&&siN2(siCurrent.unitPrice)>0)&&(()=>{
             const { total } = siCalcLine(siCurrent, formIsTax&&!formIsDelivery);
-            return <div style={{ marginTop:8, textAlign:"right", fontSize:13, fontWeight:700, color:"#22c55e" }}>= ৳ {siFmt2(total)}</div>;
+            return <div style={{ marginTop:8, textAlign:"right", fontSize:13, fontWeight:700, color:"#22c55e" }}>= {t.cur} {siFmt2(total)}</div>;
           })()}
         </div>
 
@@ -4314,12 +4315,12 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                   {item.code&&<span>📋 {item.code}</span>}
                   {item.brand&&<span>🏷️ {item.brand}</span>}
                   <span>{item.qty} {item.unit}</span>
-                  {!formIsDelivery&&siN2(item.unitPrice)>0&&<span>৳{item.unitPrice}</span>}
+                  {!formIsDelivery&&siN2(item.unitPrice)>0&&<span>{t.cur}{item.unitPrice}</span>}
                   {!formIsDelivery&&siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{item.discountPerc}%</span>}
                   {formIsTax&&!formIsDelivery&&siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>VAT {item.vatPerc}%</span>}
                 </div>
               </div>
-              {!formIsDelivery&&<span style={{ fontSize:14, fontWeight:800, color:"#22c55e", flexShrink:0 }}>৳{siFmt2(total)}</span>}
+              {!formIsDelivery&&<span style={{ fontSize:14, fontWeight:800, color:"#22c55e", flexShrink:0 }}>{t.cur}{siFmt2(total)}</span>}
               <button onClick={()=>setSiLines(p=>p.filter(x=>x.id!==item.id))}
                 style={{ width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12, flexShrink:0 }}>✕</button>
             </div>
@@ -4331,11 +4332,11 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
         <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📊 {t.si_summary}</div>
         {[[t.si_subtotal,siFmt2(totals.sub),th.txtPrimary],...(totals.disc>0?[[t.si_totalDiscount,`- ${siFmt2(totals.disc)}`,"#ef4444"]]:[]),...(totals.vat>0?[["VAT",`+ ${siFmt2(totals.vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
-          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>৳ {v}</span></div>
+          <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>{t.cur} {v}</span></div>
         ))}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
           <span style={{ fontSize:15, fontWeight:800 }}>{t.si_grandTotal}</span>
-          <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(totals.grand)}</span>
+          <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {siFmt2(totals.grand)}</span>
         </div>
       </div>
 
@@ -4362,16 +4363,16 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         {formIsCash ? (
           <div style={{ padding:"12px 14px", borderRadius:10, background:"rgba(34,197,94,0.08)", border:"1px solid #22c55e", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>✅ {lang==="bn"?"নগদে সম্পূর্ণ পরিশোধিত":"Fully Paid (Cash)"}</span>
-            <span style={{ fontSize:18, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(totals.grand)}</span>
+            <span style={{ fontSize:18, fontWeight:900, color:"#22c55e" }}>{t.cur} {siFmt2(totals.grand)}</span>
           </div>
         ) : (
           <>
             <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_amountPaid}</div>
             <input style={inp()} inputMode="decimal" placeholder="0.00" value={siForm.amountPaid} onChange={e=>siUpd("amountPaid",e.target.value)} />
-            {totals.grand>0&&<div style={{ marginTop:6 }}><button onClick={()=>siUpd("amountPaid",siFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.si_fullPay} (৳ {siFmt2(totals.grand)})</button></div>}
+            {totals.grand>0&&<div style={{ marginTop:6 }}><button onClick={()=>siUpd("amountPaid",siFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.si_fullPay} ({t.cur} {siFmt2(totals.grand)})</button></div>}
             {totals.grand>0&&<div style={{ marginTop:10, padding:"10px 14px", borderRadius:10, background:balance>0.01?"rgba(239,68,68,0.08)":"rgba(34,197,94,0.08)", border:`1px solid ${balance>0.01?"#ef4444":"#22c55e"}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span>
-              <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(balance)}</span>
+              <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.cur} {siFmt2(balance)}</span>
             </div>}
           </>
         )}
@@ -5403,7 +5404,7 @@ const startEditOrder = (order) => {
                                 <div style={{ fontSize:13, fontWeight:700 }}>{p.name}</div>
                                 <div style={{ fontSize:11, color:"#71717a" }}>
                                   {[p.code,p.brand,p.category].filter(Boolean).join(" · ")}
-                                  {p.price&&<span style={{ color:"#22c55e", marginLeft:6 }}>৳{p.price}</span>}
+                                  {p.price&&<span style={{ color:"#22c55e", marginLeft:6 }}>{t.cur}{p.price}</span>}
                                 </div>
                               </button>
                             ))}
@@ -5824,7 +5825,7 @@ const startEditOrder = (order) => {
                     </div>
                     <div style={{ display:"flex", gap:6, marginTop:5, flexWrap:"wrap", alignItems:"center" }}>
                       {p.category&&<span style={{ fontSize:10, background:th.accentDim, color:"#f97316", padding:"2px 8px", borderRadius:20, border:"1px solid #451a03" }}>{p.category}</span>}
-                      {p.vatExclusive&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>৳{p.vatExclusive}</span>}
+                      {p.vatExclusive&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>{t.cur}{p.vatExclusive}</span>}
                       {p.mrp&&parseFloat(p.mrp)>0&&<span style={{ fontSize:10, color:"#71717a" }}>MRP {p.mrp}</span>}
                       {p.openingStock&&parseFloat(p.openingStock)>0&&<span style={{ fontSize:10, color:"#818cf8" }}>Stock: {p.openingStock}</span>}
                       <span style={{ fontSize:10, color:"#52525b", marginLeft:"auto" }}>{p.unit}</span>
