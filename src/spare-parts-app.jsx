@@ -250,6 +250,8 @@ const TR = {
     si_regularInvoiceLabel:"বিক্রয় ইনভয়েস",
     si_showCodeLabel:"ইনভয়েসে মডেল/কোড/সাইজ দেখাও",
     si_showCodeDesc:"সক্রিয় করলে ইনভয়েসে পণ্যের নামের সাথে কোড ও ব্র্যান্ড দেখাবে",
+    si_colorLabel:"রঙিন ইনভয়েস প্রিন্ট",
+    si_colorDesc:"বন্ধ থাকলে সাদা-কালো, চালু করলে রঙিন ইনভয়েস প্রিন্ট হবে",
     si_invoiceSettings:"📄 ইনভয়েস সেটিংস",
     si_invoiceSettingsSub:"ইনভয়েস প্রদর্শন পছন্দ",
     tabVendor:"🏭 ভেন্ডর মাস্টার",
@@ -659,6 +661,8 @@ const TR = {
     si_regularInvoiceLabel:"SALES INVOICE",
     si_showCodeLabel:"Show Model / Code / Size in Invoice",
     si_showCodeDesc:"When enabled, product code and brand will appear under product name in invoice",
+    si_colorLabel:"Color Invoice Print",
+    si_colorDesc:"OFF = Black & White print, ON = Color invoice print",
     si_invoiceSettings:"📄 Invoice Settings",
     si_invoiceSettingsSub:"Invoice display preferences",
     tabVendor:"🏭 Vendor Master",
@@ -3480,6 +3484,9 @@ function siCalcTotals(items, isTax=true) {
 const SI_SHOW_CODE_KEY = "si-show-code";
 const loadSiShowCode = () => { try { return localStorage.getItem(SI_SHOW_CODE_KEY)==="true"; } catch { return false; } };
 const saveSiShowCode = (v) => { try { localStorage.setItem(SI_SHOW_CODE_KEY, v?"true":"false"); } catch {} };
+const SI_COLOR_KEY = "si-color-print";
+const loadSiColor = () => { try { return localStorage.getItem(SI_COLOR_KEY)==="true"; } catch { return false; } };
+const saveSiColor = (v) => { try { localStorage.setItem(SI_COLOR_KEY, v?"true":"false"); } catch {} };
 
 function siEmptyLine() {
   return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" };
@@ -3496,7 +3503,7 @@ function siEmptyForm() {
 }
 
 // ── Print / PDF Generator ──
-function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
+function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
   const isBn       = lang==="bn";
   const invType    = invoice.invoiceType||"regular";
   const isTax      = invType==="tax";
@@ -3513,10 +3520,15 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode) {
       ? (isBn?"ডেলিভারি চালান":"DELIVERY CHALLAN")
       : (isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
 
-  const headerColor = isTax?"#1d4ed8": isDelivery?"#7c3aed":"#16a34a";
-  const headerGrad  = isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":
-                      isDelivery?"linear-gradient(135deg,#7c3aed,#6d28d9)":
-                      "linear-gradient(135deg,#16a34a,#15803d)";
+  // B&W or Color
+  const headerColor = colorPrint
+    ? (isTax?"#1d4ed8": isDelivery?"#7c3aed":"#16a34a")
+    : "#1a1a1a";
+  const headerGrad  = colorPrint
+    ? (isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":
+       isDelivery?"linear-gradient(135deg,#7c3aed,#6d28d9)":
+       "linear-gradient(135deg,#16a34a,#15803d)")
+    : "linear-gradient(135deg,#1a1a1a,#2d2d2d)";
 
   const rows = (invoice.items||[]).map((it,i)=>{
     const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
@@ -3569,8 +3581,8 @@ ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুম
 </div><div class="footer">${isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
 }
 
-function printSalesInvoice(invoice, shop, lang, showCode) {
-  const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false);
+function printSalesInvoice(invoice, shop, lang, showCode, colorPrint) {
+  const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false, colorPrint||false);
   const w = window.open("","_blank","width=950,height=750");
   if (!w) { alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups."); return; }
   w.document.write(html);
@@ -3715,7 +3727,7 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint }) {
   const isOwner = profile?.role==="owner";
 
   const [invoices,setInvoices]     = useState([]);
@@ -3834,8 +3846,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:siN2(it.unitPrice), discountPerc:isDelivery?0:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:effectiveIsTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) };
     });
     const { sub, disc, vat, grand } = siCalcTotals(siLines, effectiveIsTax);
-    const paid=isDelivery?0:siN2(siForm.amountPaid), bal=Math.max(0,grand-paid);
-    const derivedStatus=isDelivery?"confirmed":(status==="confirmed"?(bal<0.01?"paid":paid>0?"partial":"confirmed"):status);
+    const isCash     = siForm.paymentMethod==="cash";
+    // cash invoice: auto fully paid | delivery: confirmed | credit: normal
+    const paid = isDelivery ? 0
+               : isCash     ? parseFloat(siFmt2(grand))
+               : siN2(siForm.amountPaid);
+    const bal  = isDelivery ? 0 : Math.max(0, grand - paid);
+    const derivedStatus = isDelivery ? "confirmed"
+                        : (status==="confirmed" ? (bal<0.01?"paid":paid>0?"partial":"confirmed") : status);
     return { shopId, invoiceNo:siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
@@ -3859,8 +3877,11 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
   const formIsDelivery = siForm.invoiceType==="delivery";
   const formIsTax      = siForm.invoiceType==="tax";
+  const formIsCash     = siForm.paymentMethod==="cash";
   const totals=siCalcTotals(siLines, formIsTax&&!formIsDelivery);
-  const paid=siN2(siForm.amountPaid), balance=Math.max(0,totals.grand-paid);
+  // cash: auto fully paid, delivery: 0
+  const formPaid = formIsDelivery ? 0 : formIsCash ? totals.grand : siN2(siForm.amountPaid);
+  const balance  = Math.max(0, totals.grand - formPaid);
 
   // ══ LIST ══
   if (siView==="list") return (
@@ -3909,11 +3930,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   // ══ DETAIL ══
   if (siView==="detail"&&selInv) {
     const inv=invoices.find(x=>x.id===selInv.id)||selInv;
-    const isTax = inv.invoiceType==="tax";
-    const { sub, disc, vat, grand } = siCalcTotals(inv.items||[], isTax);
+    const isTax       = inv.invoiceType==="tax";
+    const isInvCash   = inv.paymentMethod==="cash";
+    const isInvDelivery = inv.invoiceType==="delivery";
+    const { sub, disc, vat, grand } = siCalcTotals(inv.items||[], isTax&&!isInvDelivery);
     const bal=grand-inv.amountPaid;
     const canEdit=["draft","confirmed"].includes(inv.status);
-    const canPay=["confirmed","partial"].includes(inv.status);
+    // cash invoice is always fully paid → no mark paid button
+    const canPay=!isInvCash&&["confirmed","partial"].includes(inv.status);
     const dr={ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
     return (
       <div style={panel}>
@@ -3969,13 +3993,15 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           </div>
           <div style={{ height:1, background:th.border, margin:"10px 0" }} />
           <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.si_paymentMethod}</span><span style={{ fontSize:12, fontWeight:700, color:th.txtPrimary }}>{SI_PAY[inv.paymentMethod]?.icon} {SI_PAY[inv.paymentMethod]?.[lang]}</span></div>
-          <div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.si_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(inv.amountPaid)}</span></div>
-          <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span><span style={{ fontSize:16, fontWeight:900, color:bal>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(Math.max(0,bal))}</span></div>
+          {!isInvDelivery&&<div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.si_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>৳ {siFmt2(inv.amountPaid)}</span></div>}
+          {/* Balance due — only for non-cash, non-delivery */}
+          {!isInvCash&&!isInvDelivery&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span><span style={{ fontSize:16, fontWeight:900, color:bal>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(Math.max(0,bal))}</span></div>}
+          {isInvCash&&<div style={{ padding:"8px 0" }}><span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>✅ {lang==="bn"?"নগদে সম্পূর্ণ পরিশোধিত":"Fully Paid (Cash)"}</span></div>}
         </div>
 
         {/* Actions */}
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button onClick={()=>printSalesInvoice(inv,shop,lang,siShowCode)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
+          <button onClick={()=>printSalesInvoice(inv,shop,lang,siShowCode,siColorPrint)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
           {canEdit&&<button onClick={()=>siOpenEdit(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.si_edit}</button>}
           {canPay&&<button onClick={()=>siMarkPaid(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_markPaid}</button>}
           {["confirmed","partial","draft"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
@@ -4087,13 +4113,24 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             </button>
           ))}
         </div>
-        <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_amountPaid}</div>
-        <input style={inp()} inputMode="decimal" placeholder="0.00" value={siForm.amountPaid} onChange={e=>siUpd("amountPaid",e.target.value)} />
-        {totals.grand>0&&<div style={{ marginTop:6 }}><button onClick={()=>siUpd("amountPaid",siFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.si_fullPay} (৳ {siFmt2(totals.grand)})</button></div>}
-        {totals.grand>0&&<div style={{ marginTop:12, padding:"10px 14px", borderRadius:10, background:balance>0.01?"rgba(239,68,68,0.08)":"rgba(34,197,94,0.08)", border:`1px solid ${balance>0.01?"#ef4444":"#22c55e"}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span>
-          <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(balance)}</span>
-        </div>}
+
+        {/* Cash: auto-paid badge | Credit/Bank/Cheque: amount paid input */}
+        {formIsCash ? (
+          <div style={{ padding:"12px 14px", borderRadius:10, background:"rgba(34,197,94,0.08)", border:"1px solid #22c55e", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>✅ {lang==="bn"?"নগদে সম্পূর্ণ পরিশোধিত":"Fully Paid (Cash)"}</span>
+            <span style={{ fontSize:18, fontWeight:900, color:"#22c55e" }}>৳ {siFmt2(totals.grand)}</span>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_amountPaid}</div>
+            <input style={inp()} inputMode="decimal" placeholder="0.00" value={siForm.amountPaid} onChange={e=>siUpd("amountPaid",e.target.value)} />
+            {totals.grand>0&&<div style={{ marginTop:6 }}><button onClick={()=>siUpd("amountPaid",siFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.si_fullPay} (৳ {siFmt2(totals.grand)})</button></div>}
+            {totals.grand>0&&<div style={{ marginTop:10, padding:"10px 14px", borderRadius:10, background:balance>0.01?"rgba(239,68,68,0.08)":"rgba(34,197,94,0.08)", border:`1px solid ${balance>0.01?"#ef4444":"#22c55e"}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontSize:12, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span>
+              <span style={{ fontSize:18, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>৳ {siFmt2(balance)}</span>
+            </div>}
+          </>
+        )}
       </div>}
 
       {/* Delivery Note */}
@@ -4242,6 +4279,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [waStyle,setWaStyleState]=useState(loadWaStyle());
   const setWaStyle = (v) => { setWaStyleState(v); saveWaStyle(v); };
   const [siShowCode,setSiShowCode] = useState(loadSiShowCode);
+  const [siColorPrint,setSiColorPrint] = useState(loadSiColor);
 
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
@@ -6136,7 +6174,7 @@ const startEditOrder = (order) => {
           shopId={shopId} user={user} profile={profile}
           customers={customers} products={products}
           shop={localShop} toast={toast} isDesktop={isDesktop}
-          siShowCode={siShowCode}
+          siShowCode={siShowCode} siColorPrint={siColorPrint}
         />
       )}
 
@@ -6395,6 +6433,7 @@ const startEditOrder = (order) => {
           {settingsPage==="invoice"&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{t.si_invoiceSettings}</div>
+
               {/* Show Code Toggle */}
               <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, padding:"14px 0", borderBottom:`1px solid ${th.border}` }}>
                 <div style={{ flex:1 }}>
@@ -6402,18 +6441,40 @@ const startEditOrder = (order) => {
                   <div style={{ fontSize:12, color:th.txtMuted }}>{t.si_showCodeDesc}</div>
                   <div style={{ marginTop:8, padding:"8px 12px", background:siShowCode?"rgba(34,197,94,0.08)":"rgba(113,113,122,0.06)", borderRadius:8, fontSize:12, fontWeight:700, color:siShowCode?"#22c55e":th.txtMuted }}>
                     {siShowCode
-                      ? (lang==="bn"?"✅ চালু — ইনভয়েসে কোড/মডেল দেখাবে":"✅ ON — Code/Model shows in invoice")
-                      : (lang==="bn"?"⬜ বন্ধ — শুধু পণ্যের নাম দেখাবে":"⬜ OFF — Only product name shows")}
+                      ? (lang==="bn"?"✅ চালু — কোড/মডেল দেখাবে":"✅ ON — Code/Model shows")
+                      : (lang==="bn"?"⬜ বন্ধ — শুধু পণ্যের নাম":"⬜ OFF — Product name only")}
                   </div>
                 </div>
                 <button onClick={()=>{ const nv=!siShowCode; setSiShowCode(nv); saveSiShowCode(nv); }} style={{ width:52, height:30, borderRadius:15, border:"none", cursor:"pointer", background:siShowCode?"#22c55e":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s", marginTop:4 }}>
                   <span style={{ position:"absolute", top:3, left:siShowCode?25:3, width:24, height:24, borderRadius:"50%", background:"#fff", transition:"left 0.15s", display:"block" }} />
                 </button>
               </div>
+
+              {/* Color Print Toggle */}
+              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, padding:"14px 0", borderBottom:`1px solid ${th.border}` }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>{t.si_colorLabel}</div>
+                  <div style={{ fontSize:12, color:th.txtMuted }}>{t.si_colorDesc}</div>
+                  <div style={{ marginTop:8, padding:"8px 12px", background:siColorPrint?"rgba(99,102,241,0.08)":"rgba(113,113,122,0.06)", borderRadius:8, fontSize:12, fontWeight:700, color:siColorPrint?"#818cf8":th.txtMuted }}>
+                    {siColorPrint
+                      ? (lang==="bn"?"🎨 চালু — রঙিন ইনভয়েস প্রিন্ট হবে":"🎨 ON — Color invoice print")
+                      : (lang==="bn"?"🖤 বন্ধ — সাদা-কালো প্রিন্ট (Default)":"🖤 OFF — Black & White print (Default)")}
+                  </div>
+                </div>
+                <button onClick={()=>{ const nv=!siColorPrint; setSiColorPrint(nv); saveSiColor(nv); }} style={{ width:52, height:30, borderRadius:15, border:"none", cursor:"pointer", background:siColorPrint?"#6366f1":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s", marginTop:4 }}>
+                  <span style={{ position:"absolute", top:3, left:siColorPrint?25:3, width:24, height:24, borderRadius:"50%", background:"#fff", transition:"left 0.15s", display:"block" }} />
+                </button>
+              </div>
+
+              {/* Preview */}
               <div style={{ marginTop:16, padding:"12px 14px", background:th.bgInp, borderRadius:10, border:`1px solid ${th.border}` }}>
-                <div style={{ fontSize:11, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{lang==="bn"?"উদাহরণ":"Example"}</div>
+                <div style={{ fontSize:11, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{lang==="bn"?"উদাহরণ":"Preview"}</div>
                 <div style={{ fontSize:13, color:th.txtPrimary, fontWeight:700 }}>Brake Pad</div>
                 {siShowCode&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📋 BP-123  🏷️ Toyota</div>}
+                <div style={{ marginTop:8, fontSize:11, display:"flex", gap:6, alignItems:"center" }}>
+                  <div style={{ width:40, height:14, borderRadius:3, background:siColorPrint?"#16a34a":"#1a1a1a" }} />
+                  <span style={{ color:th.txtMuted }}>{siColorPrint?(lang==="bn"?"রঙিন হেডার":"Color header"):(lang==="bn"?"সাদা-কালো হেডার":"B&W header")}</span>
+                </div>
               </div>
             </div>
           )}
