@@ -3520,15 +3520,18 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
       ? (isBn?"ডেলিভারি চালান":"DELIVERY CHALLAN")
       : (isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
 
-  // B&W or Color
-  const headerColor = colorPrint
-    ? (isTax?"#1d4ed8": isDelivery?"#7c3aed":"#16a34a")
-    : "#1a1a1a";
-  const headerGrad  = colorPrint
+  // B&W vs Color — clearly distinct
+  const headerColor  = colorPrint ? (isTax?"#1d4ed8": isDelivery?"#7c3aed":"#16a34a") : "#374151";
+  const headerGrad   = colorPrint
     ? (isTax?"linear-gradient(135deg,#1d4ed8,#1e40af)":
        isDelivery?"linear-gradient(135deg,#7c3aed,#6d28d9)":
        "linear-gradient(135deg,#16a34a,#15803d)")
-    : "linear-gradient(135deg,#1a1a1a,#2d2d2d)";
+    : "#f8f9fa"; // B&W: light grey header
+  const headerText   = colorPrint ? "#ffffff" : "#111111"; // B&W: black text
+  const theadBg      = colorPrint ? "#1f2937" : "#e5e7eb";
+  const theadText    = colorPrint ? "#ffffff" : "#111111";
+  const accentBorder = colorPrint ? headerColor : "#6b7280";
+  const grandBg      = colorPrint ? headerColor : "#374151";
 
   const rows = (invoice.items||[]).map((it,i)=>{
     const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
@@ -3565,11 +3568,52 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
   const deliveryHTML = !isDelivery&&(invoice.deliveryNoteNo||invoice.vehicleNo)
     ? `<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>` : "";
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title} - ${invoice.invoiceNo}</title>
-<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}.invoice{max-width:820px;margin:0 auto;border:2px solid ${headerColor};border-radius:12px;overflow:hidden}.hdr{background:${headerGrad};color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}.shop-name{font-size:20px;font-weight:900}.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}.inv-title{font-size:24px;font-weight:900;text-align:right;letter-spacing:2px}.inv-no{font-size:12px;text-align:right;margin-top:3px;opacity:0.9}.body{padding:18px 22px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}.info-value{font-size:14px;font-weight:700;color:#111}.info-sub{font-size:11px;color:#6b7280;margin-top:2px}table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}thead tr{background:#1f2937;color:#fff}th{padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}td{padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:nth-child(even){background:#f9fafb}.totals{display:flex;justify-content:flex-end;margin-bottom:14px}.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}.totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}.tl{color:#6b7280;font-size:12px}.tv{font-weight:700;font-size:12px}.grand-row{display:flex;justify-content:space-between;padding:11px 13px;background:${headerColor}}.gl{color:#fff;font-size:13px;font-weight:800}.gv{color:#fff;font-size:17px;font-weight:900}.pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}${isDelivery?`.recv-box{background:#f3e8ff;border:2px solid #7c3aed;border-radius:8px;padding:14px;margin-bottom:14px}.recv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}.recv-item{border-top:1.5px solid #9ca3af;margin-top:36px;padding-top:6px;font-size:11px;color:#6b7280}`:""}
-.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid ${headerColor};font-size:12px;color:${headerColor};font-weight:700}@media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0}}</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px"><button onclick="window.print()" style="padding:10px 28px;background:${headerColor};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button><button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button></div>
-<div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">📅 ${invoice.invoiceDate}</div><div class="inv-no">👤 ${invoice.createdByName}</div></div></div>
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title} - ${invoice.invoiceNo}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
+.invoice{max-width:820px;margin:0 auto;border:2px solid ${accentBorder};border-radius:${colorPrint?"12px":"4px"};overflow:hidden;box-shadow:${colorPrint?"0 4px 20px rgba(0,0,0,0.12)":"none"}}
+.hdr{background:${headerGrad};color:${headerText};padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:${colorPrint?"none":"2px solid #dee2e6"}}
+.shop-name{font-size:20px;font-weight:900}
+.shop-sub{font-size:11px;opacity:${colorPrint?"0.85":"0.7"};margin-top:3px}
+.inv-title{font-size:24px;font-weight:900;text-align:right;letter-spacing:2px}
+.inv-no{font-size:12px;text-align:right;margin-top:3px;opacity:0.9}
+.body{padding:18px 22px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}
+.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}
+.info-value{font-size:14px;font-weight:700;color:#111}
+.info-sub{font-size:11px;color:#6b7280;margin-top:2px}
+table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}
+thead tr{background:${theadBg};color:${theadText}}
+th{padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}
+td{padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+tbody tr:nth-child(even){background:#f9fafb}
+.totals{display:flex;justify-content:flex-end;margin-bottom:14px}
+.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+.totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}
+.tl{color:#6b7280;font-size:12px}
+.tv{font-weight:700;font-size:12px}
+.grand-row{display:flex;justify-content:space-between;padding:11px 13px;background:${grandBg}}
+.gl{color:#fff;font-size:13px;font-weight:800}
+.gv{color:#fff;font-size:17px;font-weight:900}
+.pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}
+${isDelivery?`.recv-box{background:${colorPrint?"#f3e8ff":"#f8f9fa"};border:2px solid ${colorPrint?"#7c3aed":"#6b7280"};border-radius:8px;padding:14px;margin-bottom:14px}.recv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}.recv-item{border-top:1.5px solid #9ca3af;margin-top:36px;padding-top:6px;font-size:11px;color:#6b7280}`:""}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}
+.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
+.footer{text-align:center;padding:11px 22px;background:${colorPrint?"#f9fafb":"#f0f0f0"};border-top:2px solid ${accentBorder};font-size:12px;color:${accentBorder};font-weight:700}
+@media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0;box-shadow:none}}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="padding:10px 28px;background:${grandBg};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
+  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
+</div>
+<div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${invoice.createdByName}</div></div></div>
 <div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>
 ${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
 ${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
@@ -3583,12 +3627,18 @@ ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুম
 
 function printSalesInvoice(invoice, shop, lang, showCode, colorPrint) {
   const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false, colorPrint||false);
-  const w = window.open("","_blank","width=950,height=750");
-  if (!w) { alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups."); return; }
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(()=>w.print(), 600);
+  // Use Blob URL to properly handle UTF-8/Bengali encoding
+  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const w    = window.open(url, "_blank", "width=980,height=780");
+  if (!w) {
+    URL.revokeObjectURL(url);
+    alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups.");
+    return;
+  }
+  w.addEventListener("load", () => {
+    setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
+  });
 }
 
 // ── SI Status Badge ──
@@ -3935,7 +3985,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const isInvDelivery = inv.invoiceType==="delivery";
     const { sub, disc, vat, grand } = siCalcTotals(inv.items||[], isTax&&!isInvDelivery);
     const bal=grand-inv.amountPaid;
-    const canEdit=["draft","confirmed"].includes(inv.status);
+    const canEdit=["draft","confirmed","paid","partial"].includes(inv.status);
     // cash invoice is always fully paid → no mark paid button
     const canPay=!isInvCash&&["confirmed","partial"].includes(inv.status);
     const dr={ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
