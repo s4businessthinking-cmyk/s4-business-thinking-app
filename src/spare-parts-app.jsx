@@ -314,6 +314,11 @@ const TR = {
     cm_discountPerc:"ডিফল্ট ছাড় (%)",
     cm_assignedSalesman:"নির্ধারিত সেলসম্যান",
     cm_notes:"বিশেষ নোট",
+    cm_emirate:"এমিরেট", cm_fax:"ফ্যাক্স",
+    cm_import:"📥 ইমপোর্ট", cm_importBtn:"এক্সেল থেকে ইমপোর্ট",
+    cm_importFile:"XLS/XLSX ফাইল বেছে নিন", cm_importStart:"✅ ইমপোর্ট শুরু করুন",
+    cm_importDone:"সফলভাবে ইমপোর্ট হয়েছে!", cm_importProgress:"ইমপোর্ট হচ্ছে...",
+    cm_importCount:"টি রেকর্ড", cm_importSkip:"টি skip (duplicate)",
     cm_totalCustomers:"মোট কাস্টমার",
     cm_activeCustomers:"সক্রিয়",
     cm_totalCreditLimit:"মোট ক্রেডিট লিমিট",
@@ -382,6 +387,8 @@ const TR = {
     vm_openingBalance:"শুরুর ব্যালেন্স (৳)",
     vm_paymentTerms:"পেমেন্ট শর্ত (দিন)",
     vm_notes:"বিশেষ নোট",
+    vm_emirate:"এমিরেট", vm_fax:"ফ্যাক্স",
+    vm_import:"📥 ইমপোর্ট", vm_importBtn:"এক্সেল থেকে ইমপোর্ট",
     vm_totalVendors:"মোট ভেন্ডর",
     vm_activeVendors:"সক্রিয়",
     vm_totalCredit:"মোট ক্রেডিট লিমিট",
@@ -725,6 +732,11 @@ const TR = {
     cm_discountPerc:"Default Discount (%)",
     cm_assignedSalesman:"Assigned Salesman",
     cm_notes:"Special Notes",
+    cm_emirate:"Emirate", cm_fax:"Fax",
+    cm_import:"📥 Import", cm_importBtn:"Import from Excel",
+    cm_importFile:"Choose XLS/XLSX file", cm_importStart:"✅ Start Import",
+    cm_importDone:"Imported successfully!", cm_importProgress:"Importing...",
+    cm_importCount:"records found", cm_importSkip:"skipped (duplicate)",
     cm_totalCustomers:"Total Customers",
     cm_activeCustomers:"Active",
     cm_totalCreditLimit:"Total Credit Limit",
@@ -793,6 +805,8 @@ const TR = {
     vm_openingBalance:"Opening Balance (AED)",
     vm_paymentTerms:"Payment Terms (Days)",
     vm_notes:"Special Notes",
+    vm_emirate:"Emirate", vm_fax:"Fax",
+    vm_import:"📥 Import", vm_importBtn:"Import from Excel",
     vm_totalVendors:"Total Vendors",
     vm_activeVendors:"Active",
     vm_totalCredit:"Total Credit Limit",
@@ -1838,11 +1852,192 @@ function VmStatusBadge({ status, lang }) {
 }
 
 // ─── VENDOR MASTER WINDOW ─────────────────────────────────────
-const emptyVendor = {
+// ─── EXCEL IMPORT MODAL ──────────────────────────────────────
+function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImported,
+  type, // "customer" | "vendor"
+  columnMap, defaultFields, collection: colName }) {
+
+  const [rows,setRows]         = useState([]);
+  const [status,setStatus]     = useState("idle"); // idle|parsing|preview|importing|done
+  const [progress,setProgress] = useState(0);
+  const [imported,setImported] = useState(0);
+  const [skipped,setSkipped]   = useState(0);
+  const [error,setError]       = useState("");
+
+  const isBn = lang==="bn";
+  const nameKey = type==="customer"?"customerName":"vendorName";
+  const cleanVal = (v) => {
+    if (v===null||v===undefined) return "";
+    const s = String(v).trim();
+    if (s==="nan"||s==="NaN"||s==="-"||s==="None"||s==="") return "";
+    if (/^\d+\.0$/.test(s)) return s.slice(0,-2); // remove .0
+    // Large numbers that might be TRN/phone stored as float
+    if (/^\d+\.\d+$/.test(s) && s.length > 8) {
+      // Convert float to int string
+      try { return String(Math.round(parseFloat(s))); } catch { return s; }
+    }
+    return s;
+  };
+
+  const parseFile = async (file) => {
+    setStatus("parsing"); setError("");
+    try {
+      const XLSX = await import("https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs");
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf, { type:"array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const data = XLSX.utils.sheet_to_json(ws, { defval:"" });
+      if (!data.length) { setError(isBn?"ফাইলে কোনো ডেটা নেই":"No data found in file"); setStatus("idle"); return; }
+      setRows(data);
+      setStatus("preview");
+    } catch(e) {
+      setError(String(e)); setStatus("idle");
+    }
+  };
+
+  const doImport = async () => {
+    setStatus("importing"); setProgress(0); setImported(0); setSkipped(0);
+    let imp=0, skip=0;
+    const BATCH_SIZE = 400;
+    try {
+      for (let i=0; i<rows.length; i+=BATCH_SIZE) {
+        const batch = writeBatch(db);
+        const chunk = rows.slice(i, i+BATCH_SIZE);
+        for (const row of chunk) {
+          // Map columns
+          const mapped = { ...defaultFields, shopId, createdBy:user.uid, createdAt:serverTimestamp() };
+          for (const [xlsCol, dbField] of Object.entries(columnMap)) {
+            const v = cleanVal(row[xlsCol]);
+            if (v) mapped[dbField] = v;
+          }
+          const name = mapped[nameKey]||"";
+          if (!name) { skip++; continue; }
+          const ref = doc(collection(db, colName));
+          batch.set(ref, mapped);
+          imp++;
+        }
+        await batch.commit();
+        setProgress(Math.round(((i+BATCH_SIZE)/rows.length)*100));
+        setImported(imp); setSkipped(skip);
+      }
+      setStatus("done"); setImported(imp); setSkipped(skip);
+      onImported && onImported(imp);
+    } catch(e) { setError(String(e)); setStatus("preview"); }
+  };
+
+  const overlay = { position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:10000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 };
+  const modal   = { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:16, padding:24, maxWidth:600, width:"100%", maxHeight:"90vh", overflow:"auto" };
+  const btn = (bg,col,onClick,label,disabled=false) => (
+    <button onClick={onClick} disabled={disabled}
+      style={{ padding:"12px 20px", borderRadius:10, border:"none", background:disabled?"#333":bg, color:col, fontSize:14, fontWeight:700, cursor:disabled?"not-allowed":"pointer" }}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={overlay} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={modal}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+          <div style={{ fontSize:17, fontWeight:800, color:th.txtPrimary }}>
+            {type==="customer"?t.cm_importBtn:t.vm_importBtn}
+          </div>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:th.txtMuted, fontSize:20, cursor:"pointer" }}>✕</button>
+        </div>
+
+        {/* File picker */}
+        {(status==="idle"||status==="parsing")&&(
+          <div>
+            <div style={{ border:`2px dashed ${th.borderMid}`, borderRadius:12, padding:32, textAlign:"center", marginBottom:16 }}>
+              <div style={{ fontSize:36, marginBottom:8 }}>📂</div>
+              <div style={{ fontSize:14, color:th.txtMuted, marginBottom:16 }}>
+                {isBn?"XLS / XLSX ফাইল এখানে টেনে আনুন বা ক্লিক করুন":"Drag & drop XLS/XLSX file or click to browse"}
+              </div>
+              <label style={{ display:"inline-block", padding:"10px 24px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                {status==="parsing"?(isBn?"পড়া হচ্ছে...":"Reading..."):(isBn?"ফাইল বেছে নিন":"Choose File")}
+                <input type="file" accept=".xls,.xlsx" style={{ display:"none" }} disabled={status==="parsing"}
+                  onChange={e=>e.target.files[0]&&parseFile(e.target.files[0])} />
+              </label>
+            </div>
+            <div style={{ fontSize:12, color:"#f59e0b", background:"rgba(245,158,11,0.08)", borderRadius:8, padding:"8px 12px" }}>
+              ⚠️ {isBn?"Import করলে নতুন রেকর্ড যোগ হবে। একই নামের পুরনো রেকর্ড মুছবে না।":"Import adds new records. Existing records with same name are not deleted."}
+            </div>
+            {error&&<div style={{ marginTop:10, color:"#ef4444", fontSize:13 }}>❌ {error}</div>}
+          </div>
+        )}
+
+        {/* Preview */}
+        {status==="preview"&&(
+          <div>
+            <div style={{ fontSize:14, fontWeight:700, color:"#22c55e", marginBottom:12 }}>
+              ✅ {rows.length} {isBn?t.cm_importCount:t.cm_importCount}
+            </div>
+            <div style={{ overflowX:"auto", marginBottom:16, borderRadius:8, border:`1px solid ${th.border}` }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
+                <thead>
+                  <tr style={{ background:th.bgInp }}>
+                    {Object.keys(columnMap).slice(0,6).map(col=>(
+                      <th key={col} style={{ padding:"6px 8px", textAlign:"left", color:th.txtMuted, fontWeight:700, whiteSpace:"nowrap", fontSize:10 }}>{col}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.slice(0,5).map((row,i)=>(
+                    <tr key={i} style={{ borderTop:`1px solid ${th.border}` }}>
+                      {Object.keys(columnMap).slice(0,6).map(col=>(
+                        <td key={col} style={{ padding:"5px 8px", color:th.txtPrimary, maxWidth:120, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {cleanVal(row[col])||"—"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {rows.length>5&&<div style={{ fontSize:11, color:th.txtMuted, marginBottom:12 }}>...{isBn?"আরও":"and"} {rows.length-5} {isBn?"টি রেকর্ড":"more records"}</div>}
+            <div style={{ display:"flex", gap:10 }}>
+              {btn("linear-gradient(135deg,#22c55e,#16a34a)","#fff",doImport, isBn?`✅ ${rows.length} টি ইমপোর্ট করুন`:`✅ Import ${rows.length} records`)}
+              {btn("transparent","#a1a1aa",()=>{ setRows([]); setStatus("idle"); }, isBn?"বাতিল":"Cancel")}
+            </div>
+            {error&&<div style={{ marginTop:10, color:"#ef4444", fontSize:13 }}>❌ {error}</div>}
+          </div>
+        )}
+
+        {/* Progress */}
+        {status==="importing"&&(
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
+            <div style={{ fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:8 }}>
+              {isBn?"ইমপোর্ট হচ্ছে...":"Importing..."}
+            </div>
+            <div style={{ background:th.bgInp, borderRadius:100, height:8, overflow:"hidden", marginBottom:8 }}>
+              <div style={{ background:"#22c55e", height:"100%", width:`${progress}%`, transition:"width 0.3s", borderRadius:100 }} />
+            </div>
+            <div style={{ fontSize:13, color:"#22c55e", fontWeight:700 }}>{imported} {isBn?"টি সম্পন্ন":"done"}</div>
+          </div>
+        )}
+
+        {/* Done */}
+        {status==="done"&&(
+          <div style={{ textAlign:"center", padding:"20px 0" }}>
+            <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
+            <div style={{ fontSize:18, fontWeight:800, color:"#22c55e", marginBottom:6 }}>
+              {isBn?t.cm_importDone:t.cm_importDone}
+            </div>
+            <div style={{ fontSize:14, color:th.txtMuted, marginBottom:20 }}>
+              {imported} {isBn?"টি রেকর্ড ইমপোর্ট হয়েছে":"records imported"}
+              {skipped>0&&` · ${skipped} ${isBn?"টি skip":"skipped"}`}
+            </div>
+            {btn("linear-gradient(135deg,#22c55e,#16a34a)","#fff",onClose,isBn?"✅ বন্ধ করুন":"✅ Close")}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
   vendorName:"", vendorCode:"", category:"", status:"active",
   contactPerson:"",
-  mobileNumber:"", phoneNumber:"", whatsappNumber:"", email:"",
-  address:"", area:"", city:"", country:"", mapLink:"",
+  mobileNumber:"", phoneNumber:"", whatsappNumber:"", fax:"", email:"",
+  address:"", emirate:"", area:"", city:"", country:"", mapLink:"",
   trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
   bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
   creditLimit:"", openingBalance:"", paymentTerms:"",
@@ -1851,6 +2046,14 @@ const emptyVendor = {
 
 function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDesktop, onGoToPurchase }) {
   const [vmView,setVmView]           = useState("list"); // list|form|detail
+  const [showVmImport,setShowVmImport] = useState(false);
+  const VM_COL_MAP = {
+    VendorName:"vendorName", Address:"address", LedgerCode:"vendorCode",
+    Emirate:"emirate", Area:"area", PhoneNo:"phoneNumber", MobileNo:"mobileNumber",
+    Fax:"fax", Email:"email", LicenseNo:"tradeLicenseNumber", TRN:"trnNumber",
+    CreditLimit:"creditLimit", CreditPeriod:"paymentTerms", OpeningBal:"openingBalance",
+  };
+  const VM_DEFAULTS = { ...emptyVendor, status:"active", country:"UAE" };
   const [selVendor,setSelVendor]     = useState(null);
   const [editVendorId,setEditVendorId] = useState(null);
   const [vmForm,setVmForm]           = useState({...emptyVendor});
@@ -1915,6 +2118,7 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
       whatsappNumber:vmForm.whatsappNumber.trim(), email:vmForm.email.trim(),
       address:vmForm.address.trim(), area:vmForm.area.trim(),
       city:vmForm.city.trim(), country:vmForm.country.trim(), mapLink:vmForm.mapLink.trim(),
+      emirate:(vmForm.emirate||"").trim(), fax:(vmForm.fax||"").trim(),
       trnNumber:vmForm.trnNumber.trim(),
       tradeLicenseNumber:vmForm.tradeLicenseNumber.trim(),
       tinNumber:vmForm.tinNumber.trim(), binNumber:vmForm.binNumber.trim(), vatNumber:vmForm.vatNumber.trim(),
@@ -1977,12 +2181,24 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
   // ══════════════════════════════════
   if (vmView==="list") return (
     <div style={panel}>
+      {showVmImport&&<ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
+        type="vendor" columnMap={VM_COL_MAP} defaultFields={VM_DEFAULTS}
+        collection="vendors"
+        onClose={()=>setShowVmImport(false)}
+        onImported={(n)=>{ setShowVmImport(false); toast(`✅ ${n} ${lang==="bn"?"জন ভেন্ডর ইমপোর্ট হয়েছে":"vendors imported!"}`) }} />}
+
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.vm_title}</div>
-        <button onClick={()=>{ setVmForm({...emptyVendor}); setEditVendorId(null); setVmView("form"); }}
-          style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>
-          {t.vm_new}
-        </button>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={()=>setShowVmImport(true)}
+            style={{ padding:"9px 14px", borderRadius:10, border:"1px solid #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            {t.vm_import}
+          </button>
+          <button onClick={()=>{ setVmForm({...emptyVendor}); setEditVendorId(null); setVmView("form"); }}
+            style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            {t.vm_new}
+          </button>
+        </div>
       </div>
 
       {/* KPI */}
@@ -2201,9 +2417,11 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
           )}
         </div>
         <div style={grid2}>
+          {fieldWrap(t.vm_emirate, <input style={inp()} placeholder="ABU DHABI / DUBAI..." value={vmForm.emirate||""} onChange={e=>upd("emirate",e.target.value)} />)}
           {fieldWrap(t.vm_area, <input style={inp()} placeholder={lang==="bn"?"এলাকা":"Area"} value={vmForm.area} onChange={e=>upd("area",e.target.value)} />)}
           {fieldWrap(t.vm_city, <input style={inp()} placeholder={lang==="bn"?"শহর":"City"} value={vmForm.city} onChange={e=>upd("city",e.target.value)} />)}
-          {fieldWrap(t.vm_country, <input style={inp()} placeholder="Bangladesh / UAE..." value={vmForm.country} onChange={e=>upd("country",e.target.value)} />)}
+          {fieldWrap(t.vm_country, <input style={inp()} placeholder="UAE..." value={vmForm.country} onChange={e=>upd("country",e.target.value)} />)}
+          {fieldWrap(t.vm_fax, <input style={inp()} inputMode="tel" placeholder={lang==="bn"?"ফ্যাক্স নম্বর":"Fax number"} value={vmForm.fax||""} onChange={e=>upd("fax",e.target.value)} />)}
           {fieldWrap(t.vm_mapLink, <input style={inp()} placeholder="https://maps.google.com/..." value={vmForm.mapLink} onChange={e=>upd("mapLink",e.target.value)} />)}
         </div>
       </div>
@@ -2277,8 +2495,8 @@ const emptyCustomer = {
   customerName:"", customerCode:"", customerType:"", status:"active",
   paymentType:"cash",
   contactPerson:"",
-  mobileNumber:"", phoneNumber:"", whatsappNumber:"", email:"",
-  address:"", area:"", city:"", country:"", mapLink:"",
+  mobileNumber:"", phoneNumber:"", whatsappNumber:"", fax:"", email:"",
+  address:"", emirate:"", area:"", city:"", country:"", mapLink:"",
   trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
   bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
   creditLimit:"", openingBalance:"", paymentTerms:"",
@@ -2293,6 +2511,14 @@ function CmStatusBadge({ status, lang }) {
 
 function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toast, isDesktop }) {
   const [cmView,setCmView]             = useState("list");
+  const [showCmImport,setShowCmImport] = useState(false);
+  const CM_COL_MAP = {
+    CustomerName:"customerName", Address:"address", LedgerCode:"customerCode",
+    Emirate:"emirate", Area:"area", PhoneNo:"phoneNumber", MobileNo:"mobileNumber",
+    Fax:"fax", Email:"email", LicenseNo:"tradeLicenseNumber", TRN:"trnNumber",
+    CreditLimit:"creditLimit", CreditPeriod:"paymentTerms", OpeningBal:"openingBalance",
+  };
+  const CM_DEFAULTS = { ...emptyCustomer, customerType:"corporate", status:"active", country:"UAE", paymentType:"credit" };
   const [selCustomer,setSelCustomer]   = useState(null);
   const [editCustomerId,setEditCustomerId] = useState(null);
   const [cmForm,setCmForm]             = useState({...emptyCustomer});
@@ -2358,6 +2584,7 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
       whatsappNumber:cmForm.whatsappNumber.trim(), email:cmForm.email.trim(),
       address:cmForm.address.trim(), area:cmForm.area.trim(),
       city:cmForm.city.trim(), country:cmForm.country.trim(), mapLink:cmForm.mapLink.trim(),
+      emirate:(cmForm.emirate||"").trim(), fax:(cmForm.fax||"").trim(),
       trnNumber:cmForm.trnNumber.trim(), tradeLicenseNumber:cmForm.tradeLicenseNumber.trim(),
       tinNumber:cmForm.tinNumber.trim(), binNumber:cmForm.binNumber.trim(), vatNumber:cmForm.vatNumber.trim(),
       bankName:cmForm.bankName.trim(), bankBranch:cmForm.bankBranch.trim(),
@@ -2424,12 +2651,24 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
   // ══════ LIST VIEW ══════
   if (cmView==="list") return (
     <div style={panel}>
+      {showCmImport&&<ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
+        type="customer" columnMap={CM_COL_MAP} defaultFields={CM_DEFAULTS}
+        collection="customers"
+        onClose={()=>setShowCmImport(false)}
+        onImported={(n)=>{ setShowCmImport(false); toast(`✅ ${n} ${lang==="bn"?"জন কাস্টমার ইমপোর্ট হয়েছে":"customers imported!"}`) }} />}
+
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.cm_title}</div>
-        <button onClick={()=>{ setCmForm({...emptyCustomer}); setEditCustomerId(null); setCmView("form"); }}
-          style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>
-          {t.cm_new}
-        </button>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={()=>setShowCmImport(true)}
+            style={{ padding:"9px 14px", borderRadius:10, border:"1px solid #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            {t.cm_import}
+          </button>
+          <button onClick={()=>{ setCmForm({...emptyCustomer}); setEditCustomerId(null); setCmView("form"); }}
+            style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+            {t.cm_new}
+          </button>
+        </div>
       </div>
 
       {/* KPI */}
@@ -2693,10 +2932,12 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
           {fw(t.cm_address, <AutoTA style={taStyle} placeholder={lang==="bn"?"সম্পূর্ণ ঠিকানা...":"Full address..."} value={cmForm.address} onChange={e=>upd("address",e.target.value)} />, true)}
         </div>
         <div style={grid2}>
-          {fw(t.cm_area,    <input style={inp()} placeholder={lang==="bn"?"এলাকা":"Area"} value={cmForm.area}    onChange={e=>upd("area",e.target.value)} />)}
-          {fw(t.cm_city,    <input style={inp()} placeholder={lang==="bn"?"শহর":"City"} value={cmForm.city}    onChange={e=>upd("city",e.target.value)} />)}
-          {fw(t.cm_country, <input style={inp()} placeholder="Bangladesh..." value={cmForm.country} onChange={e=>upd("country",e.target.value)} />)}
-          {fw(t.cm_mapLink, <input style={inp()} placeholder="https://maps.google.com/..." value={cmForm.mapLink} onChange={e=>upd("mapLink",e.target.value)} />)}
+          {fw(t.cm_emirate,  <input style={inp()} placeholder="ABU DHABI / DUBAI..." value={cmForm.emirate||""} onChange={e=>upd("emirate",e.target.value)} />)}
+          {fw(t.cm_area,     <input style={inp()} placeholder={lang==="bn"?"এলাকা":"Area"} value={cmForm.area}    onChange={e=>upd("area",e.target.value)} />)}
+          {fw(t.cm_city,     <input style={inp()} placeholder={lang==="bn"?"শহর":"City"} value={cmForm.city}    onChange={e=>upd("city",e.target.value)} />)}
+          {fw(t.cm_country,  <input style={inp()} placeholder="UAE..." value={cmForm.country} onChange={e=>upd("country",e.target.value)} />)}
+          {fw(t.cm_fax,      <input style={inp()} inputMode="tel" placeholder={lang==="bn"?"ফ্যাক্স নম্বর":"Fax number"} value={cmForm.fax||""} onChange={e=>upd("fax",e.target.value)} />)}
+          {fw(t.cm_mapLink,  <input style={inp()} placeholder="https://maps.google.com/..." value={cmForm.mapLink} onChange={e=>upd("mapLink",e.target.value)} />)}
         </div>
       </div>
 
