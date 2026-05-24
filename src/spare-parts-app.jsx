@@ -2034,6 +2034,8 @@ function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImported,
     </div>
   );
 }
+
+const emptyVendor = {
   vendorName:"", vendorCode:"", category:"", status:"active",
   contactPerson:"",
   mobileNumber:"", phoneNumber:"", whatsappNumber:"", fax:"", email:"",
