@@ -45,13 +45,14 @@ const PRESET_POSITIONS = {
 
 // ─── PERMISSIONS ────────────────────────────────────────────
 const PERMISSIONS_LIST = [
-  { key: "sendOrder",       bn: "অর্ডার দেওয়া",           en: "Send Orders" },
-  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",    en: "Manage Companies" },
-  { key: "setPrices",       bn: "দাম সেট করা",             en: "Set Prices" },
-  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",  en: "Change Item Status" },
-  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",      en: "Mark as Delivered" },
-  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",        en: "Delete Orders" },
-  { key: "viewProducts",   bn: "পণ্য তালিকা দেখা",          en: "View Product List" },
+  { key: "sendOrder",       bn: "অর্ডার দেওয়া",               en: "Send Orders" },
+  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",        en: "Manage Companies" },
+  { key: "setPrices",       bn: "দাম সেট করা",                 en: "Set Prices" },
+  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",      en: "Change Item Status" },
+  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",          en: "Mark as Delivered" },
+  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",            en: "Delete Orders" },
+  { key: "viewProducts",    bn: "পণ্য তালিকা দেখা",            en: "View Product List" },
+  { key: "createPO",        bn: "📋 ক্রয় অর্ডার (Purchase Order) তৈরি ও দেখা", en: "📋 Create & View Purchase Orders" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -62,6 +63,7 @@ const DEFAULT_PERMISSIONS = {
   markDelivery: false,
   deleteOrder: false,
   viewProducts: false,
+  createPO: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -5469,6 +5471,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [localShop,setLocalShop]=useState(shopProp);
 
   const [tab,setTab]=useState(isOwner?"owner":"shop");
+  const [poSubTab,setPoSubTab]=useState("salesman"); // "salesman" | "purchase"
 
   // ── INVOICE STATE ──
   // items = confirmed invoice list (locked rows)
@@ -6065,6 +6068,7 @@ const startEditOrder = (order) => {
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
+        ...(can("createPO")?[["owner",t.tabOwner]]:[]),
         ["sales", t.tabSales],
         ["purchase", lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info"],
         ["settings",t.tabSettings],
@@ -6532,13 +6536,53 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {isOwner&&tab==="owner"&&(
-        <PurchaseOrderWindow
-          t={t} lang={lang} th={th} s={s}
-          shopId={shopId} user={user} profile={profile}
-          vendors={vendors} products={products}
-          shop={localShop} toast={toast} isDesktop={isDesktop}
-        />
+      {tab==="owner"&&(
+        isOwner ? (
+          <div>
+            {/* ── Subtab switcher (owner only) ── */}
+            <div style={{ display:"flex", gap:0, padding:"10px 14px 0", background:th.bgHdr, borderBottom:`1px solid ${th.border}`, position:"sticky", top:61, zIndex:5 }}>
+              <button onClick={()=>setPoSubTab("salesman")} style={{ flex:1, padding:"10px 8px", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, background:poSubTab==="salesman"?"#f97316":"transparent", color:poSubTab==="salesman"?"#fff":th.txtMuted, borderRadius:"8px 8px 0 0", position:"relative" }}>
+                📦 {lang==="bn"?"সেলসম্যান অর্ডার":"Salesman Orders"}
+                {unread>0&&<span style={{ marginLeft:6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:18, height:18, fontSize:10, display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:800 }}>{unread}</span>}
+              </button>
+              <button onClick={()=>setPoSubTab("purchase")} style={{ flex:1, padding:"10px 8px", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, background:poSubTab==="purchase"?"#1d4ed8":"transparent", color:poSubTab==="purchase"?"#fff":th.txtMuted, borderRadius:"8px 8px 0 0" }}>
+                📋 {lang==="bn"?"ক্রয় অর্ডার (PO)":"Purchase Orders (PO)"}
+              </button>
+            </div>
+
+            {/* ── Salesman Orders subtab ── */}
+            {poSubTab==="salesman"&&(
+              <div style={isDesktop?s.desktopPanel:s.panel}>
+                <div style={{ position:"relative", marginBottom:12 }}>
+                  <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+                  <input style={{ ...s.inp, paddingLeft:36, background:th.bgCard }} placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."} value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+                  {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+                </div>
+                {orders.length===0
+                  ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+                  : (() => {
+                      const filtered = filterOrders(orders);
+                      if (!filtered.length) return (<div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>);
+                      const groups = groupByDay(filtered);
+                      return groups.map(([dateStr, dayOrders]) => (
+                        <div key={dateStr}>
+                          <div style={s.dayHeader}><span style={s.dayDot} /><span style={s.dayLabel}>📅 {dateStr}</span><span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span></div>
+                          {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+                        </div>
+                      ));
+                    })()}
+              </div>
+            )}
+
+            {/* ── Purchase Orders (ERP) subtab ── */}
+            {poSubTab==="purchase"&&(
+              <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} />
+            )}
+          </div>
+        ) : (
+          /* Salesman with createPO permission — sees Purchase Order directly */
+          can("createPO") && <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} />
+        )
       )}
 
       {(isOwner||can("viewProducts"))&&tab==="products"&&(
