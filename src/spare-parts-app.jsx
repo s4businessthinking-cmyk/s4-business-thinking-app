@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -5280,7 +5280,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
               const thisIdx=statusOrder.indexOf(st);
               const isDone=curIdx>thisIdx;
               return (
-                <React.Fragment key={st}>
+                <Fragment key={st}>
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
                     <div style={{ width:28, height:28, borderRadius:"50%", background:isCurrent?stObj.color:isDone?"#22c55e":th.bgInp, border:`2px solid ${isCurrent?stObj.color:isDone?"#22c55e":th.borderMid}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11 }}>
                       {isDone?"✓":isCurrent?"●":"○"}
@@ -5288,7 +5288,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
                     <div style={{ fontSize:8, color:isCurrent?stObj.color:isDone?"#22c55e":th.txtFaint, fontWeight:700, textTransform:"uppercase", marginTop:4, textAlign:"center", maxWidth:60 }}>{stObj?.[lang]||st}</div>
                   </div>
                   {i<arr.length-1&&<div style={{ flex:1, height:2, background:isDone?"#22c55e":th.border, minWidth:12 }} />}
-                </React.Fragment>
+                </Fragment>
               );
             })}
           </div>
