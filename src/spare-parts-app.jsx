@@ -5138,26 +5138,74 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
 
   // Build payload
   const poBuild = (status) => {
-    if (!poForm.vendorName.trim()) { toast(t.po_errVendor,"err"); return null; }
-    const valid=poLines.filter(it=>it.name.trim());
+    const vName=(poForm.vendorName||"").trim();
+    if (!vName) { toast(t.po_errVendor,"err"); return null; }
+    const valid=poLines.filter(it=>(it.name||"").trim());
     if (!valid.length) { toast(t.po_errItems,"err"); return null; }
     for (const it of valid) {
       if (!it.qty||poN2(it.qty)<=0) { toast(t.po_errQty,"err"); return null; }
     }
-    const builtItems=valid.map(it=>{ const {disc,total}=poCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:poN2(it.qty), unit:it.unit, unitPrice:poN2(it.unitPrice), discountPerc:poN2(it.discountPerc), discountAmt:parseFloat(poFmt2(disc)), lineTotal:parseFloat(poFmt2(total)) }; });
+    const builtItems=valid.map(it=>{
+      const {disc,total}=poCalcLine(it);
+      return {
+        productId: it.productId||null,
+        name:   (it.name  ||"").trim(),
+        code:   (it.code  ||"").trim(),
+        brand:  (it.brand ||"").trim(),
+        qty:    poN2(it.qty),
+        unit:   it.unit||"Pcs",
+        unitPrice:    poN2(it.unitPrice),
+        discountPerc: poN2(it.discountPerc),
+        discountAmt:  parseFloat(poFmt2(disc)),
+        lineTotal:    parseFloat(poFmt2(total)),
+      };
+    });
     const { sub,disc,grand }=poCalcTotals(builtItems);
-    return { shopId, poNumber, poDate:poForm.poDate, deliveryDate:poForm.deliveryDate||"", vendorId:poForm.vendorId||null, vendorName:poForm.vendorName.trim(), vendorMobile:poForm.vendorMobile.trim(), vendorAddress:poForm.vendorAddress.trim(), vendorTrn:poForm.vendorTrn.trim(), shippingAddress:poForm.shippingAddress.trim(), items:builtItems, subtotal:parseFloat(poFmt2(sub)), totalDiscount:parseFloat(poFmt2(disc)), grandTotal:parseFloat(poFmt2(grand)), notes:poForm.notes.trim(), terms:poForm.terms.trim(), internalNote:poForm.internalNote.trim(), status, createdBy:user.uid, createdByName:profile.personName };
+    const createdByName = profile?.personName||profile?.name||user?.displayName||"";
+    return {
+      shopId,
+      poNumber:         poNumber||`PO-${Date.now().toString().slice(-6)}`,
+      poDate:           poForm.poDate||poToday(),
+      deliveryDate:     (poForm.deliveryDate||""),
+      vendorId:         poForm.vendorId||null,
+      vendorName:       vName,
+      vendorMobile:     (poForm.vendorMobile||"").trim(),
+      vendorAddress:    (poForm.vendorAddress||"").trim(),
+      vendorTrn:        (poForm.vendorTrn||"").trim(),
+      shippingAddress:  (poForm.shippingAddress||"").trim(),
+      items:            builtItems,
+      subtotal:         parseFloat(poFmt2(sub)),
+      totalDiscount:    parseFloat(poFmt2(disc)),
+      grandTotal:       parseFloat(poFmt2(grand)),
+      notes:            (poForm.notes||"").trim(),
+      terms:            (poForm.terms||"").trim(),
+      internalNote:     (poForm.internalNote||"").trim(),
+      status,
+      createdBy:        user.uid,
+      createdByName,
+    };
   };
 
   const poSave = async (status) => {
     const p=poBuild(status); if (!p) return;
     setPoSaving(true);
     try {
-      if (editPoId) { await updateDoc(doc(db,"purchaseOrders",editPoId),{...p,updatedAt:serverTimestamp()}); toast(t.po_updated); }
-      else { await addDoc(collection(db,"purchaseOrders"),{...p,createdAt:serverTimestamp()}); toast(status==="draft"?t.po_saved:t.po_submitted); }
+      if (editPoId) {
+        await updateDoc(doc(db,"purchaseOrders",editPoId),{...p,updatedAt:serverTimestamp()});
+        toast(t.po_updated);
+      } else {
+        await addDoc(collection(db,"purchaseOrders"),{...p,createdAt:serverTimestamp()});
+        toast(status==="draft"?t.po_saved:t.po_submitted);
+      }
       setPoView("list");
-    } catch(e) { toast(e.message,"err"); }
-    finally { setPoSaving(false); }
+    } catch(e) {
+      const code=e?.code||"";
+      const msg=code==="permission-denied"
+        ? "❌ Firestore: purchaseOrders collection এ write permission নেই। Rules update করুন।"
+        : `❌ ${e?.message||"Unknown error"}`;
+      toast(msg,"err");
+      console.error("poSave failed:",e);
+    } finally { setPoSaving(false); }
   };
 
   const poUpdateStatus = async (poId, newStatus, successMsg) => {
