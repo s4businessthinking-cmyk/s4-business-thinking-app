@@ -5067,50 +5067,62 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
   const [poSaving,setPoSaving] = useState(false);
   const [search,setSearch]     = useState("");
   const [statusF,setStatusF]   = useState("ALL");
+  const [poErr,setPoErr]       = useState("");
 
-  // Firestore listener
+  // Firestore listener — no orderBy to avoid composite index requirement
   useEffect(()=>{
     if (!shopId) return;
-    setPoLoading(true);
-    let u2=null;
-    const q=query(collection(db,"purchaseOrders"),where("shopId","==",shopId),orderBy("createdAt","desc"));
-    const u1=onSnapshot(q,snap=>{
-      setPos(snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()})));
-      setPoLoading(false);
-    },()=>{
-      const q2=query(collection(db,"purchaseOrders"),where("shopId","==",shopId));
-      u2=onSnapshot(q2,snap=>{
-        const docs=snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()}));
+    setPoLoading(true); setPoErr("");
+    const q=query(collection(db,"purchaseOrders"),where("shopId","==",shopId));
+    const unsub=onSnapshot(q,
+      snap=>{
+        const docs=snap.docs.map(d=>{
+          const data=d.data();
+          return { ...data, id:d.id, createdAt:data.createdAt?.toDate?.()||new Date(data.createdAt||Date.now()) };
+        });
         docs.sort((a,b)=>b.createdAt-a.createdAt);
         setPos(docs); setPoLoading(false);
-      },err=>{ console.error(err); setPoLoading(false); });
-    });
-    return ()=>{ u1(); u2&&u2(); };
+      },
+      err=>{
+        console.error("PO listener error:",err);
+        setPoErr(err.message||"Permission denied");
+        setPoLoading(false);
+      }
+    );
+    return ()=>unsub();
   },[shopId]);
 
-  // Generate PO Number
+  // Generate PO Number — 3-layer fallback, always succeeds
   const genPoNo = async () => {
+    // Layer 1: atomic transaction on shop serial counter
     try {
       const serial=await runTransaction(db,async tx=>{
-        const ref=doc(db,"shops",shopId), snap=await tx.get(ref);
-        const next=Number(snap.data()?.lastPOSerial||0)+1;
-        tx.update(ref,{lastPOSerial:next}); return next;
+        const ref=doc(db,"shops",shopId);
+        const snap=await tx.get(ref);
+        const next=(Number(snap.data()?.lastPOSerial)||0)+1;
+        tx.update(ref,{lastPOSerial:next});
+        return next;
       });
       return `${PO_PREFIX}${String(serial).padStart(4,"0")}`;
-    } catch {
+    } catch(_e1) {
+      // Layer 2: scan existing POs for max number
       try {
         const snap=await getDocs(query(collection(db,"purchaseOrders"),where("shopId","==",shopId)));
-        const max=snap.docs.reduce((mx,d)=>{ const m=String(d.data().poNumber||"").match(/PO-?(\d+)$/); return m?Math.max(mx,Number(m[1])):mx; },0);
+        const max=snap.docs.reduce((mx,d)=>{
+          const m=String(d.data().poNumber||"").match(/(\d+)$/);
+          return m?Math.max(mx,Number(m[1])):mx;
+        },0);
         return `${PO_PREFIX}${String(max+1).padStart(4,"0")}`;
-      } catch { return `${PO_PREFIX}${String(Date.now()).slice(-4)}`; }
+      } catch(_e2) {
+        // Layer 3: timestamp-based, always works
+        return `${PO_PREFIX}${String(Date.now()).slice(-4)}`;
+      }
     }
   };
 
   const poOpenNew = async () => {
-    try {
-      const no=await genPoNo();
-      setPoNumber(no); setPoForm(poEmptyForm()); setPoLines([poEmptyLine()]); setEditPoId(null); setPoView("form");
-    } catch(e) { toast(e.message,"err"); }
+    const no=await genPoNo();
+    setPoNumber(no); setPoForm(poEmptyForm()); setPoLines([poEmptyLine()]); setEditPoId(null); setPoView("form");
   };
 
   const poOpenEdit = (po) => {
@@ -5152,11 +5164,21 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
     const p=poBuild(status); if (!p) return;
     setPoSaving(true);
     try {
-      if (editPoId) { await updateDoc(doc(db,"purchaseOrders",editPoId),{...p,updatedAt:serverTimestamp()}); toast(t.po_updated); }
-      else { await addDoc(collection(db,"purchaseOrders"),{...p,createdAt:serverTimestamp()}); toast(status==="draft"?t.po_saved:t.po_submitted); }
+      if (editPoId) {
+        await updateDoc(doc(db,"purchaseOrders",editPoId),{...p,updatedAt:serverTimestamp()});
+        toast(t.po_updated);
+      } else {
+        await addDoc(collection(db,"purchaseOrders"),{...p,createdAt:serverTimestamp()});
+        toast(status==="draft"?t.po_saved:t.po_submitted);
+      }
       setPoView("list");
-    } catch(e) { toast(e.message,"err"); }
-    finally { setPoSaving(false); }
+    } catch(e) {
+      const msg=e?.code==="permission-denied"
+        ? "❌ Permission Denied — Firestore rules এ purchaseOrders collection add করুন।"
+        : `❌ ${e.message}`;
+      toast(msg,"err");
+      console.error("poSave error:",e);
+    } finally { setPoSaving(false); }
   };
 
   const poUpdateStatus = async (poId, newStatus, successMsg) => {
@@ -5241,7 +5263,16 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
       </div>
 
       {poLoading&&<div style={{ textAlign:"center", padding:"50px", color:th.txtFaint }}><div style={{ fontSize:36 }}>⏳</div><div>{t.po_loading}</div></div>}
-      {!poLoading&&pos.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:48, marginBottom:10 }}>📋</div><div>{t.po_noOrders}</div></div>}
+      {!poLoading&&poErr&&(
+        <div style={{ margin:"16px 0", padding:"14px 16px", borderRadius:10, background:"#450a0a", border:"1px solid #ef4444" }}>
+          <div style={{ color:"#ef4444", fontWeight:700, fontSize:13, marginBottom:4 }}>⚠️ Firestore Error</div>
+          <div style={{ color:"#fca5a5", fontSize:12, fontFamily:"monospace", wordBreak:"break-all" }}>{poErr}</div>
+          <div style={{ color:"#fca5a5", fontSize:11, marginTop:8 }}>
+            Firebase Console → Firestore → Rules এ নতুন rules paste করুন (firestore.rules file থেকে)।
+          </div>
+        </div>
+      )}
+      {!poLoading&&!poErr&&pos.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:48, marginBottom:10 }}>📋</div><div>{t.po_noOrders}</div></div>}
       {!poLoading&&pos.length>0&&filtered.length===0&&<div style={{ textAlign:"center", padding:"40px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.po_noResults}</div></div>}
       {!poLoading&&filtered.map(po=>(
         <PoCard key={po.id} po={po} t={t} th={th} lang={lang} onClick={()=>{ setSelPo(po); setPoView("detail"); }} />
