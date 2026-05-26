@@ -5053,8 +5053,9 @@ function PoCard({ po, onClick, t, th, lang }) {
 }
 
 // ── PURCHASE ORDER WINDOW (main component) ──
-function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
+function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, canCreate }) {
   const isOwner = profile?.role==="owner";
+  const canCreatePO = canCreate !== undefined ? canCreate : isOwner;
   const [pos,setPos]           = useState([]);
   const [poLoading,setPoLoading]= useState(true);
   const [poView,setPoView]     = useState("list");
@@ -5226,7 +5227,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
     <div style={panel}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ fontSize:17, fontWeight:900, color:"#1d4ed8" }}>{t.po_title}</div>
-        {isOwner&&<button onClick={poOpenNew} disabled={poSaving} style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_new}</button>}
+        {canCreatePO&&<button onClick={poOpenNew} disabled={poSaving} style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_new}</button>}
       </div>
 
       {/* KPI */}
@@ -5371,7 +5372,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
         </div>
 
         {/* Actions */}
-        {isOwner&&<div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {canCreatePO&&<div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           <button onClick={()=>printPurchaseOrder(po,shop,lang)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_print}</button>
           {waLink&&<a href={waLink} target="_blank" rel="noreferrer" style={{ display:"block", padding:"12px", borderRadius:12, border:"none", background:"#15803d", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", textAlign:"center", textDecoration:"none" }}>💬 {t.po_waMsg}</a>}
           {po.status==="draft"&&<button onClick={()=>poUpdateStatus(po.id,"submitted",t.po_submitted)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#0891b2,#0e7490)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_submit}</button>}
@@ -6607,12 +6608,12 @@ const startEditOrder = (order) => {
 
             {/* ── Purchase Orders (ERP) subtab ── */}
             {poSubTab==="purchase"&&(
-              <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} />
+              <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} canCreate={true} />
             )}
           </div>
         ) : (
           /* Salesman with createPO permission — sees Purchase Order directly */
-          can("createPO") && <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} />
+          can("createPO") && <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} canCreate={can("createPO")} />
         )
       )}
 
