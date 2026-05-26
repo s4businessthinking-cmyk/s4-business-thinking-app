@@ -5199,12 +5199,14 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
 
   // WA message to vendor
   const poWaLink = (po) => {
-    const v=vendors.find(x=>x.id===po.vendorId);
-    const phone=v?.whatsappNumber||v?.mobileNumber||po.vendorMobile;
-    if (!phone) return null;
-    const lines=po.items.map((it,i)=>`${i+1}. *${it.name}* | ${it.code?" "+it.code+" |":""} ${it.qty} ${it.unit}`).join("\n");
-    const msg=`*Purchase Order: ${po.poNumber}*\n📅 ${po.poDate}\n\n${lines}\n\n_${lang==="bn"?"অনুগ্রহ করে উপরোক্ত পণ্যগুলো সরবরাহ করুন। ধন্যবাদ।":"Please supply the above items. Thank you."}_`;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    try {
+      const v=vendors.find(x=>x.id===po.vendorId);
+      const phone=(v?.whatsappNumber||v?.mobileNumber||po.vendorMobile||"").trim();
+      if (!phone) return null;
+      const lines=(po.items||[]).map((it,i)=>`${i+1}. *${it.name||"?"}* | ${it.code?it.code+" | ":""}${it.qty} ${it.unit}`).join("\n");
+      const msg=`*Purchase Order: ${po.poNumber}*\n📅 ${po.poDate}\n\n${lines}\n\n_${lang==="bn"?"অনুগ্রহ করে উপরোক্ত পণ্যগুলো সরবরাহ করুন। ধন্যবাদ।":"Please supply the above items. Thank you."}_`;
+      return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    } catch { return null; }
   };
 
   // Filter
@@ -5284,9 +5286,11 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
   // ══ DETAIL VIEW ══
   if (poView==="detail"&&selPo) {
     const po = pos.find(x=>x.id===selPo.id)||selPo;
-    const { sub,disc,grand }=poCalcTotals(po.items||[]);
+    if (!po) { setPoView("list"); return null; }
+    const items = po.items||[];
+    const { sub,disc,grand }=poCalcTotals(items);
     const dr={ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
-    const canEdit=["draft","submitted"].includes(po.status);
+    const canEdit=["draft","submitted"].includes(po.status||"");
     const waLink=poWaLink(po);
     return (
       <div style={panel}>
@@ -5341,7 +5345,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
             <span style={{ width:90, textAlign:"right" }}>{t.po_unitPrice}</span>
             <span style={{ width:100, textAlign:"right" }}>{t.po_lineTotal}</span>
           </div>
-          {(po.items||[]).map((it,i)=>{
+          {items.map((it,i)=>{
             const { disc:d, total:tot }=poCalcLine(it);
             return (
               <div key={i} style={{ display:"flex", alignItems:"flex-start", padding:"9px 0", borderBottom:`1px solid ${th.border}`, gap:6 }}>
