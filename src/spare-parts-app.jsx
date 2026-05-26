@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -45,14 +45,13 @@ const PRESET_POSITIONS = {
 
 // ─── PERMISSIONS ────────────────────────────────────────────
 const PERMISSIONS_LIST = [
-  { key: "sendOrder",       bn: "অর্ডার দেওয়া",               en: "Send Orders" },
-  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",        en: "Manage Companies" },
-  { key: "setPrices",       bn: "দাম সেট করা",                 en: "Set Prices" },
-  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",      en: "Change Item Status" },
-  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",          en: "Mark as Delivered" },
-  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",            en: "Delete Orders" },
-  { key: "viewProducts",    bn: "পণ্য তালিকা দেখা",            en: "View Product List" },
-  { key: "createPO",        bn: "📋 ক্রয় অর্ডার (Purchase Order) তৈরি ও দেখা", en: "📋 Create & View Purchase Orders" },
+  { key: "sendOrder",       bn: "অর্ডার দেওয়া",           en: "Send Orders" },
+  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",    en: "Manage Companies" },
+  { key: "setPrices",       bn: "দাম সেট করা",             en: "Set Prices" },
+  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",  en: "Change Item Status" },
+  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",      en: "Mark as Delivered" },
+  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",        en: "Delete Orders" },
+  { key: "viewProducts",   bn: "পণ্য তালিকা দেখা",          en: "View Product List" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -63,7 +62,6 @@ const DEFAULT_PERMISSIONS = {
   markDelivery: false,
   deleteOrder: false,
   viewProducts: false,
-  createPO: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -258,30 +256,6 @@ const TR = {
     si_invoiceSettingsSub:"ইনভয়েস প্রদর্শন পছন্দ",
     tabVendor:"🏭 ভেন্ডর মাস্টার",
     tabCustomer:"👥 কাস্টমার মাস্টার",
-    po_title:"📋 ক্রয় অর্ডার",po_new:"+ নতুন PO",po_edit:"✏️ এডিট",po_print:"🖨️ প্রিন্ট",
-    po_poNumber:"PO নম্বর",po_date:"তারিখ",po_deliveryDate:"ডেলিভারি তারিখ",
-    po_vendor:"ভেন্ডর / সাপ্লায়ার",po_vendorSelect:"ভেন্ডর বেছে নিন...",po_vendorManual:"ভেন্ডরের নাম লিখুন",
-    po_items:"পণ্যের তালিকা",po_itemName:"পণ্যের নাম *",po_code:"কোড",po_brand:"ব্র্যান্ড",
-    po_qty:"পরিমাণ *",po_unit:"ইউনিট",po_unitPrice:`একক মূল্য *`,po_discPerc:"ছাড় %",
-    po_lineTotal:"লাইন মোট",po_subtotal:"সাব-টোটাল",po_totalDiscount:"মোট ছাড়",po_grandTotal:"সর্বমোট",
-    po_notes:"নোট / মন্তব্য",po_terms:"শর্তাবলী",po_shippingAddr:"ডেলিভারি ঠিকানা",
-    po_saveDraft:"💾 ড্রাফট সেভ",po_submit:"📤 জমা দিন",
-    po_approve:"✅ অনুমোদন করুন",po_sendSupplier:"📦 সাপ্লায়ারকে পাঠান",
-    po_markReceived:"📥 মাল পাওয়া গেছে",po_markPartial:"📦 আংশিক প্রাপ্ত",
-    po_cancelBtn:"🚫 বাতিল করুন",po_deleteBtn:"🗑️ মুছুন",po_backToList:"← তালিকায় ফিরুন",
-    po_searchPh:"PO নম্বর, ভেন্ডর বা পণ্য খুঁজুন...",po_allStatus:"সব",
-    po_noOrders:"কোনো Purchase Order নেই। নতুন তৈরি করুন।",po_noResults:"কিছু পাওয়া যায়নি",
-    po_totalPOs:"মোট PO",po_totalValue:"মোট মূল্য",po_pendingCount:"চলমান",po_receivedCount:"প্রাপ্ত",
-    po_createdBy:"তৈরি করেছেন",po_approvedBy:"অনুমোদনকারী",po_waMsg:"WhatsApp-এ পাঠান",
-    po_saved:"✅ ড্রাফট সেভ!",po_submitted:"✅ PO জমা দেওয়া হয়েছে!",po_approved:"✅ PO অনুমোদিত!",
-    po_sent:"✅ সাপ্লায়ারকে পাঠানো হয়েছে!",po_received:"✅ মাল পাওয়া গেছে!",
-    po_deleted:"PO মুছে ফেলা হয়েছে।",po_cancelledMsg:"🚫 PO বাতিল হয়েছে।",po_updated:"✅ PO আপডেট হয়েছে!",
-    po_confirmDelete:"এই Purchase Order টি মুছে ফেলবেন?",po_confirmCancel:"PO বাতিল করবেন?",
-    po_errVendor:"ভেন্ডরের নাম দিন!",po_errItems:"অন্তত একটি পণ্য যোগ করুন!",
-    po_errName:"পণ্যের নাম দিন!",po_errQty:"পরিমাণ দিন!",
-    po_secHeader:"📋 অর্ডার তথ্য",po_secItems:"📦 পণ্য তালিকা",po_secSummary:"💰 মূল্য সারসংক্ষেপ",
-    po_secDelivery:"🚚 ডেলিভারি ও নোট",po_addItem:"+ পণ্য যোগ করুন",po_fromMaster:"📦 Product Master থেকে",
-    po_itemsCount:"টি পণ্য",po_loading:"লোড হচ্ছে...",
     cm_title:"👥 কাস্টমার মাস্টার",
     cm_new:"+ নতুন কাস্টমার",
     cm_edit:"✏️ কাস্টমার এডিট",
@@ -700,30 +674,6 @@ const TR = {
     si_invoiceSettingsSub:"Invoice display preferences",
     tabVendor:"🏭 Vendor Master",
     tabCustomer:"👥 Customer Master",
-    po_title:"📋 Purchase Order",po_new:"+ New PO",po_edit:"✏️ Edit",po_print:"🖨️ Print",
-    po_poNumber:"PO Number",po_date:"Date",po_deliveryDate:"Delivery Date",
-    po_vendor:"Vendor / Supplier",po_vendorSelect:"Select vendor...",po_vendorManual:"Type vendor name",
-    po_items:"Item List",po_itemName:"Item Name *",po_code:"Code",po_brand:"Brand",
-    po_qty:"Qty *",po_unit:"Unit",po_unitPrice:"Unit Price *",po_discPerc:"Disc %",
-    po_lineTotal:"Line Total",po_subtotal:"Subtotal",po_totalDiscount:"Total Discount",po_grandTotal:"Grand Total",
-    po_notes:"Notes / Remarks",po_terms:"Terms & Conditions",po_shippingAddr:"Delivery Address",
-    po_saveDraft:"💾 Save Draft",po_submit:"📤 Submit PO",
-    po_approve:"✅ Approve PO",po_sendSupplier:"📦 Send to Supplier",
-    po_markReceived:"📥 Mark as Received",po_markPartial:"📦 Mark Partial",
-    po_cancelBtn:"🚫 Cancel PO",po_deleteBtn:"🗑️ Delete",po_backToList:"← Back to List",
-    po_searchPh:"Search by PO no, vendor or item...",po_allStatus:"All",
-    po_noOrders:"No Purchase Orders yet. Create your first PO.",po_noResults:"No results found",
-    po_totalPOs:"Total POs",po_totalValue:"Total Value",po_pendingCount:"Active",po_receivedCount:"Received",
-    po_createdBy:"Created by",po_approvedBy:"Approved by",po_waMsg:"Send via WhatsApp",
-    po_saved:"✅ Draft saved!",po_submitted:"✅ PO Submitted!",po_approved:"✅ PO Approved!",
-    po_sent:"✅ Sent to Supplier!",po_received:"✅ Goods Received!",
-    po_deleted:"PO deleted.",po_cancelledMsg:"🚫 PO cancelled.",po_updated:"✅ PO updated!",
-    po_confirmDelete:"Delete this Purchase Order?",po_confirmCancel:"Cancel this PO?",
-    po_errVendor:"Enter vendor name!",po_errItems:"Add at least one item!",
-    po_errName:"Enter item name!",po_errQty:"Enter quantity!",
-    po_secHeader:"📋 Order Info",po_secItems:"📦 Item List",po_secSummary:"💰 Price Summary",
-    po_secDelivery:"🚚 Delivery & Notes",po_addItem:"+ Add Item",po_fromMaster:"📦 From Product Master",
-    po_itemsCount:" items",po_loading:"Loading...",
     cm_title:"👥 Customer Master",
     cm_new:"+ New Customer",
     cm_edit:"✏️ Edit Customer",
@@ -4829,666 +4779,6 @@ function ShopInfoSettings({ localShop, shopId, th, s, lang, toast }) {
   );
 }
 
-// ─── PURCHASE ORDER MODULE ────────────────────────────────────
-const PO_PREFIX = "PO-";
-const PO_UNITS  = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];
-const PO_STATUSES = {
-  draft:              { bn:"ড্রাফট",            en:"Draft",              color:"#f59e0b", bg:"#451a03" },
-  submitted:          { bn:"জমা দেওয়া",          en:"Submitted",          color:"#06b6d4", bg:"#083344" },
-  approved:           { bn:"অনুমোদিত",           en:"Approved",           color:"#22c55e", bg:"#052e16" },
-  sent_to_supplier:   { bn:"সাপ্লায়ারকে পাঠানো", en:"Sent to Supplier",   color:"#a855f7", bg:"#2e1065" },
-  partially_received: { bn:"আংশিক প্রাপ্ত",      en:"Partially Received", color:"#f97316", bg:"#431407" },
-  received:           { bn:"সম্পূর্ণ প্রাপ্ত",    en:"Received",           color:"#10b981", bg:"#052e16" },
-  cancelled:          { bn:"বাতিল",              en:"Cancelled",          color:"#71717a", bg:"#27272a" },
-};
-const poFmt2  = (n) => (Math.round((parseFloat(n)||0)*100)/100).toFixed(2);
-const poN2    = (v) => parseFloat(v)||0;
-const poToday = () => new Date().toISOString().split("T")[0];
-function poCalcLine(it) {
-  const qty=poN2(it.qty), price=poN2(it.unitPrice), dp=poN2(it.discountPerc);
-  const gross=qty*price, disc=gross*dp/100, total=gross-disc;
-  return { gross, disc, total };
-}
-function poCalcTotals(items) {
-  let sub=0, disc=0, grand=0;
-  (items||[]).forEach(it=>{ const c=poCalcLine(it); sub+=c.gross; disc+=c.disc; grand+=c.total; });
-  return { sub, disc, grand };
-}
-function poEmptyLine() {
-  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitPrice:"", discountPerc:"0" };
-}
-function poEmptyForm() {
-  return { poDate:poToday(), deliveryDate:"", vendorId:"", vendorName:"", vendorMobile:"", vendorAddress:"", vendorTrn:"", shippingAddress:"", notes:"", terms:"", internalNote:"" };
-}
-
-// ── PO Status Badge ──
-function PoStatusBadge({ status, lang }) {
-  const st = PO_STATUSES[status]||PO_STATUSES.draft;
-  return <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, color:st.color, background:st.bg, whiteSpace:"nowrap" }}>{st[lang]}</span>;
-}
-
-// ── PO Print HTML ──
-function generatePOHTML(po, shop, lang) {
-  const isBn = lang==="bn";
-  const { sub, disc, grand } = poCalcTotals(po.items||[]);
-  const rows = (po.items||[]).map((it,i)=>{
-    const { disc:d, total:tot } = poCalcLine(it);
-    return `<tr>
-      <td style="text-align:center">${i+1}</td>
-      <td><strong>${it.name}</strong>${it.code?`<br><span style="font-size:10px;color:#666">📋 ${it.code}${it.brand?" · 🏷️ "+it.brand:""}</span>`:""}  </td>
-      <td style="text-align:center">${it.qty} ${it.unit}</td>
-      <td style="text-align:right">${poFmt2(it.unitPrice)}</td>
-      <td style="text-align:center">${poN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td>
-      <td style="text-align:right"><strong>${poFmt2(tot)}</strong></td>
-    </tr>`;
-  }).join("");
-  const status = PO_STATUSES[po.status];
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Purchase Order - ${po.poNumber}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:20px}
-.po{max-width:820px;margin:0 auto;border:2px solid #1d4ed8;border-radius:10px;overflow:hidden}
-.hdr{background:linear-gradient(135deg,#1d4ed8,#1e40af);color:#fff;padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}
-.co-name{font-size:20px;font-weight:900}
-.co-sub{font-size:11px;opacity:0.85;margin-top:3px}
-.po-title{font-size:22px;font-weight:900;text-align:right;letter-spacing:2px}
-.po-no{font-size:13px;font-weight:800;text-align:right;margin-top:4px}
-.po-sub{font-size:11px;text-align:right;opacity:0.85}
-.body{padding:18px 22px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}
-.info-label{font-size:10px;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:3px}
-.info-value{font-size:13px;font-weight:700;color:#111}
-.info-sub{font-size:11px;color:#6b7280;margin-top:2px}
-.status-badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:${status?.bg||"#083344"};color:${status?.color||"#06b6d4"};border:1px solid ${status?.color||"#06b6d4"};margin-top:6px}
-table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:12px}
-thead tr{background:#1e3a8a;color:#fff}
-th{padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}
-td{padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
-tbody tr:nth-child(even){background:#f9fafb}
-.totals{display:flex;justify-content:flex-end;margin-bottom:14px}
-.totals-box{width:280px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
-.t-row{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f3f4f6}
-.grand{display:flex;justify-content:space-between;padding:11px 12px;background:linear-gradient(135deg,#1d4ed8,#1e40af)}
-.gl{color:#fff;font-size:13px;font-weight:800}
-.gv{color:#fff;font-size:18px;font-weight:900}
-.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:12px;font-size:12px}
-.sigs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb;text-align:center}
-.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280}
-.footer{text-align:center;padding:11px 22px;background:#eff6ff;border-top:2px solid #1d4ed8;font-size:12px;color:#1d4ed8;font-weight:700}
-@media print{body{padding:0}.no-print{display:none!important}}
-</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="padding:10px 28px;background:#1d4ed8;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
-  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
-</div>
-<div class="po">
-  <div class="hdr">
-    <div>
-      <div class="co-name">🏢 ${shop?.companyName||"Company"}</div>
-      <div class="co-sub">${[shop?.area,shop?.country||"UAE"].filter(Boolean).join(", ")}</div>
-      ${shop?.mobile?`<div class="co-sub">📱 ${shop.mobile}</div>`:""}
-      ${shop?.trnNumber?`<div class="co-sub" style="font-weight:800">TRN: ${shop.trnNumber}</div>`:""}
-    </div>
-    <div>
-      <div class="po-title">PURCHASE ORDER</div>
-      <div class="po-no">${po.poNumber}</div>
-      <div class="po-sub">📅 ${po.poDate}</div>
-      ${po.deliveryDate?`<div class="po-sub">🚚 ${isBn?"ডেলিভারি":"Delivery"}: ${po.deliveryDate}</div>`:""}
-    </div>
-  </div>
-  <div class="body">
-    <div class="info-grid">
-      <div class="info-box">
-        <div class="info-label">🏭 ${isBn?"সাপ্লায়ার":"Supplier"}</div>
-        <div class="info-value">${po.vendorName||"—"}</div>
-        ${po.vendorMobile?`<div class="info-sub">📱 ${po.vendorMobile}</div>`:""}
-        ${po.vendorAddress?`<div class="info-sub">📍 ${po.vendorAddress}</div>`:""}
-        ${po.vendorTrn?`<div class="info-sub" style="color:#b45309;font-weight:700">TRN: ${po.vendorTrn}</div>`:""}
-      </div>
-      <div class="info-box">
-        <div class="info-label">📋 ${isBn?"অর্ডার তথ্য":"Order Info"}</div>
-        <div class="info-value">${po.poNumber}</div>
-        <div class="info-sub">📅 ${po.poDate}</div>
-        <div class="info-sub">👤 ${po.createdByName}</div>
-        <div class="status-badge">${status?.[lang]||po.status}</div>
-      </div>
-    </div>
-    ${po.shippingAddress?`<div class="note-box">🚚 ${isBn?"ডেলিভারি ঠিকানা":"Delivery Address"}: ${po.shippingAddress}</div>`:""}
-    <table>
-      <thead><tr>
-        <th style="width:30px">#</th>
-        <th>${isBn?"পণ্যের বিবরণ":"Description"}</th>
-        <th style="text-align:center;width:80px">${isBn?"পরিমাণ":"Qty"}</th>
-        <th style="text-align:right;width:100px">${isBn?"একক মূল্য":"Unit Price"}</th>
-        <th style="text-align:center;width:60px">${isBn?"ছাড়":"Disc"}</th>
-        <th style="text-align:right;width:110px">${isBn?"মোট":"Total"}</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="totals"><div class="totals-box">
-      ${disc>0?`<div class="t-row"><span style="color:#6b7280">${isBn?"ছাড়":"Discount"}</span><span style="color:#ef4444;font-weight:700">- ${poFmt2(disc)}</span></div>`:""}
-      <div class="grand"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${poFmt2(grand)}</span></div>
-    </div></div>
-    ${po.terms?`<div class="note-box">📝 ${isBn?"শর্তাবলী":"Terms"}: ${po.terms}</div>`:""}
-    ${po.notes?`<div class="note-box">💬 ${isBn?"নোট":"Notes"}: ${po.notes}</div>`:""}
-    <div class="sigs">
-      <div><div class="sig-line">${isBn?"তৈরিকারীর স্বাক্ষর":"Prepared By"}</div></div>
-      <div><div class="sig-line">${isBn?"অনুমোদনকারীর স্বাক্ষর":"Approved By"}</div></div>
-      <div><div class="sig-line">${isBn?"সাপ্লায়ারের স্বাক্ষর":"Supplier Signature"}</div></div>
-    </div>
-  </div>
-  <div class="footer">${isBn?"এই ক্রয় অর্ডারটি কম্পিউটার-জেনারেটেড — স্বাক্ষর ছাড়াও বৈধ":"This Purchase Order is computer-generated and valid without signature"}</div>
-</div></body></html>`;
-}
-function printPurchaseOrder(po, shop, lang) {
-  const html  = generatePOHTML(po, shop, lang);
-  const blob  = new Blob([html], { type:"text/html;charset=utf-8" });
-  const url   = URL.createObjectURL(blob);
-  const w     = window.open(url,"_blank","width=960,height=780");
-  if (!w) { URL.revokeObjectURL(url); alert(lang==="bn"?"Pop-up block আছে। Allow করুন।":"Popup blocked. Please allow popups."); return; }
-  w.addEventListener("load",()=>{ setTimeout(()=>{ w.print(); URL.revokeObjectURL(url); },400); });
-}
-
-// ── PO Line Item ──
-function PoLineItem({ item, idx, onUpdate, onDelete, onPick, t, th }) {
-  const { disc, total } = poCalcLine(item);
-  const inp=(ex={})=>({ padding:"8px 10px", borderRadius:7, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...ex });
-  const lbl={ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 };
-  return (
-    <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:12, marginBottom:8 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-        <span style={{ fontSize:13, fontWeight:800, color:"#1d4ed8" }}>#{idx+1}</span>
-        <div style={{ display:"flex", gap:6 }}>
-          <button onClick={()=>onPick(idx)} title={t.po_fromMaster} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:11, fontWeight:700 }}>📦</button>
-          <button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12 }}>✕</button>
-        </div>
-      </div>
-      <input style={{ ...inp(), marginBottom:8, fontSize:13, fontWeight:600 }} placeholder={t.po_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:8 }}>
-        <input style={inp()} placeholder={t.po_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
-        <input style={inp()} placeholder={t.po_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"80px 80px 1fr 80px", gap:6, alignItems:"flex-end" }}>
-        <div><div style={lbl}>{t.po_qty}</div><input style={inp({textAlign:"center"})} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></div>
-        <div><div style={lbl}>{t.po_unit}</div><select style={{ ...inp(), padding:"8px 4px" }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{PO_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
-        <div><div style={lbl}>{t.po_unitPrice}</div><input style={inp({textAlign:"right"})} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>
-        <div><div style={lbl}>{t.po_discPerc}</div><input style={inp({textAlign:"center"})} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
-      </div>
-      {(poN2(item.qty)>0&&poN2(item.unitPrice)>0)&&(
-        <div style={{ marginTop:8, padding:"7px 10px", background:"rgba(29,78,216,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:11, color:th.txtMuted }}>{t.po_lineTotal}</span>
-          <span style={{ fontSize:14, fontWeight:800, color:"#1d4ed8" }}>AED {poFmt2(total)}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── PO Card (list) ──
-function PoCard({ po, onClick, t, th, lang }) {
-  const { grand } = poCalcTotals(po.items||[]);
-  const age = Math.floor((Date.now() - (po.createdAt instanceof Date ? po.createdAt : new Date(po.createdAt))) / 86400000);
-  return (
-    <div onClick={onClick} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
-      onMouseEnter={e=>e.currentTarget.style.borderColor="#1d4ed8"}
-      onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-        <div>
-          <div style={{ fontSize:15, fontWeight:900, color:"#1d4ed8", letterSpacing:0.5 }}>{po.poNumber}</div>
-          <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📅 {po.poDate} · {po.createdByName}</div>
-        </div>
-        <PoStatusBadge status={po.status} lang={lang} />
-      </div>
-      <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:6 }}>🏭 {po.vendorName||"—"}</div>
-      <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
-        <span style={{ fontSize:11, color:th.txtMuted }}>{po.items?.length||0}{lang==="bn"?t.po_itemsCount:t.po_itemsCount}</span>
-        <span style={{ fontSize:14, fontWeight:800, color:"#1d4ed8" }}>AED {poFmt2(grand)}</span>
-        {age===0&&<span style={{ fontSize:10, background:"rgba(29,78,216,0.1)", color:"#1d4ed8", padding:"2px 8px", borderRadius:10, fontWeight:700 }}>🔔 {lang==="bn"?"আজকের":"Today"}</span>}
-      </div>
-    </div>
-  );
-}
-
-// ── PURCHASE ORDER WINDOW (main component) ──
-function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, canCreate }) {
-  const isOwner = profile?.role==="owner";
-  const canCreatePO = canCreate !== undefined ? canCreate : isOwner;
-  const [pos,setPos]           = useState([]);
-  const [poLoading,setPoLoading]= useState(true);
-  const [poView,setPoView]     = useState("list");
-  const [selPo,setSelPo]       = useState(null);
-  const [editPoId,setEditPoId] = useState(null);
-  const [poNumber,setPoNumber] = useState("");
-  const [poForm,setPoForm]     = useState(poEmptyForm());
-  const [poLines,setPoLines]   = useState([poEmptyLine()]);
-  const [picker,setPicker]     = useState(null);
-  const [poSaving,setPoSaving] = useState(false);
-  const [search,setSearch]     = useState("");
-  const [statusF,setStatusF]   = useState("ALL");
-  const [poErr,setPoErr]       = useState("");
-
-  // Firestore listener — no orderBy to avoid composite index requirement
-  useEffect(()=>{
-    if (!shopId) return;
-    setPoLoading(true); setPoErr("");
-    const q=query(collection(db,"purchaseOrders"),where("shopId","==",shopId));
-    const unsub=onSnapshot(q,
-      snap=>{
-        const docs=snap.docs.map(d=>{
-          const data=d.data();
-          return { ...data, id:d.id, createdAt:data.createdAt?.toDate?.()||new Date(data.createdAt||Date.now()) };
-        });
-        docs.sort((a,b)=>b.createdAt-a.createdAt);
-        setPos(docs); setPoLoading(false);
-      },
-      err=>{
-        console.error("PO listener error:",err);
-        setPoErr(err.message||"Permission denied");
-        setPoLoading(false);
-      }
-    );
-    return ()=>unsub();
-  },[shopId]);
-
-  // Generate PO Number — 3-layer fallback, always succeeds
-  const genPoNo = async () => {
-    // Layer 1: atomic transaction on shop serial counter
-    try {
-      const serial=await runTransaction(db,async tx=>{
-        const ref=doc(db,"shops",shopId);
-        const snap=await tx.get(ref);
-        const next=(Number(snap.data()?.lastPOSerial)||0)+1;
-        tx.update(ref,{lastPOSerial:next});
-        return next;
-      });
-      return `${PO_PREFIX}${String(serial).padStart(4,"0")}`;
-    } catch(_e1) {
-      // Layer 2: scan existing POs for max number
-      try {
-        const snap=await getDocs(query(collection(db,"purchaseOrders"),where("shopId","==",shopId)));
-        const max=snap.docs.reduce((mx,d)=>{
-          const m=String(d.data().poNumber||"").match(/(\d+)$/);
-          return m?Math.max(mx,Number(m[1])):mx;
-        },0);
-        return `${PO_PREFIX}${String(max+1).padStart(4,"0")}`;
-      } catch(_e2) {
-        // Layer 3: timestamp-based, always works
-        return `${PO_PREFIX}${String(Date.now()).slice(-4)}`;
-      }
-    }
-  };
-
-  const poOpenNew = async () => {
-    const no=await genPoNo();
-    setPoNumber(no); setPoForm(poEmptyForm()); setPoLines([poEmptyLine()]); setEditPoId(null); setPoView("form");
-  };
-
-  const poOpenEdit = (po) => {
-    setPoNumber(po.poNumber);
-    setPoForm({ poDate:po.poDate, deliveryDate:po.deliveryDate||"", vendorId:po.vendorId||"", vendorName:po.vendorName||"", vendorMobile:po.vendorMobile||"", vendorAddress:po.vendorAddress||"", vendorTrn:po.vendorTrn||"", shippingAddress:po.shippingAddress||"", notes:po.notes||"", terms:po.terms||"", internalNote:po.internalNote||"" });
-    setPoLines((po.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0") })));
-    setEditPoId(po.id); setPoView("form");
-  };
-
-  const poUpd = (k,v)=>setPoForm(p=>({...p,[k]:v}));
-  const poAddLine = ()=>setPoLines(p=>[...p,poEmptyLine()]);
-  const poUpdLine = (id,f,v)=>setPoLines(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
-  const poDelLine = (id)=>setPoLines(p=>p.filter(it=>it.id!==id));
-  const poSelectProd = (prod,idx)=>{
-    setPoLines(p=>p.map((it,i)=>i===idx?{ ...it, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitPrice:prod.landingCost||prod.vatExclusive||it.unitPrice }:it));
-    setPicker(null);
-  };
-  const poHandleVendor = (e)=>{
-    const vid=e.target.value;
-    if (!vid){ poUpd("vendorId",""); poUpd("vendorName",""); poUpd("vendorMobile",""); poUpd("vendorAddress",""); poUpd("vendorTrn",""); return; }
-    const v=vendors.find(x=>x.id===vid);
-    if (v){ poUpd("vendorId",vid); poUpd("vendorName",v.vendorName); poUpd("vendorMobile",v.mobileNumber||""); poUpd("vendorAddress",[v.area,v.emirate||v.city,v.country].filter(Boolean).join(", ")||""); poUpd("vendorTrn",v.trnNumber||""); }
-  };
-
-  // Build payload
-  const poBuild = (status) => {
-    if (!poForm.vendorName.trim()) { toast(t.po_errVendor,"err"); return null; }
-    const valid=poLines.filter(it=>it.name.trim());
-    if (!valid.length) { toast(t.po_errItems,"err"); return null; }
-    for (const it of valid) {
-      if (!it.qty||poN2(it.qty)<=0) { toast(t.po_errQty,"err"); return null; }
-    }
-    const builtItems=valid.map(it=>{ const {disc,total}=poCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:poN2(it.qty), unit:it.unit, unitPrice:poN2(it.unitPrice), discountPerc:poN2(it.discountPerc), discountAmt:parseFloat(poFmt2(disc)), lineTotal:parseFloat(poFmt2(total)) }; });
-    const { sub,disc,grand }=poCalcTotals(builtItems);
-    return { shopId, poNumber, poDate:poForm.poDate, deliveryDate:poForm.deliveryDate||"", vendorId:poForm.vendorId||null, vendorName:poForm.vendorName.trim(), vendorMobile:poForm.vendorMobile.trim(), vendorAddress:poForm.vendorAddress.trim(), vendorTrn:poForm.vendorTrn.trim(), shippingAddress:poForm.shippingAddress.trim(), items:builtItems, subtotal:parseFloat(poFmt2(sub)), totalDiscount:parseFloat(poFmt2(disc)), grandTotal:parseFloat(poFmt2(grand)), notes:poForm.notes.trim(), terms:poForm.terms.trim(), internalNote:poForm.internalNote.trim(), status, createdBy:user.uid, createdByName:profile.personName };
-  };
-
-  const poSave = async (status) => {
-    const p=poBuild(status); if (!p) return;
-    setPoSaving(true);
-    try {
-      if (editPoId) {
-        await updateDoc(doc(db,"purchaseOrders",editPoId),{...p,updatedAt:serverTimestamp()});
-        toast(t.po_updated);
-      } else {
-        await addDoc(collection(db,"purchaseOrders"),{...p,createdAt:serverTimestamp()});
-        toast(status==="draft"?t.po_saved:t.po_submitted);
-      }
-      setPoView("list");
-    } catch(e) {
-      const msg=e?.code==="permission-denied"
-        ? "❌ Permission Denied — Firestore rules এ purchaseOrders collection add করুন।"
-        : `❌ ${e.message}`;
-      toast(msg,"err");
-      console.error("poSave error:",e);
-    } finally { setPoSaving(false); }
-  };
-
-  const poUpdateStatus = async (poId, newStatus, successMsg) => {
-    try { await updateDoc(doc(db,"purchaseOrders",poId),{status:newStatus,updatedAt:serverTimestamp()}); setSelPo(p=>({...p,status:newStatus})); toast(successMsg); }
-    catch(e) { toast(e.message,"err"); }
-  };
-  const poDelete = async (po) => {
-    if (!window.confirm(t.po_confirmDelete)) return;
-    try { await deleteDoc(doc(db,"purchaseOrders",po.id)); setPoView("list"); setSelPo(null); toast(t.po_deleted,"err"); }
-    catch(e) { toast(e.message,"err"); }
-  };
-  const poCancel = async (po) => {
-    if (!window.confirm(t.po_confirmCancel)) return;
-    try { await updateDoc(doc(db,"purchaseOrders",po.id),{status:"cancelled",updatedAt:serverTimestamp()}); setSelPo(p=>({...p,status:"cancelled"})); toast(t.po_cancelledMsg,"err"); }
-    catch(e) { toast(e.message,"err"); }
-  };
-
-  // WA message to vendor
-  const poWaLink = (po) => {
-    try {
-      const v=vendors.find(x=>x.id===po.vendorId);
-      const phone=(v?.whatsappNumber||v?.mobileNumber||po.vendorMobile||"").trim();
-      if (!phone) return null;
-      const lines=(po.items||[]).map((it,i)=>`${i+1}. *${it.name||"?"}* | ${it.code?it.code+" | ":""}${it.qty} ${it.unit}`).join("\n");
-      const msg=`*Purchase Order: ${po.poNumber}*\n📅 ${po.poDate}\n\n${lines}\n\n_${lang==="bn"?"অনুগ্রহ করে উপরোক্ত পণ্যগুলো সরবরাহ করুন। ধন্যবাদ।":"Please supply the above items. Thank you."}_`;
-      return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-    } catch { return null; }
-  };
-
-  // Filter
-  const filtered = pos.filter(po=>{
-    const matchSt = statusF==="ALL"||po.status===statusF;
-    const q=search.trim();
-    if (!q) return matchSt;
-    const hay=[po.poNumber,po.vendorName,po.createdByName,...(po.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
-    return matchSt&&(hay.toLowerCase().includes(q.toLowerCase()));
-  });
-  const kpi=pos.reduce((a,po)=>{ a.total++; a.value+=po.grandTotal||0; if (!["received","cancelled"].includes(po.status)) a.active++; else if (po.status==="received") a.received++; return a; },{total:0,value:0,active:0,received:0});
-
-  const panel = isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"16px 14px 60px"};
-  const inp=(ex={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...ex });
-  const secLbl=(icon,label)=>(<div style={{ fontSize:11, color:"#1d4ed8", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>{icon} {label}</div>);
-  const card={ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 };
-
-  // ══ LIST VIEW ══
-  if (poView==="list") return (
-    <div style={panel}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-        <div style={{ fontSize:17, fontWeight:900, color:"#1d4ed8" }}>{t.po_title}</div>
-        {canCreatePO&&<button onClick={poOpenNew} disabled={poSaving} style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_new}</button>}
-      </div>
-
-      {/* KPI */}
-      {pos.length>0&&(
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:16 }}>
-          {[
-            { l:t.po_totalPOs,    v:kpi.total,             c:"#a1a1aa", pre:"" },
-            { l:t.po_totalValue,  v:poFmt2(kpi.value),     c:"#1d4ed8", pre:"AED " },
-            { l:t.po_pendingCount,v:kpi.active,             c:"#f97316", pre:"" },
-            { l:t.po_receivedCount,v:kpi.received,          c:"#10b981", pre:"" },
-          ].map((k,i)=>(
-            <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
-              <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{k.pre}{k.v}</div>
-              <div style={{ fontSize:8, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2, letterSpacing:0.3 }}>{k.l}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Search */}
-      <div style={{ position:"relative", marginBottom:10 }}>
-        <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-        <input style={{ ...inp(), paddingLeft:38, background:th.bgCard }} placeholder={t.po_searchPh} value={search} onChange={e=>setSearch(e.target.value)} />
-        {search&&<button onClick={()=>setSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16 }}>✕</button>}
-      </div>
-
-      {/* Status pills */}
-      <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:8, marginBottom:12 }}>
-        {["ALL",...Object.keys(PO_STATUSES)].map(st=>(
-          <button key={st} onClick={()=>setStatusF(st)} style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit", background:statusF===st?"#1d4ed8":"transparent", borderColor:statusF===st?"#1d4ed8":th.borderMid, color:statusF===st?"#fff":th.txtMuted }}>
-            {st==="ALL"?t.po_allStatus:PO_STATUSES[st]?.[lang]}
-          </button>
-        ))}
-      </div>
-
-      {poLoading&&<div style={{ textAlign:"center", padding:"50px", color:th.txtFaint }}><div style={{ fontSize:36 }}>⏳</div><div>{t.po_loading}</div></div>}
-      {!poLoading&&poErr&&(
-        <div style={{ margin:"16px 0", padding:"14px 16px", borderRadius:10, background:"#450a0a", border:"1px solid #ef4444" }}>
-          <div style={{ color:"#ef4444", fontWeight:700, fontSize:13, marginBottom:4 }}>⚠️ Firestore Error</div>
-          <div style={{ color:"#fca5a5", fontSize:12, fontFamily:"monospace", wordBreak:"break-all" }}>{poErr}</div>
-          <div style={{ color:"#fca5a5", fontSize:11, marginTop:8 }}>
-            Firebase Console → Firestore → Rules এ নতুন rules paste করুন (firestore.rules file থেকে)।
-          </div>
-        </div>
-      )}
-      {!poLoading&&!poErr&&pos.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:48, marginBottom:10 }}>📋</div><div>{t.po_noOrders}</div></div>}
-      {!poLoading&&pos.length>0&&filtered.length===0&&<div style={{ textAlign:"center", padding:"40px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.po_noResults}</div></div>}
-      {!poLoading&&filtered.map(po=>(
-        <PoCard key={po.id} po={po} t={t} th={th} lang={lang} onClick={()=>{ setSelPo(po); setPoView("detail"); }} />
-      ))}
-    </div>
-  );
-
-  // ══ DETAIL VIEW ══
-  if (poView==="detail"&&selPo) {
-    const po = pos.find(x=>x.id===selPo.id)||selPo;
-    if (!po) { setPoView("list"); return null; }
-    const items = po.items||[];
-    const { sub,disc,grand }=poCalcTotals(items);
-    const dr={ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
-    const canEdit=["draft","submitted"].includes(po.status||"");
-    const waLink=poWaLink(po);
-    return (
-      <div style={panel}>
-        <button onClick={()=>{ setPoView("list"); setSelPo(null); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#1d4ed8", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.po_backToList}</button>
-
-        {/* Header Card */}
-        <div style={{ ...card, borderColor:"#1d4ed8" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:12 }}>
-            <div>
-              <div style={{ fontSize:24, fontWeight:900, color:"#1d4ed8", letterSpacing:1 }}>{po.poNumber}</div>
-              <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📅 {po.poDate}{po.deliveryDate&&` · 🚚 ${po.deliveryDate}`}</div>
-            </div>
-            <PoStatusBadge status={po.status} lang={lang} />
-          </div>
-
-          {/* Status Timeline */}
-          <div style={{ display:"flex", alignItems:"center", gap:0, marginBottom:14, overflowX:"auto" }}>
-            {["draft","submitted","approved","sent_to_supplier","received"].map((st,i,arr)=>{
-              const stObj=PO_STATUSES[st];
-              const isCurrent=po.status===st;
-              const statusOrder=["draft","submitted","approved","sent_to_supplier","partially_received","received","cancelled"];
-              const curIdx=statusOrder.indexOf(po.status);
-              const thisIdx=statusOrder.indexOf(st);
-              const isDone=curIdx>thisIdx;
-              return (
-                <Fragment key={st}>
-                  <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-                    <div style={{ width:28, height:28, borderRadius:"50%", background:isCurrent?stObj.color:isDone?"#22c55e":th.bgInp, border:`2px solid ${isCurrent?stObj.color:isDone?"#22c55e":th.borderMid}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11 }}>
-                      {isDone?"✓":isCurrent?"●":"○"}
-                    </div>
-                    <div style={{ fontSize:8, color:isCurrent?stObj.color:isDone?"#22c55e":th.txtFaint, fontWeight:700, textTransform:"uppercase", marginTop:4, textAlign:"center", maxWidth:60 }}>{stObj?.[lang]||st}</div>
-                  </div>
-                  {i<arr.length-1&&<div style={{ flex:1, height:2, background:isDone?"#22c55e":th.border, minWidth:12 }} />}
-                </Fragment>
-              );
-            })}
-          </div>
-
-          <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏭 {t.po_vendor}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{po.vendorName||"—"}</span></div>
-          {po.vendorMobile&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📱</span><span>{po.vendorMobile}</span></div>}
-          {po.vendorTrn&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>TRN</span><span style={{ fontFamily:"monospace", color:"#f59e0b", fontWeight:700 }}>{po.vendorTrn}</span></div>}
-          <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>👤 {t.po_createdBy}</span><span style={{ fontSize:12, color:th.txtMuted }}>{po.createdByName}</span></div>
-          {po.notes&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #1d4ed8" }}>📝 {po.notes}</div>}
-        </div>
-
-        {/* Items */}
-        <div style={{ ...card, overflowX:"auto" }}>
-          <div style={{ fontSize:11, color:"#1d4ed8", fontWeight:700, textTransform:"uppercase", marginBottom:10 }}>📦 {t.po_items} ({po.items?.length||0})</div>
-          <div style={{ fontSize:9, color:th.txtMuted, display:"flex", gap:6, padding:"6px 0", borderBottom:`1px solid ${th.border}`, textTransform:"uppercase", fontWeight:700 }}>
-            <span style={{ width:24 }}>#</span><span style={{ flex:1 }}>{lang==="bn"?"পণ্য":"Item"}</span>
-            <span style={{ width:70, textAlign:"center" }}>{t.po_qty}</span>
-            <span style={{ width:90, textAlign:"right" }}>{t.po_unitPrice}</span>
-            <span style={{ width:100, textAlign:"right" }}>{t.po_lineTotal}</span>
-          </div>
-          {items.map((it,i)=>{
-            const { disc:d, total:tot }=poCalcLine(it);
-            return (
-              <div key={i} style={{ display:"flex", alignItems:"flex-start", padding:"9px 0", borderBottom:`1px solid ${th.border}`, gap:6 }}>
-                <span style={{ width:24, fontSize:11, fontWeight:800, color:"#1d4ed8", flexShrink:0 }}>{i+1}</span>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{it.name}</div>
-                  <div style={{ fontSize:10, color:th.txtMuted, marginTop:2, display:"flex", gap:6, flexWrap:"wrap" }}>
-                    {it.code&&<span>📋 {it.code}</span>}
-                    {it.brand&&<span>🏷️ {it.brand}</span>}
-                    {poN2(it.discountPerc)>0&&<span style={{ color:"#ef4444" }}>Disc {it.discountPerc}%</span>}
-                  </div>
-                </div>
-                <span style={{ width:70, textAlign:"center", fontSize:12, color:th.txtPrimary, flexShrink:0 }}>{it.qty} {it.unit}</span>
-                <span style={{ width:90, textAlign:"right", fontSize:12, color:th.txtMuted, flexShrink:0 }}>AED {poFmt2(it.unitPrice)}</span>
-                <span style={{ width:100, textAlign:"right", fontSize:13, fontWeight:700, color:"#1d4ed8", flexShrink:0 }}>AED {poFmt2(tot)}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Totals */}
-        <div style={card}>
-          {disc>0&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{t.po_totalDiscount}</span><span style={{ color:"#ef4444", fontWeight:700 }}>- AED {poFmt2(disc)}</span></div>}
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
-            <span style={{ fontSize:15, fontWeight:800 }}>{t.po_grandTotal}</span>
-            <span style={{ fontSize:22, fontWeight:900, color:"#1d4ed8" }}>AED {poFmt2(grand)}</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        {canCreatePO&&<div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button onClick={()=>printPurchaseOrder(po,shop,lang)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_print}</button>
-          {waLink&&<a href={waLink} target="_blank" rel="noreferrer" style={{ display:"block", padding:"12px", borderRadius:12, border:"none", background:"#15803d", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", textAlign:"center", textDecoration:"none" }}>💬 {t.po_waMsg}</a>}
-          {po.status==="draft"&&<button onClick={()=>poUpdateStatus(po.id,"submitted",t.po_submitted)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#0891b2,#0e7490)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_submit}</button>}
-          {po.status==="submitted"&&<button onClick={()=>poUpdateStatus(po.id,"approved",t.po_approved)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_approve}</button>}
-          {po.status==="approved"&&<button onClick={()=>poUpdateStatus(po.id,"sent_to_supplier",t.po_sent)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_sendSupplier}</button>}
-          {po.status==="sent_to_supplier"&&<button onClick={()=>poUpdateStatus(po.id,"partially_received",t.po_received)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#ea580c,#c2410c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_markPartial}</button>}
-          {["sent_to_supplier","partially_received"].includes(po.status)&&<button onClick={()=>poUpdateStatus(po.id,"received",t.po_received)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#10b981,#059669)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_markReceived}</button>}
-          {canEdit&&<button onClick={()=>poOpenEdit(po)} style={{ padding:"11px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#475569,#334155)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>✏️ {t.po_edit}</button>}
-          {!["received","cancelled"].includes(po.status)&&<button onClick={()=>poCancel(po)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_cancelBtn}</button>}
-          {po.status==="draft"&&<button onClick={()=>poDelete(po)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_deleteBtn}</button>}
-        </div>}
-      </div>
-    );
-  }
-
-  // ══ FORM VIEW ══
-  const totals=poCalcTotals(poLines);
-  return (
-    <div style={panel}>
-      {picker!==null&&<PiProductPicker products={products} t={{ ...t, pi_fromMaster:t.po_fromMaster, pi_pmSearchPh:lang==="bn"?"পণ্য খুঁজুন...":"Search products...", pi_noResults:t.po_noResults }} th={th} onSelect={p=>poSelectProd(p,picker)} onClose={()=>setPicker(null)} />}
-
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-        <button onClick={()=>setPoView("list")} style={{ background:"transparent", border:"none", color:"#1d4ed8", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.po_backToList}</button>
-        <div style={{ fontSize:14, fontWeight:800, color:"#1d4ed8" }}>{editPoId?t.po_edit:t.po_new} — <span style={{ fontFamily:"monospace" }}>{poNumber}</span></div>
-      </div>
-
-      {/* Section 1: Order Info */}
-      <div style={card}>
-        {secLbl("📋",t.po_secHeader)}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
-          <div>
-            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.po_poNumber}</div>
-            <div style={{ padding:"10px 12px", borderRadius:8, background:"rgba(29,78,216,0.08)", border:"1px solid #1d4ed8", fontSize:16, fontWeight:900, color:"#1d4ed8", letterSpacing:1, fontFamily:"monospace" }}>{poNumber}</div>
-          </div>
-          <div>
-            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.po_date}</div>
-            <input type="date" style={inp()} value={poForm.poDate} onChange={e=>poUpd("poDate",e.target.value)} />
-          </div>
-        </div>
-        <div style={{ marginBottom:12 }}>
-          <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.po_deliveryDate}</div>
-          <input type="date" style={inp()} value={poForm.deliveryDate} onChange={e=>poUpd("deliveryDate",e.target.value)} />
-        </div>
-
-        {secLbl("🏭",t.po_vendor)}
-        {vendors.length>0&&(
-          <select style={{ ...inp(), background:th.bgCard, marginBottom:8 }} value={poForm.vendorId} onChange={poHandleVendor}>
-            <option value="">{t.po_vendorSelect}</option>
-            {vendors.map(v=><option key={v.id} value={v.id}>{v.vendorName}{v.mobileNumber?` — ${v.mobileNumber}`:""}</option>)}
-          </select>
-        )}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
-          <input style={inp()} placeholder={t.po_vendorManual} value={poForm.vendorName} onChange={e=>poUpd("vendorName",e.target.value)} />
-          <input style={inp()} placeholder="📱 Mobile" inputMode="tel" value={poForm.vendorMobile} onChange={e=>poUpd("vendorMobile",e.target.value)} />
-        </div>
-        <input style={{ ...inp(), marginBottom:8 }} placeholder={`📍 ${lang==="bn"?"ভেন্ডরের ঠিকানা":"Vendor address"}`} value={poForm.vendorAddress} onChange={e=>poUpd("vendorAddress",e.target.value)} />
-        <input style={{ ...inp(), borderColor:"#f59e0b", fontFamily:"monospace" }} placeholder="TRN: 100XXXXXXXXX" value={poForm.vendorTrn} onChange={e=>poUpd("vendorTrn",e.target.value)} />
-      </div>
-
-      {/* Section 2: Items */}
-      <div style={card}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-          {secLbl("📦",t.po_secItems)}
-          <span style={{ fontSize:12, color:"#1d4ed8", fontWeight:800 }}>{poLines.length}{lang==="bn"?"টি":""}</span>
-        </div>
-        {poLines.map((item,idx)=>(
-          <PoLineItem key={item.id} item={item} idx={idx} onUpdate={poUpdLine} onDelete={poDelLine} onPick={i=>setPicker(i)} t={t} th={th} />
-        ))}
-        <button onClick={poAddLine} style={{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed #1d4ed8`, background:"rgba(29,78,216,0.05)", color:"#1d4ed8", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_addItem}</button>
-      </div>
-
-      {/* Section 3: Summary */}
-      <div style={{ ...card, borderColor:totals.grand>0?"#1d4ed8":th.border }}>
-        {secLbl("💰",t.po_secSummary)}
-        {totals.disc>0&&<div style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{t.po_totalDiscount}</span><span style={{ color:"#ef4444", fontWeight:700 }}>- AED {poFmt2(totals.disc)}</span></div>}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
-          <span style={{ fontSize:15, fontWeight:800 }}>{t.po_grandTotal}</span>
-          <span style={{ fontSize:22, fontWeight:900, color:"#1d4ed8" }}>AED {poFmt2(totals.grand)}</span>
-        </div>
-      </div>
-
-      {/* Section 4: Delivery & Notes */}
-      <div style={card}>
-        {secLbl("🚚",t.po_secDelivery)}
-        <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          <div>
-            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.po_shippingAddr}</div>
-            <input style={inp()} placeholder={lang==="bn"?"মাল কোথায় পাঠাবে...":"Where to deliver..."} value={poForm.shippingAddress} onChange={e=>poUpd("shippingAddress",e.target.value)} />
-          </div>
-          <div>
-            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.po_terms}</div>
-            <input style={inp()} placeholder={lang==="bn"?"যেমন: NET 30, Cash on Delivery...":"e.g. NET 30, Cash on Delivery..."} value={poForm.terms} onChange={e=>poUpd("terms",e.target.value)} />
-          </div>
-          <div>
-            <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.po_notes}</div>
-            <AutoTA style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", overflow:"hidden", minHeight:60, boxSizing:"border-box", fontFamily:"inherit" }} placeholder={lang==="bn"?"যেকোনো বিশেষ নোট...":"Any special instructions..."} value={poForm.notes} onChange={e=>poUpd("notes",e.target.value)} />
-          </div>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-        <button onClick={()=>poSave("submitted")} disabled={poSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:poSaving?"#1e3a5f":"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:15, fontWeight:800, cursor:poSaving?"not-allowed":"pointer" }}>
-          {poSaving?"...":t.po_submit}
-        </button>
-        <button onClick={()=>poSave("draft")} disabled={poSaving} style={{ padding:"12px", borderRadius:12, border:`1.5px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_saveDraft}</button>
-        <button onClick={()=>setPoView("list")} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{lang==="bn"?"✕ বাতিল":"✕ Cancel"}</button>
-      </div>
-    </div>
-  );
-}
-
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
   const isOwner = profile.role==="owner";
@@ -5507,7 +4797,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [localShop,setLocalShop]=useState(shopProp);
 
   const [tab,setTab]=useState(isOwner?"owner":"shop");
-  const [poSubTab,setPoSubTab]=useState("salesman"); // "salesman" | "purchase"
 
   // ── INVOICE STATE ──
   // items = confirmed invoice list (locked rows)
@@ -6104,7 +5393,6 @@ const startEditOrder = (order) => {
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
-        ...(can("createPO")?[["owner",t.tabOwner]]:[]),
         ["sales", t.tabSales],
         ["purchase", lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info"],
         ["settings",t.tabSettings],
@@ -6572,53 +5860,41 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {tab==="owner"&&(
-        isOwner ? (
-          <div>
-            {/* ── Subtab switcher (owner only) ── */}
-            <div style={{ display:"flex", gap:0, padding:"10px 14px 0", background:th.bgHdr, borderBottom:`1px solid ${th.border}`, position:"sticky", top:61, zIndex:5 }}>
-              <button onClick={()=>setPoSubTab("salesman")} style={{ flex:1, padding:"10px 8px", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, background:poSubTab==="salesman"?"#f97316":"transparent", color:poSubTab==="salesman"?"#fff":th.txtMuted, borderRadius:"8px 8px 0 0", position:"relative" }}>
-                📦 {lang==="bn"?"সেলসম্যান অর্ডার":"Salesman Orders"}
-                {unread>0&&<span style={{ marginLeft:6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:18, height:18, fontSize:10, display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:800 }}>{unread}</span>}
-              </button>
-              <button onClick={()=>setPoSubTab("purchase")} style={{ flex:1, padding:"10px 8px", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, background:poSubTab==="purchase"?"#1d4ed8":"transparent", color:poSubTab==="purchase"?"#fff":th.txtMuted, borderRadius:"8px 8px 0 0" }}>
-                📋 {lang==="bn"?"ক্রয় অর্ডার (PO)":"Purchase Orders (PO)"}
-              </button>
-            </div>
-
-            {/* ── Salesman Orders subtab ── */}
-            {poSubTab==="salesman"&&(
-              <div style={isDesktop?s.desktopPanel:s.panel}>
-                <div style={{ position:"relative", marginBottom:12 }}>
-                  <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-                  <input style={{ ...s.inp, paddingLeft:36, background:th.bgCard }} placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."} value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
-                  {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
-                </div>
-                {orders.length===0
-                  ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
-                  : (() => {
-                      const filtered = filterOrders(orders);
-                      if (!filtered.length) return (<div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>);
-                      const groups = groupByDay(filtered);
-                      return groups.map(([dateStr, dayOrders]) => (
-                        <div key={dateStr}>
-                          <div style={s.dayHeader}><span style={s.dayDot} /><span style={s.dayLabel}>📅 {dateStr}</span><span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span></div>
-                          {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
-                        </div>
-                      ));
-                    })()}
-              </div>
-            )}
-
-            {/* ── Purchase Orders (ERP) subtab ── */}
-            {poSubTab==="purchase"&&(
-              <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} canCreate={true} />
-            )}
+      {isOwner&&tab==="owner"&&(
+        <div style={isDesktop?s.desktopPanel:s.panel}>
+          {/* Search box */}
+          <div style={{ position:"relative", marginBottom:12 }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+            <input
+              style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
+              placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+              value={searchQ}
+              onChange={e=>setSearchQ(e.target.value)}
+            />
+            {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
           </div>
-        ) : (
-          /* Salesman with createPO permission — sees Purchase Order directly */
-          can("createPO") && <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} canCreate={can("createPO")} />
-        )
+          {/* Daily grouped orders */}
+          {orders.length===0
+            ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+            : (() => {
+                const filtered = filterOrders(orders);
+                if (!filtered.length) return (
+                  <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+                );
+                const groups = groupByDay(filtered);
+                return groups.map(([dateStr, dayOrders]) => (
+                  <div key={dateStr}>
+                    <div style={s.dayHeader}>
+                      <span style={s.dayDot} />
+                      <span style={s.dayLabel}>📅 {dateStr}</span>
+                      <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                    </div>
+                    {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+                  </div>
+                ));
+              })()
+          }
+        </div>
       )}
 
       {(isOwner||can("viewProducts"))&&tab==="products"&&(
