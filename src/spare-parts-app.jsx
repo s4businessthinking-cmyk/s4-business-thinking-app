@@ -45,13 +45,14 @@ const PRESET_POSITIONS = {
 
 // ─── PERMISSIONS ────────────────────────────────────────────
 const PERMISSIONS_LIST = [
-  { key: "sendOrder",       bn: "অর্ডার দেওয়া",           en: "Send Orders" },
-  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",    en: "Manage Companies" },
-  { key: "setPrices",       bn: "দাম সেট করা",             en: "Set Prices" },
-  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",  en: "Change Item Status" },
-  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",      en: "Mark as Delivered" },
-  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",        en: "Delete Orders" },
-  { key: "viewProducts",   bn: "পণ্য তালিকা দেখা",          en: "View Product List" },
+  { key: "sendOrder",       bn: "অর্ডার দেওয়া",                                    en: "Send Orders" },
+  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",                             en: "Manage Companies" },
+  { key: "setPrices",       bn: "দাম সেট করা",                                      en: "Set Prices" },
+  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",                           en: "Change Item Status" },
+  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",                               en: "Mark as Delivered" },
+  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",                                 en: "Delete Orders" },
+  { key: "viewProducts",    bn: "পণ্য তালিকা দেখা",                                 en: "View Product List" },
+  { key: "createPO",        bn: "📋 ক্রয় অর্ডার (Purchase Order) তৈরি ও দেখা",    en: "📋 Create & View Purchase Orders" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -62,6 +63,7 @@ const DEFAULT_PERMISSIONS = {
   markDelivery: false,
   deleteOrder: false,
   viewProducts: false,
+  createPO: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -5051,8 +5053,9 @@ function PoCard({ po, onClick, t, th, lang }) {
 }
 
 // ── PURCHASE ORDER WINDOW (main component) ──
-function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
+function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, canCreate }) {
   const isOwner = profile?.role==="owner";
+  const canCreatePO = canCreate !== undefined ? canCreate : isOwner;
   const [pos,setPos]           = useState([]);
   const [poLoading,setPoLoading]= useState(true);
   const [poView,setPoView]     = useState("list");
@@ -5174,12 +5177,14 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
 
   // WA message to vendor
   const poWaLink = (po) => {
-    const v=vendors.find(x=>x.id===po.vendorId);
-    const phone=v?.whatsappNumber||v?.mobileNumber||po.vendorMobile;
-    if (!phone) return null;
-    const lines=po.items.map((it,i)=>`${i+1}. *${it.name}* | ${it.code?" "+it.code+" |":""} ${it.qty} ${it.unit}`).join("\n");
-    const msg=`*Purchase Order: ${po.poNumber}*\n📅 ${po.poDate}\n\n${lines}\n\n_${lang==="bn"?"অনুগ্রহ করে উপরোক্ত পণ্যগুলো সরবরাহ করুন। ধন্যবাদ।":"Please supply the above items. Thank you."}_`;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    try {
+      const v=vendors.find(x=>x.id===po.vendorId);
+      const phone=(v?.whatsappNumber||v?.mobileNumber||po.vendorMobile||"").trim();
+      if (!phone) return null;
+      const lines=(po.items||[]).map((it,i)=>`${i+1}. *${it.name||"?"}* | ${it.code?it.code+" | ":""}${it.qty} ${it.unit}`).join("\n");
+      const msg=`*Purchase Order: ${po.poNumber}*\n📅 ${po.poDate}\n\n${lines}\n\n_${lang==="bn"?"অনুগ্রহ করে উপরোক্ত পণ্যগুলো সরবরাহ করুন। ধন্যবাদ।":"Please supply the above items. Thank you."}_`;
+      return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    } catch { return null; }
   };
 
   // Filter
@@ -5202,7 +5207,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
     <div style={panel}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
         <div style={{ fontSize:17, fontWeight:900, color:"#1d4ed8" }}>{t.po_title}</div>
-        {isOwner&&<button onClick={poOpenNew} disabled={poSaving} style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_new}</button>}
+        {canCreatePO&&<button onClick={poOpenNew} disabled={poSaving} style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.po_new}</button>}
       </div>
 
       {/* KPI */}
@@ -5250,9 +5255,11 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
   // ══ DETAIL VIEW ══
   if (poView==="detail"&&selPo) {
     const po = pos.find(x=>x.id===selPo.id)||selPo;
-    const { sub,disc,grand }=poCalcTotals(po.items||[]);
+    if (!po) { setPoView("list"); return null; }
+    const items = po.items||[];
+    const { sub,disc,grand }=poCalcTotals(items);
     const dr={ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
-    const canEdit=["draft","submitted"].includes(po.status);
+    const canEdit=["draft","submitted"].includes(po.status||"");
     const waLink=poWaLink(po);
     return (
       <div style={panel}>
@@ -5338,7 +5345,7 @@ function PurchaseOrderWindow({ t, lang, th, s, shopId, user, profile, vendors, p
         </div>
 
         {/* Actions */}
-        {isOwner&&<div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+        {canCreatePO&&<div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           <button onClick={()=>printPurchaseOrder(po,shop,lang)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#1e40af)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_print}</button>
           {waLink&&<a href={waLink} target="_blank" rel="noreferrer" style={{ display:"block", padding:"12px", borderRadius:12, border:"none", background:"#15803d", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", textAlign:"center", textDecoration:"none" }}>💬 {t.po_waMsg}</a>}
           {po.status==="draft"&&<button onClick={()=>poUpdateStatus(po.id,"submitted",t.po_submitted)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#0891b2,#0e7490)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.po_submit}</button>}
@@ -5469,6 +5476,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [localShop,setLocalShop]=useState(shopProp);
 
   const [tab,setTab]=useState(isOwner?"owner":"shop");
+  const [poSubTab,setPoSubTab]=useState("salesman");
 
   // ── INVOICE STATE ──
   // items = confirmed invoice list (locked rows)
@@ -6065,6 +6073,7 @@ const startEditOrder = (order) => {
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
+        ...(can("createPO")?[["owner",t.tabOwner]]:[]),
         ["sales", t.tabSales],
         ["purchase", lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info"],
         ["settings",t.tabSettings],
@@ -6532,13 +6541,53 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {isOwner&&tab==="owner"&&(
-        <PurchaseOrderWindow
-          t={t} lang={lang} th={th} s={s}
-          shopId={shopId} user={user} profile={profile}
-          vendors={vendors} products={products}
-          shop={localShop} toast={toast} isDesktop={isDesktop}
-        />
+      {tab==="owner"&&(
+        isOwner ? (
+          <div style={{ display:"flex", flexDirection:"column", height:"100%" }}>
+            {/* ── Subtab switcher ── */}
+            <div style={{ display:"flex", background:th.bgHdr, borderBottom:`2px solid ${th.border}`, position:"sticky", top:61, zIndex:5, flexShrink:0 }}>
+              <button onClick={()=>setPoSubTab("salesman")} style={{ flex:1, padding:"11px 8px", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, background:poSubTab==="salesman"?"#f97316":"transparent", color:poSubTab==="salesman"?"#fff":th.txtMuted, borderRadius:0, position:"relative", transition:"all 0.15s" }}>
+                📦 {lang==="bn"?"সেলসম্যান অর্ডার":"Salesman Orders"}
+                {unread>0&&<span style={{ marginLeft:5, background:"#ef4444", color:"#fff", borderRadius:"50%", width:17, height:17, fontSize:10, display:"inline-flex", alignItems:"center", justifyContent:"center", fontWeight:800, verticalAlign:"middle" }}>{unread}</span>}
+              </button>
+              <button onClick={()=>setPoSubTab("purchase")} style={{ flex:1, padding:"11px 8px", border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, background:poSubTab==="purchase"?"#1d4ed8":"transparent", color:poSubTab==="purchase"?"#fff":th.txtMuted, borderRadius:0, transition:"all 0.15s" }}>
+                📋 {lang==="bn"?"ক্রয় অর্ডার (PO)":"Purchase Orders (PO)"}
+              </button>
+            </div>
+
+            {/* ── Salesman Orders ── */}
+            {poSubTab==="salesman"&&(
+              <div style={isDesktop?s.desktopPanel:s.panel}>
+                <div style={{ position:"relative", marginBottom:12 }}>
+                  <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+                  <input style={{ ...s.inp, paddingLeft:36, background:th.bgCard }} placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড...":"Search order no, item or brand..."} value={searchQ} onChange={e=>setSearchQ(e.target.value)} />
+                  {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16 }}>✕</button>}
+                </div>
+                {orders.length===0
+                  ?<div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+                  :(() => {
+                    const filtered=filterOrders(orders);
+                    if (!filtered.length) return <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>;
+                    const groups=groupByDay(filtered);
+                    return groups.map(([dateStr,dayOrders])=>(
+                      <div key={dateStr}>
+                        <div style={s.dayHeader}><span style={s.dayDot}/><span style={s.dayLabel}>📅 {dateStr}</span><span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span></div>
+                        {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true}/>)}
+                      </div>
+                    ));
+                  })()
+                }
+              </div>
+            )}
+
+            {/* ── Purchase Orders (PO) ── */}
+            {poSubTab==="purchase"&&(
+              <PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} canCreate={true} />
+            )}
+          </div>
+        ) : (
+          can("createPO")&&<PurchaseOrderWindow t={t} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} vendors={vendors} products={products} shop={localShop} toast={toast} isDesktop={isDesktop} canCreate={true} />
+        )
       )}
 
       {(isOwner||can("viewProducts"))&&tab==="products"&&(
