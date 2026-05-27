@@ -4550,41 +4550,85 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             <input style={inp()} placeholder={t.si_code} value={siCurrent.code} onChange={e=>setSiCurrent(p=>({...p,code:e.target.value}))} />
             <input style={inp()} placeholder={t.si_brand} value={siCurrent.brand} onChange={e=>setSiCurrent(p=>({...p,brand:e.target.value}))} />
           </div>
-          {/* Qty + Unit + Price + (VAT if tax) + ADD button */}
-          <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
-            <div style={{ flex:"0 0 70px" }}>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_qty}</div>
-              <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="1" value={siCurrent.qty}
-                onChange={e=>setSiCurrent(p=>({...p,qty:e.target.value}))}
-                onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
+          {/* Qty + Unit + Price + Disc + VAT + ADD — responsive layout */}
+          {isDesktop ? (
+            /* ── Desktop: single row ── */
+            <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
+              <div style={{ flex:"0 0 70px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_qty}</div>
+                <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="1" value={siCurrent.qty}
+                  onChange={e=>setSiCurrent(p=>({...p,qty:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
+              </div>
+              <div style={{ flex:"0 0 70px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unit}</div>
+                <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>setSiCurrent(p=>({...p,unit:e.target.value}))}>
+                  {SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unitPrice}</div>
+                <input style={inp()} inputMode="decimal" placeholder="0.00" value={siCurrent.unitPrice}
+                  onChange={e=>setSiCurrent(p=>({...p,unitPrice:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
+              </div>
+              {!formIsDelivery&&<div style={{ flex:"0 0 62px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_discPerc}</div>
+                <input style={inp()} inputMode="decimal" placeholder="0" value={siCurrent.discountPerc} onChange={e=>setSiCurrent(p=>({...p,discountPerc:e.target.value}))} />
+              </div>}
+              {formIsTax&&!formIsDelivery&&<div style={{ flex:"0 0 58px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>VAT%</div>
+                <input style={inp()} inputMode="decimal" placeholder="5" value={siCurrent.vatPerc} onChange={e=>setSiCurrent(p=>({...p,vatPerc:e.target.value}))} />
+              </div>}
+              <button onClick={siAddCurrentItem}
+                style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", flexShrink:0, height:42, alignSelf:"flex-end" }}>
+                {lang==="bn"?"যোগ →":"Add →"}
+              </button>
             </div>
-            <div style={{ flex:"0 0 70px" }}>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unit}</div>
-              <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>setSiCurrent(p=>({...p,unit:e.target.value}))}>
-                {SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
-              </select>
+          ) : (
+            /* ── Mobile: 2-row layout so Price gets full space ── */
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              {/* Row 1: Qty + Unit */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_qty}</div>
+                  <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="1" value={siCurrent.qty}
+                    onChange={e=>setSiCurrent(p=>({...p,qty:e.target.value}))}
+                    onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unit}</div>
+                  <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>setSiCurrent(p=>({...p,unit:e.target.value}))}>
+                    {SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* Row 2: Price (big) + Disc% + VAT% */}
+              <div style={{ display:"grid", gridTemplateColumns:formIsTax&&!formIsDelivery?"1fr 72px 62px":!formIsDelivery?"1fr 72px":"1fr", gap:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>
+                    {t.si_unitPrice} <span style={{ color:th.txtFaint, fontWeight:400 }}>({t.cur})</span>
+                  </div>
+                  <input style={{ ...inp(), fontSize:16, fontWeight:700 }} inputMode="decimal" placeholder="0.00" value={siCurrent.unitPrice}
+                    onChange={e=>setSiCurrent(p=>({...p,unitPrice:e.target.value}))}
+                    onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
+                </div>
+                {!formIsDelivery&&<div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_discPerc}</div>
+                  <input style={inp()} inputMode="decimal" placeholder="0" value={siCurrent.discountPerc} onChange={e=>setSiCurrent(p=>({...p,discountPerc:e.target.value}))} />
+                </div>}
+                {formIsTax&&!formIsDelivery&&<div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>VAT%</div>
+                  <input style={inp()} inputMode="decimal" placeholder="5" value={siCurrent.vatPerc} onChange={e=>setSiCurrent(p=>({...p,vatPerc:e.target.value}))} />
+                </div>}
+              </div>
+              {/* Row 3: Add button full width */}
+              <button onClick={siAddCurrentItem}
+                style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:"pointer" }}>
+                {lang==="bn"?"✅ পণ্য যোগ করুন":"✅ Add Item"}
+              </button>
             </div>
-            {/* Unit Price — shown for ALL types including delivery */}
-            <div style={{ flex:1 }}>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unitPrice}</div>
-              <input style={inp()} inputMode="decimal" placeholder="0.00" value={siCurrent.unitPrice}
-                onChange={e=>setSiCurrent(p=>({...p,unitPrice:e.target.value}))}
-                onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
-            </div>
-            {!formIsDelivery&&<div style={{ flex:"0 0 62px" }}>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_discPerc}</div>
-              <input style={inp()} inputMode="decimal" placeholder="0" value={siCurrent.discountPerc} onChange={e=>setSiCurrent(p=>({...p,discountPerc:e.target.value}))} />
-            </div>}
-            {formIsTax&&!formIsDelivery&&<div style={{ flex:"0 0 58px" }}>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>VAT%</div>
-              <input style={inp()} inputMode="decimal" placeholder="5" value={siCurrent.vatPerc} onChange={e=>setSiCurrent(p=>({...p,vatPerc:e.target.value}))} />
-            </div>}
-            {/* ADD button */}
-            <button onClick={siAddCurrentItem}
-              style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", flexShrink:0, height:42, alignSelf:"flex-end" }}>
-              {lang==="bn"?"যোগ →":"Add →"}
-            </button>
-          </div>
+          )}
           {/* Live total preview */}
           {(siN2(siCurrent.qty)>0&&siN2(siCurrent.unitPrice)>0)&&(()=>{
             const { total } = siCalcLine(siCurrent, formIsTax&&!formIsDelivery);
