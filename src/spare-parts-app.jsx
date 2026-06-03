@@ -3346,6 +3346,22 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [pickerTarget,setPickerTarget] = useState(null);
   const [piSaving,setPiSaving]       = useState(false);
 
+  // ── Vendor search state (for purchase invoice form) ──
+  const [vendorSearchQ,setVendorSearchQ]     = useState("");
+  const [vendorDropOpen,setVendorDropOpen]   = useState(false);
+  const vendorSearchRef = React.useRef(null);
+
+  // Close vendor dropdown when clicking outside
+  React.useEffect(()=>{
+    const handler=(e)=>{
+      if (vendorSearchRef.current && !vendorSearchRef.current.contains(e.target)){
+        setVendorDropOpen(false);
+      }
+    };
+    document.addEventListener("mousedown",handler);
+    return ()=>document.removeEventListener("mousedown",handler);
+  },[]);
+
   // ── Filter state ──
   const [piSearch,setPiSearch]       = useState("");
   const [piStatusF,setPiStatusF]     = useState("ALL");
@@ -3399,7 +3415,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piOpenNew = async () => {
     try {
       const no=await genInvoiceNo();
-      setPiInvoiceNo(no); setPiForm(piEmptyForm()); setPiLines([piEmptyLine()]); setEditInvoiceId(null); setPiView("form");
+      setPiInvoiceNo(no); setPiForm(piEmptyForm()); setPiLines([piEmptyLine()]); setEditInvoiceId(null); setPiView("form"); setVendorSearchQ(""); setVendorDropOpen(false);
     } catch(e) {
       toast(lang==="bn"?"ইনভয়েস খুলতে সমস্যা হয়েছে!":"Failed to open invoice form!","err");
     }
@@ -3410,7 +3426,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     setPiInvoiceNo(inv.invoiceNo);
     setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
     setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc||"0"), taxPerc:String(it.taxPerc||"5"), salePrice:String(it.salePrice||"") })));
-    setEditInvoiceId(inv.id); setPiView("form");
+    setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
   };
 
   // ── Form helpers ──
@@ -3430,6 +3446,27 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const v=vendors.find(x=>x.id===vid);
     if (v){ piUpd("vendorId",vid); piUpd("vendorName",v.vendorName); piUpd("vendorMobile",v.mobileNumber||v.whatsappNumber||""); }
   };
+
+  // ── Searchable vendor picker handler ──
+  const piPickVendor=(v)=>{
+    piUpd("vendorId",v.id);
+    piUpd("vendorName",v.vendorName);
+    piUpd("vendorMobile",v.mobileNumber||v.whatsappNumber||"");
+    setVendorSearchQ(v.vendorName);
+    setVendorDropOpen(false);
+  };
+  const piClearVendor=()=>{
+    piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile","");
+    setVendorSearchQ(""); setVendorDropOpen(false);
+  };
+  const filteredVendorOpts = vendors.filter(v=>{
+    if (!vendorSearchQ.trim()) return true;
+    const q=vendorSearchQ.trim().toLowerCase();
+    return (v.vendorName||"").toLowerCase().includes(q)
+      ||(v.vendorCode||"").toLowerCase().includes(q)
+      ||(v.mobileNumber||"").includes(q)
+      ||(v.city||"").toLowerCase().includes(q);
+  });
 
   // ── Build payload ──
   const piBuild=(status)=>{
@@ -3599,10 +3636,68 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           <input style={{ ...inp(), borderColor:"#a855f7", color:"#a855f7" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />
         </div>
         {vendors.length>0&&(
-          <select style={{ ...inp(), background:th.bgCard, marginBottom:8 }} value={piForm.vendorId} onChange={piHandleVendor}>
-            <option value="">{t.pi_vendorSelect}</option>
-            {vendors.map(v=><option key={v.id} value={v.id}>{v.vendorName}{v.mobileNumber?` — ${v.mobileNumber}`:""}</option>)}
-          </select>
+          <div ref={vendorSearchRef} style={{ position:"relative", marginBottom:8 }}>
+            {/* Search input row */}
+            <div style={{ display:"flex", alignItems:"center", gap:0, border:`1.5px solid ${vendorDropOpen?"#f97316":th.border}`, borderRadius:10, background:th.bgInp, overflow:"hidden", transition:"border-color 0.15s" }}>
+              <span style={{ padding:"0 10px", fontSize:14, color:"#f97316", userSelect:"none" }}>🔍</span>
+              <input
+                style={{ flex:1, padding:"10px 4px", border:"none", background:"transparent", color:th.txtPrimary, fontSize:13, outline:"none", fontFamily:"inherit" }}
+                placeholder={lang==="bn"?"ভেন্ডর খুঁজুন (নাম / কোড / মোবাইল)...":"Search vendor (name / code / mobile)..."}
+                value={vendorSearchQ}
+                onChange={e=>{ setVendorSearchQ(e.target.value); setVendorDropOpen(true); if(!e.target.value.trim()){ piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile",""); } }}
+                onFocus={()=>setVendorDropOpen(true)}
+                autoComplete="off"
+              />
+              {/* Selected vendor badge or clear button */}
+              {piForm.vendorId&&(
+                <button onClick={piClearVendor} style={{ padding:"6px 10px", background:"transparent", border:"none", cursor:"pointer", color:"#f87171", fontSize:16, lineHeight:1 }} title="Clear vendor">✕</button>
+              )}
+              <button onClick={()=>setVendorDropOpen(o=>!o)} style={{ padding:"8px 12px", background:"transparent", border:"none", cursor:"pointer", color:th.txtMuted, fontSize:12, lineHeight:1 }}>▾</button>
+            </div>
+
+            {/* Selected vendor chip */}
+            {piForm.vendorId&&!vendorDropOpen&&(
+              <div style={{ marginTop:5, padding:"6px 10px", background:"rgba(249,115,22,0.1)", border:"1px solid rgba(249,115,22,0.35)", borderRadius:8, display:"flex", alignItems:"center", gap:8 }}>
+                <span style={{ fontSize:12, color:"#f97316" }}>🏭</span>
+                <span style={{ fontSize:12, fontWeight:700, color:"#f97316", flex:1 }}>{piForm.vendorName}</span>
+                {piForm.vendorMobile&&<span style={{ fontSize:11, color:th.txtMuted }}>📱 {piForm.vendorMobile}</span>}
+              </div>
+            )}
+
+            {/* Dropdown list */}
+            {vendorDropOpen&&(
+              <div style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:999, background:th.bgCard, border:`1.5px solid #f97316`, borderRadius:10, marginTop:4, maxHeight:220, overflowY:"auto", boxShadow:"0 8px 32px rgba(0,0,0,0.4)" }}>
+                {filteredVendorOpts.length===0?(
+                  <div style={{ padding:"14px 16px", fontSize:12, color:th.txtMuted, textAlign:"center" }}>
+                    {lang==="bn"?"কোনো ভেন্ডর পাওয়া যায়নি":"No vendors found"}
+                  </div>
+                ):(
+                  filteredVendorOpts.map(v=>(
+                    <div key={v.id}
+                      onClick={()=>piPickVendor(v)}
+                      style={{ padding:"10px 14px", cursor:"pointer", borderBottom:`1px solid ${th.border}`, display:"flex", alignItems:"center", gap:10, transition:"background 0.1s", background:piForm.vendorId===v.id?"rgba(249,115,22,0.12)":"transparent" }}
+                      onMouseEnter={e=>e.currentTarget.style.background="rgba(249,115,22,0.08)"}
+                      onMouseLeave={e=>e.currentTarget.style.background=piForm.vendorId===v.id?"rgba(249,115,22,0.12)":"transparent"}
+                    >
+                      <span style={{ fontSize:15 }}>🏭</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                          {v.vendorName}
+                          {piForm.vendorId===v.id&&<span style={{ marginLeft:6, fontSize:10, color:"#f97316" }}>✓</span>}
+                        </div>
+                        <div style={{ display:"flex", gap:8, marginTop:2 }}>
+                          {v.vendorCode&&<span style={{ fontSize:10, color:"#a1a1aa", fontFamily:"monospace" }}>#{v.vendorCode}</span>}
+                          {(v.mobileNumber||v.whatsappNumber)&&<span style={{ fontSize:10, color:th.txtMuted }}>📱 {v.mobileNumber||v.whatsappNumber}</span>}
+                          {v.city&&<span style={{ fontSize:10, color:th.txtMuted }}>📍 {v.city}</span>}
+                        </div>
+                      </div>
+                      {v.status&&v.status!=="active"&&<span style={{ fontSize:9, padding:"2px 6px", borderRadius:4, background:"rgba(248,113,113,0.15)", color:"#f87171", fontWeight:700 }}>{v.status.toUpperCase()}</span>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         )}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
           <input style={inp()} placeholder={t.pi_vendorManual} value={piForm.vendorName} onChange={e=>piUpd("vendorName",e.target.value)} />
