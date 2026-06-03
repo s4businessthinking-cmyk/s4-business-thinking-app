@@ -99,6 +99,7 @@ const TR = {
     connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
     confirmLogout:"লগআউট করতে চান?",
+    tabCheque:"🖨️ চেক প্রিন্ট",
     tabShop:"🏪 দোকান", tabOwner:"👤 অর্ডার", tabCompany:"🏢 কোম্পানি",
     newOrder:"📋 নতুন Purchase Order",
     itemName:"আইটেমের নাম *", code:"কোড / মডেল / সাইজ", brand:"ব্র্যান্ডের নাম",
@@ -517,6 +518,7 @@ const TR = {
     connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
     confirmLogout:"Do you want to logout?",
+    tabCheque:"🖨️ Cheque Print",
     tabShop:"🏪 Shop", tabOwner:"👤 Orders", tabCompany:"🏢 Companies",
     newOrder:"📋 New Purchase Order",
     itemName:"Item Name *", code:"Code / Model / Size", brand:"Brand Name",
@@ -4917,6 +4919,399 @@ function ShopInfoSettings({ localShop, shopId, th, s, lang, toast }) {
   );
 }
 
+
+// ─── UAE BANKS DATA ───────────────────────────────────────────
+const UAE_BANKS = [
+  { id:"enbd",   name:"Emirates NBD",                  short:"ENBD", color:"#CC0000", code:"033", swift:"EBILAEAD",  tag:"Together Unlimited" },
+  { id:"fab",    name:"First Abu Dhabi Bank",           short:"FAB",  color:"#00563F", code:"035", swift:"NBADAEAA",  tag:"Advancing Growth" },
+  { id:"adcb",   name:"ADCB",                           short:"ADCB", color:"#E31837", code:"030", swift:"ADCBAEAA",  tag:"Abu Dhabi Commercial Bank" },
+  { id:"dib",    name:"Dubai Islamic Bank",             short:"DIB",  color:"#006837", code:"240", swift:"DUIBAEAD",  tag:"Always with you" },
+  { id:"mashreq",name:"Mashreq Bank",                   short:"MAQ",  color:"#E2211C", code:"031", swift:"BOMLAEAD",  tag:"Moving you forward" },
+  { id:"adib",   name:"Abu Dhabi Islamic Bank",         short:"ADIB", color:"#7B2D8B", code:"500", swift:"ADIBAEAA",  tag:"Islamic Banking" },
+  { id:"rak",    name:"RAKBANK",                        short:"RAK",  color:"#C8102E", code:"045", swift:"NRAKAEAK",  tag:"National Bank of Ras Al Khaimah" },
+  { id:"hsbc",   name:"HSBC UAE",                       short:"HSBC", color:"#DB0011", code:"043", swift:"BBMEAEAD",  tag:"The World's Local Bank" },
+  { id:"sc",     name:"Standard Chartered UAE",         short:"SCB",  color:"#0072BC", code:"050", swift:"SCBLAEAD",  tag:"Here for Good" },
+  { id:"cbd",    name:"Commercial Bank of Dubai",       short:"CBD",  color:"#005B82", code:"053", swift:"CBDUAEAD",  tag:"Your bank, your life" },
+  { id:"cbi",    name:"Commercial Bank International",  short:"CBI",  color:"#003087", code:"054", swift:"CBILAEAA",  tag:"CBI" },
+  { id:"nbf",    name:"National Bank of Fujairah",      short:"NBF",  color:"#00529B", code:"055", swift:"NBFUAEAS",  tag:"A better way to bank" },
+  { id:"nbq",    name:"National Bank of Umm Al Qaiwain",short:"NBQ",  color:"#005B82", code:"056", swift:"NBUQAEAQ",  tag:"NBQ" },
+  { id:"sib",    name:"Sharjah Islamic Bank",           short:"SIB",  color:"#008000", code:"057", swift:"SIBLAEAA",  tag:"Islamic Banking" },
+  { id:"alhilal",name:"Al Hilal Bank",                  short:"AHB",  color:"#00529B", code:"225", swift:"ALHIAEAA",  tag:"Islamic Banking" },
+  { id:"invest", name:"Invest Bank",                    short:"INV",  color:"#1C4480", code:"095", swift:"INVBAEAS",  tag:"Invest Bank Sharjah" },
+  { id:"citiuae",name:"Citibank UAE",                   short:"CITI", color:"#003A78", code:"082", swift:"CITIAEAX",  tag:"Citi — The Citi Never Sleeps" },
+  { id:"ubl",    name:"United Bank Limited UAE",        short:"UBL",  color:"#005595", code:"095", swift:"UNILAEAA",  tag:"Pakistan's Global Bank" },
+  { id:"emirates_islamic",name:"Emirates Islamic",      short:"EIB",  color:"#006400", code:"236", swift:"MEBLAEADXXX", tag:"Islamic Banking" },
+  { id:"ajman",  name:"Ajman Bank",                     short:"AJB",  color:"#006633", code:"140", swift:"AJMAAEAA",  tag:"Ajman Bank" },
+];
+
+// ─── AMOUNT TO WORDS ──────────────────────────────────────────
+function amountToWordsAED(n) {
+  if (!n || n <= 0) return "";
+  const a = ["","One","Two","Three","Four","Five","Six","Seven","Eight","Nine","Ten","Eleven","Twelve","Thirteen","Fourteen","Fifteen","Sixteen","Seventeen","Eighteen","Nineteen"];
+  const b = ["","","Twenty","Thirty","Forty","Fifty","Sixty","Seventy","Eighty","Ninety"];
+  function hun(x) {
+    if (x < 20) return a[x];
+    if (x < 100) return b[Math.floor(x/10)] + (x%10 ? " " + a[x%10] : "");
+    return a[Math.floor(x/100)] + " Hundred" + (x%100 ? " " + hun(x%100) : "");
+  }
+  const parts = parseFloat(n).toFixed(2).split(".");
+  let whole = parseInt(parts[0]), fils = parseInt(parts[1]);
+  let res = "";
+  if (whole >= 1000000) { res += hun(Math.floor(whole/1000000)) + " Million "; whole %= 1000000; }
+  if (whole >= 1000)    { res += hun(Math.floor(whole/1000)) + " Thousand "; whole %= 1000; }
+  if (whole > 0)          res += hun(whole) + " ";
+  res += "Dirhams";
+  if (fils > 0) res += " and " + hun(fils) + " Fils";
+  return res.trim();
+}
+
+// ─── CHEQUE PRINTER TAB ───────────────────────────────────────
+function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
+  const [bank, setBank] = useState(UAE_BANKS[0]);
+  const [chqNo,  setChqNo]  = useState("000001");
+  const [payee,  setPayee]  = useState("");
+  const [amount, setAmount] = useState("");
+  const [words,  setWords]  = useState("");
+  const [wordsManual, setWordsManual] = useState(false);
+  const [acno,   setAcno]   = useState("");
+  const [dateVal,setDateVal] = useState(()=> new Date().toISOString().split("T")[0]);
+  const [showBankList, setShowBankList] = useState(false);
+
+  // auto-fill words from amount
+  const handleAmountChange = (v) => {
+    setAmount(v);
+    if (!wordsManual) {
+      const n = parseFloat(v);
+      setWords(n > 0 ? amountToWordsAED(n) : "");
+    }
+  };
+  const handleWordsChange = (v) => { setWords(v); setWordsManual(true); };
+  const handleAmountBlur  = () => { setWordsManual(false); };
+
+  // date boxes
+  const dateParts = dateVal ? (() => {
+    const [y,m,d] = dateVal.split("-");
+    return [...d, ...m, ...y];
+  })() : ["D","D","M","M","Y","Y","Y","Y"];
+
+  const fmtAmount = (v) => {
+    const n = parseFloat(v);
+    if (!n) return "0.00";
+    return n.toLocaleString("en-AE", { minimumFractionDigits:2, maximumFractionDigits:2 });
+  };
+
+  const inp = { padding:"10px 12px", borderRadius:8, border:\`1px solid \${th.borderMid}\`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  const lbl = { fontSize:11, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
+  const sec = { fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12, marginTop:4 };
+
+  return (
+    <div style={isDesktop ? s.desktopPanel : s.panel}>
+
+      {/* ── HEADER ── */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap:"wrap", gap:10 }}>
+        <div style={s.secTitle}>{lang==="bn"?"🖨️ UAE ব্যাংক চেক প্রিন্টার":"🖨️ UAE Bank Cheque Printer"}</div>
+        <div style={{ fontSize:11, color:th.txtMuted, background:th.bgCard, border:\`1px solid \${th.border}\`, borderRadius:8, padding:"5px 10px" }}>
+          {lang==="bn"?"প্রিন্টারে চেক লিফ রেখে প্রিন্ট করুন":"Place cheque leaf in printer then print"}
+        </div>
+      </div>
+
+      <div style={{ display:"flex", flexDirection:isDesktop?"row":"column", gap:16, alignItems:"flex-start" }}>
+
+        {/* ── LEFT PANEL: FORM ── */}
+        <div style={{ flex:"0 0 300px", minWidth:0 }}>
+
+          {/* Bank Selector */}
+          <div style={{ ...s.card, border:\`1px solid \${th.border}\`, marginBottom:14 }}>
+            <div style={sec}>🏦 {lang==="bn"?"ব্যাংক বেছে নিন":"Select Bank"}</div>
+            <div
+              onClick={() => setShowBankList(!showBankList)}
+              style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, border:\`1px solid \${showBankList ? bank.color : th.borderMid}\`, background:th.bgInp, cursor:"pointer", transition:"border-color 0.2s" }}
+            >
+              <div style={{ width:36, height:36, borderRadius:8, background:bank.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:"#fff", flexShrink:0, textAlign:"center", lineHeight:1.2 }}>
+                {bank.short}
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{bank.name}</div>
+                <div style={{ fontSize:10, color:th.txtMuted }}>{bank.tag}</div>
+              </div>
+              <span style={{ fontSize:16, color:th.txtMuted }}>{showBankList ? "▲" : "▼"}</span>
+            </div>
+            {showBankList && (
+              <div style={{ marginTop:8, maxHeight:260, overflowY:"auto", borderRadius:8, border:\`1px solid \${th.border}\`, background:th.bgCard }}>
+                {UAE_BANKS.map(b => (
+                  <button key={b.id}
+                    onClick={() => { setBank(b); setShowBankList(false); }}
+                    style={{ width:"100%", textAlign:"left", padding:"9px 12px", background:b.id===bank.id?th.accentDim:"transparent", border:"none", borderBottom:\`1px solid \${th.border}\`, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:10 }}
+                  >
+                    <div style={{ width:28, height:28, borderRadius:6, background:b.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:800, color:"#fff", flexShrink:0, textAlign:"center", lineHeight:1.1 }}>{b.short}</div>
+                    <div>
+                      <div style={{ fontSize:12, fontWeight:700, color:b.id===bank.id?th.accent:th.txtPrimary }}>{b.name}</div>
+                      <div style={{ fontSize:10, color:th.txtMuted }}>{b.swift}</div>
+                    </div>
+                    {b.id===bank.id && <span style={{ marginLeft:"auto", color:th.accent }}>✓</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Form Fields */}
+          <div style={{ ...s.card, marginBottom:14 }}>
+            <div style={sec}>📝 {lang==="bn"?"চেকের তথ্য":"Cheque Details"}</div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+              <div>
+                <span style={lbl}>{lang==="bn"?"চেক নং":"Cheque No."}</span>
+                <input style={inp} value={chqNo} onChange={e=>setChqNo(e.target.value)} maxLength={8} placeholder="000001" />
+              </div>
+              <div>
+                <span style={lbl}>{lang==="bn"?"তারিখ":"Date"}</span>
+                <input style={inp} type="date" value={dateVal} onChange={e=>setDateVal(e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom:10 }}>
+              <span style={lbl}>{lang==="bn"?"প্রাপকের নাম (Pay to)":"Pay to (Beneficiary)"}</span>
+              <input style={inp} value={payee} onChange={e=>setPayee(e.target.value)} placeholder={lang==="bn"?"ব্যক্তি বা কোম্পানির নাম":"Person or company name"} />
+            </div>
+
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+              <div>
+                <span style={lbl}>{lang==="bn"?"পরিমাণ (AED)":"Amount (AED)"}</span>
+                <input style={{ ...inp, fontWeight:700, fontSize:16, color:"#22c55e" }} inputMode="decimal" value={amount}
+                  onChange={e=>handleAmountChange(e.target.value)}
+                  onBlur={handleAmountBlur}
+                  placeholder="0.00" />
+              </div>
+              <div>
+                <span style={lbl}>{lang==="bn"?"অ্যাকাউন্ট নং":"Account No."}</span>
+                <input style={inp} value={acno} onChange={e=>setAcno(e.target.value)} placeholder="Your account number" />
+              </div>
+            </div>
+
+            <div style={{ marginBottom:6 }}>
+              <span style={lbl}>{lang==="bn"?"কথায় পরিমাণ (স্বয়ংক্রিয়)":"Amount in Words (auto)"}</span>
+              <input style={{ ...inp, fontSize:12 }} value={words}
+                onChange={e=>handleWordsChange(e.target.value)}
+                placeholder={lang==="bn"?"কথায় পরিমাণ...":"Amount in words..."} />
+              {!wordsManual && amount && <div style={{ fontSize:10, color:th.txtMuted, marginTop:3 }}>✨ {lang==="bn"?"স্বয়ংক্রিয় পূরণ — এডিট করতে পারবেন":"Auto-filled — editable"}</div>}
+            </div>
+          </div>
+
+          {/* Print Button */}
+          <button
+            onClick={() => window.print()}
+            style={{ ...s.sendBtn, marginBottom:10, fontSize:15, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
+          >
+            🖨️ {lang==="bn"?"চেক প্রিন্ট করুন":"Print Cheque"}
+          </button>
+          <button
+            onClick={() => { setChqNo("000001"); setPayee(""); setAmount(""); setWords(""); setAcno(""); setDateVal(new Date().toISOString().split("T")[0]); setWordsManual(false); }}
+            style={{ ...s.stBtn, width:"100%", padding:"11px", textAlign:"center", fontSize:13 }}
+          >
+            🗑️ {lang==="bn"?"ক্লিয়ার করুন":"Clear All"}
+          </button>
+
+          <div style={{ marginTop:14, padding:"10px 12px", background:th.bgCard, borderRadius:8, border:\`1px solid \${th.border}\`, fontSize:11, color:th.txtMuted, lineHeight:1.7 }}>
+            💡 <strong style={{ color:th.txtSecondary }}>{lang==="bn"?"টিপস:":"Tips:"}</strong>
+            {lang==="bn"
+              ? " প্রথমে সাদা কাগজে প্রিন্ট করে alignment মিলিয়ে দেখুন। তারপর আসল চেক লিফ প্রিন্টারে রেখে প্রিন্ট করুন।"
+              : " First print on plain paper to check alignment. Then place the real cheque leaf in the printer and print."}
+          </div>
+        </div>
+
+        {/* ── RIGHT PANEL: CHEQUE PREVIEW ── */}
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>
+            {lang==="bn"?"লাইভ প্রিভিউ (UAE Standard Cheque — 210mm × 90mm)":"Live Preview (UAE Standard Cheque — 210mm × 90mm)"}
+          </div>
+
+          {/* Cheque Paper — printable area */}
+          <div id="cheque-print-area" style={{ overflowX:"auto", paddingBottom:8 }}>
+            <div style={{
+              width:794, height:302,
+              background:"#fffef8",
+              position:"relative",
+              border:"1px solid #c0a882",
+              boxShadow:"0 2px 14px rgba(0,0,0,0.15)",
+              fontFamily:"'Times New Roman', Georgia, serif",
+              overflow:"hidden",
+              flexShrink:0,
+              marginBottom:8,
+            }}>
+              {/* Subtle guilloche watermark */}
+              <div style={{ position:"absolute", inset:0, opacity:0.03, pointerEvents:"none",
+                backgroundImage:"repeating-linear-gradient(45deg,#8b6914 0,#8b6914 1px,transparent 0,transparent 50%)",
+                backgroundSize:"100px 100px" }} />
+              {/* Security stripe right edge */}
+              <div style={{ position:"absolute", top:0, right:0, width:8, bottom:0, pointerEvents:"none",
+                backgroundImage:"repeating-linear-gradient(180deg,#c0a040 0,#c0a040 4px,#e8d080 4px,#e8d080 8px)", opacity:0.4 }} />
+              {/* Inner border */}
+              <div style={{ position:"absolute", inset:5, border:"1px solid #c0a882", pointerEvents:"none" }} />
+              {/* Watermark text */}
+              <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-50%,-50%) rotate(-30deg)",
+                fontSize:52, fontWeight:900, color:"rgba(139,105,20,0.05)", whiteSpace:"nowrap",
+                pointerEvents:"none", letterSpacing:4, fontFamily:"Arial Black, sans-serif" }}>
+                {bank.name.toUpperCase()}
+              </div>
+
+              {/* ── CHEQUE CONTENT ── */}
+              <div style={{ position:"absolute", inset:0, padding:"14px 20px 10px" }}>
+
+                {/* Bank header row */}
+                <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:7 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:9 }}>
+                    <div style={{ width:38, height:38, borderRadius:8, background:bank.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:"#fff", flexShrink:0, textAlign:"center", lineHeight:1.2 }}>
+                      {bank.short}
+                    </div>
+                    <div>
+                      <div style={{ fontSize:14, fontWeight:700, color:"#1a1a1a", letterSpacing:0.3 }}>{bank.name}</div>
+                      <div style={{ fontSize:9, color:"#666", marginTop:1 }}>{bank.tag} · SWIFT: {bank.swift}</div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ fontSize:9, color:"#555" }}>Cheque No.</div>
+                    <div style={{ fontSize:14, fontWeight:800, fontFamily:"monospace", color:"#1a1a1a", letterSpacing:1 }}>
+                      {chqNo || "000001"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Account / IBAN row */}
+                <div style={{ display:"flex", gap:16, marginBottom:5 }}>
+                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                    <span style={{ fontSize:9, color:"#555" }}>Account No.</span>
+                    <div style={{ borderBottom:"1px solid #8b7355", minWidth:130, height:16, display:"flex", alignItems:"flex-end", paddingBottom:1 }}>
+                      <span style={{ fontSize:10, fontFamily:"monospace", color:"#1a1a1a", fontWeight:700 }}>{acno}</span>
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+                    <span style={{ fontSize:9, color:"#555" }}>IBAN</span>
+                    <div style={{ borderBottom:"1px solid #8b7355", minWidth:180, height:16, display:"flex", alignItems:"flex-end", paddingBottom:1 }}>
+                      <span style={{ fontSize:9, fontFamily:"monospace", color:"#555" }}>
+                        {acno ? \`AE\${bank.code}0000\${acno.padStart(10,"0").slice(0,12)}\` : ""}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pay to row */}
+                <div style={{ display:"flex", alignItems:"flex-end", gap:8, marginBottom:5 }}>
+                  <span style={{ fontSize:11, color:"#444", fontStyle:"italic", whiteSpace:"nowrap", flexShrink:0 }}>Pay to the order of</span>
+                  <div style={{ flex:1, borderBottom:"1px solid #8b7355", height:22, display:"flex", alignItems:"flex-end", paddingBottom:2, minWidth:0 }}>
+                    <span style={{ fontSize:14, fontWeight:800, color:"#1a1a1a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>{payee || " "}</span>
+                  </div>
+                  {/* Amount box */}
+                  <div style={{ flexShrink:0 }}>
+                    <div style={{ fontSize:8, color:"#555", textAlign:"center", marginBottom:1 }}>AED</div>
+                    <div style={{ border:"1.5px solid #8b4513", background:"#faf5e4", padding:"4px 12px", minWidth:120, textAlign:"center" }}>
+                      <div style={{ fontSize:15, fontWeight:800, fontFamily:"monospace", color:"#1a1a1a", letterSpacing:0.5 }}>
+                        {fmtAmount(amount)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Amount in words row */}
+                <div style={{ display:"flex", alignItems:"flex-end", gap:8, marginBottom:5 }}>
+                  <span style={{ fontSize:10, color:"#444", fontStyle:"italic", whiteSpace:"nowrap", flexShrink:0 }}>Amount in words</span>
+                  <div style={{ flex:1, borderBottom:"1px solid #8b7355", height:20, display:"flex", alignItems:"flex-end", paddingBottom:2, minWidth:0 }}>
+                    <span style={{ fontSize:11, color:"#1a1a1a", fontStyle:"italic", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>
+                      {words || " "}
+                    </span>
+                  </div>
+                  <span style={{ fontSize:10, color:"#444", fontStyle:"italic", whiteSpace:"nowrap", flexShrink:0 }}>Only</span>
+                </div>
+
+                {/* Date + Signature row */}
+                <div style={{ display:"flex", alignItems:"flex-end", justifyContent:"space-between" }}>
+                  <div style={{ display:"flex", alignItems:"flex-end", gap:8 }}>
+                    <span style={{ fontSize:10, color:"#444", fontStyle:"italic" }}>Date</span>
+                    <div style={{ display:"flex", gap:2, alignItems:"center" }}>
+                      {dateParts.slice(0,2).map((d,i)=>(
+                        <div key={i} style={{ width:24, height:20, border:"1px solid #8b7355", background:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"monospace" }}>{d}</div>
+                      ))}
+                      <span style={{ fontSize:13, fontWeight:700, color:"#555", margin:"0 2px" }}>/</span>
+                      {dateParts.slice(2,4).map((d,i)=>(
+                        <div key={i} style={{ width:24, height:20, border:"1px solid #8b7355", background:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"monospace" }}>{d}</div>
+                      ))}
+                      <span style={{ fontSize:13, fontWeight:700, color:"#555", margin:"0 2px" }}>/</span>
+                      {dateParts.slice(4,8).map((d,i)=>(
+                        <div key={i} style={{ width:24, height:20, border:"1px solid #8b7355", background:"rgba(255,255,255,0.7)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, fontFamily:"monospace" }}>{d}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:"right" }}>
+                    <div style={{ width:160, borderBottom:"1px solid #8b7355", marginBottom:3 }} />
+                    <div style={{ fontSize:9, color:"#555", fontStyle:"italic" }}>Authorised Signatory</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* MICR strip */}
+              <div style={{ position:"absolute", bottom:0, left:0, right:0, height:34, background:"rgba(0,0,0,0.025)", borderTop:"1px solid #d4b896", display:"flex", alignItems:"center", padding:"0 18px", justifyContent:"space-between" }}>
+                <div>
+                  <div style={{ fontFamily:"'Courier New',monospace", fontSize:12, color:"#111", letterSpacing:"0.2em" }}>
+                    ⑆{(chqNo||"000001").padStart(6,"0")}⑆
+                  </div>
+                  <div style={{ fontSize:8, color:"#888", fontStyle:"italic" }}>Cheque No.</div>
+                </div>
+                <div>
+                  <div style={{ fontFamily:"'Courier New',monospace", fontSize:12, color:"#111", letterSpacing:"0.2em" }}>
+                    ⑆{(acno||"0000000000").padStart(10,"0").slice(0,10)}⑆
+                  </div>
+                  <div style={{ fontSize:8, color:"#888", fontStyle:"italic" }}>Account No.</div>
+                </div>
+                <div style={{ textAlign:"right" }}>
+                  <div style={{ fontFamily:"'Courier New',monospace", fontSize:12, color:"#111", letterSpacing:"0.2em" }}>
+                    ⑆{bank.code}⑆
+                  </div>
+                  <div style={{ fontSize:8, color:"#888", fontStyle:"italic" }}>Bank Code</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Info card */}
+          <div style={{ ...s.card, fontSize:12, color:th.txtMuted, lineHeight:1.8 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase", letterSpacing:0.5 }}>
+              ℹ️ {lang==="bn"?"প্রিন্ট নির্দেশনা":"Print Instructions"}
+            </div>
+            <div>📐 {lang==="bn"?"UAE স্ট্যান্ডার্ড চেক সাইজ: 210mm × 90mm":"UAE standard cheque size: 210mm × 90mm"}</div>
+            <div>🖨️ {lang==="bn"?"প্রিন্টারে Landscape বা Custom Page Size সেট করুন":"Set printer to Landscape or Custom Page Size"}</div>
+            <div>📋 {lang==="bn"?"প্রতিটি ব্যাংকের field position একটু আলাদা হতে পারে":"Each bank's field position may differ slightly"}</div>
+            <div>✅ {lang==="bn"?"আসল চেকে প্রিন্ট করার আগে সাদা কাগজে alignment চেক করুন":"Check alignment on plain paper before printing on real cheque"}</div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── PRINT STYLES (injected only on this page) ── */}
+      <style>{`
+        @media print {
+          body > *:not(#root) { display: none !important; }
+          header, nav, .sidebar, [data-sidebar] { display: none !important; }
+          #cheque-print-area {
+            position: fixed !important;
+            top: 0 !important; left: 0 !important;
+            width: 210mm !important;
+            padding: 0 !important;
+            overflow: visible !important;
+          }
+          #cheque-print-area > div {
+            width: 210mm !important;
+            height: 90mm !important;
+            box-shadow: none !important;
+            border: none !important;
+            page-break-after: avoid !important;
+          }
+          @page { size: 210mm 90mm; margin: 0; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
   const isOwner = profile.role==="owner";
@@ -4966,6 +5361,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
 
+  const [showChequePrinter,setShowChequePrinter]=useState(false);
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
   const [settingsPage,setSettingsPage]=useState(null); // null = menu list
@@ -5526,13 +5922,14 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["settings",t.tabSettings]]
+    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["settings",t.tabSettings]]
     : [
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
         ["sales", t.tabSales],
         ["purchase", lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info"],
+        ["cheque",t.tabCheque],
         ["settings",t.tabSettings],
       ];
 
@@ -6857,6 +7254,15 @@ const startEditOrder = (order) => {
           customers={customers} products={products}
           shop={localShop} toast={toast} isDesktop={isDesktop}
           siShowCode={siShowCode} siColorPrint={siColorPrint}
+        />
+      )}
+
+
+      {tab==="cheque"&&(
+        <ChequePrinterTab
+          t={t} lang={lang} th={th} s={s}
+          isDesktop={isDesktop}
+          shopName={localShop?.companyName||""}
         />
       )}
 
