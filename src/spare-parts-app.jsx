@@ -5000,7 +5000,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
     return n.toLocaleString("en-AE", { minimumFractionDigits:2, maximumFractionDigits:2 });
   };
 
-  const inp = { padding:"10px 12px", borderRadius:8, border:\`1px solid \${th.borderMid}\`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  const inp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
   const lbl = { fontSize:11, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
   const sec = { fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12, marginTop:4 };
 
@@ -5010,7 +5010,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
       {/* ── HEADER ── */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap:"wrap", gap:10 }}>
         <div style={s.secTitle}>{lang==="bn"?"🖨️ UAE ব্যাংক চেক প্রিন্টার":"🖨️ UAE Bank Cheque Printer"}</div>
-        <div style={{ fontSize:11, color:th.txtMuted, background:th.bgCard, border:\`1px solid \${th.border}\`, borderRadius:8, padding:"5px 10px" }}>
+        <div style={{ fontSize:11, color:th.txtMuted, background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:8, padding:"5px 10px" }}>
           {lang==="bn"?"প্রিন্টারে চেক লিফ রেখে প্রিন্ট করুন":"Place cheque leaf in printer then print"}
         </div>
       </div>
@@ -5021,11 +5021,11 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
         <div style={{ flex:"0 0 300px", minWidth:0 }}>
 
           {/* Bank Selector */}
-          <div style={{ ...s.card, border:\`1px solid \${th.border}\`, marginBottom:14 }}>
+          <div style={{ ...s.card, border:`1px solid ${th.border}`, marginBottom:14 }}>
             <div style={sec}>🏦 {lang==="bn"?"ব্যাংক বেছে নিন":"Select Bank"}</div>
             <div
               onClick={() => setShowBankList(!showBankList)}
-              style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, border:\`1px solid \${showBankList ? bank.color : th.borderMid}\`, background:th.bgInp, cursor:"pointer", transition:"border-color 0.2s" }}
+              style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, border:`1px solid ${showBankList ? bank.color : th.borderMid}`, background:th.bgInp, cursor:"pointer", transition:"border-color 0.2s" }}
             >
               <div style={{ width:36, height:36, borderRadius:8, background:bank.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:"#fff", flexShrink:0, textAlign:"center", lineHeight:1.2 }}>
                 {bank.short}
@@ -5037,11 +5037,11 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
               <span style={{ fontSize:16, color:th.txtMuted }}>{showBankList ? "▲" : "▼"}</span>
             </div>
             {showBankList && (
-              <div style={{ marginTop:8, maxHeight:260, overflowY:"auto", borderRadius:8, border:\`1px solid \${th.border}\`, background:th.bgCard }}>
+              <div style={{ marginTop:8, maxHeight:260, overflowY:"auto", borderRadius:8, border:`1px solid ${th.border}`, background:th.bgCard }}>
                 {UAE_BANKS.map(b => (
                   <button key={b.id}
                     onClick={() => { setBank(b); setShowBankList(false); }}
-                    style={{ width:"100%", textAlign:"left", padding:"9px 12px", background:b.id===bank.id?th.accentDim:"transparent", border:"none", borderBottom:\`1px solid \${th.border}\`, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:10 }}
+                    style={{ width:"100%", textAlign:"left", padding:"9px 12px", background:b.id===bank.id?th.accentDim:"transparent", border:"none", borderBottom:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit", display:"flex", alignItems:"center", gap:10 }}
                   >
                     <div style={{ width:28, height:28, borderRadius:6, background:b.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:8, fontWeight:800, color:"#fff", flexShrink:0, textAlign:"center", lineHeight:1.1 }}>{b.short}</div>
                     <div>
@@ -5112,7 +5112,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
             🗑️ {lang==="bn"?"ক্লিয়ার করুন":"Clear All"}
           </button>
 
-          <div style={{ marginTop:14, padding:"10px 12px", background:th.bgCard, borderRadius:8, border:\`1px solid \${th.border}\`, fontSize:11, color:th.txtMuted, lineHeight:1.7 }}>
+          <div style={{ marginTop:14, padding:"10px 12px", background:th.bgCard, borderRadius:8, border:`1px solid ${th.border}`, fontSize:11, color:th.txtMuted, lineHeight:1.7 }}>
             💡 <strong style={{ color:th.txtSecondary }}>{lang==="bn"?"টিপস:":"Tips:"}</strong>
             {lang==="bn"
               ? " প্রথমে সাদা কাগজে প্রিন্ট করে alignment মিলিয়ে দেখুন। তারপর আসল চেক লিফ প্রিন্টারে রেখে প্রিন্ট করুন।"
@@ -5189,7 +5189,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName }) {
                     <span style={{ fontSize:9, color:"#555" }}>IBAN</span>
                     <div style={{ borderBottom:"1px solid #8b7355", minWidth:180, height:16, display:"flex", alignItems:"flex-end", paddingBottom:1 }}>
                       <span style={{ fontSize:9, fontFamily:"monospace", color:"#555" }}>
-                        {acno ? \`AE\${bank.code}0000\${acno.padStart(10,"0").slice(0,12)}\` : ""}
+                        {acno ? `AE${bank.code}0000${acno.padStart(10,"0").slice(0,12)}` : ""}
                       </span>
                     </div>
                   </div>
