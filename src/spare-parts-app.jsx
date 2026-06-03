@@ -3349,10 +3349,10 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ── Vendor search state (for purchase invoice form) ──
   const [vendorSearchQ,setVendorSearchQ]     = useState("");
   const [vendorDropOpen,setVendorDropOpen]   = useState(false);
-  const vendorSearchRef = React.useRef(null);
+  const vendorSearchRef = useRef(null);
 
   // Close vendor dropdown when clicking outside
-  React.useEffect(()=>{
+  useEffect(()=>{
     const handler=(e)=>{
       if (vendorSearchRef.current && !vendorSearchRef.current.contains(e.target)){
         setVendorDropOpen(false);
@@ -3648,7 +3648,6 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
                 onFocus={()=>setVendorDropOpen(true)}
                 autoComplete="off"
               />
-              {/* Selected vendor badge or clear button */}
               {piForm.vendorId&&(
                 <button onClick={piClearVendor} style={{ padding:"6px 10px", background:"transparent", border:"none", cursor:"pointer", color:"#f87171", fontSize:16, lineHeight:1 }} title="Clear vendor">✕</button>
               )}
@@ -3675,7 +3674,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
                   filteredVendorOpts.map(v=>(
                     <div key={v.id}
                       onClick={()=>piPickVendor(v)}
-                      style={{ padding:"10px 14px", cursor:"pointer", borderBottom:`1px solid ${th.border}`, display:"flex", alignItems:"center", gap:10, transition:"background 0.1s", background:piForm.vendorId===v.id?"rgba(249,115,22,0.12)":"transparent" }}
+                      style={{ padding:"10px 14px", cursor:"pointer", borderBottom:`1px solid ${th.border}`, display:"flex", alignItems:"center", gap:10, background:piForm.vendorId===v.id?"rgba(249,115,22,0.12)":"transparent" }}
                       onMouseEnter={e=>e.currentTarget.style.background="rgba(249,115,22,0.08)"}
                       onMouseLeave={e=>e.currentTarget.style.background=piForm.vendorId===v.id?"rgba(249,115,22,0.12)":"transparent"}
                     >
