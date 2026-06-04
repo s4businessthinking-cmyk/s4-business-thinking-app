@@ -5137,37 +5137,23 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     marginBottom:12, marginTop:4,
   };
 
-  // Helper: single date digit box for preview
-  const DateBox = ({ char }) => (
+  // Preview: single date text with slash, exactly like it should print on ADCB cheque
+  const chequeDateText = `${dd}/${mm}/${yyyy}`;
+
+  const previewDateBoxes = () => (
     <div style={{
-      width:21, height:20, border:"1px solid #8b7355",
-      background:"rgba(255,255,255,0.85)",
-      display:"flex", alignItems:"center", justifyContent:"center",
-      fontSize:11, fontWeight:800, fontFamily:"'Courier New',monospace",
-      color:"#1a1a1a",
+      fontSize:16,
+      fontWeight:800,
+      fontFamily:"'Courier New', Courier, monospace",
+      color:"#000",
+      letterSpacing:0,
+      wordSpacing:0,
+      whiteSpace:"nowrap",
+      lineHeight:1,
     }}>
-      {char}
+      {chequeDateText}
     </div>
   );
-
-  // Preview: date boxes — DD  MM  YYYY with space gaps only (no slash/dot)
-  const previewDateBoxes = () => {
-    const displayDate = `${dd}/${mm}/${yyyy}`;
-    return (
-      <div
-        style={{
-          fontSize: 16,
-          fontWeight: 700,
-          fontFamily: "'Courier New', monospace",
-          letterSpacing: 0,
-          whiteSpace: "nowrap",
-          color: "#000"
-        }}
-      >
-        {displayDate}
-      </div>
-    );
-  };
 
   return (
     <div style={isDesktop ? s.desktopPanel : s.panel}>
@@ -5774,51 +5760,22 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           </div>
         )}
 
-        {/* Date — DD (each digit lands in its own pre-printed box on the cheque) */}
-        {dd && (
+        {/* Date — single slash format printed on cheque: DD/MM/YYYY */}
+        {chequeDateText && (
           <div style={{
             position:"absolute",
             top:`${P.dateTop}mm`,
             left:`${P.dateDDLeft}mm`,
-            fontSize:"11.5pt", fontWeight:"700",
+            fontSize:"11.5pt",
+            fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
             color:"#000",
-            letterSpacing:"0.55em",
+            letterSpacing:0,
+            wordSpacing:0,
             whiteSpace:"nowrap",
+            lineHeight:1,
           }}>
-            {dd}
-          </div>
-        )}
-
-        {/* Date — MM */}
-        {mm && (
-          <div style={{
-            position:"absolute",
-            top:`${P.dateTop}mm`,
-            left:`${P.dateMMLeft}mm`,
-            fontSize:"11.5pt", fontWeight:"700",
-            fontFamily:"'Courier New', Courier, monospace",
-            color:"#000",
-            letterSpacing:"0.55em",
-            whiteSpace:"nowrap",
-          }}>
-            {mm}
-          </div>
-        )}
-
-        {/* Date — YYYY */}
-        {yyyy && (
-          <div style={{
-            position:"absolute",
-            top:`${P.dateTop}mm`,
-            left:`${P.dateYYLeft}mm`,
-            fontSize:"11.5pt", fontWeight:"700",
-            fontFamily:"'Courier New', Courier, monospace",
-            color:"#000",
-            letterSpacing:"0.55em",
-            whiteSpace:"nowrap",
-          }}>
-            {yyyy}
+            {chequeDateText}
           </div>
         )}
       </div>
