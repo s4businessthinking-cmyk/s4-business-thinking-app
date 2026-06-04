@@ -5030,8 +5030,10 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [wordsY, setWordsY] = useState(0);   // Amount words → up/down
   const [amtX,   setAmtX]   = useState(0);   // Amount number → left/right
   const [amtY,   setAmtY]   = useState(0);   // Amount number → up/down
-  const [dateX,  setDateX]  = useState(0);   // Date → left/right
+  const [dateX,  setDateX]  = useState(0);   // Date DD → left/right (all move together)
   const [dateY,  setDateY]  = useState(0);   // Date → up/down
+  const [mmOff,  setMmOff]  = useState(0);   // MM gap from DD (positive = more right)
+  const [yyOff,  setYyOff]  = useState(0);   // YYYY gap from MM (positive = more right)
   const [pageW,  setPageW]  = useState(196); // Page width  mm (caliper)
   const [pageH,  setPageH]  = useState(99);  // Page height mm (caliper)
   const [saveDone, setSaveDone] = useState(false);
@@ -5041,6 +5043,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     setWordsX(0); setWordsY(0);
     setAmtX(0);   setAmtY(0);
     setDateX(0);  setDateY(0);
+    setMmOff(0);  setYyOff(0);
     setPageW(196); setPageH(99);
   };
 
@@ -5053,6 +5056,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         setWordsX(o.wx||0); setWordsY(o.wy||0);
         setAmtX(o.ax||0);   setAmtY(o.ay||0);
         setDateX(o.dx||0);  setDateY(o.dy||0);
+        setMmOff(o.mo||0);  setYyOff(o.yo||0);
         setPageW(o.w||196); setPageH(o.h||99);
       } else { resetAll(); }
     } catch(e) { resetAll(); }
@@ -5065,6 +5069,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         wx:wordsX, wy:wordsY,
         ax:amtX,   ay:amtY,
         dx:dateX,  dy:dateY,
+        mo:mmOff,  yo:yyOff,
         w:pageW,   h:pageH,
       }));
       setSaveDone(true);
@@ -5109,8 +5114,8 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     wordsMaxW:  pos.wordsMaxW,
     dateTop:    pos.dateTop    + dateY,
     dateDDLeft: pos.dateDDLeft + dateX,
-    dateMMLeft: pos.dateMMLeft + dateX,
-    dateYYLeft: pos.dateYYLeft + dateX,
+    dateMMLeft: pos.dateMMLeft + dateX + mmOff,   // MM gap adjustable
+    dateYYLeft: pos.dateYYLeft + dateX + mmOff + yyOff,  // YYYY gap adjustable
   };
 
   // Shared styles
@@ -5396,12 +5401,48 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
                   onYU={() => adj(setAmtY)(-1)} onYD={() => adj(setAmtY)(+1)}
                   onXL={() => adj(setAmtX)(-1)} onXR={() => adj(setAmtX)(+1)}
                 />
+                {/* Date: main position */}
                 <FieldCtrl
-                  icon="📅" label={lang==="bn" ? "তারিখ" : "Date"}
+                  icon="📅" label={lang==="bn" ? "তারিখ (DD উপর/নিচ/বাম/ডান)" : "Date DD (Up/Down/Left/Right)"}
                   xVal={dateX} yVal={dateY}
                   onYU={() => adj(setDateY)(-1)} onYD={() => adj(setDateY)(+1)}
                   onXL={() => adj(setDateX)(-1)} onXR={() => adj(setDateX)(+1)}
                 />
+
+                {/* Date gap controls */}
+                <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:8 }}>
+                    📅 {lang==="bn" ? "তারিখের মাঝের gap (MM ও YYYY)" : "Date gap — MM & YYYY spacing"}
+                  </div>
+                  {/* MM gap */}
+                  <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+                    <span style={{ fontSize:10, color:th.txtMuted, minWidth:70, fontWeight:600 }}>
+                      {lang==="bn" ? "MM gap" : "MM gap"}
+                    </span>
+                    <button onClick={() => adj(setMmOff)(-1)}
+                      style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:800, fontSize:12 }}>◄</button>
+                    <div style={{ minWidth:46, textAlign:"center", fontSize:12, fontWeight:800, color: mmOff!==0 ? "#f59e0b" : th.txtMuted }}>
+                      {mmOff>0?"+":""}{mmOff}mm
+                    </div>
+                    <button onClick={() => adj(setMmOff)(+1)}
+                      style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:800, fontSize:12 }}>►</button>
+                    <span style={{ fontSize:9, color:th.txtMuted, marginLeft:4 }}>← DD·MM·YYYY</span>
+                  </div>
+                  {/* YYYY gap */}
+                  <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                    <span style={{ fontSize:10, color:th.txtMuted, minWidth:70, fontWeight:600 }}>
+                      {lang==="bn" ? "YYYY gap" : "YYYY gap"}
+                    </span>
+                    <button onClick={() => adj(setYyOff)(-1)}
+                      style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:800, fontSize:12 }}>◄</button>
+                    <div style={{ minWidth:46, textAlign:"center", fontSize:12, fontWeight:800, color: yyOff!==0 ? "#f59e0b" : th.txtMuted }}>
+                      {yyOff>0?"+":""}{yyOff}mm
+                    </div>
+                    <button onClick={() => adj(setYyOff)(+1)}
+                      style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:800, fontSize:12 }}>►</button>
+                    <span style={{ fontSize:9, color:th.txtMuted, marginLeft:4 }}>← MM·YYYY</span>
+                  </div>
+                </div>
 
                 {/* Save / Reset */}
                 <div style={{ display:"flex", gap:8, marginTop:4 }}>
@@ -5415,7 +5456,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
                       transition:"background 0.3s",
                     }}
                   >
-                    {saveDone ? "✅ সেভ হয়েছে!" : `💾 ${lang==="bn" ? "সেভ করুন" : "Save All"}`}
+                    {saveDone
+                      ? `✅ ${lang==="bn" ? "সেভ হয়েছে!" : "Saved!"}`
+                      : `💾 ${lang==="bn" ? "সেভ করুন" : "Save All"}`}
                   </button>
                   <button
                     onClick={resetAll}
