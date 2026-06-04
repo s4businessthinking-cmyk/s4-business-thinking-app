@@ -5012,6 +5012,40 @@ const CHEQUE_POSITIONS = {
   default:{ payeeTop:32, payeeLeft:50, payeeMaxW:114, amtTop:29, amtRight:12, wordsTop:43, wordsLeft:11, wordsMaxW:148, dateTop:58, dateDDLeft:149, dateMMLeft:163, dateYYLeft:175 },
 };
 
+// ─── DATE FORMAT OPTIONS ─────────────────────────────────────────────────────
+// slash/dot/dash/space print one normal date text. box prints DD/MM/YYYY parts
+// separately for cheques that already have date boxes or fixed digit spaces.
+const CHEQUE_DATE_FORMATS = [
+  { id:"slash", label:"DD/MM/YYYY", sep:"/" },
+  { id:"dot",   label:"DD.MM.YYYY", sep:"." },
+  { id:"dash",  label:"DD-MM-YYYY", sep:"-" },
+  { id:"space", label:"DD MM YYYY", sep:" " },
+  { id:"box",   label:"Box / Digit spacing", sep:null },
+];
+
+// ─── BANK-SPECIFIC DEFAULT CALIBRATION ───────────────────────────────────────
+// These defaults apply only when the user has not saved custom settings for a bank.
+const CHEQUE_BANK_DEFAULTS = {
+  adcb: {
+    px:-12, py:-17,
+    wx:19,  wy:-18,
+    ax:-6,  ay:-16,
+    dx:14,  dy:-19,
+    mo:-3,  yo:-3,
+    w:200,  h:90,
+    dm:"slash",
+  },
+  default: {
+    px:0, py:0,
+    wx:0, wy:0,
+    ax:0, ay:0,
+    dx:0, dy:0,
+    mo:0, yo:0,
+    w:196, h:99,
+    dm:"slash",
+  },
+};
+
 // ─── CHEQUE PRINTER TAB ───────────────────────────────────────────────────────
 function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban }) {
   const [bank, setBank]         = useState(UAE_BANKS[0]);
@@ -5034,32 +5068,38 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [dateY,  setDateY]  = useState(0);   // Date → up/down
   const [mmOff,  setMmOff]  = useState(0);   // MM gap from DD (positive = more right)
   const [yyOff,  setYyOff]  = useState(0);   // YYYY gap from MM (positive = more right)
+  const [dateMode, setDateMode] = useState("slash"); // slash/dot/dash/space/box
   const [pageW,  setPageW]  = useState(196); // Page width  mm — ADCB cheque measured
   const [pageH,  setPageH]  = useState(99);  // Page height mm — ADCB cheque measured
   const [saveDone, setSaveDone] = useState(false);
 
+  const getBankDefaults = (bankId) => CHEQUE_BANK_DEFAULTS[bankId] || CHEQUE_BANK_DEFAULTS.default;
+
+  const applyChequeSettings = (o) => {
+    setPayeeX(o.px || 0); setPayeeY(o.py || 0);
+    setWordsX(o.wx || 0); setWordsY(o.wy || 0);
+    setAmtX(o.ax || 0);   setAmtY(o.ay || 0);
+    setDateX(o.dx || 0);  setDateY(o.dy || 0);
+    setMmOff(o.mo || 0);  setYyOff(o.yo || 0);
+    setPageW(o.w || 196); setPageH(o.h || 99);
+    setDateMode(o.dm || "slash");
+  };
+
   const resetAll = () => {
-    setPayeeX(0); setPayeeY(0);
-    setWordsX(0); setWordsY(0);
-    setAmtX(0);   setAmtY(0);
-    setDateX(0);  setDateY(0);
-    setMmOff(0);  setYyOff(0);
-    setPageW(196); setPageH(99);
+    applyChequeSettings(getBankDefaults(bank.id));
   };
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`chq_off2_${bank.id}`);
       if (saved) {
-        const o = JSON.parse(saved);
-        setPayeeX(o.px||0); setPayeeY(o.py||0);
-        setWordsX(o.wx||0); setWordsY(o.wy||0);
-        setAmtX(o.ax||0);   setAmtY(o.ay||0);
-        setDateX(o.dx||0);  setDateY(o.dy||0);
-        setMmOff(o.mo||0);  setYyOff(o.yo||0);
-        setPageW(o.w||196); setPageH(o.h||99);
-      } else { resetAll(); }
-    } catch(e) { resetAll(); }
+        applyChequeSettings(JSON.parse(saved));
+      } else {
+        applyChequeSettings(getBankDefaults(bank.id));
+      }
+    } catch(e) {
+      applyChequeSettings(getBankDefaults(bank.id));
+    }
   }, [bank.id]);
 
   const saveOffsets = () => {
@@ -5071,6 +5111,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         dx:dateX,  dy:dateY,
         mo:mmOff,  yo:yyOff,
         w:pageW,   h:pageH,
+        dm:dateMode,
       }));
       setSaveDone(true);
       setTimeout(() => setSaveDone(false), 2500);
@@ -5137,23 +5178,56 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     marginBottom:12, marginTop:4,
   };
 
-  // Preview: single date text with slash, exactly like it should print on ADCB cheque
-  const chequeDateText = `${dd}/${mm}/${yyyy}`;
-
-  const previewDateBoxes = () => (
+  // Helper: single date digit box for preview
+  const DateBox = ({ char }) => (
     <div style={{
-      fontSize:16,
-      fontWeight:800,
-      fontFamily:"'Courier New', Courier, monospace",
-      color:"#000",
-      letterSpacing:0,
-      wordSpacing:0,
-      whiteSpace:"nowrap",
-      lineHeight:1,
+      width:21, height:20, border:"1px solid #8b7355",
+      background:"rgba(255,255,255,0.85)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      fontSize:11, fontWeight:800, fontFamily:"'Courier New',monospace",
+      color:"#1a1a1a",
     }}>
-      {chequeDateText}
+      {char}
     </div>
   );
+
+  const formatDateText = (mode = dateMode) => {
+    if (!dd || !mm || !yyyy) return "DD/MM/YYYY";
+    const opt = CHEQUE_DATE_FORMATS.find(x => x.id === mode) || CHEQUE_DATE_FORMATS[0];
+    if (mode === "box") return `${dd} ${mm} ${yyyy}`;
+    return `${dd}${opt.sep}${mm}${opt.sep}${yyyy}`;
+  };
+
+  // Preview: date format selected by the user/bank
+  const previewDateBoxes = () => {
+    const d0 = dd?.[0]||"D", d1 = dd?.[1]||"D";
+    const m0 = mm?.[0]||"M", m1 = mm?.[1]||"M";
+    const y0 = yyyy?.[0]||"Y", y1 = yyyy?.[1]||"Y",
+          y2 = yyyy?.[2]||"Y", y3 = yyyy?.[3]||"Y";
+
+    if (dateMode === "box") {
+      return (
+        <div style={{ display:"flex", gap:2, alignItems:"center" }}>
+          <DateBox char={d0}/><DateBox char={d1}/>
+          <div style={{ width:8 }} />
+          <DateBox char={m0}/><DateBox char={m1}/>
+          <div style={{ width:8 }} />
+          <DateBox char={y0}/><DateBox char={y1}/><DateBox char={y2}/><DateBox char={y3}/>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{
+        fontSize:15, fontWeight:800,
+        fontFamily:"'Courier New', Courier, monospace",
+        color:"#1a1a1a", letterSpacing:0,
+        whiteSpace:"nowrap",
+      }}>
+        {formatDateText()}
+      </div>
+    );
+  };
 
   return (
     <div style={isDesktop ? s.desktopPanel : s.panel}>
@@ -5396,6 +5470,36 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
                   onYU={() => adj(setDateY)(-1)} onYD={() => adj(setDateY)(+1)}
                   onXL={() => adj(setDateX)(-1)} onXR={() => adj(setDateX)(+1)}
                 />
+
+                {/* Date format selector */}
+                <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:8 }}>
+                    📅 {lang==="bn" ? "তারিখের ফরম্যাট" : "Date Format"}
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap:6 }}>
+                    {CHEQUE_DATE_FORMATS.map(opt => (
+                      <button
+                        key={opt.id}
+                        onClick={() => setDateMode(opt.id)}
+                        style={{
+                          padding:"7px 6px", borderRadius:7,
+                          border:`1px solid ${dateMode===opt.id ? th.accent : th.borderMid}`,
+                          background:dateMode===opt.id ? th.accentDim : th.bgCard,
+                          color:dateMode===opt.id ? th.accent : th.txtPrimary,
+                          cursor:"pointer", fontWeight:800, fontSize:11,
+                          textAlign:"center",
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:9, color:th.txtMuted, marginTop:7, lineHeight:1.5 }}>
+                    {lang==="bn"
+                      ? "যে ব্যাংকের চেকে যেই ফরম্যাট লাগে সেটি সিলেক্ট করে Save All করুন।"
+                      : "Select the format needed for that bank cheque, then Save All."}
+                  </div>
+                </div>
 
                 {/* Date gap controls */}
                 <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
@@ -5760,23 +5864,72 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           </div>
         )}
 
-        {/* Date — single slash format printed on cheque: DD/MM/YYYY */}
-        {chequeDateText && (
-          <div style={{
-            position:"absolute",
-            top:`${P.dateTop}mm`,
-            left:`${P.dateDDLeft}mm`,
-            fontSize:"11.5pt",
-            fontWeight:"700",
-            fontFamily:"'Courier New', Courier, monospace",
-            color:"#000",
-            letterSpacing:0,
-            wordSpacing:0,
-            whiteSpace:"nowrap",
-            lineHeight:1,
-          }}>
-            {chequeDateText}
-          </div>
+        {/* Date */}
+        {dateMode === "box" ? (
+          <>
+            {/* Date — DD (each digit lands in its own pre-printed box on the cheque) */}
+            {dd && (
+              <div style={{
+                position:"absolute",
+                top:`${P.dateTop}mm`,
+                left:`${P.dateDDLeft}mm`,
+                fontSize:"11.5pt", fontWeight:"700",
+                fontFamily:"'Courier New', Courier, monospace",
+                color:"#000",
+                letterSpacing:"0.55em",
+                whiteSpace:"nowrap",
+              }}>
+                {dd}
+              </div>
+            )}
+
+            {/* Date — MM */}
+            {mm && (
+              <div style={{
+                position:"absolute",
+                top:`${P.dateTop}mm`,
+                left:`${P.dateMMLeft}mm`,
+                fontSize:"11.5pt", fontWeight:"700",
+                fontFamily:"'Courier New', Courier, monospace",
+                color:"#000",
+                letterSpacing:"0.55em",
+                whiteSpace:"nowrap",
+              }}>
+                {mm}
+              </div>
+            )}
+
+            {/* Date — YYYY */}
+            {yyyy && (
+              <div style={{
+                position:"absolute",
+                top:`${P.dateTop}mm`,
+                left:`${P.dateYYLeft}mm`,
+                fontSize:"11.5pt", fontWeight:"700",
+                fontFamily:"'Courier New', Courier, monospace",
+                color:"#000",
+                letterSpacing:"0.55em",
+                whiteSpace:"nowrap",
+              }}>
+                {yyyy}
+              </div>
+            )}
+          </>
+        ) : (
+          dateVal && (
+            <div style={{
+              position:"absolute",
+              top:`${P.dateTop}mm`,
+              left:`${P.dateDDLeft}mm`,
+              fontSize:"11.5pt", fontWeight:"700",
+              fontFamily:"'Courier New', Courier, monospace",
+              color:"#000",
+              letterSpacing:"0",
+              whiteSpace:"nowrap",
+            }}>
+              {formatDateText()}
+            </div>
+          )
         )}
       </div>
 
