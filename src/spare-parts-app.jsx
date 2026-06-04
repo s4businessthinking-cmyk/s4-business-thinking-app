@@ -5152,17 +5152,19 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
   // Preview: date boxes — DD  MM  YYYY with space gaps only (no slash/dot)
   const previewDateBoxes = () => {
-    const d0 = dd?.[0]||"D", d1 = dd?.[1]||"D";
-    const m0 = mm?.[0]||"M", m1 = mm?.[1]||"M";
-    const y0 = yyyy?.[0]||"Y", y1 = yyyy?.[1]||"Y",
-          y2 = yyyy?.[2]||"Y", y3 = yyyy?.[3]||"Y";
+    const displayDate = `${dd}/${mm}/${yyyy}`;
     return (
-      <div style={{ display:"flex", gap:2, alignItems:"center" }}>
-        <DateBox char={d0}/><DateBox char={d1}/>
-        <div style={{ width:8 }} />
-        <DateBox char={m0}/><DateBox char={m1}/>
-        <div style={{ width:8 }} />
-        <DateBox char={y0}/><DateBox char={y1}/><DateBox char={y2}/><DateBox char={y3}/>
+      <div
+        style={{
+          fontSize: 16,
+          fontWeight: 700,
+          fontFamily: "'Courier New', monospace",
+          letterSpacing: 0,
+          whiteSpace: "nowrap",
+          color: "#000"
+        }}
+      >
+        {displayDate}
       </div>
     );
   };
