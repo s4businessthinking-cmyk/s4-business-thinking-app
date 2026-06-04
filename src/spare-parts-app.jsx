@@ -5022,42 +5022,58 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [dateVal, setDateVal]   = useState(() => new Date().toISOString().split("T")[0]);
   const [showBankList, setShowBankList] = useState(false);
 
-  // ── Calibration offsets & custom page size ──────────────────────────────────
-  const [xOff,     setXOff]     = useState(0);    // global X shift (mm)
-  const [yOff,     setYOff]     = useState(0);    // global Y shift (mm)
-  const [dateYOff, setDateYOff] = useState(0);    // date-only Y shift (mm)
-  const [pageW,    setPageW]    = useState(196);  // page width  (mm) — caliper measured
-  const [pageH,    setPageH]    = useState(99);   // page height (mm) — caliper measured
-  const [saveDone, setSaveDone] = useState(false); // visual save feedback
+  // ── Per-field calibration offsets (mm) + page size ────────────────────────
+  // Each field has independent X (left/right) and Y (up/down) offset
+  const [payeeX, setPayeeX] = useState(0);   // Pay-to name → left/right
+  const [payeeY, setPayeeY] = useState(0);   // Pay-to name → up/down
+  const [wordsX, setWordsX] = useState(0);   // Amount words → left/right
+  const [wordsY, setWordsY] = useState(0);   // Amount words → up/down
+  const [amtX,   setAmtX]   = useState(0);   // Amount number → left/right
+  const [amtY,   setAmtY]   = useState(0);   // Amount number → up/down
+  const [dateX,  setDateX]  = useState(0);   // Date → left/right
+  const [dateY,  setDateY]  = useState(0);   // Date → up/down
+  const [pageW,  setPageW]  = useState(196); // Page width  mm (caliper)
+  const [pageH,  setPageH]  = useState(99);  // Page height mm (caliper)
+  const [saveDone, setSaveDone] = useState(false);
+
+  const resetAll = () => {
+    setPayeeX(0); setPayeeY(0);
+    setWordsX(0); setWordsY(0);
+    setAmtX(0);   setAmtY(0);
+    setDateX(0);  setDateY(0);
+    setPageW(196); setPageH(99);
+  };
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(`chq_off_${bank.id}`);
+      const saved = localStorage.getItem(`chq_off2_${bank.id}`);
       if (saved) {
         const o = JSON.parse(saved);
-        setXOff(o.x||0); setYOff(o.y||0);
-        setDateYOff(o.dy||0);
+        setPayeeX(o.px||0); setPayeeY(o.py||0);
+        setWordsX(o.wx||0); setWordsY(o.wy||0);
+        setAmtX(o.ax||0);   setAmtY(o.ay||0);
+        setDateX(o.dx||0);  setDateY(o.dy||0);
         setPageW(o.w||196); setPageH(o.h||99);
-      } else {
-        setXOff(0); setYOff(0); setDateYOff(0);
-        setPageW(196); setPageH(99);
-      }
-    } catch(e) { setXOff(0); setYOff(0); setDateYOff(0); setPageW(196); setPageH(99); }
+      } else { resetAll(); }
+    } catch(e) { resetAll(); }
   }, [bank.id]);
 
   const saveOffsets = () => {
     try {
-      localStorage.setItem(`chq_off_${bank.id}`, JSON.stringify({
-        x:xOff, y:yOff, dy:dateYOff, w:pageW, h:pageH
+      localStorage.setItem(`chq_off2_${bank.id}`, JSON.stringify({
+        px:payeeX, py:payeeY,
+        wx:wordsX, wy:wordsY,
+        ax:amtX,   ay:amtY,
+        dx:dateX,  dy:dateY,
+        w:pageW,   h:pageH,
       }));
       setSaveDone(true);
       setTimeout(() => setSaveDone(false), 2500);
     } catch(e) { alert("Save failed — localStorage may be unavailable"); }
   };
 
-  const adjY  = (d) => setYOff(    v => +((v + d).toFixed(1)));
-  const adjX  = (d) => setXOff(    v => +((v + d).toFixed(1)));
-  const adjDY = (d) => setDateYOff(v => +((v + d).toFixed(1)));
+  // Helpers — step 1 mm per click
+  const adj = (setter) => (d) => setter(v => +((v + d).toFixed(1)));
 
   // Auto-fill amount in words from numeric amount
   const handleAmountChange = (v) => {
@@ -5080,21 +5096,21 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   // Split date into parts
   const [yyyy, mm, dd] = dateVal ? dateVal.split("-") : ["", "", ""];
 
-  // Position config = bank defaults + global offset + field-specific offsets
+  // Final print positions = bank baseline + per-field user offsets
   const pos = CHEQUE_POSITIONS[bank.id] || CHEQUE_POSITIONS.default;
   const P = {
-    payeeTop:   pos.payeeTop   + yOff,
-    payeeLeft:  pos.payeeLeft  + xOff,
+    payeeTop:   pos.payeeTop   + payeeY,
+    payeeLeft:  pos.payeeLeft  + payeeX,
     payeeMaxW:  pos.payeeMaxW,
-    amtTop:     pos.amtTop     + yOff,
-    amtRight:   Math.max(1, pos.amtRight - xOff),
-    wordsTop:   pos.wordsTop   + yOff,
-    wordsLeft:  pos.wordsLeft  + xOff,
+    amtTop:     pos.amtTop     + amtY,
+    amtRight:   Math.max(1, pos.amtRight - amtX),
+    wordsTop:   pos.wordsTop   + wordsY,
+    wordsLeft:  pos.wordsLeft  + wordsX,
     wordsMaxW:  pos.wordsMaxW,
-    dateTop:    pos.dateTop    + yOff + dateYOff,   // date has its own extra offset
-    dateDDLeft: pos.dateDDLeft + xOff,
-    dateMMLeft: pos.dateMMLeft + xOff,
-    dateYYLeft: pos.dateYYLeft + xOff,
+    dateTop:    pos.dateTop    + dateY,
+    dateDDLeft: pos.dateDDLeft + dateX,
+    dateMMLeft: pos.dateMMLeft + dateX,
+    dateYYLeft: pos.dateYYLeft + dateX,
   };
 
   // Shared styles
@@ -5279,146 +5295,138 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           </div>
 
           {/* ── 🎯 Position Calibration Card ── */}
-          <div style={{ ...s.card, marginBottom:14, border:`1.5px solid ${th.accent}44` }}>
-            <div style={{ fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0.5, marginBottom:6 }}>
-              🎯 {lang==="bn" ? "প্রিন্ট ক্যালিব্রেশন" : "Print Calibration"}
-            </div>
-            <div style={{ fontSize:10, color:th.txtMuted, marginBottom:10, lineHeight:1.6 }}>
-              {lang==="bn"
-                ? "সাদা কাগজে প্রিন্ট → চেকের উপর রাখুন → বাটন দিয়ে ঠিক করুন → সেভ করুন"
-                : "Test print → place over cheque → adjust → save"}
-            </div>
-
-            {/* ── Page Size ── */}
-            <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
-              <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase" }}>
-                📐 {lang==="bn" ? "চেকের সাইজ (mm)" : "Cheque Size (mm)"}
-              </div>
-              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, color:th.txtMuted, marginBottom:2 }}>{lang==="bn" ? "প্রস্থ (Long)" : "Width (Long)"}</div>
-                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                    <button onClick={() => setPageW(w => Math.max(100, +(w-1).toFixed(0)))}
-                      style={{ padding:"3px 8px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:700 }}>−</button>
-                    <div style={{ flex:1, textAlign:"center", fontSize:14, fontWeight:800, color:th.txtPrimary }}>{pageW}</div>
-                    <button onClick={() => setPageW(w => +(w+1).toFixed(0))}
-                      style={{ padding:"3px 8px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:700 }}>+</button>
-                  </div>
-                </div>
-                <div style={{ fontSize:16, color:th.txtMuted }}>×</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:9, color:th.txtMuted, marginBottom:2 }}>{lang==="bn" ? "উচ্চতা (Hight)" : "Height (Hight)"}</div>
-                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                    <button onClick={() => setPageH(h => Math.max(50, +(h-1).toFixed(0)))}
-                      style={{ padding:"3px 8px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:700 }}>−</button>
-                    <div style={{ flex:1, textAlign:"center", fontSize:14, fontWeight:800, color:th.txtPrimary }}>{pageH}</div>
-                    <button onClick={() => setPageH(h => +(h+1).toFixed(0))}
-                      style={{ padding:"3px 8px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:700 }}>+</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Row helper ── */}
-            {(() => {
-              const AdjRow = ({ label, val, onUp, onDn, highlight }) => (
-                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:7 }}>
-                  <span style={{ fontSize:10, color:th.txtSecondary, minWidth:80, fontWeight:700, lineHeight:1.3 }}>
-                    {label}
-                  </span>
-                  <button onClick={onUp}
-                    style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                    ▲
-                  </button>
-                  <div style={{ minWidth:48, textAlign:"center", fontSize:12, fontWeight:800, color: val!==0 ? th.accent : th.txtMuted }}>
-                    {val>0?"+":""}{val}mm
-                  </div>
-                  <button onClick={onDn}
-                    style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                    ▼
-                  </button>
-                </div>
-              );
-              const AdjRowLR = ({ label, val, onL, onR }) => (
-                <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:7 }}>
-                  <span style={{ fontSize:10, color:th.txtSecondary, minWidth:80, fontWeight:700, lineHeight:1.3 }}>
-                    {label}
-                  </span>
-                  <button onClick={onL}
-                    style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                    ◄
-                  </button>
-                  <div style={{ minWidth:48, textAlign:"center", fontSize:12, fontWeight:800, color: val!==0 ? th.accent : th.txtMuted }}>
-                    {val>0?"+":""}{val}mm
-                  </div>
-                  <button onClick={onR}
-                    style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:12 }}>
-                    ►
-                  </button>
-                </div>
-              );
+          {(() => {
+            // Reusable 4-direction control for one field
+            const FieldCtrl = ({ icon, label, xVal, yVal, onXL, onXR, onYU, onYD }) => {
+              const btnSt = {
+                padding:"4px 9px", borderRadius:5,
+                border:`1px solid ${th.borderMid}`,
+                background:th.bgCard, color:th.txtPrimary,
+                cursor:"pointer", fontWeight:800, fontSize:12, lineHeight:1,
+              };
+              const valSt = (v) => ({
+                minWidth:42, textAlign:"center", fontSize:11, fontWeight:800,
+                color: v!==0 ? th.accent : th.txtMuted,
+              });
               return (
-                <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
-                  <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase" }}>
-                    ↕↔ {lang==="bn" ? "সব field উপর/নিচ/বাম/ডান" : "All fields Up/Down/Left/Right"}
+                <div style={{ marginBottom:10, background:th.bgInp, borderRadius:8, padding:"8px 10px", border:`1px solid ${th.border}` }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6 }}>
+                    {icon} {label}
                   </div>
-                  <AdjRow
-                    label={lang==="bn" ? "↕ উপর/নিচ" : "↕ Up/Down"}
-                    val={yOff}
-                    onUp={() => adjY(-1)}
-                    onDn={() => adjY(+1)}
-                  />
-                  <AdjRowLR
-                    label={lang==="bn" ? "↔ বাম/ডান" : "↔ Left/Right"}
-                    val={xOff}
-                    onL={() => adjX(-1)}
-                    onR={() => adjX(+1)}
-                  />
+                  <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
+                    {/* Up / Down */}
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <span style={{ fontSize:9, color:th.txtMuted, marginRight:2 }}>↕</span>
+                      <button style={btnSt} onClick={onYU}>▲</button>
+                      <div style={valSt(yVal)}>{yVal>0?"+":""}{yVal}mm</div>
+                      <button style={btnSt} onClick={onYD}>▼</button>
+                    </div>
+                    <div style={{ width:1, height:24, background:th.border }} />
+                    {/* Left / Right */}
+                    <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                      <span style={{ fontSize:9, color:th.txtMuted, marginRight:2 }}>↔</span>
+                      <button style={btnSt} onClick={onXL}>◄</button>
+                      <div style={valSt(xVal)}>{xVal>0?"+":""}{xVal}mm</div>
+                      <button style={btnSt} onClick={onXR}>►</button>
+                    </div>
+                  </div>
                 </div>
               );
-            })()}
+            };
 
-            {/* ── Date-only offset ── */}
-            <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
-              <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase" }}>
-                📅 {lang==="bn" ? "শুধু তারিখ উপর/নিচ" : "Date Only — Up/Down"}
-              </div>
-              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                <span style={{ fontSize:10, color:th.txtSecondary, minWidth:80, fontWeight:700 }}>
-                  {lang==="bn" ? "তারিখ" : "Date"}
-                </span>
-                <button onClick={() => adjDY(-1)}
-                  style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:12 }}>▲</button>
-                <div style={{ minWidth:48, textAlign:"center", fontSize:12, fontWeight:800, color: dateYOff!==0 ? "#f59e0b" : th.txtMuted }}>
-                  {dateYOff>0?"+":""}{dateYOff}mm
+            // Page size row
+            const SizeBtn = ({ onClick, label }) => (
+              <button onClick={onClick} style={{
+                padding:"3px 9px", borderRadius:5,
+                border:`1px solid ${th.borderMid}`,
+                background:th.bgCard, color:th.txtPrimary,
+                cursor:"pointer", fontWeight:800, fontSize:13,
+              }}>{label}</button>
+            );
+
+            return (
+              <div style={{ ...s.card, marginBottom:14, border:`1.5px solid ${th.accent}44` }}>
+                <div style={{ fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0.5, marginBottom:4 }}>
+                  🎯 {lang==="bn" ? "প্রিন্ট ক্যালিব্রেশন" : "Print Calibration"}
                 </div>
-                <button onClick={() => adjDY(+1)}
-                  style={{ padding:"4px 10px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:12 }}>▼</button>
-              </div>
-            </div>
+                <div style={{ fontSize:10, color:th.txtMuted, marginBottom:10, lineHeight:1.6 }}>
+                  {lang==="bn"
+                    ? "সাদা কাগজে প্রিন্ট → চেকের উপর রাখুন → নিচের বাটন দিয়ে প্রতিটা field ঠিক করুন → সেভ করুন"
+                    : "Print on plain paper → hold over cheque → adjust each field below → save"}
+                </div>
 
-            {/* ── Save / Reset ── */}
-            <div style={{ display:"flex", gap:8 }}>
-              <button
-                onClick={saveOffsets}
-                style={{
-                  flex:1, padding:"9px", borderRadius:8, border:"none",
-                  background: saveDone ? "#22c55e" : th.accent,
-                  color:"#fff", cursor:"pointer", fontWeight:700, fontSize:13,
-                  display:"flex", alignItems:"center", justifyContent:"center", gap:5,
-                  transition:"background 0.3s",
-                }}
-              >
-                {saveDone ? "✅ Saved!" : `💾 ${lang==="bn" ? "সেভ করুন" : "Save"}`}
-              </button>
-              <button
-                onClick={() => { setXOff(0); setYOff(0); setDateYOff(0); setPageW(196); setPageH(99); }}
-                style={{ ...s.stBtn, flex:"0 0 80px", padding:"9px", fontSize:12, textAlign:"center" }}
-              >
-                ↺ Reset
-              </button>
-            </div>
-          </div>
+                {/* Page size */}
+                <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6 }}>
+                    📐 {lang==="bn" ? "চেকের সাইজ" : "Cheque Size (mm)"}
+                  </div>
+                  <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:4, flex:1 }}>
+                      <span style={{ fontSize:9, color:th.txtMuted }}>{lang==="bn" ? "প্রস্থ" : "W"}</span>
+                      <SizeBtn onClick={() => setPageW(w => Math.max(100,w-1))} label="−" />
+                      <div style={{ flex:1, textAlign:"center", fontSize:14, fontWeight:800, color:th.txtPrimary }}>{pageW}</div>
+                      <SizeBtn onClick={() => setPageW(w => w+1)} label="+" />
+                    </div>
+                    <span style={{ color:th.txtMuted }}>×</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:4, flex:1 }}>
+                      <span style={{ fontSize:9, color:th.txtMuted }}>{lang==="bn" ? "উচ্চতা" : "H"}</span>
+                      <SizeBtn onClick={() => setPageH(h => Math.max(50,h-1))} label="−" />
+                      <div style={{ flex:1, textAlign:"center", fontSize:14, fontWeight:800, color:th.txtPrimary }}>{pageH}</div>
+                      <SizeBtn onClick={() => setPageH(h => h+1)} label="+" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-field controls */}
+                <FieldCtrl
+                  icon="👤" label={lang==="bn" ? "Pay to — নাম" : "Pay to (Name)"}
+                  xVal={payeeX} yVal={payeeY}
+                  onYU={() => adj(setPayeeY)(-1)} onYD={() => adj(setPayeeY)(+1)}
+                  onXL={() => adj(setPayeeX)(-1)} onXR={() => adj(setPayeeX)(+1)}
+                />
+                <FieldCtrl
+                  icon="📝" label={lang==="bn" ? "কথায় পরিমাণ" : "Amount in Words"}
+                  xVal={wordsX} yVal={wordsY}
+                  onYU={() => adj(setWordsY)(-1)} onYD={() => adj(setWordsY)(+1)}
+                  onXL={() => adj(setWordsX)(-1)} onXR={() => adj(setWordsX)(+1)}
+                />
+                <FieldCtrl
+                  icon="💰" label={lang==="bn" ? "পরিমাণ (AED)" : "Amount (AED)"}
+                  xVal={amtX} yVal={amtY}
+                  onYU={() => adj(setAmtY)(-1)} onYD={() => adj(setAmtY)(+1)}
+                  onXL={() => adj(setAmtX)(-1)} onXR={() => adj(setAmtX)(+1)}
+                />
+                <FieldCtrl
+                  icon="📅" label={lang==="bn" ? "তারিখ" : "Date"}
+                  xVal={dateX} yVal={dateY}
+                  onYU={() => adj(setDateY)(-1)} onYD={() => adj(setDateY)(+1)}
+                  onXL={() => adj(setDateX)(-1)} onXR={() => adj(setDateX)(+1)}
+                />
+
+                {/* Save / Reset */}
+                <div style={{ display:"flex", gap:8, marginTop:4 }}>
+                  <button
+                    onClick={saveOffsets}
+                    style={{
+                      flex:1, padding:"10px", borderRadius:8, border:"none",
+                      background: saveDone ? "#22c55e" : th.accent,
+                      color:"#fff", cursor:"pointer", fontWeight:700, fontSize:13,
+                      display:"flex", alignItems:"center", justifyContent:"center", gap:5,
+                      transition:"background 0.3s",
+                    }}
+                  >
+                    {saveDone ? "✅ সেভ হয়েছে!" : `💾 ${lang==="bn" ? "সেভ করুন" : "Save All"}`}
+                  </button>
+                  <button
+                    onClick={resetAll}
+                    style={{ ...s.stBtn, flex:"0 0 76px", padding:"10px", fontSize:12, textAlign:"center" }}
+                  >
+                    ↺ Reset
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* ── Print + Clear buttons ── */}
           <button
