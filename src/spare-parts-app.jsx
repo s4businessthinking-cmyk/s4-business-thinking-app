@@ -5573,35 +5573,45 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
       {/* ── PRINT STYLES ── */}
       <style>{`
-        /* ── Default: hide the print-only layer on screen ── */
+        /* Screen: hide the print layer */
         #cheque-print-area {
           display: none;
         }
 
         @media print {
-          /* 1. Hide everything on the page */
-          body > * { display: none !important; }
+          /* 1. visibility:hidden hides everything but lets children
+                override with visibility:visible — unlike display:none
+                which blocks children completely */
+          body {
+            visibility: hidden !important;
+          }
 
-          /* 2. Only #cheque-print-area is visible when printing */
+          /* 2. Show ONLY the cheque print area and its children */
+          #cheque-print-area,
+          #cheque-print-area * {
+            visibility: visible !important;
+          }
+
+          /* 3. Position the print area on the page */
           #cheque-print-area {
             display: block !important;
             position: fixed !important;
-            top:  0 !important;
-            left: 0 !important;
+            top:    0 !important;
+            left:   0 !important;
             width:  210mm !important;
-            height:  90mm !important;
+            height: 90mm !important;
             background: transparent !important;
             margin:  0 !important;
             padding: 0 !important;
             overflow: visible !important;
           }
 
-          /* 3. Each text field inside is absolutely positioned */
+          /* 4. Each text field is absolutely positioned in mm */
           #cheque-print-area > div {
             position: absolute !important;
           }
 
-          /* 4. Page size matches the physical cheque leaf */
+          /* 5. Page = physical cheque size, no margins */
           @page {
             size: 210mm 90mm;
             margin: 0;
