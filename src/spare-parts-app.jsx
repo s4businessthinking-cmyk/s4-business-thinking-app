@@ -5001,7 +5001,7 @@ const CHEQUE_POSITIONS = {
   //               payee             amount          words              date
   enbd:   { payeeTop:31, payeeLeft:52, payeeMaxW:112, amtTop:29, amtRight:13, wordsTop:43, wordsLeft:12, wordsMaxW:148, dateTop:58, dateDDLeft:149, dateMMLeft:163, dateYYLeft:175 },
   fab:    { payeeTop:32, payeeLeft:54, payeeMaxW:110, amtTop:30, amtRight:12, wordsTop:44, wordsLeft:12, wordsMaxW:148, dateTop:58, dateDDLeft:149, dateMMLeft:163, dateYYLeft:175 },
-  adcb:   { payeeTop:34, payeeLeft:46, payeeMaxW:118, amtTop:31, amtRight:10, wordsTop:46, wordsLeft:10, wordsMaxW:146, dateTop:60, dateDDLeft:147, dateMMLeft:162, dateYYLeft:174 },
+  adcb:   { payeeTop:36, payeeLeft:46, payeeMaxW:118, amtTop:54, amtRight:10, wordsTop:48, wordsLeft:10, wordsMaxW:146, dateTop:22, dateDDLeft:145, dateMMLeft:158, dateYYLeft:170 },
   dib:    { payeeTop:31, payeeLeft:50, payeeMaxW:114, amtTop:28, amtRight:12, wordsTop:43, wordsLeft:11, wordsMaxW:148, dateTop:57, dateDDLeft:149, dateMMLeft:163, dateYYLeft:175 },
   mashreq:{ payeeTop:30, payeeLeft:50, payeeMaxW:115, amtTop:27, amtRight:13, wordsTop:42, wordsLeft:12, wordsMaxW:148, dateTop:57, dateDDLeft:150, dateMMLeft:164, dateYYLeft:176 },
   adib:   { payeeTop:31, payeeLeft:48, payeeMaxW:116, amtTop:28, amtRight:11, wordsTop:43, wordsLeft:10, wordsMaxW:148, dateTop:58, dateDDLeft:148, dateMMLeft:163, dateYYLeft:175 },
@@ -5034,8 +5034,8 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [dateY,  setDateY]  = useState(0);   // Date → up/down
   const [mmOff,  setMmOff]  = useState(0);   // MM gap from DD (positive = more right)
   const [yyOff,  setYyOff]  = useState(0);   // YYYY gap from MM (positive = more right)
-  const [pageW,  setPageW]  = useState(196); // Page width  mm (caliper)
-  const [pageH,  setPageH]  = useState(99);  // Page height mm (caliper)
+  const [pageW,  setPageW]  = useState(196); // Page width  mm — ADCB cheque measured
+  const [pageH,  setPageH]  = useState(99);  // Page height mm — ADCB cheque measured
   const [saveDone, setSaveDone] = useState(false);
 
   const resetAll = () => {
@@ -5150,7 +5150,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     </div>
   );
 
-  // Preview: date boxes rendered as DD / MM / YYYY
+  // Preview: date boxes — DD  MM  YYYY with space gaps only (no slash/dot)
   const previewDateBoxes = () => {
     const d0 = dd?.[0]||"D", d1 = dd?.[1]||"D";
     const m0 = mm?.[0]||"M", m1 = mm?.[1]||"M";
@@ -5159,9 +5159,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     return (
       <div style={{ display:"flex", gap:2, alignItems:"center" }}>
         <DateBox char={d0}/><DateBox char={d1}/>
-        <span style={{ fontSize:11, color:"#777", margin:"0 1px", fontWeight:700 }}>/</span>
+        <div style={{ width:8 }} />
         <DateBox char={m0}/><DateBox char={m1}/>
-        <span style={{ fontSize:11, color:"#777", margin:"0 1px", fontWeight:700 }}>/</span>
+        <div style={{ width:8 }} />
         <DateBox char={y0}/><DateBox char={y1}/><DateBox char={y2}/><DateBox char={y3}/>
       </div>
     );
@@ -5772,7 +5772,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           </div>
         )}
 
-        {/* Date — DD */}
+        {/* Date — DD (each digit lands in its own pre-printed box on the cheque) */}
         {dd && (
           <div style={{
             position:"absolute",
@@ -5780,7 +5780,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             left:`${P.dateDDLeft}mm`,
             fontSize:"11.5pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
-            color:"#000", letterSpacing:"0.15em",
+            color:"#000",
+            letterSpacing:"0.55em",
+            whiteSpace:"nowrap",
           }}>
             {dd}
           </div>
@@ -5794,7 +5796,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             left:`${P.dateMMLeft}mm`,
             fontSize:"11.5pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
-            color:"#000", letterSpacing:"0.15em",
+            color:"#000",
+            letterSpacing:"0.55em",
+            whiteSpace:"nowrap",
           }}>
             {mm}
           </div>
@@ -5808,7 +5812,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             left:`${P.dateYYLeft}mm`,
             fontSize:"11.5pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
-            color:"#000", letterSpacing:"0.15em",
+            color:"#000",
+            letterSpacing:"0.55em",
+            whiteSpace:"nowrap",
           }}>
             {yyyy}
           </div>
