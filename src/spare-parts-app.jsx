@@ -5022,6 +5022,25 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [dateVal, setDateVal]   = useState(() => new Date().toISOString().split("T")[0]);
   const [showBankList, setShowBankList] = useState(false);
 
+  // ── Calibration offsets (mm) applied to ALL print positions ──
+  const [xOff, setXOff] = useState(0);
+  const [yOff, setYOff] = useState(0);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`chq_off_${bank.id}`);
+      if (saved) { const o = JSON.parse(saved); setXOff(o.x||0); setYOff(o.y||0); }
+      else        { setXOff(0); setYOff(0); }
+    } catch(e)  { setXOff(0); setYOff(0); }
+  }, [bank.id]);
+
+  const saveOffsets = () => {
+    try { localStorage.setItem(`chq_off_${bank.id}`, JSON.stringify({x:xOff, y:yOff})); }
+    catch(e) {}
+  };
+  const adjY = (d) => setYOff(v => +((v + d).toFixed(1)));
+  const adjX = (d) => setXOff(v => +((v + d).toFixed(1)));
+
   // Auto-fill amount in words from numeric amount
   const handleAmountChange = (v) => {
     setAmount(v);
@@ -5043,8 +5062,22 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   // Split date into parts
   const [yyyy, mm, dd] = dateVal ? dateVal.split("-") : ["", "", ""];
 
-  // Position config for the selected bank
+  // Position config = bank defaults + user calibration offset
   const pos = CHEQUE_POSITIONS[bank.id] || CHEQUE_POSITIONS.default;
+  const P = {
+    payeeTop:   pos.payeeTop   + yOff,
+    payeeLeft:  pos.payeeLeft  + xOff,
+    payeeMaxW:  pos.payeeMaxW,
+    amtTop:     pos.amtTop     + yOff,
+    amtRight:   Math.max(1, pos.amtRight - xOff),
+    wordsTop:   pos.wordsTop   + yOff,
+    wordsLeft:  pos.wordsLeft  + xOff,
+    wordsMaxW:  pos.wordsMaxW,
+    dateTop:    pos.dateTop    + yOff,
+    dateDDLeft: pos.dateDDLeft + xOff,
+    dateMMLeft: pos.dateMMLeft + xOff,
+    dateYYLeft: pos.dateYYLeft + xOff,
+  };
 
   // Shared styles
   const inp = {
@@ -5227,6 +5260,70 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             </div>
           </div>
 
+          {/* ── 🎯 Position Calibration Card ── */}
+          <div style={{ ...s.card, marginBottom:14, border:`1.5px solid ${th.accent}33` }}>
+            <div style={{ fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0.5, marginBottom:8 }}>
+              🎯 {lang==="bn" ? "প্রিন্ট পজিশন ক্যালিব্রেশন" : "Print Position Calibration"}
+            </div>
+            <div style={{ fontSize:10, color:th.txtMuted, marginBottom:10, lineHeight:1.6 }}>
+              {lang==="bn"
+                ? "সাদা কাগজে প্রিন্ট করুন → আসল চেকের উপর রাখুন → যেদিকে সরা সেদিকে বাটন চাপুন → সেভ করুন"
+                : "Test print on plain paper → place over real cheque → press buttons to shift → save"}
+            </div>
+
+            {/* Y axis (up/down) */}
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
+              <span style={{ fontSize:11, color:th.txtSecondary, minWidth:62, fontWeight:700 }}>
+                ↕ {lang==="bn" ? "উপর/নিচ" : "Up/Down"}
+              </span>
+              <button
+                onClick={() => adjY(-1)}
+                style={{ padding:"5px 10px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:13 }}
+              >▲</button>
+              <div style={{ minWidth:52, textAlign:"center", fontSize:13, fontWeight:800, color: yOff!==0 ? th.accent : th.txtMuted }}>
+                {yOff>0?"+":""}{yOff}mm
+              </div>
+              <button
+                onClick={() => adjY(+1)}
+                style={{ padding:"5px 10px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:13 }}
+              >▼</button>
+            </div>
+
+            {/* X axis (left/right) */}
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
+              <span style={{ fontSize:11, color:th.txtSecondary, minWidth:62, fontWeight:700 }}>
+                ↔ {lang==="bn" ? "বাম/ডান" : "Left/Right"}
+              </span>
+              <button
+                onClick={() => adjX(-1)}
+                style={{ padding:"5px 10px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:13 }}
+              >◄</button>
+              <div style={{ minWidth:52, textAlign:"center", fontSize:13, fontWeight:800, color: xOff!==0 ? th.accent : th.txtMuted }}>
+                {xOff>0?"+":""}{xOff}mm
+              </div>
+              <button
+                onClick={() => adjX(+1)}
+                style={{ padding:"5px 10px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, cursor:"pointer", fontWeight:700, fontSize:13 }}
+              >►</button>
+            </div>
+
+            {/* Save / Reset */}
+            <div style={{ display:"flex", gap:8 }}>
+              <button
+                onClick={saveOffsets}
+                style={{ ...s.sendBtn, flex:1, padding:"8px", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center", gap:4 }}
+              >
+                💾 {lang==="bn" ? "সেভ করুন" : "Save"}
+              </button>
+              <button
+                onClick={() => { setXOff(0); setYOff(0); }}
+                style={{ ...s.stBtn, flex:1, padding:"8px", fontSize:12, textAlign:"center" }}
+              >
+                ↺ Reset
+              </button>
+            </div>
+          </div>
+
           {/* ── Print + Clear buttons ── */}
           <button
             onClick={() => window.print()}
@@ -5249,10 +5346,10 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           <div style={{ marginTop:14, padding:"10px 12px", background:th.bgCard, borderRadius:8, border:`1px solid ${th.border}`, fontSize:11, color:th.txtMuted, lineHeight:1.8 }}>
             💡 <strong style={{ color:th.txtSecondary }}>{lang==="bn" ? "টিপস:" : "Tips:"}</strong>
             {lang==="bn"
-              ? " প্রথমে সাদা কাগজে প্রিন্ট করুন। কাগজটি আসল চেকের উপর রেখে alignment মিলিয়ে দেখুন। ঠিক হলে আসল চেক লিফ প্রিন্টারে দিন।"
-              : " Print on plain paper first. Hold it over the real cheque to verify field alignment. Once correct, feed the real cheque leaf into the printer."}
-            <div style={{ marginTop:6, padding:"6px 8px", background:th.bgInp, borderRadius:6, border:`1px solid ${th.border}` }}>
-              📐 {lang==="bn" ? "চেক সাইজ: 210mm × 90mm (Landscape)" : "Cheque size: 210mm × 90mm (Landscape)"}
+              ? " প্রিন্টারে Paper Size: Custom 210×90mm, Scale: 100%, Margins: None সেট করুন।"
+              : " Set printer: Paper Size=Custom 210×90mm, Scale=100%, Margins=None."}
+            <div style={{ marginTop:6, padding:"6px 8px", background:"#fef3c7", borderRadius:6, border:"1px solid #fcd34d", color:"#92400e", fontWeight:700 }}>
+              ⚠️ {lang==="bn" ? "Chrome → More settings → Paper size → Custom → 210mm × 90mm" : "Chrome → More settings → Paper size → Custom → 210 × 90 mm"}
             </div>
           </div>
         </div>
@@ -5486,9 +5583,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         {payee && (
           <div style={{
             position:"absolute",
-            top:`${pos.payeeTop}mm`,
-            left:`${pos.payeeLeft}mm`,
-            maxWidth:`${pos.payeeMaxW}mm`,
+            top:`${P.payeeTop}mm`,
+            left:`${P.payeeLeft}mm`,
+            maxWidth:`${P.payeeMaxW}mm`,
             fontSize:"12.5pt", fontWeight:"700",
             fontFamily:"Arial, Helvetica, sans-serif",
             color:"#000", whiteSpace:"nowrap",
@@ -5502,8 +5599,8 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         {amount && (
           <div style={{
             position:"absolute",
-            top:`${pos.amtTop}mm`,
-            right:`${pos.amtRight}mm`,
+            top:`${P.amtTop}mm`,
+            right:`${P.amtRight}mm`,
             fontSize:"13pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
             color:"#000",
@@ -5516,9 +5613,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         {words && (
           <div style={{
             position:"absolute",
-            top:`${pos.wordsTop}mm`,
-            left:`${pos.wordsLeft}mm`,
-            maxWidth:`${pos.wordsMaxW}mm`,
+            top:`${P.wordsTop}mm`,
+            left:`${P.wordsLeft}mm`,
+            maxWidth:`${P.wordsMaxW}mm`,
             fontSize:"11pt",
             fontFamily:"Arial, Helvetica, sans-serif",
             color:"#000", whiteSpace:"nowrap",
@@ -5532,11 +5629,11 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         {dd && (
           <div style={{
             position:"absolute",
-            top:`${pos.dateTop}mm`,
-            left:`${pos.dateDDLeft}mm`,
+            top:`${P.dateTop}mm`,
+            left:`${P.dateDDLeft}mm`,
             fontSize:"11.5pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
-            color:"#000", letterSpacing:"0.12em",
+            color:"#000", letterSpacing:"0.15em",
           }}>
             {dd}
           </div>
@@ -5546,11 +5643,11 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         {mm && (
           <div style={{
             position:"absolute",
-            top:`${pos.dateTop}mm`,
-            left:`${pos.dateMMLeft}mm`,
+            top:`${P.dateTop}mm`,
+            left:`${P.dateMMLeft}mm`,
             fontSize:"11.5pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
-            color:"#000", letterSpacing:"0.12em",
+            color:"#000", letterSpacing:"0.15em",
           }}>
             {mm}
           </div>
@@ -5560,11 +5657,11 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         {yyyy && (
           <div style={{
             position:"absolute",
-            top:`${pos.dateTop}mm`,
-            left:`${pos.dateYYLeft}mm`,
+            top:`${P.dateTop}mm`,
+            left:`${P.dateYYLeft}mm`,
             fontSize:"11.5pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
-            color:"#000", letterSpacing:"0.12em",
+            color:"#000", letterSpacing:"0.15em",
           }}>
             {yyyy}
           </div>
@@ -5573,17 +5670,19 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
       {/* ── PRINT STYLES ── */}
       <style>{`
-        /* Screen: hide the print layer */
+        /* Screen: hide the print layer completely */
         #cheque-print-area {
           display: none;
         }
 
         @media print {
-          /* 1. visibility:hidden hides everything but lets children
+          /* 1. visibility:hidden hides all content but lets children
                 override with visibility:visible — unlike display:none
-                which blocks children completely */
+                which also hides all descendants and can't be overridden */
           body {
             visibility: hidden !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
 
           /* 2. Show ONLY the cheque print area and its children */
@@ -5592,7 +5691,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             visibility: visible !important;
           }
 
-          /* 3. Position the print area on the page */
+          /* 3. Position the print area at the top-left of the page */
           #cheque-print-area {
             display: block !important;
             position: fixed !important;
@@ -5606,15 +5705,15 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             overflow: visible !important;
           }
 
-          /* 4. Each text field is absolutely positioned in mm */
+          /* 4. Each child text field is absolutely positioned in mm */
           #cheque-print-area > div {
             position: absolute !important;
           }
 
-          /* 5. Page = physical cheque size, no margins */
+          /* 5. Page = physical cheque size, zero margins */
           @page {
             size: 210mm 90mm;
-            margin: 0;
+            margin: 0mm;
           }
         }
       `}</style>
