@@ -5013,6 +5013,15 @@ const CHEQUE_POSITIONS = {
 };
 
 // ─── CHEQUE PRINTER TAB ───────────────────────────────────────────────────────
+
+// ─── CHEQUE AMOUNT FORMATTER: no comma, no spaces, always 2 decimals ─────────
+const formatChequeAmountNoComma = (value) => {
+  const clean = String(value ?? "").replace(/[,\s]/g, "");
+  const n = Number(clean);
+  if (!Number.isFinite(n)) return "";
+  return n.toFixed(2);
+};
+
 function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban }) {
   const [bank, setBank]         = useState(UAE_BANKS[0]);
   const [payee, setPayee]       = useState("");
@@ -5740,7 +5749,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             fontFamily:"'Courier New', Courier, monospace",
             color:"#000",
           }}>
-            {fmtAmount(amount)}
+            {formatChequeAmountNoComma(amount)}
           </div>
         )}
 
