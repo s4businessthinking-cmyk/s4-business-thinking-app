@@ -5013,15 +5013,6 @@ const CHEQUE_POSITIONS = {
 };
 
 // ─── CHEQUE PRINTER TAB ───────────────────────────────────────────────────────
-
-// ─── CHEQUE AMOUNT FORMATTER: no comma, no spaces, always 2 decimals ─────────
-const formatChequeAmountNoComma = (value) => {
-  const clean = String(value ?? "").replace(/[,\s]/g, "");
-  const n = Number(clean);
-  if (!Number.isFinite(n)) return "";
-  return n.toFixed(2);
-};
-
 function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban }) {
   const [bank, setBank]         = useState(UAE_BANKS[0]);
   const [payee, setPayee]       = useState("");
@@ -5091,20 +5082,31 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
   // Auto-fill amount in words from numeric amount
   const handleAmountChange = (v) => {
-    setAmount(v);
+    const cleanAmount = normalizeChequeAmount(v);
+    setAmount(cleanAmount);
     if (!wordsManual) {
-      const n = parseFloat(v);
+      const n = parseFloat(cleanAmount);
       setWords(n > 0 ? amountToWordsAED(n) : "");
     }
   };
   const handleWordsChange = (v) => { setWords(v); setWordsManual(true); };
   const handleAmountBlur  = ()  => { setWordsManual(false); };
 
-  // Format number as AED amount
+  // Format number as AED amount for cheque: no comma, no spaces, always 2 decimals
+  const normalizeChequeAmount = (v) => {
+    const raw = String(v ?? "").replace(/[,\s]/g, "");
+    const cleaned = raw
+      .replace(/[^0-9.]/g, "")
+      .replace(/(\..*)\./g, "$1");
+    return cleaned;
+  };
+
   const fmtAmount = (v) => {
-    const n = parseFloat(v);
-    if (!n) return "";
-    return n.toLocaleString("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const cleaned = normalizeChequeAmount(v);
+    if (!cleaned) return "";
+    const n = Number(cleaned);
+    if (!Number.isFinite(n)) return "";
+    return n.toFixed(2);
   };
 
   // Split date into parts
@@ -5748,8 +5750,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             fontSize:"13pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
             color:"#000",
+            letterSpacing:"0",
           }}>
-            {formatChequeAmountNoComma(amount)}
+            {fmtAmount(amount)}
           </div>
         )}
 
