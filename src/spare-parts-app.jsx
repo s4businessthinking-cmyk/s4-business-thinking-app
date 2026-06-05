@@ -1362,8 +1362,8 @@ function PmForm({ pmForm, pmUpd, t, lang, th }) {
   const _th  = th || {bgInp:"#09090b",bgCard:"#18181b",txtPrimary:"#f4f4f5",txtMuted:"#71717a",borderMid:"#3f3f46",border:"#27272a",accentDim:"#451a03"};
   const inp  = { padding:"9px 11px", borderRadius:8, border:`1px solid ${_th.borderMid}`, background:_th.bgInp, color:_th.txtPrimary, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
   const calcInp = { ...inp, color:"#22c55e", fontWeight:700 };
-  const lbl  = { fontSize:10, color:_th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:3, display:"block" };
-  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${_th.border}`, marginBottom:10 };
+  const lbl  = { fontSize:10, color:_th.txtMuted, textTransform:"uppercase", letterSpacing:0, fontWeight:700, marginBottom:3, display:"block" };
+  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, padding:"8px 0 6px", borderBottom:`1px solid ${_th.border}`, marginBottom:10 };
   const g2   = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 };
 
   // More barcodes state
@@ -1571,7 +1571,7 @@ function PiSummaryBox({ items, amountPaid, th, t }) {
   const row = { display:"flex", justifyContent:"space-between", alignItems:"center", padding:"7px 0", borderBottom:`1px solid ${th.border}` };
   return (
     <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
-      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📊 {t.pi_summary}</div>
+      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>📊 {t.pi_summary}</div>
       <div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_subtotal}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{t.cur} {piFmt2(sub)}</span></div>
       {disc>0&&<div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_totalDiscount}</span><span style={{ fontSize:13, fontWeight:700, color:"#ef4444" }}>- {t.cur} {piFmt2(disc)}</span></div>}
       {tax>0&&<div style={row}><span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_totalTax}</span><span style={{ fontSize:13, fontWeight:700, color:"#06b6d4" }}>+ {t.cur} {piFmt2(tax)}</span></div>}
@@ -1766,7 +1766,7 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
 
       {/* Items */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10, overflowX:"auto" }}>
-        <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📦 {t.pi_items} ({invoice.items?.length||0})</div>
+        <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>📦 {t.pi_items} ({invoice.items?.length||0})</div>
         <div style={{ display:"flex", fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, letterSpacing:0.4, padding:"7px 0", borderBottom:`1px solid ${th.border}`, gap:6 }}>
           <span style={{ width:24 }}>#</span><span style={{ flex:1 }}>{lang==="bn"?"পণ্য":"Item"}</span>
           <span style={{ width:60, textAlign:"center" }}>{t.pi_qty}</span>
@@ -2081,7 +2081,7 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
   };
   const secLabel = (icon, label) => (
     <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase",
-      letterSpacing:0.5, padding:"10px 0 8px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>
+      letterSpacing:0, padding:"10px 0 8px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>
       {icon} {label}
     </div>
   );
@@ -2545,7 +2545,7 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
   const taStyle = { ...inp(), minHeight:52, resize:"none", overflow:"hidden", lineHeight:1.6 };
   const secLbl = (icon, label) => (
     <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase",
-      letterSpacing:0.5, padding:"8px 0 8px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>
+      letterSpacing:0, padding:"8px 0 8px", borderBottom:`1px solid ${th.border}`, marginBottom:12 }}>
       {icon} {label}
     </div>
   );
@@ -2791,7 +2791,7 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
         {/* Credit box — featured prominently */}
         {(c.paymentType==="credit"||c.creditLimit>0)&&(
           <div style={{ background:"linear-gradient(135deg,rgba(249,115,22,0.1),rgba(249,115,22,0.04))", border:"1.5px solid #f97316", borderRadius:14, padding:"14px 16px", marginBottom:12 }}>
-            <div style={{ fontSize:10, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>💳 {t.cm_secCredit}</div>
+            <div style={{ fontSize:10, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>💳 {t.cm_secCredit}</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
               <div style={{ textAlign:"center", padding:"10px 8px", background:"rgba(0,0,0,0.2)", borderRadius:10 }}>
                 <div style={{ fontSize:16, fontWeight:900, color:"#f97316" }}>{t.cur}{(c.creditLimit||0).toLocaleString()}</div>
@@ -3265,7 +3265,7 @@ function PiSalesmanView({ t, lang, th, shopId }) {
             {/* Qty + Purchase price row */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:10 }}>
               <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
-                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, letterSpacing:0.5, marginBottom:4 }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, letterSpacing:0, marginBottom:4 }}>
                   {lang==="bn"?"📦 ক্রয় পরিমাণ":"📦 Purchased Qty"}
                 </div>
                 <div style={{ fontSize:20, fontWeight:900, color:"#06b6d4" }}>
@@ -3273,7 +3273,7 @@ function PiSalesmanView({ t, lang, th, shopId }) {
                 </div>
               </div>
               <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
-                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, letterSpacing:0.5, marginBottom:4 }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, letterSpacing:0, marginBottom:4 }}>
                   {t.pi_purchasePrice}
                 </div>
                 <div style={{ fontSize:20, fontWeight:900, color:"#a1a1aa" }}>
@@ -3285,7 +3285,7 @@ function PiSalesmanView({ t, lang, th, shopId }) {
             {/* Sale price — big prominent box */}
             {saleEx>0 ? (
               <div style={{ background:"linear-gradient(135deg,rgba(34,197,94,0.12),rgba(34,197,94,0.05))", border:"1.5px solid #22c55e", borderRadius:12, padding:"14px 16px" }}>
-                <div style={{ fontSize:10, color:"#22c55e", textTransform:"uppercase", fontWeight:700, letterSpacing:0.5, marginBottom:10 }}>
+                <div style={{ fontSize:10, color:"#22c55e", textTransform:"uppercase", fontWeight:700, letterSpacing:0, marginBottom:10 }}>
                   💰 {lang==="bn"?"বিক্রয় মূল্য বিবরণ":"Sale Price Details"}
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
@@ -3300,7 +3300,7 @@ function PiSalesmanView({ t, lang, th, shopId }) {
                 {/* Total inc VAT — the big number */}
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                   <span style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{t.pi_saleIncVat}</span>
-                  <span style={{ fontSize:26, fontWeight:900, color:"#22c55e", letterSpacing:0.5 }}>{t.cur} {piFmt2(saleInc)}</span>
+                  <span style={{ fontSize:26, fontWeight:900, color:"#22c55e", letterSpacing:0 }}>{t.cur} {piFmt2(saleInc)}</span>
                 </div>
                 {/* Margin info */}
                 {margin>0&&(
@@ -3522,7 +3522,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ── Styles ──
   const panel = isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
   const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
-  const secLbl={ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
+  const secLbl={ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
   const totals=piCalcTotals(piLines);
   const paid=piN2(piForm.amountPaid), balance=Math.max(0,totals.grand-paid);
 
@@ -4395,7 +4395,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
   const panel=isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
   const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
-  const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
+  const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
   const formIsDelivery = siForm.invoiceType==="delivery";
   const formIsTax      = siForm.invoiceType==="tax";
   const formIsCash     = siForm.paymentMethod==="cash";
@@ -4508,7 +4508,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
         {/* Items */}
         <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10, overflowX:"auto" }}>
-          <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📦 {t.si_items} ({inv.items?.length||0})</div>
+          <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>📦 {t.si_items} ({inv.items?.length||0})</div>
           {(inv.items||[]).map((it,i)=>{
             const { disc:d, vat:v, total:tot }=siCalcLine(it, isTax);
             return (
@@ -4574,7 +4574,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
       {/* Invoice Type Toggle */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
-        <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:12 }}>📋 {t.si_invoiceType}</div>
+        <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:12 }}>📋 {t.si_invoiceType}</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
           {[["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"],["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"],["delivery","🚚",t.si_delivery,t.si_deliveryDesc,"#a855f7"]].map(([type,icon,label,desc,color])=>(
             <button key={type} onClick={()=>siUpd("invoiceType",type)} style={{ padding:"14px 10px", borderRadius:12, cursor:"pointer", fontFamily:"inherit", border:`2px solid ${siForm.invoiceType===type?color:th.borderMid}`, background:siForm.invoiceType===type?`${color}18`:"transparent", display:"flex", flexDirection:"column", alignItems:"center", gap:4, transition:"all 0.15s" }}>
@@ -4769,7 +4769,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
       {/* Summary */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
-        <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>📊 {t.si_summary}</div>
+        <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>📊 {t.si_summary}</div>
         {[[t.si_subtotal,siFmt2(totals.sub),th.txtPrimary],...(totals.disc>0?[[t.si_totalDiscount,`- ${siFmt2(totals.disc)}`,"#ef4444"]]:[]),...(totals.vat>0?[["VAT",`+ ${siFmt2(totals.vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
           <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>{t.cur} {v}</span></div>
         ))}
@@ -5012,6 +5012,39 @@ const CHEQUE_POSITIONS = {
   default:{ payeeTop:32, payeeLeft:50, payeeMaxW:114, amtTop:29, amtRight:12, wordsTop:43, wordsLeft:11, wordsMaxW:148, dateTop:58, dateDDLeft:149, dateMMLeft:163, dateYYLeft:175 },
 };
 
+// ─── PER-BANK USER DEFAULT TEMPLATE VALUES ──────────────────────────────────
+// These are user-adjustable defaults. Saved values in localStorage override them.
+// Reset returns to these values for the selected bank only.
+const CHEQUE_TEMPLATE_DEFAULTS = {
+  default: {
+    px:0, py:0, wx:0, wy:0, ax:0, ay:0, dx:0, dy:0, mo:0, yo:0,
+    w:196, h:99, dm:"slash",
+  },
+  adcb: {
+    // ADCB calibrated from user's real cheque/printer test screenshots.
+    px:-12, py:-16,
+    wx:19, wy:-18,
+    ax:-8, ay:-15,
+    dx:14, dy:-19,
+    mo:-3, yo:-3,
+    w:200, h:90,
+    dm:"slash",
+  },
+};
+
+const DATE_FORMAT_OPTIONS = [
+  { id:"slash", label:"DD/MM/YYYY", sep:"/" },
+  { id:"dot",   label:"DD.MM.YYYY", sep:"." },
+  { id:"dash",  label:"DD-MM-YYYY", sep:"-" },
+  { id:"space", label:"DD MM YYYY", sep:" " },
+  { id:"box",   label:"Box / digit spacing", sep:null },
+];
+
+const getChequeTemplateDefault = (bankId) => ({
+  ...CHEQUE_TEMPLATE_DEFAULTS.default,
+  ...(CHEQUE_TEMPLATE_DEFAULTS[bankId] || {}),
+});
+
 // ─── CHEQUE PRINTER TAB ───────────────────────────────────────────────────────
 function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban }) {
   const [bank, setBank]         = useState(UAE_BANKS[0]);
@@ -5036,30 +5069,36 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [yyOff,  setYyOff]  = useState(0);   // YYYY gap from MM (positive = more right)
   const [pageW,  setPageW]  = useState(196); // Page width  mm — ADCB cheque measured
   const [pageH,  setPageH]  = useState(99);  // Page height mm — ADCB cheque measured
+  const [dateMode, setDateMode] = useState("slash"); // slash/dot/dash/space/box
   const [saveDone, setSaveDone] = useState(false);
 
+  const applyTemplateValues = (o) => {
+    const d = getChequeTemplateDefault(bank.id);
+    const v = { ...d, ...(o || {}) };
+    setPayeeX(Number(v.px) || 0); setPayeeY(Number(v.py) || 0);
+    setWordsX(Number(v.wx) || 0); setWordsY(Number(v.wy) || 0);
+    setAmtX(Number(v.ax) || 0);   setAmtY(Number(v.ay) || 0);
+    setDateX(Number(v.dx) || 0);  setDateY(Number(v.dy) || 0);
+    setMmOff(Number(v.mo) || 0);  setYyOff(Number(v.yo) || 0);
+    setPageW(Number(v.w) || d.w); setPageH(Number(v.h) || d.h);
+    setDateMode(DATE_FORMAT_OPTIONS.some(x => x.id === v.dm) ? v.dm : d.dm);
+  };
+
   const resetAll = () => {
-    setPayeeX(0); setPayeeY(0);
-    setWordsX(0); setWordsY(0);
-    setAmtX(0);   setAmtY(0);
-    setDateX(0);  setDateY(0);
-    setMmOff(0);  setYyOff(0);
-    setPageW(196); setPageH(99);
+    applyTemplateValues(getChequeTemplateDefault(bank.id));
   };
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`chq_off2_${bank.id}`);
       if (saved) {
-        const o = JSON.parse(saved);
-        setPayeeX(o.px||0); setPayeeY(o.py||0);
-        setWordsX(o.wx||0); setWordsY(o.wy||0);
-        setAmtX(o.ax||0);   setAmtY(o.ay||0);
-        setDateX(o.dx||0);  setDateY(o.dy||0);
-        setMmOff(o.mo||0);  setYyOff(o.yo||0);
-        setPageW(o.w||196); setPageH(o.h||99);
-      } else { resetAll(); }
-    } catch(e) { resetAll(); }
+        applyTemplateValues(JSON.parse(saved));
+      } else {
+        applyTemplateValues(getChequeTemplateDefault(bank.id));
+      }
+    } catch(e) {
+      applyTemplateValues(getChequeTemplateDefault(bank.id));
+    }
   }, [bank.id]);
 
   const saveOffsets = () => {
@@ -5071,6 +5110,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         dx:dateX,  dy:dateY,
         mo:mmOff,  yo:yyOff,
         w:pageW,   h:pageH,
+        dm:dateMode,
       }));
       setSaveDone(true);
       setTimeout(() => setSaveDone(false), 2500);
@@ -5081,6 +5121,12 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const adj = (setter) => (d) => setter(v => +((v + d).toFixed(1)));
 
   // Auto-fill amount in words from numeric amount
+  const normalizeChequeAmount = (v) => {
+    const raw = String(v ?? "").replace(/[,\s]/g, "");
+    const parts = raw.replace(/[^0-9.]/g, "").split(".");
+    return parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("")}` : parts[0];
+  };
+
   const handleAmountChange = (v) => {
     const cleanAmount = normalizeChequeAmount(v);
     setAmount(cleanAmount);
@@ -5093,19 +5139,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const handleAmountBlur  = ()  => { setWordsManual(false); };
 
   // Format number as AED amount for cheque: no comma, no spaces, always 2 decimals
-  const normalizeChequeAmount = (v) => {
-    const raw = String(v ?? "").replace(/[,\s]/g, "");
-    const cleaned = raw
-      .replace(/[^0-9.]/g, "")
-      .replace(/(\..*)\./g, "$1");
-    return cleaned;
-  };
-
   const fmtAmount = (v) => {
-    const cleaned = normalizeChequeAmount(v);
-    if (!cleaned) return "";
-    const n = Number(cleaned);
-    if (!Number.isFinite(n)) return "";
+    const n = Number(normalizeChequeAmount(v));
+    if (!Number.isFinite(n) || n <= 0) return "";
     return n.toFixed(2);
   };
 
@@ -5144,27 +5180,41 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   };
   const sec = {
     fontSize:12, fontWeight:700, color:th.accent,
-    textTransform:"uppercase", letterSpacing:0.5,
+    textTransform:"uppercase", letterSpacing:0,
     marginBottom:12, marginTop:4,
   };
 
-  // Preview: single date text with slash, exactly like it should print on ADCB cheque
-  const chequeDateText = `${dd}/${mm}/${yyyy}`;
+  // Date render engine: supports slash, dot, dash, space, and box/digit mode per bank/user
+  const selectedDateFormat = DATE_FORMAT_OPTIONS.find(x => x.id === dateMode) || DATE_FORMAT_OPTIONS[0];
+  const chequeDateText = selectedDateFormat.id === "box"
+    ? ""
+    : `${dd}${selectedDateFormat.sep}${mm}${selectedDateFormat.sep}${yyyy}`;
 
-  const previewDateBoxes = () => (
-    <div style={{
-      fontSize:16,
-      fontWeight:800,
-      fontFamily:"'Courier New', Courier, monospace",
-      color:"#000",
-      letterSpacing:0,
-      wordSpacing:0,
-      whiteSpace:"nowrap",
-      lineHeight:1,
-    }}>
-      {chequeDateText}
-    </div>
-  );
+  const previewDateBoxes = () => {
+    if (dateMode === "box") {
+      return (
+        <div style={{ display:"flex", gap:8, alignItems:"center", fontFamily:"'Courier New', Courier, monospace", fontSize:16, fontWeight:800, color:"#000" }}>
+          <span style={{ letterSpacing:"0.18em" }}>{dd}</span>
+          <span style={{ letterSpacing:"0.18em" }}>{mm}</span>
+          <span style={{ letterSpacing:"0.18em" }}>{yyyy}</span>
+        </div>
+      );
+    }
+    return (
+      <div style={{
+        fontSize:16,
+        fontWeight:800,
+        fontFamily:"'Courier New', Courier, monospace",
+        color:"#000",
+        letterSpacing:0,
+        wordSpacing:0,
+        whiteSpace:"nowrap",
+        lineHeight:1,
+      }}>
+        {chequeDateText}
+      </div>
+    );
+  };
 
   return (
     <div style={isDesktop ? s.desktopPanel : s.panel}>
@@ -5350,7 +5400,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
             return (
               <div style={{ ...s.card, marginBottom:14, border:`1.5px solid ${th.accent}44` }}>
-                <div style={{ fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0.5, marginBottom:4 }}>
+                <div style={{ fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0, marginBottom:4 }}>
                   🎯 {lang==="bn" ? "প্রিন্ট ক্যালিব্রেশন" : "Print Calibration"}
                 </div>
                 <div style={{ fontSize:10, color:th.txtMuted, marginBottom:10, lineHeight:1.6 }}>
@@ -5407,6 +5457,37 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
                   onYU={() => adj(setDateY)(-1)} onYD={() => adj(setDateY)(+1)}
                   onXL={() => adj(setDateX)(-1)} onXR={() => adj(setDateX)(+1)}
                 />
+
+                {/* Date format selector */}
+                <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6 }}>
+                    📅 {lang==="bn" ? "তারিখের ফরম্যাট" : "Date Format"}
+                  </div>
+                  <select
+                    value={dateMode}
+                    onChange={e => setDateMode(e.target.value)}
+                    style={{
+                      width:"100%",
+                      padding:"8px 10px",
+                      borderRadius:7,
+                      border:`1px solid ${th.borderMid}`,
+                      background:th.bgCard,
+                      color:th.txtPrimary,
+                      fontSize:12,
+                      fontWeight:700,
+                      outline:"none",
+                    }}
+                  >
+                    {DATE_FORMAT_OPTIONS.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize:9, color:th.txtMuted, marginTop:6, lineHeight:1.5 }}>
+                    {lang==="bn"
+                      ? "যে ব্যাংকের চেকে / . - space বা box যেটা লাগে, সেটাই সিলেক্ট করুন। Save All দিলে ওই ব্যাংকের জন্য থাকবে।"
+                      : "Select the exact date style required by this bank cheque. Save All stores it per bank."}
+                  </div>
+                </div>
 
                 {/* Date gap controls */}
                 <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
@@ -5504,7 +5585,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             RIGHT PANEL — Cheque Preview (screen only)
         ════════════════════════════════════════ */}
         <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>
             {lang==="bn" ? "লাইভ প্রিভিউ" : "Live Preview"} — 210mm × 90mm
           </div>
 
@@ -5623,7 +5704,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
                   <div style={{ flexShrink:0 }}>
                     <div style={{ fontSize:7.5, color:"#555", textAlign:"center", marginBottom:1 }}>AED</div>
                     <div style={{ border:"1.5px solid #7a3e0e", background:"#faf3e0", padding:"4px 14px", minWidth:115, textAlign:"center" }}>
-                      <div style={{ fontSize:14, fontWeight:800, fontFamily:"'Courier New',monospace", color:"#1a1a1a", letterSpacing:0.5 }}>
+                      <div style={{ fontSize:14, fontWeight:800, fontFamily:"'Courier New',monospace", color:"#1a1a1a", letterSpacing:0 }}>
                         {fmtAmount(amount) || "0.00"}
                       </div>
                     </div>
@@ -5706,7 +5787,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
           {/* Info box */}
           <div style={{ ...s.card, fontSize:12, color:th.txtMuted, lineHeight:1.9 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase", letterSpacing:0.5 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase", letterSpacing:0 }}>
               ℹ️ {lang==="bn" ? "প্রিন্ট নির্দেশনা" : "Print Instructions"}
             </div>
             <div>📐 {lang==="bn" ? "UAE চেক সাইজ: 210mm × 90mm" : "UAE standard cheque: 210mm × 90mm"}</div>
@@ -5750,7 +5831,6 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             fontSize:"13pt", fontWeight:"700",
             fontFamily:"'Courier New', Courier, monospace",
             color:"#000",
-            letterSpacing:"0",
           }}>
             {fmtAmount(amount)}
           </div>
@@ -5772,8 +5852,8 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           </div>
         )}
 
-        {/* Date — single slash format printed on cheque: DD/MM/YYYY */}
-        {chequeDateText && (
+        {/* Date — selected format printed on cheque */}
+        {dateMode !== "box" && chequeDateText && (
           <div style={{
             position:"absolute",
             top:`${P.dateTop}mm`,
@@ -5789,6 +5869,42 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           }}>
             {chequeDateText}
           </div>
+        )}
+
+        {/* Date — box/digit mode for cheques with date boxes */}
+        {dateMode === "box" && (
+          <>
+            {dd && (
+              <div style={{
+                position:"absolute",
+                top:`${P.dateTop}mm`,
+                left:`${P.dateDDLeft}mm`,
+                fontSize:"11.5pt", fontWeight:"700",
+                fontFamily:"'Courier New', Courier, monospace",
+                color:"#000", letterSpacing:"0.18em",
+              }}>{dd}</div>
+            )}
+            {mm && (
+              <div style={{
+                position:"absolute",
+                top:`${P.dateTop}mm`,
+                left:`${P.dateMMLeft}mm`,
+                fontSize:"11.5pt", fontWeight:"700",
+                fontFamily:"'Courier New', Courier, monospace",
+                color:"#000", letterSpacing:"0.18em",
+              }}>{mm}</div>
+            )}
+            {yyyy && (
+              <div style={{
+                position:"absolute",
+                top:`${P.dateTop}mm`,
+                left:`${P.dateYYLeft}mm`,
+                fontSize:"11.5pt", fontWeight:"700",
+                fontFamily:"'Courier New', Courier, monospace",
+                color:"#000", letterSpacing:"0.18em",
+              }}>{yyyy}</div>
+            )}
+          </>
         )}
       </div>
 
@@ -6586,7 +6702,7 @@ const startEditOrder = (order) => {
           if (!entries.length) return null;
           return (
             <div style={{ marginTop:10, marginBottom:4 }}>
-              <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:6 }}>
+              <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0, fontWeight:700, marginBottom:6 }}>
                 {lang==="bn"?"💬 WhatsApp-এ পাঠান":"💬 Send via WhatsApp"}
               </div>
               {entries.map(({co, items})=>(
@@ -6601,7 +6717,7 @@ const startEditOrder = (order) => {
         })()}
         {(isOwner||can("setStatus"))&&order.overall!=="cancelled"&&(
           <div style={{ marginTop:10 }}>
-            <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>
+            <div style={{ fontSize:11, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>
               {lang==="bn"?"স্ট্যাটাস আপডেট করুন":"Update Status"}
             </div>
             {order.overall==="pending"&&(
@@ -7008,14 +7124,14 @@ const startEditOrder = (order) => {
                         { lbl:lang==="bn"?"ইউনিট":"Unit", val:pmDetail.unit, icon:"📐" },
                       ].map(({lbl,val,icon})=> val?(
                         <div key={lbl} style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
-                          <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0.5 }}>{icon} {lbl}</div>
+                          <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0 }}>{icon} {lbl}</div>
                           <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{val}</div>
                         </div>
                       ):null)}
                     </div>
                     {/* Pricing section */}
                     <div style={{ background:th.bgInp, borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
-                      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5 }}>💰 {lang==="bn"?"মূল্য তথ্য":"Pricing Info"}</div>
+                      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:0 }}>💰 {lang==="bn"?"মূল্য তথ্য":"Pricing Info"}</div>
                       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
                         {[
                           { lbl:lang==="bn"?"Landing Cost":"Landing Cost", val:pmDetail.landingCost, color:"#a1a1aa" },
@@ -7954,7 +8070,7 @@ const startEditOrder = (order) => {
               ))}
               {inviteCodes.filter(c=>c.used).length>0&&(
                 <div style={{ marginTop:12, paddingTop:10, borderTop:`1px solid ${th.border}` }}>
-                  <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0.5, fontWeight:700, marginBottom:8 }}>
+                  <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0, fontWeight:700, marginBottom:8 }}>
                     {lang==="bn"?"ব্যবহৃত Codes":"Used Codes"} ({inviteCodes.filter(c=>c.used).length})
                   </div>
                   {inviteCodes.filter(c=>c.used).map(c=>(
@@ -8023,7 +8139,7 @@ const startEditOrder = (order) => {
                   {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
                     <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0.5 }}>{t.positionLbl}</span>
+                        <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0 }}>{t.positionLbl}</span>
                         <select style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
                           value={m.position||"Salesman"}
                           onChange={async e=>{ try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); } catch(err) { hErr(err); } }}>
@@ -8032,7 +8148,7 @@ const startEditOrder = (order) => {
                         </select>
                       </div>
                       <div style={{ height:1, background:th.bgCard, marginBottom:8 }} />
-                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 }}>{t.permissionsTitle}</div>
+                      <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>{t.permissionsTitle}</div>
                       {PERMISSIONS_LIST.map((perm,pi)=>{
                         const mPerms = m.permissions||DEFAULT_PERMISSIONS;
                         const isOn   = mPerms[perm.key]===true;
@@ -8350,7 +8466,7 @@ function getStyles(th) { return {
   sendBtn:     { width:"100%", padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg, #f97316, #ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" },
   addInvoiceBtn:{ width:"100%", padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.08)", color:th.accent, fontSize:14, fontWeight:700, cursor:"pointer", letterSpacing:0.3 },
   invoiceCard: { background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, overflow:"hidden", marginBottom:4 },
-  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  invHeader:   { display:"flex", alignItems:"center", gap:8, padding:"8px 12px", background:th.border, fontSize:10, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0, fontWeight:700 },
   invRow:      { display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderTop:`1px solid ${th.border}` },
   invSerial:   { fontSize:12, fontWeight:800, color:th.accent },
   invDelBtn:   { width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:11, fontWeight:700, flexShrink:0, display:"flex", alignItems:"center", justifyContent:"center" },
@@ -8397,7 +8513,7 @@ function getStyles(th) { return {
   roleEmoji:   { fontSize:38, marginBottom:8 },
   roleName:    { fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:4 },
   roleDesc:    { fontSize:12, color:th.txtMuted },
-  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0.5, fontWeight:700 },
+  settingsLbl: { fontSize:11, color:th.txtMuted, marginBottom:10, textTransform:"uppercase", letterSpacing:0, fontWeight:700 },
   inviteBox:   { fontSize:22, fontWeight:800, color:th.accent, textAlign:"center", padding:"16px", background:th.bgInp, borderRadius:10, border:`2px dashed ${th.accent}`, letterSpacing:2, fontFamily:"monospace" },
   logoutBtn:   { width:"100%", padding:"13px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:14, fontWeight:700, cursor:"pointer", marginTop:16 },
   desktopLayout:  { display:"flex", height:"calc(100vh - 61px)", overflow:"hidden" },
