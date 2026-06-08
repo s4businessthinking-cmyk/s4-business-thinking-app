@@ -1,13 +1,6 @@
-// =====================================================
-// 🔥 FIREBASE CONFIG — S4 Business Thinking
-// =====================================================
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import {
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager
-} from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDCeMFkkUFUz8tnFvZIe-pt9v5mDd0Hn4o",
@@ -19,16 +12,6 @@ const firebaseConfig = {
   measurementId: "G-5NFNKEZWQX"
 };
 
-// Firebase initialize
 const app = initializeApp(firebaseConfig);
-
-// ✅ Offline support — Firebase 10 নতুন পদ্ধতি
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
-
-const auth = getAuth(app);
-
-export { db, auth };
+export const db = getFirestore(app);
+export const auth = getAuth(app);
