@@ -1069,7 +1069,18 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
     finally { setBusy(false); }
   };
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+    <div
+  style={{
+    ..._s.root,
+    minHeight: "100vh",
+    backgroundImage:
+      "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.70)), url('./images/login-bg.jpg')",
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+  }}
+>
+  <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
         <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
         <div style={_s.authTitle}>{t.welcomeBack}</div>
