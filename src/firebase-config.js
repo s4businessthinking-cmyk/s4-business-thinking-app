@@ -4,6 +4,9 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { enableIndexedDbPersistence } from 'firebase/firestore'
+
+enableIndexedDbPersistence(db).catch(console.error)
 
 const firebaseConfig = {
   apiKey: "AIzaSyDceMFkkUFUz8tnFvZIe-pt9v5mDd0Hn4o",
