@@ -6134,37 +6134,6 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
         </>
       )}
 
-      {/* ── recent orders ── */}
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
-        <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5 }}>{t.dashRecentOrders}</div>
-        <button onClick={()=>setTab(isOwner?"owner":"shop")}
-          style={{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"inherit" }}>
-          {t.dashViewAll}
-        </button>
-      </div>
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, overflow:"hidden", marginBottom:20 }}>
-        {recent5.length===0 ? (
-          <div style={{ padding:"24px", textAlign:"center", color:th.txtFaint, fontSize:13 }}>{t.dashNoOrders}</div>
-        ) : recent5.map((o,i)=>(
-          <div key={o.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom: i<recent5.length-1?`1px solid ${th.border}`:"none" }}>
-            <div style={{ width:40, height:40, borderRadius:10, background:th.bgInp, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-              <span style={{ fontSize:11, fontWeight:800, color:th.accent }}>{o.orderNo||o.id.slice(-4).toUpperCase()}</span>
-            </div>
-            <div style={{ flex:1, minWidth:0 }}>
-              <div style={{ fontSize:12, fontWeight:700, color:th.txtPrimary, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                {o.items?.map(it=>it.name).filter(Boolean).join(", ")||"—"}
-              </div>
-              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>
-                {o.createdByName||""} · {fmtDate(o.createdAt)}
-              </div>
-            </div>
-            <span style={{ padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700, background:`${STATUS_COLOR[o.overall]||"#71717a"}22`, color:STATUS_COLOR[o.overall]||"#71717a", whiteSpace:"nowrap", flexShrink:0 }}>
-              {SL[o.overall]||o.overall}
-            </span>
-          </div>
-        ))}
-      </div>
-
       {/* ── quick navigation ── */}
       <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>{t.dashQuickNav}</div>
       <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))", gap:10 }}>
