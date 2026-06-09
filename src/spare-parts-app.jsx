@@ -1074,7 +1074,7 @@ function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toas
     ..._s.root,
     minHeight: "100vh",
     backgroundImage:
-      "linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.70)), url('./images/login-bg.jpg')",
+      "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.60)), url('https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/main/WhatsApp%20Image%202026-04-09%20at%2011.44.45%20AM.jpeg')",
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
