@@ -90,6 +90,16 @@ const TR = {
     notVerified:"এখনো যাচাই হয়নি। ইমেইল চেক করুন।",
     resetTitle:"🔑 পাসওয়ার্ড রিসেট", resetMsg:"আপনার ইমেইলে একটি রিসেট লিঙ্ক পাঠানো হবে।",
     resetBtn:"📤 রিসেট লিঙ্ক পাঠান", resetSent:"✅ ইমেইল পাঠানো হয়েছে! ইমেইল চেক করুন।",
+    tabDashboard:"🏠 ড্যাশবোর্ড",
+    dashGreeting:"স্বাগতম", dashShopLabel:"দোকান",
+    dashTotalOrders:"মোট অর্ডার", dashPending:"অপেক্ষায়",
+    dashDelivered:"ডেলিভারি হয়েছে", dashCancelled:"বাতিল",
+    dashInProgress:"প্রসেসে আছে", dashOutForBranch:"ব্রাঞ্চে পাঠানো",
+    dashProducts:"পণ্য", dashCompanies:"কোম্পানি",
+    dashTeam:"টিম মেম্বার", dashCustomers:"কাস্টমার", dashVendors:"ভেন্ডর",
+    dashRecentOrders:"সাম্প্রতিক অর্ডার", dashViewAll:"সব দেখুন →",
+    dashQuickNav:"দ্রুত যাওয়া", dashNoOrders:"কোনো অর্ডার নেই",
+    dashMyOrders:"আমার অর্ডার",
     tabSettings:"⚙️ সেটিংস", settingsTitle:"⚙️ অ্যাপ সেটিংস",
     profileTitle:"👤 প্রোফাইল", shopInfoTitle:"🏢 দোকানের তথ্য",
     inviteCodeTitle:"🔗 কর্মী Invite Code",
@@ -509,6 +519,16 @@ const TR = {
     notVerified:"Not verified yet. Please check your email.",
     resetTitle:"🔑 Password Reset", resetMsg:"A reset link will be sent to your email.",
     resetBtn:"📤 Send Reset Link", resetSent:"✅ Email sent! Please check your inbox.",
+    tabDashboard:"🏠 Dashboard",
+    dashGreeting:"Welcome", dashShopLabel:"Shop",
+    dashTotalOrders:"Total Orders", dashPending:"Pending",
+    dashDelivered:"Delivered", dashCancelled:"Cancelled",
+    dashInProgress:"In Progress", dashOutForBranch:"Out for Branch",
+    dashProducts:"Products", dashCompanies:"Companies",
+    dashTeam:"Team Members", dashCustomers:"Customers", dashVendors:"Vendors",
+    dashRecentOrders:"Recent Orders", dashViewAll:"View All →",
+    dashQuickNav:"Quick Navigate", dashNoOrders:"No orders yet",
+    dashMyOrders:"My Orders",
     tabSettings:"⚙️ Settings", settingsTitle:"⚙️ App Settings",
     profileTitle:"👤 Profile", shopInfoTitle:"🏢 Shop Info",
     inviteCodeTitle:"🔗 Staff Invite Code",
@@ -5971,6 +5991,196 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     </div>
   );
 }
+// ─── DASHBOARD TAB ───────────────────────────────────────────
+function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread }) {
+  const cur = lang==="bn"?"৳":"AED";
+
+  // ── stats ──
+  const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===profile.uid);
+  const pending    = myOrders.filter(o=>o.overall==="pending").length;
+  const delivered  = myOrders.filter(o=>o.overall==="delivered").length;
+  const cancelled  = myOrders.filter(o=>o.overall==="cancelled").length;
+  const inProgress = myOrders.filter(o=>!["pending","delivered","cancelled"].includes(o.overall)).length;
+  const outBranch  = myOrders.filter(o=>o.overall==="out_for_branch").length;
+  const recent5    = myOrders.slice(0,5);
+
+  const STATUS_COLOR = {
+    pending:"#f59e0b", order_confirmed:"#22c55e", ordered_supplier:"#06b6d4",
+    in_stock:"#22c55e", out_of_stock:"#ef4444", waiting_delivery:"#f97316",
+    arrived_main_shop:"#a855f7", out_for_branch:"#06b6d4", delivered:"#818cf8", cancelled:"#71717a",
+  };
+  const STATUS_LABEL_BN = {
+    pending:"⏳ অপেক্ষায়", order_confirmed:"✅ গ্রহণ", ordered_supplier:"📦 কোম্পানিকে",
+    in_stock:"✅ স্টকে", out_of_stock:"❌ নেই", waiting_delivery:"⏳ আসছে",
+    arrived_main_shop:"🏪 মেইন শপে", out_for_branch:"🚚 ব্রাঞ্চে", delivered:"✅ ডেলিভারি", cancelled:"🚫 বাতিল",
+  };
+  const STATUS_LABEL_EN = {
+    pending:"⏳ Pending", order_confirmed:"✅ Confirmed", ordered_supplier:"📦 Ordered",
+    in_stock:"✅ In Stock", out_of_stock:"❌ No Stock", waiting_delivery:"⏳ Waiting",
+    arrived_main_shop:"🏪 Main Shop", out_for_branch:"🚚 Outgoing", delivered:"✅ Delivered", cancelled:"🚫 Cancelled",
+  };
+  const SL = lang==="bn" ? STATUS_LABEL_BN : STATUS_LABEL_EN;
+
+  const fmtDate = (d) => {
+    if (!d) return "";
+    const dt = d instanceof Date ? d : new Date(d);
+    return dt.toLocaleDateString(lang==="bn"?"bn-BD":"en-GB",{day:"2-digit",month:"short"});
+  };
+
+  const panelStyle = isDesktop ? s.desktopPanel : { ...s.panel, paddingBottom:80 };
+
+  // owner quick nav items
+  const ownerNavItems = [
+    { key:"owner",    icon:"📋", label:lang==="bn"?"অর্ডার":"Orders",         badge:unread },
+    { key:"companies",icon:"🏢", label:lang==="bn"?"কোম্পানি":"Companies",    badge:cos.length },
+    { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:products.length },
+    { key:"purchase", icon:"🧾", label:lang==="bn"?"ক্রয়":"Purchase",         badge:null },
+    { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
+    { key:"vendors",  icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors",        badge:vendors.length },
+    { key:"customers",icon:"👥", label:lang==="bn"?"কাস্টমার":"Customers",    badge:customers.length },
+    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক প্রিন্ট":"Cheque",    badge:null },
+    { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
+  ];
+  const salesNavItems = [
+    { key:"shop",     icon:"📋", label:lang==="bn"?"অর্ডার":"New Order",      badge:unread },
+    { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:null },
+    { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
+    { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
+    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক প্রিন্ট":"Cheque",    badge:null },
+    { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
+  ];
+  const navItems = isOwner ? ownerNavItems : salesNavItems;
+
+  const cardStyle = (accent) => ({
+    background: th.bgCard,
+    border: `1px solid ${th.border}`,
+    borderRadius: 14,
+    padding: "16px 18px",
+    flex: 1,
+    minWidth: 100,
+    borderTop: `3px solid ${accent}`,
+  });
+
+  const statNum  = { fontSize: 28, fontWeight: 800, color: th.txtPrimary, lineHeight: 1.1 };
+  const statLbl  = { fontSize: 11, color: th.txtMuted, marginTop: 4, fontWeight: 600, textTransform:"uppercase", letterSpacing:0.4 };
+
+  return (
+    <div style={panelStyle}>
+      {/* ── greeting ── */}
+      <div style={{ background:`linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.04))`, border:`1px solid rgba(249,115,22,0.25)`, borderRadius:16, padding:"20px 22px", marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
+        <div style={{ fontSize:46 }}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div>
+          <div style={{ fontSize:20, fontWeight:800, color:th.txtPrimary }}>
+            {t.dashGreeting}, {profile.personName}! 👋
+          </div>
+          <div style={{ fontSize:13, color:th.txtMuted, marginTop:3 }}>
+            🏪 {localShop?.companyName||""}
+            {!isOwner && profile.position && <span style={{ marginLeft:8, color:th.accent, fontWeight:600 }}> · {profile.position}</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* ── stat cards ── */}
+      <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>
+        {isOwner ? t.dashTotalOrders : t.dashMyOrders}
+      </div>
+      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
+        <div style={cardStyle("#f59e0b")}>
+          <div style={statNum}>{pending}</div>
+          <div style={statLbl}>⏳ {t.dashPending}</div>
+        </div>
+        <div style={cardStyle("#06b6d4")}>
+          <div style={statNum}>{inProgress}</div>
+          <div style={statLbl}>🔄 {t.dashInProgress}</div>
+        </div>
+        <div style={cardStyle("#22c55e")}>
+          <div style={statNum}>{delivered}</div>
+          <div style={statLbl}>✅ {t.dashDelivered}</div>
+        </div>
+        <div style={cardStyle("#ef4444")}>
+          <div style={statNum}>{cancelled}</div>
+          <div style={statLbl}>🚫 {t.dashCancelled}</div>
+        </div>
+      </div>
+
+      {/* ── owner extra stats ── */}
+      {isOwner && (
+        <>
+          <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>
+            {lang==="bn"?"দোকানের সংক্ষিপ্ত তথ্য":"Shop Overview"}
+          </div>
+          <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
+            <div style={cardStyle("#a855f7")}>
+              <div style={statNum}>{products.length}</div>
+              <div style={statLbl}>📦 {t.dashProducts}</div>
+            </div>
+            <div style={cardStyle("#f97316")}>
+              <div style={statNum}>{cos.length}</div>
+              <div style={statLbl}>🏢 {t.dashCompanies}</div>
+            </div>
+            <div style={cardStyle("#818cf8")}>
+              <div style={statNum}>{team.length}</div>
+              <div style={statLbl}>👥 {t.dashTeam}</div>
+            </div>
+            <div style={cardStyle("#22c55e")}>
+              <div style={statNum}>{customers.length}</div>
+              <div style={statLbl}>👤 {t.dashCustomers}</div>
+            </div>
+            <div style={cardStyle("#06b6d4")}>
+              <div style={statNum}>{vendors.length}</div>
+              <div style={statLbl}>🏭 {t.dashVendors}</div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── recent orders ── */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5 }}>{t.dashRecentOrders}</div>
+        <button onClick={()=>setTab(isOwner?"owner":"shop")}
+          style={{ background:"transparent", border:"none", color:th.accent, cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"inherit" }}>
+          {t.dashViewAll}
+        </button>
+      </div>
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, overflow:"hidden", marginBottom:20 }}>
+        {recent5.length===0 ? (
+          <div style={{ padding:"24px", textAlign:"center", color:th.txtFaint, fontSize:13 }}>{t.dashNoOrders}</div>
+        ) : recent5.map((o,i)=>(
+          <div key={o.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 16px", borderBottom: i<recent5.length-1?`1px solid ${th.border}`:"none" }}>
+            <div style={{ width:40, height:40, borderRadius:10, background:th.bgInp, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+              <span style={{ fontSize:11, fontWeight:800, color:th.accent }}>{o.orderNo||o.id.slice(-4).toUpperCase()}</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:12, fontWeight:700, color:th.txtPrimary, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                {o.items?.map(it=>it.name).filter(Boolean).join(", ")||"—"}
+              </div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>
+                {o.createdByName||""} · {fmtDate(o.createdAt)}
+              </div>
+            </div>
+            <span style={{ padding:"3px 10px", borderRadius:20, fontSize:10, fontWeight:700, background:`${STATUS_COLOR[o.overall]||"#71717a"}22`, color:STATUS_COLOR[o.overall]||"#71717a", whiteSpace:"nowrap", flexShrink:0 }}>
+              {SL[o.overall]||o.overall}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── quick navigation ── */}
+      <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>{t.dashQuickNav}</div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))", gap:10 }}>
+        {navItems.map(n=>(
+          <button key={n.key} onClick={()=>setTab(n.key)}
+            style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 8px", cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:6, position:"relative" }}>
+            {n.badge>0 && <span style={{ position:"absolute", top:6, right:6, background:"#ef4444", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:9, fontWeight:800 }}>{n.badge}</span>}
+            <span style={{ fontSize:22 }}>{n.icon}</span>
+            <span style={{ fontSize:11, fontWeight:700, color:th.txtSecondary, textAlign:"center", lineHeight:1.3 }}>{n.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
   const isOwner = profile.role==="owner";
@@ -5988,7 +6198,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [syncState,setSyncState]=useState("connecting");
   const [localShop,setLocalShop]=useState(shopProp);
 
-  const [tab,setTab]=useState(isOwner?"owner":"shop");
+  const [tab,setTab]=useState("dashboard");
 
   // ── INVOICE STATE ──
   // items = confirmed invoice list (locked rows)
@@ -6581,8 +6791,9 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["settings",t.tabSettings]]
     : [
+        ["dashboard",t.tabDashboard],
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
@@ -6868,6 +7079,16 @@ const startEditOrder = (order) => {
   // ── TAB CONTENT ──
   const tabContent = (
     <>
+      {tab==="dashboard"&&(
+        <DashboardTab
+          t={t} lang={lang} th={th} s={s}
+          profile={profile} localShop={localShop}
+          orders={orders} cos={cos} products={products}
+          team={team} vendors={vendors} customers={customers}
+          isOwner={isOwner} isDesktop={isDesktop}
+          setTab={setTab} unread={unread}
+        />
+      )}
       {!isOwner&&tab==="shop"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           {can("sendOrder")&&(
