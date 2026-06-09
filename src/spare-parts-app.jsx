@@ -6803,6 +6803,11 @@ const startEditOrder = (order) => {
         ["settings",t.tabSettings],
       ];
 
+  // Safety: if any old/invalid tab is active after new menu changes, always return to Dashboard.
+  useEffect(() => {
+    if (!visibleTabs.some(([k]) => k === tab)) setTab("dashboard");
+  }, [tab, visibleTabs]);
+
   // ── ORDER STATUS FLOW (overall) ──
   const setOrderStatus = async (oId, newStatus) => {
     if (!isOwner&&!can("setStatus")) return;
@@ -8686,7 +8691,7 @@ function getStyles(th) { return {
   langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
   lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
   lBtnA:       { background:th.accent, color:"#fff" },
-  tabs:        { display:"flex", gap:5 },
+  tabs:        { display:"flex", gap:5, flexWrap:"wrap", maxWidth:"100%", overflowX:"auto" },
   tab:         { padding:"7px 11px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600, position:"relative" },
   tabA:        { background:th.accent, color:"#fff", border:`1px solid ${th.accent}` },
   badge:       { position:"absolute", top:-6, right:-6, background:"#ef4444", color:"#fff", borderRadius:"50%", width:16, height:16, fontSize:9, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:800 },
