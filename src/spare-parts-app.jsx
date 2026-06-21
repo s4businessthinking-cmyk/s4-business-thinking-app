@@ -458,6 +458,42 @@ const TR = {
     pi_createdBy:"তৈরি করেছেন",
     pi_backToList:"← তালিকায় ফিরুন",
     pi_itemsCount:"টি পণ্য",
+    // ── Payment Receipt / Cheque Receipt ──
+    pi_paymentHistory:"💳 পেমেন্ট হিস্টরি",
+    pi_addPayment:"+ পেমেন্ট রিসিট যোগ করুন",
+    pi_noPayments:"এখনো কোনো পেমেন্ট রিসিট নেই",
+    pi_paymentNo:"রিসিট নং",
+    pi_paymentDate:"পেমেন্টের তারিখ",
+    pi_paymentAmount:"পরিমাণ (৳) *",
+    pi_paymentNote:"নোট (ঐচ্ছিক)",
+    pi_paymentNotePh:"যেকোনো মন্তব্য...",
+    pi_fullAmount:"পুরো বাকি টাকা",
+    pi_chequeNo:"চেক নম্বর *",
+    pi_chequeBank:"ব্যাংকের নাম",
+    pi_chequeDate:"চেকের তারিখ",
+    pi_chequeStatus:"চেকের অবস্থা",
+    pi_chequeStatusPending:"⏳ অপেক্ষমান",
+    pi_chequeStatusCleared:"✅ ক্লিয়ার হয়েছে",
+    pi_chequeStatusBounced:"❌ বাউন্স হয়েছে",
+    pi_markCleared:"✅ ক্লিয়ার চিহ্নিত করুন",
+    pi_markBounced:"❌ বাউন্স চিহ্নিত করুন",
+    pi_cancelPayment:"বাতিল করুন",
+    pi_confirmCancelPayment:"এই পেমেন্ট রিসিটটি বাতিল করবেন? বাতিল করলে বাকি টাকার পরিমাণ আবার বেড়ে যাবে।",
+    pi_confirmBounce:"চেকটি বাউন্স হয়েছে হিসেবে চিহ্নিত করবেন? এতে এই পেমেন্টের টাকা আবার বাকিতে যোগ হয়ে যাবে।",
+    pi_paymentAdded:"✅ পেমেন্ট রিসিট যোগ হয়েছে!",
+    pi_paymentCancelled:"🚫 পেমেন্ট রিসিট বাতিল হয়েছে।",
+    pi_chequeUpdated:"✅ চেকের অবস্থা আপডেট হয়েছে!",
+    pi_chequeBounced:"❌ চেক বাউন্স হিসেবে চিহ্নিত হয়েছে। বাকি টাকা আপডেট হয়েছে।",
+    pi_errPaymentAmount:"সঠিক পরিমাণ লিখুন!",
+    pi_errPaymentExceeds:"পরিমাণ বাকি টাকার চেয়ে বেশি হতে পারবে না!",
+    pi_errChequeNo:"চেক নম্বর লিখুন!",
+    pi_printReceipt:"🖨️ রিসিট প্রিন্ট",
+    pi_paymentReceiptTitle:"পেমেন্ট রিসিট",
+    pi_chequeReceiptTitle:"চেক রিসিট",
+    pi_receiptFor:"পেমেন্ট বাবদ",
+    pi_receivedFrom:"গ্রহণ করা হয়েছে",
+    pi_paidTo:"প্রদান করা হয়েছে",
+    pi_alreadyFullyPaid:"✅ এই ইনভয়েসটি ইতিমধ্যে সম্পূর্ণ পরিশোধিত!",
     pi_pmSearch:"পণ্য খুঁজুন...",
     pi_totalInvoices:"মোট ইনভয়েস",
     pi_totalAmount:"মোট ক্রয়",
@@ -887,6 +923,42 @@ const TR = {
     pi_createdBy:"Created by",
     pi_backToList:"← Back to List",
     pi_itemsCount:" items",
+    // ── Payment Receipt / Cheque Receipt ──
+    pi_paymentHistory:"💳 Payment History",
+    pi_addPayment:"+ Add Payment Receipt",
+    pi_noPayments:"No payment receipts yet",
+    pi_paymentNo:"Receipt No.",
+    pi_paymentDate:"Payment Date",
+    pi_paymentAmount:"Amount (AED) *",
+    pi_paymentNote:"Note (Optional)",
+    pi_paymentNotePh:"Any remarks...",
+    pi_fullAmount:"Full Balance Due",
+    pi_chequeNo:"Cheque No. *",
+    pi_chequeBank:"Bank Name",
+    pi_chequeDate:"Cheque Date",
+    pi_chequeStatus:"Cheque Status",
+    pi_chequeStatusPending:"⏳ Pending",
+    pi_chequeStatusCleared:"✅ Cleared",
+    pi_chequeStatusBounced:"❌ Bounced",
+    pi_markCleared:"✅ Mark Cleared",
+    pi_markBounced:"❌ Mark Bounced",
+    pi_cancelPayment:"Cancel",
+    pi_confirmCancelPayment:"Cancel this payment receipt? The balance due will increase again.",
+    pi_confirmBounce:"Mark this cheque as bounced? This payment's amount will be added back to the balance due.",
+    pi_paymentAdded:"✅ Payment receipt added!",
+    pi_paymentCancelled:"🚫 Payment receipt cancelled.",
+    pi_chequeUpdated:"✅ Cheque status updated!",
+    pi_chequeBounced:"❌ Cheque marked as bounced. Balance due updated.",
+    pi_errPaymentAmount:"Enter a valid amount!",
+    pi_errPaymentExceeds:"Amount cannot exceed the balance due!",
+    pi_errChequeNo:"Enter cheque number!",
+    pi_printReceipt:"🖨️ Print Receipt",
+    pi_paymentReceiptTitle:"Payment Receipt",
+    pi_chequeReceiptTitle:"Cheque Receipt",
+    pi_receiptFor:"Payment For",
+    pi_receivedFrom:"Received From",
+    pi_paidTo:"Paid To",
+    pi_alreadyFullyPaid:"✅ This invoice is already fully paid!",
     pi_pmSearch:"Search products...",
     pi_totalInvoices:"Total Invoices",
     pi_totalAmount:"Total Purchase",
@@ -1543,12 +1615,24 @@ function PmForm({ pmForm, pmUpd, t, lang, th }) {
 
 // ─── PURCHASE INVOICE — CONSTANTS ────────────────────────────
 const PI_PREFIX       = "PI-";
+const PMT_PREFIX      = "PMT-";
 const PI_UNITS        = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];
 const PI_PAY_METHODS  = {
   cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
   bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
   cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
   credit: { bn:"বাকি (ক্রেডিট)",  en:"Credit",         icon:"📅" },
+};
+// Methods valid for an actual money Payment Receipt (credit excluded — credit isn't a real payment)
+const PI_RECEIPT_METHODS = {
+  cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
+  bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
+  cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
+};
+const PI_CHEQUE_STATUSES = {
+  pending:  { bn:"⏳ অপেক্ষমান",      en:"⏳ Pending",  color:"#f59e0b", bg:"#451a03" },
+  cleared:  { bn:"✅ ক্লিয়ার হয়েছে",  en:"✅ Cleared",  color:"#22c55e", bg:"#052e16" },
+  bounced:  { bn:"❌ বাউন্স হয়েছে",   en:"❌ Bounced",  color:"#ef4444", bg:"#450a0a" },
 };
 const PI_STATUSES = {
   draft:     { bn:"ড্রাফট",        en:"Draft",     color:"#f59e0b", bg:"#451a03" },
@@ -1692,11 +1776,11 @@ function PiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ─── PI: DETAIL VIEW ──────────────────────────────────────────
-function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack, t, th, lang, isOwner }) {
+function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack, t, th, lang, isOwner, payments, paymentsLoading, onOpenPaymentModal, onCancelPayment, onSetChequeStatus, onPrintPayment }) {
   const { sub, disc, tax, grand } = piCalcTotals(invoice.items||[]);
   const balance = grand - invoice.amountPaid;
   const canEdit   = ["draft","confirmed"].includes(invoice.status);
-  const canPay    = ["confirmed","partial"].includes(invoice.status);
+  const canPay    = ["confirmed","partial"].includes(invoice.status) && balance>0.01;
   const canCancel = ["draft","confirmed","partial"].includes(invoice.status);
   const dr = { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
   return (
@@ -1772,17 +1856,286 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
         </div>
       </div>
 
+      {/* Payment History — Payment Receipts / Cheque Receipts */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+          <span style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0 }}>{t.pi_paymentHistory}</span>
+          {payments?.length>0&&<span style={{ fontSize:11, fontWeight:800, color:"#f97316", background:"rgba(249,115,22,0.1)", padding:"2px 10px", borderRadius:20 }}>{payments.length}</span>}
+        </div>
+        {isOwner&&canPay&&(
+          <button onClick={onOpenPaymentModal} style={{ width:"100%", marginBottom:10, padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer" }}>{t.pi_addPayment}</button>
+        )}
+        {!canPay&&balance<=0.01&&invoice.status!=="draft"&&invoice.status!=="cancelled"&&(
+          <div style={{ padding:"9px 12px", borderRadius:8, background:"rgba(34,197,94,0.08)", border:"1px solid #22c55e", color:"#22c55e", fontSize:12, fontWeight:700, textAlign:"center", marginBottom:10 }}>{t.pi_alreadyFullyPaid}</div>
+        )}
+        {paymentsLoading&&<div style={{ textAlign:"center", padding:"14px", color:th.txtFaint, fontSize:12 }}>⏳</div>}
+        {!paymentsLoading&&(!payments||payments.length===0)&&(
+          <div style={{ textAlign:"center", padding:"14px", color:th.txtFaint, fontSize:12 }}>{t.pi_noPayments}</div>
+        )}
+        {!paymentsLoading&&(payments||[]).map(p=>(
+          <PiPaymentRow key={p.id} payment={p} t={t} th={th} lang={lang} isOwner={isOwner}
+            onCancel={()=>onCancelPayment(p)}
+            onSetChequeStatus={(st)=>onSetChequeStatus(p,st)}
+            onPrint={()=>onPrintPayment(p)} />
+        ))}
+      </div>
+
       {/* Actions */}
       {isOwner&&(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {canEdit&&<button onClick={onEdit} style={{ padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.pi_editBtn}</button>}
-          {canPay&&<button onClick={onMarkPaid} style={{ padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.pi_markPaid}</button>}
+          {canPay&&<button onClick={onMarkPaid} style={{ padding:"12px", borderRadius:10, border:"1.5px solid #22c55e", background:"transparent", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_markPaid}</button>}
           {canCancel&&<button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelBtn}</button>}
           {invoice.status==="draft"&&<button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_deleteBtn}</button>}
         </div>
       )}
     </div>
   );
+}
+
+// ─── PI: PAYMENT RECEIPT ROW (within Payment History) ─────────
+function PiPaymentRow({ payment, t, th, lang, isOwner, onCancel, onSetChequeStatus, onPrint }) {
+  const isCheque = payment.method==="cheque";
+  const isCancelled = payment.status==="cancelled";
+  const chequeSt = PI_CHEQUE_STATUSES[payment.chequeStatus]||PI_CHEQUE_STATUSES.pending;
+  return (
+    <div style={{ padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:8, border:`1px solid ${th.border}`, opacity:isCancelled?0.55:1 }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+            <span style={{ fontSize:12, fontWeight:800, color:"#f97316" }}>{PI_RECEIPT_METHODS[payment.method]?.icon||"💵"} {payment.paymentNo}</span>
+            {isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:"#ef4444", background:"#450a0a", padding:"2px 7px", borderRadius:10 }}>{lang==="bn"?"বাতিল":"CANCELLED"}</span>}
+            {isCheque&&!isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:chequeSt.color, background:chequeSt.bg, padding:"2px 7px", borderRadius:10 }}>{chequeSt[lang]}</span>}
+          </div>
+          <div style={{ fontSize:11, color:th.txtMuted, marginTop:3 }}>📅 {payment.paymentDate}</div>
+          {isCheque&&(payment.chequeNo||payment.chequeBank)&&(
+            <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
+              {payment.chequeNo&&<span>📃 {payment.chequeNo}</span>}
+              {payment.chequeBank&&<span>🏦 {payment.chequeBank}</span>}
+              {payment.chequeDate&&<span>📅 {payment.chequeDate}</span>}
+            </div>
+          )}
+          {payment.note&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📝 {payment.note}</div>}
+        </div>
+        <span style={{ fontSize:15, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", flexShrink:0, textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(payment.amount)}</span>
+      </div>
+      <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
+        <button onClick={onPrint} style={{ padding:"5px 10px", borderRadius:7, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:10, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>
+        {isOwner&&!isCancelled&&isCheque&&payment.chequeStatus==="pending"&&(
+          <>
+            <button onClick={()=>onSetChequeStatus("cleared")} style={{ padding:"5px 10px", borderRadius:7, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:10, fontWeight:700, cursor:"pointer" }}>{t.pi_markCleared}</button>
+            <button onClick={()=>onSetChequeStatus("bounced")} style={{ padding:"5px 10px", borderRadius:7, border:"1px solid #ef4444", background:"rgba(239,68,68,0.08)", color:"#ef4444", fontSize:10, fontWeight:700, cursor:"pointer" }}>{t.pi_markBounced}</button>
+          </>
+        )}
+        {isOwner&&!isCancelled&&(
+          <button onClick={onCancel} style={{ padding:"5px 10px", borderRadius:7, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:10, fontWeight:700, cursor:"pointer", marginLeft:"auto" }}>✕ {t.pi_cancelPayment}</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PI: PAYMENT RECEIPT MODAL (Add Payment / Cheque Receipt) ─
+function PiPaymentModal({ invoice, balance, onClose, onSave, t, th, lang, saving }) {
+  const [amount,setAmount]       = useState(piFmt2(balance));
+  const [method,setMethod]       = useState("cash");
+  const [paymentDate,setPaymentDate] = useState(piToday());
+  const [note,setNote]           = useState("");
+  const [chequeNo,setChequeNo]   = useState("");
+  const [chequeBank,setChequeBank] = useState("");
+  const [chequeDate,setChequeDate] = useState(piToday());
+
+  const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
+  const lbl={ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 };
+
+  const handleSave = () => {
+    onSave({
+      amount, method, paymentDate, note,
+      chequeNo: method==="cheque"?chequeNo:"",
+      chequeBank: method==="cheque"?chequeBank:"",
+      chequeDate: method==="cheque"?chequeDate:"",
+    });
+  };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:10000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
+      <div style={{ width:"100%", maxWidth:520, background:th.bgCard, borderRadius:"16px 16px 0 0", maxHeight:"88vh", display:"flex", flexDirection:"column", border:`1px solid ${th.border}` }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", borderBottom:`1px solid ${th.border}` }}>
+          <span style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{method==="cheque"?`📃 ${t.pi_chequeReceiptTitle}`:`💳 ${t.pi_paymentReceiptTitle}`}</span>
+          <button onClick={onClose} style={{ background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:20, lineHeight:1 }}>✕</button>
+        </div>
+
+        <div style={{ overflowY:"auto", flex:1, padding:16 }}>
+          {/* Invoice + Balance context */}
+          <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px", marginBottom:14, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{invoice.invoiceNo}</div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>🏭 {invoice.vendorName||"—"}</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700 }}>{t.pi_balanceDue}</div>
+              <div style={{ fontSize:16, fontWeight:900, color:"#ef4444" }}>{t.cur} {piFmt2(balance)}</div>
+            </div>
+          </div>
+
+          {/* Method */}
+          <div style={lbl}>{t.pi_paymentMethod}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:14 }}>
+            {Object.entries(PI_RECEIPT_METHODS).map(([key,pm])=>(
+              <button key={key} onClick={()=>setMethod(key)} style={{ padding:"10px 6px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", border:`1.5px solid ${method===key?"#f97316":th.borderMid}`, background:method===key?"rgba(249,115,22,0.12)":"transparent", color:method===key?"#f97316":th.txtMuted, fontSize:12, fontWeight:700, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                <span style={{ fontSize:18 }}>{pm.icon}</span><span>{pm[lang]}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Amount + Date */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
+            <div>
+              <div style={lbl}>{t.pi_paymentAmount}</div>
+              <input style={{ ...inp(), fontSize:16, fontWeight:700, borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder="0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
+            </div>
+            <div>
+              <div style={lbl}>{t.pi_paymentDate}</div>
+              <input type="date" style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
+            </div>
+          </div>
+          {balance>0&&(
+            <button onClick={()=>setAmount(piFmt2(balance))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer", marginBottom:14 }}>
+              {t.pi_fullAmount} ({t.cur} {piFmt2(balance)})
+            </button>
+          )}
+
+          {/* Cheque-specific fields */}
+          {method==="cheque"&&(
+            <div style={{ background:"rgba(99,102,241,0.06)", border:"1px solid #6366f1", borderRadius:10, padding:12, marginBottom:14 }}>
+              <div style={{ fontSize:11, color:"#818cf8", fontWeight:700, marginBottom:10 }}>📃 {t.pi_chequeReceiptTitle}</div>
+              <div style={{ marginBottom:8 }}>
+                <div style={lbl}>{t.pi_chequeNo}</div>
+                <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="000123" value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div>
+                  <div style={lbl}>{t.pi_chequeBank}</div>
+                  <select style={{ ...inp(), background:th.bgCard }} value={chequeBank} onChange={e=>setChequeBank(e.target.value)}>
+                    <option value="">{lang==="bn"?"নির্বাচন করুন":"Select bank"}</option>
+                    {UAE_BANKS.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={lbl}>{t.pi_chequeDate}</div>
+                  <input type="date" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Note */}
+          <div style={{ marginBottom:8 }}>
+            <div style={lbl}>{t.pi_paymentNote}</div>
+            <AutoTA style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", overflow:"hidden", minHeight:56, boxSizing:"border-box", fontFamily:"inherit" }}
+              placeholder={t.pi_paymentNotePh} value={note} onChange={e=>setNote(e.target.value)} />
+          </div>
+        </div>
+
+        <div style={{ padding:14, borderTop:`1px solid ${th.border}` }}>
+          <button onClick={handleSave} disabled={saving} style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:saving?"#1e3a5f":"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:saving?"not-allowed":"pointer" }}>
+            {saving?"...":t.pi_addPayment}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── PI: PAYMENT/CHEQUE RECEIPT — PRINTABLE HTML ───────────────
+function generatePaymentReceiptHTML(payment, invoice, shop, lang) {
+  const isBn = lang==="bn";
+  const isCheque = payment.method==="cheque";
+  const title = isCheque ? (isBn?"চেক রিসিট":"Cheque Receipt") : (isBn?"পেমেন্ট রিসিট":"Payment Receipt");
+  const methodLabel = PI_RECEIPT_METHODS[payment.method]?.[lang] || payment.method;
+  const cur = "AED";
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${title} - ${payment.paymentNo}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
+.receipt{max-width:560px;margin:0 auto;border:2px solid #f97316;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
+.hdr{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:18px 22px}
+.shop-name{font-size:19px;font-weight:900}
+.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}
+.title-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.3)}
+.rc-title{font-size:18px;font-weight:900;letter-spacing:1px}
+.rc-no{font-size:13px;font-weight:700;opacity:0.95}
+.body{padding:20px 22px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}
+.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}
+.info-value{font-size:14px;font-weight:700;color:#111}
+.amount-box{background:#f0fdf4;border:2px solid #22c55e;border-radius:10px;padding:16px;text-align:center;margin-bottom:16px}
+.amount-label{font-size:11px;color:#15803d;font-weight:700;text-transform:uppercase}
+.amount-val{font-size:32px;font-weight:900;color:#15803d;margin-top:4px}
+.cheque-box{background:#eef2ff;border:1px solid #6366f1;border-radius:10px;padding:13px;margin-bottom:16px}
+.cheque-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px}
+.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:16px;font-size:12px;color:#92400e}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px;padding-top:14px;border-top:1px dashed #e5e7eb}
+.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
+.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid #f97316;font-size:11px;color:#f97316;font-weight:700}
+@media print{body{padding:0}.no-print{display:none!important}.receipt{border-radius:0;box-shadow:none}}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="padding:10px 28px;background:#ea580c;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
+  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
+</div>
+<div class="receipt">
+  <div class="hdr">
+    <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
+    <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
+    ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
+    <div class="title-row"><span class="rc-title">${title}</span><span class="rc-no">${payment.paymentNo}</span></div>
+  </div>
+  <div class="body">
+    <div class="info-grid">
+      <div class="info-box"><div class="info-label">📅 ${isBn?"তারিখ":"Date"}</div><div class="info-value">${payment.paymentDate}</div></div>
+      <div class="info-box"><div class="info-label">💳 ${isBn?"পদ্ধতি":"Method"}</div><div class="info-value">${PI_RECEIPT_METHODS[payment.method]?.icon||""} ${methodLabel}</div></div>
+      <div class="info-box"><div class="info-label">🏭 ${isBn?"প্রদান করা হয়েছে":"Paid To"}</div><div class="info-value">${invoice.vendorName||"—"}</div></div>
+      <div class="info-box"><div class="info-label">🧾 ${isBn?"ইনভয়েস নং":"Against Invoice"}</div><div class="info-value">${invoice.invoiceNo}</div></div>
+    </div>
+    <div class="amount-box">
+      <div class="amount-label">${isBn?"পরিমাণ":"Amount Paid"}</div>
+      <div class="amount-val">${cur} ${piFmt2(payment.amount)}</div>
+    </div>
+    ${isCheque?`<div class="cheque-box">
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📃 ${isBn?"চেক নম্বর":"Cheque No."}</span><span style="font-weight:700">${payment.chequeNo||"—"}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${payment.chequeBank||"—"}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📅 ${isBn?"চেকের তারিখ":"Cheque Date"}</span><span style="font-weight:700">${payment.chequeDate||"—"}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📊 ${isBn?"অবস্থা":"Status"}</span><span style="font-weight:700">${PI_CHEQUE_STATUSES[payment.chequeStatus]?.[lang]||payment.chequeStatus}</span></div>
+    </div>`:""}
+    ${payment.note?`<div class="note-box">📝 ${payment.note}</div>`:""}
+    <div class="sigs">
+      <div><div class="sig-line">${isBn?"প্রদানকারীর স্বাক্ষর":"Paid By Signature"}</div></div>
+      <div><div class="sig-line">${isBn?"গ্রহণকারীর স্বাক্ষর":"Received By Signature"}</div></div>
+    </div>
+  </div>
+  <div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div>
+</div>
+</body></html>`;
+}
+
+function printPaymentReceipt(payment, invoice, shop, lang) {
+  const html = generatePaymentReceiptHTML(payment, invoice, shop, lang);
+  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const w    = window.open(url, "_blank", "width=680,height=780");
+  if (!w) {
+    URL.revokeObjectURL(url);
+    alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups.");
+    return;
+  }
+  w.addEventListener("load", () => {
+    setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
+  });
 }
 
 // ─── AUTO-RESIZE TEXTAREA ────────────────────────────────────
@@ -3283,7 +3636,7 @@ function PiSalesmanView({ t, lang, th, shopId }) {
 }
 
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, toast, isDesktop }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
   const isOwner = profile?.role==="owner";
 
   // ── Firestore state ──
@@ -3295,6 +3648,12 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [piSubTab,setPiSubTab]     = useState("invoices"); // "invoices" | "ledger"
   const [selInvoice,setSelInvoice] = useState(null);
   const [editInvoiceId,setEditInvoiceId] = useState(null);
+
+  // ── Payment Receipt / Cheque Receipt state ──
+  const [invoicePayments,setInvoicePayments] = useState([]);
+  const [paymentsLoading,setPaymentsLoading] = useState(false);
+  const [showPaymentModal,setShowPaymentModal] = useState(false);
+  const [paymentSaving,setPaymentSaving] = useState(false);
 
   // ── Form state ──
   const [piInvoiceNo,setPiInvoiceNo] = useState("");
@@ -3367,6 +3726,154 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         // Layer 3: timestamp fallback — never fails
         return `${PI_PREFIX}${String(Date.now()).slice(-4)}`;
       }
+    }
+  };
+
+  // ── Generate payment receipt no (3-layer fallback, mirrors genInvoiceNo) ──
+  const genPaymentNo = async () => {
+    try {
+      const serial = await runTransaction(db,async tx=>{
+        const shopRef=doc(db,"shops",shopId), shopSnap=await tx.get(shopRef);
+        const next=Number(shopSnap.data()?.lastPaymentSerial||0)+1;
+        tx.update(shopRef,{lastPaymentSerial:next}); return next;
+      });
+      return `${PMT_PREFIX}${String(serial).padStart(4,"0")}`;
+    } catch(e1) {
+      try {
+        const snap=await getDocs(query(collection(db,"purchasePayments"),where("shopId","==",shopId)));
+        const max=snap.docs.reduce((mx,d)=>{ const m=String(d.data().paymentNo||"").match(/PMT-?(\d+)$/); return m?Math.max(mx,Number(m[1])):mx; },0);
+        return `${PMT_PREFIX}${String(max+1).padStart(4,"0")}`;
+      } catch(e2) {
+        return `${PMT_PREFIX}${String(Date.now()).slice(-4)}`;
+      }
+    }
+  };
+
+  // ── Payment Receipts listener — scoped to the currently open invoice ──
+  useEffect(()=>{
+    if (piView!=="detail" || !selInvoice?.id) { setInvoicePayments([]); return; }
+    setPaymentsLoading(true);
+    let unsub2=null;
+    const q=query(collection(db,"purchasePayments"),where("invoiceId","==",selInvoice.id),orderBy("createdAt","desc"));
+    const unsub1=onSnapshot(q,snap=>{
+      setInvoicePayments(snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() })));
+      setPaymentsLoading(false);
+    },()=>{
+      const q2=query(collection(db,"purchasePayments"),where("invoiceId","==",selInvoice.id));
+      unsub2=onSnapshot(q2,snap=>{
+        const docs=snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() }));
+        docs.sort((a,b)=>b.createdAt-a.createdAt);
+        setInvoicePayments(docs);
+        setPaymentsLoading(false);
+      },err2=>{ console.error(err2); setPaymentsLoading(false); });
+    });
+    return ()=>{ unsub1(); unsub2&&unsub2(); };
+  },[piView, selInvoice?.id]);
+
+  // ── Add a Payment Receipt / Cheque Receipt — atomically reduces invoice balance ──
+  const piAddPayment = async (payload) => {
+    if (!selInvoice) return;
+    const amt = piN2(payload.amount);
+    if (!amt || amt<=0) { toast(t.pi_errPaymentAmount,"err"); return; }
+    const currentBalance = Math.max(0, piN2(selInvoice.grandTotal) - piN2(selInvoice.amountPaid));
+    if (amt > currentBalance + 0.01) { toast(t.pi_errPaymentExceeds,"err"); return; }
+    if (payload.method==="cheque" && !String(payload.chequeNo||"").trim()) { toast(t.pi_errChequeNo,"err"); return; }
+
+    setPaymentSaving(true);
+    try {
+      const paymentNo = await genPaymentNo();
+      const invRef = doc(db,"purchaseInvoices",selInvoice.id);
+      let newAmountPaid, newBalance, newStatus;
+      await runTransaction(db, async tx=>{
+        const snap = await tx.get(invRef);
+        if (!snap.exists()) throw new Error(lang==="bn"?"ইনভয়েস খুঁজে পাওয়া যায়নি":"Invoice not found");
+        const cur = snap.data();
+        if (cur.status==="draft"||cur.status==="cancelled") throw new Error(lang==="bn"?"ড্রাফট বা বাতিল ইনভয়েসে পেমেন্ট যোগ করা যাবে না":"Cannot add a payment to a draft or cancelled invoice");
+        const curPaid = piN2(cur.amountPaid);
+        const grand   = piN2(cur.grandTotal);
+        // Re-validate against the freshly-read balance (guards against a race with another concurrent payment)
+        if (amt > Math.max(0, grand-curPaid) + 0.01) throw new Error(t.pi_errPaymentExceeds);
+        newAmountPaid = parseFloat(piFmt2(curPaid + amt));
+        newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+        newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : cur.status);
+        tx.update(invRef, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:serverTimestamp() });
+        const payRef = doc(collection(db,"purchasePayments"));
+        tx.set(payRef, {
+          shopId, paymentNo,
+          invoiceId:selInvoice.id, invoiceNo:selInvoice.invoiceNo,
+          vendorId:selInvoice.vendorId||null, vendorName:selInvoice.vendorName||"",
+          amount:amt, method:payload.method, paymentDate:payload.paymentDate||piToday(),
+          note:(payload.note||"").trim(),
+          chequeNo:   payload.method==="cheque" ? (payload.chequeNo||"").trim()   : "",
+          chequeBank: payload.method==="cheque" ? (payload.chequeBank||"").trim() : "",
+          chequeDate: payload.method==="cheque" ? (payload.chequeDate||"")        : "",
+          chequeStatus: payload.method==="cheque" ? "pending" : null,
+          status:"active",
+          createdBy:user.uid, createdByName:profile.personName, createdAt:serverTimestamp(),
+        });
+      });
+      setSelInvoice(p=>p&&p.id===selInvoice.id?{...p, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus}:p);
+      setShowPaymentModal(false);
+      toast(t.pi_paymentAdded);
+    } catch(e) { toast(e.message,"err"); }
+    finally { setPaymentSaving(false); }
+  };
+
+  // ── Cancel a Payment Receipt — reverses the amount back onto the invoice balance ──
+  const piCancelPayment = async (payment) => {
+    if (!window.confirm(t.pi_confirmCancelPayment)) return;
+    try {
+      const invRef = doc(db,"purchaseInvoices",payment.invoiceId);
+      const payRef = doc(db,"purchasePayments",payment.id);
+      let newAmountPaid, newBalance, newStatus;
+      await runTransaction(db, async tx=>{
+        const invSnap = await tx.get(invRef), paySnap = await tx.get(payRef);
+        if (!invSnap.exists()) throw new Error(lang==="bn"?"ইনভয়েস খুঁজে পাওয়া যায়নি":"Invoice not found");
+        if (!paySnap.exists()) throw new Error(lang==="bn"?"পেমেন্ট খুঁজে পাওয়া যায়নি":"Payment not found");
+        const payData = paySnap.data();
+        if (payData.status==="cancelled") throw new Error(lang==="bn"?"পেমেন্টটি ইতিমধ্যে বাতিল":"Payment already cancelled");
+        const cur = invSnap.data();
+        const grand = piN2(cur.grandTotal);
+        newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(payData.amount))));
+        newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+        newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
+        tx.update(invRef, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:serverTimestamp() });
+        tx.update(payRef, { status:"cancelled", cancelledAt:serverTimestamp(), cancelledBy:user.uid });
+      });
+      setSelInvoice(p=>p&&p.id===payment.invoiceId?{...p, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus}:p);
+      toast(t.pi_paymentCancelled,"err");
+    } catch(e) { toast(e.message,"err"); }
+  };
+
+  // ── Update a cheque's clearance status. Bounced ⇒ auto-reverses the payment. ──
+  const piSetChequeStatus = async (payment, newChequeStatus) => {
+    if (newChequeStatus==="bounced") {
+      if (!window.confirm(t.pi_confirmBounce)) return;
+      try {
+        const invRef = doc(db,"purchaseInvoices",payment.invoiceId);
+        const payRef = doc(db,"purchasePayments",payment.id);
+        let newAmountPaid, newBalance, newStatus;
+        await runTransaction(db, async tx=>{
+          const invSnap = await tx.get(invRef), paySnap = await tx.get(payRef);
+          if (!invSnap.exists()||!paySnap.exists()) throw new Error(lang==="bn"?"তথ্য খুঁজে পাওয়া যায়নি":"Record not found");
+          const payData = paySnap.data();
+          if (payData.status==="cancelled") throw new Error(lang==="bn"?"পেমেন্টটি ইতিমধ্যে বাতিল":"Payment already cancelled");
+          const cur = invSnap.data();
+          const grand = piN2(cur.grandTotal);
+          newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(payData.amount))));
+          newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+          newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
+          tx.update(invRef, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:serverTimestamp() });
+          tx.update(payRef, { chequeStatus:"bounced", status:"cancelled", cancelledAt:serverTimestamp(), cancelledBy:user.uid, cancelReason:"cheque_bounced" });
+        });
+        setSelInvoice(p=>p&&p.id===payment.invoiceId?{...p, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus}:p);
+        toast(t.pi_chequeBounced,"err");
+      } catch(e) { toast(e.message,"err"); }
+    } else {
+      try {
+        await updateDoc(doc(db,"purchasePayments",payment.id),{ chequeStatus:newChequeStatus, updatedAt:serverTimestamp() });
+        toast(t.pi_chequeUpdated);
+      } catch(e) { toast(e.message,"err"); }
     }
   };
 
@@ -3470,8 +3977,12 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     setPiSaving(true);
     try { if (editInvoiceId){ await updateDoc(doc(db,"purchaseInvoices",editInvoiceId),{...payload,updatedAt:serverTimestamp()}); toast(t.pi_updated); } else { await addDoc(collection(db,"purchaseInvoices"),{...payload,createdAt:serverTimestamp()}); toast(t.pi_confirmed); } setPiView("list"); } catch(e){ toast(e.message,"err"); } finally { setPiSaving(false); }
   };
+  // Mark fully paid = record a Payment Receipt (method: cash) for the entire remaining balance.
+  // Routed through piAddPayment so every settlement — full or partial — leaves a receipt in the Payment History.
   const piMarkPaid = async (inv) => {
-    try { await updateDoc(doc(db,"purchaseInvoices",inv.id),{amountPaid:inv.grandTotal,balanceDue:0,status:"paid",updatedAt:serverTimestamp()}); setSelInvoice(p=>({...p,amountPaid:inv.grandTotal,balanceDue:0,status:"paid"})); toast(t.pi_paidMarked); } catch(e){ toast(e.message,"err"); }
+    const bal = Math.max(0, piN2(inv.grandTotal) - piN2(inv.amountPaid));
+    if (bal<=0.009) { toast(t.pi_alreadyFullyPaid,"err"); return; }
+    await piAddPayment({ amount:piFmt2(bal), method:"cash", paymentDate:piToday(), note: lang==="bn"?"সম্পূর্ণ পরিশোধ হিসেবে চিহ্নিত":"Marked as fully paid" });
   };
   const piCancelInv = async (inv) => {
     if (!window.confirm(t.pi_confirmCancel)) return;
@@ -3523,7 +4034,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       {/* ── SUB-TAB: SUPPLIER LEDGER ── */}
       {piSubTab==="ledger"&&(
         <PiSupplierLedger invoices={invoices} t={t} th={th} lang={lang}
-          onViewInvoices={(inv)=>{ setSelInvoice(inv); setPiView("detail"); }} />
+          onViewInvoices={(inv)=>{ setSelInvoice(inv); setShowPaymentModal(false); setPiView("detail"); }} />
       )}
 
       {/* ── SUB-TAB: INVOICES ── */}
@@ -3563,7 +4074,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         {!piLoading&&invoices.length>0&&piFiltered.length===0&&<div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.pi_noResults}</div></div>}
         {!piLoading&&piFiltered.map(inv=>(
           <PiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang}
-            onClick={()=>{ setSelInvoice(inv); setPiView("detail"); }} />
+            onClick={()=>{ setSelInvoice(inv); setShowPaymentModal(false); setPiView("detail"); }} />
         ))}
       </>)}
     </div>
@@ -3573,12 +4084,28 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   if (piView==="detail"&&selInvoice) return (
     <div style={panel}>
       <PiDetailView invoice={selInvoice} t={t} th={th} lang={lang} isOwner={isOwner}
-        onBack={()=>{ setPiView("list"); setSelInvoice(null); }}
+        onBack={()=>{ setPiView("list"); setSelInvoice(null); setShowPaymentModal(false); }}
         onEdit={()=>piOpenEdit(selInvoice)}
         onMarkPaid={()=>piMarkPaid(selInvoice)}
         onCancel={()=>piCancelInv(selInvoice)}
         onDelete={()=>piDelete(selInvoice)}
+        payments={invoicePayments}
+        paymentsLoading={paymentsLoading}
+        onOpenPaymentModal={()=>setShowPaymentModal(true)}
+        onCancelPayment={piCancelPayment}
+        onSetChequeStatus={piSetChequeStatus}
+        onPrintPayment={(p)=>printPaymentReceipt(p, selInvoice, shop, lang)}
       />
+      {showPaymentModal&&(
+        <PiPaymentModal
+          invoice={selInvoice}
+          balance={Math.max(0, piN2(selInvoice.grandTotal) - piN2(selInvoice.amountPaid))}
+          onClose={()=>setShowPaymentModal(false)}
+          onSave={piAddPayment}
+          saving={paymentSaving}
+          t={t} th={th} lang={lang}
+        />
+      )}
     </div>
   );
 
@@ -8156,7 +8683,7 @@ const startEditOrder = (order) => {
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
           vendors={vendors} products={products}
-          toast={toast} isDesktop={isDesktop}
+          shop={localShop} toast={toast} isDesktop={isDesktop}
         />
       )}
 
