@@ -1585,6 +1585,9 @@ function piCalcTotals(items) {
 function piEmptyLine() {
   return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
 }
+function piEmptyCurrent() {
+  return { productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
+}
 function piEmptyForm() {
   return { invoiceDate:piToday(), supplierInvoiceNo:"", vendorId:"", vendorName:"", vendorMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
 }
@@ -1660,85 +1663,6 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
         </div>
       </div>
     </div>
-  );
-}
-
-// ─── PI: LINE ITEM ROW (mobile card) ──────────────────────────
-function PiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th }) {
-  const { disc, tax, total } = piCalcLine(item);
-  const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
-  const lbl={ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:2 };
-  return (
-    <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:12, marginBottom:8 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-        <span style={{ fontSize:12, fontWeight:800, color:"#f97316" }}>#{idx+1}</span>
-        <div style={{ display:"flex", gap:6 }}>
-          <button onClick={()=>onPick(idx)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:11, fontWeight:700 }}>📦</button>
-          <button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 }}>✕</button>
-        </div>
-      </div>
-      <input style={{ ...inp(), marginBottom:6, fontSize:13, fontWeight:600 }} placeholder={t.pi_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6, marginBottom:6 }}>
-        <input style={inp()} placeholder={t.pi_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
-        <input style={inp()} placeholder={t.pi_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:6 }}>
-        <div><div style={lbl}>{t.pi_qty}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></div>
-        <div><div style={lbl}>{t.pi_unit}</div><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
-        <div><div style={lbl}>{t.pi_unitCost}</div><input style={inp()} inputMode="decimal" placeholder="0.00" value={item.unitCost} onChange={e=>onUpdate(item.id,"unitCost",e.target.value)} /></div>
-      </div>
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
-        <div><div style={lbl}>{t.pi_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
-        <div><div style={lbl}>{t.pi_vat} (default 5%)</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></div>
-      </div>
-      <div style={{ marginTop:6 }}>
-        <div style={lbl}>💰 {t.pi_salePrice}</div>
-        <input style={{ ...inp(), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder={t.pi_salePricePh} value={item.salePrice} onChange={e=>onUpdate(item.id,"salePrice",e.target.value)} />
-      </div>
-      <div style={{ marginTop:8, padding:"7px 10px", background:"rgba(249,115,22,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-        <span style={{ fontSize:11, color:th.txtMuted }}>{t.pi_lineTotal}</span>
-        <span style={{ fontSize:15, fontWeight:800, color:"#f97316" }}>{t.cur} {piFmt2(total)}</span>
-      </div>
-    </div>
-  );
-}
-
-// ─── PI: LINE ITEM ROW (desktop table row) ────────────────────
-function PiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th }) {
-  const { disc, tax, total } = piCalcLine(item);
-  const inp=(e={})=>({ padding:"7px 9px", borderRadius:6, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
-  return (
-    <tr style={{ borderBottom:`1px solid ${th.border}` }}>
-      <td style={{ padding:"8px 6px", fontSize:12, fontWeight:700, color:"#f97316", textAlign:"center", width:30 }}>{idx+1}</td>
-      <td style={{ padding:"8px 6px" }}>
-        <div style={{ display:"flex", gap:4, marginBottom:4 }}>
-          <input style={{ ...inp(), flex:2 }} placeholder={t.pi_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
-          <button onClick={()=>onPick(idx)} title={t.pi_fromMaster} style={{ padding:"0 8px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:13, flexShrink:0 }}>📦</button>
-        </div>
-        <div style={{ display:"flex", gap:4 }}>
-          <input style={{ ...inp(), flex:1 }} placeholder={t.pi_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
-          <input style={{ ...inp(), flex:1 }} placeholder={t.pi_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
-        </div>
-      </td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:80 }}><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></td>
-      <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitCost} onChange={e=>onUpdate(item.id,"unitCost",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.taxPerc} onChange={e=>onUpdate(item.id,"taxPerc",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:100 }}><input style={{ ...inp({ textAlign:"right" }), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder="0.00" value={item.salePrice} onChange={e=>onUpdate(item.id,"salePrice",e.target.value)} /></td>
-      <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
-        <span style={{ fontSize:13, fontWeight:700, color:total>0?"#f97316":th.txtFaint }}>{t.cur} {piFmt2(total)}</span>
-        {(piN2(item.discountPerc)>0||piN2(item.taxPerc)>0)&&(
-          <div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>
-            {piN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{piFmt2(disc)} </span>}
-            {piN2(item.taxPerc)>0&&<span style={{ color:"#06b6d4" }}>+{piFmt2(tax)}</span>}
-          </div>
-        )}
-      </td>
-      <td style={{ padding:"8px 6px", width:36, textAlign:"center" }}>
-        <button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13, fontWeight:700 }}>✕</button>
-      </td>
-    </tr>
   );
 }
 
@@ -3375,9 +3299,11 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ── Form state ──
   const [piInvoiceNo,setPiInvoiceNo] = useState("");
   const [piForm,setPiForm]           = useState(piEmptyForm());
-  const [piLines,setPiLines]         = useState([piEmptyLine()]);
-  const [pickerTarget,setPickerTarget] = useState(null);
+  const [piLines,setPiLines]         = useState([]);
+  const [piCurrent,setPiCurrent]     = useState(piEmptyCurrent());
+  const [pickerTarget,setPickerTarget] = useState(false);
   const [piSaving,setPiSaving]       = useState(false);
+  const piNameRef = useRef(null);
 
   // ── Vendor search state (for purchase invoice form) ──
   const [vendorSearchQ,setVendorSearchQ]     = useState("");
@@ -3448,7 +3374,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piOpenNew = async () => {
     try {
       const no=await genInvoiceNo();
-      setPiInvoiceNo(no); setPiForm(piEmptyForm()); setPiLines([piEmptyLine()]); setEditInvoiceId(null); setPiView("form"); setVendorSearchQ(""); setVendorDropOpen(false);
+      setPiInvoiceNo(no); setPiForm(piEmptyForm()); setPiLines([]); setPiCurrent(piEmptyCurrent()); setEditInvoiceId(null); setPiView("form"); setVendorSearchQ(""); setVendorDropOpen(false);
     } catch(e) {
       toast(lang==="bn"?"ইনভয়েস খুলতে সমস্যা হয়েছে!":"Failed to open invoice form!","err");
     }
@@ -3459,18 +3385,34 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     setPiInvoiceNo(inv.invoiceNo);
     setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
     setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc||"0"), taxPerc:String(it.taxPerc||"5"), salePrice:String(it.salePrice||"") })));
+    setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
   };
 
   // ── Form helpers ──
   const piUpd=(k,v)=>setPiForm(p=>({...p,[k]:v}));
-  const piAddLine=()=>setPiLines(p=>[...p,piEmptyLine()]);
-  const piUpdLine=(id,f,v)=>setPiLines(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
   const piDelLine=(id)=>setPiLines(p=>p.filter(it=>it.id!==id));
 
-  const piSelectProduct=(prod,idx)=>{
-    setPiLines(p=>p.map((it,i)=>i===idx?{ ...it, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||it.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||it.salePrice, taxPerc:prod.salesVat||prod.purchaseVat||it.taxPerc||"5" }:it));
-    setPickerTarget(null);
+  // ── Add the staged entry row into the confirmed items list ──
+  const piAddCurrentItem = () => {
+    if (!piCurrent.name.trim()) { toast(lang==="bn"?"আইটেমের নাম লিখুন!":"Enter item name!","err"); return; }
+    if (!piCurrent.qty || piN2(piCurrent.qty)<=0) { toast(lang==="bn"?"সঠিক পরিমাণ লিখুন!":"Enter valid quantity!","err"); return; }
+    setPiLines(prev=>[...prev, { ...piCurrent, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
+    setPiCurrent(piEmptyCurrent());
+    setTimeout(()=>piNameRef.current?.focus(), 80);
+  };
+
+  // ── Load a confirmed item back into the entry row for editing ──
+  const piEditLine = (item) => {
+    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc||"0"), taxPerc:String(item.taxPerc||"5"), salePrice:String(item.salePrice||"") });
+    setPiLines(p=>p.filter(x=>x.id!==item.id));
+    setTimeout(()=>piNameRef.current?.focus(), 80);
+  };
+
+  const piSelectProduct=(prod)=>{
+    setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.salesVat||prod.purchaseVat||p.taxPerc||"5" }));
+    setPickerTarget(false);
+    setTimeout(()=>piNameRef.current?.focus(), 100);
   };
 
   const piHandleVendor=(e)=>{
@@ -3643,7 +3585,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ══════ FORM VIEW ══════
   return (
     <div style={panel}>
-      {pickerTarget!==null&&<PiProductPicker products={products} t={t} th={th} onSelect={p=>piSelectProduct(p,pickerTarget)} onClose={()=>setPickerTarget(null)} />}
+      {pickerTarget&&<PiProductPicker products={products} t={t} th={th} onSelect={p=>piSelectProduct(p)} onClose={()=>setPickerTarget(false)} />}
 
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
         <button onClick={()=>setPiView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.pi_backToList}</button>
@@ -3737,37 +3679,160 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         </div>
       </div>
 
-      {/* Items */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12, overflowX:"auto" }}>
+      {/* Items — Entry Row + Confirmed List */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={{ ...secLbl, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
           <span>📦 {t.pi_items}</span>
-          <span style={{ fontSize:11, color:"#f97316" }}>{piLines.length}{lang==="bn"?"টি":""}</span>
+          {piLines.length>0&&<span style={{ fontSize:12, fontWeight:800, color:"#f97316", background:"rgba(249,115,22,0.1)", padding:"2px 10px", borderRadius:20 }}>{piLines.length}{lang==="bn"?"টি":""}</span>}
         </div>
-        {isDesktop?(
-          <table style={{ width:"100%", borderCollapse:"collapse", minWidth:700 }}>
-            <thead>
-              <tr style={{ background:th.bgInp }}>
-                {["#",`${t.pi_itemName}`,t.pi_qty,t.pi_unit,t.pi_unitCost,t.pi_discPerc,`VAT%`,`💰 Sale`,t.pi_lineTotal,""].map((h,i)=>(
-                  <th key={i} style={{ padding:"7px 6px", fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, textAlign:i>1?"center":"left", letterSpacing:0.4 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {piLines.map((item,idx)=>(
-                <PiLineItemDesktop key={item.id} item={item} idx={idx}
-                  onUpdate={piUpdLine} onDelete={piDelLine}
-                  onPick={(i)=>setPickerTarget(i)} t={t} th={th} />
-              ))}
-            </tbody>
-          </table>
-        ):(
-          piLines.map((item,idx)=>(
-            <PiLineItemMobile key={item.id} item={item} idx={idx}
-              onUpdate={piUpdLine} onDelete={piDelLine}
-              onPick={(i)=>setPickerTarget(i)} t={t} th={th} />
-          ))
-        )}
-        <button onClick={piAddLine} style={{ width:"100%", marginTop:10, padding:"11px", borderRadius:10, border:`2px dashed ${th.accent}`, background:"rgba(249,115,22,0.06)", color:"#f97316", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_addItem}</button>
+
+        {/* ── Entry Row (staging area) ── */}
+        <div style={{ background:th.bgInp, borderRadius:12, padding:12, marginBottom:10, border:`1px dashed ${th.borderMid}` }}>
+          {/* Product name + picker */}
+          <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
+            <input
+              ref={piNameRef}
+              style={{ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, fontSize:14, fontWeight:600, outline:"none", flex:1, boxSizing:"border-box", fontFamily:"inherit" }}
+              placeholder={t.pi_itemName}
+              value={piCurrent.name}
+              onChange={e=>setPiCurrent(p=>({...p,name:e.target.value}))}
+              onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()}
+            />
+            <button onClick={()=>setPickerTarget(true)} title={t.pi_fromMaster}
+              style={{ padding:"10px 14px", borderRadius:8, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:14, fontWeight:700, flexShrink:0 }}>
+              📦
+            </button>
+          </div>
+          {/* Code + Brand */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
+            <input style={inp()} placeholder={t.pi_code} value={piCurrent.code} onChange={e=>setPiCurrent(p=>({...p,code:e.target.value}))} />
+            <input style={inp()} placeholder={t.pi_brand} value={piCurrent.brand} onChange={e=>setPiCurrent(p=>({...p,brand:e.target.value}))} />
+          </div>
+
+          {isDesktop ? (
+            /* ── Desktop: single row ── */
+            <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
+              <div style={{ flex:"0 0 64px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_qty}</div>
+                <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="0" value={piCurrent.qty}
+                  onChange={e=>setPiCurrent(p=>({...p,qty:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
+              </div>
+              <div style={{ flex:"0 0 64px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_unit}</div>
+                <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={piCurrent.unit} onChange={e=>setPiCurrent(p=>({...p,unit:e.target.value}))}>
+                  {PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_unitCost}</div>
+                <input style={inp()} inputMode="decimal" placeholder="0.00" value={piCurrent.unitCost}
+                  onChange={e=>setPiCurrent(p=>({...p,unitCost:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
+              </div>
+              <div style={{ flex:"0 0 58px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_discPerc}</div>
+                <input style={inp()} inputMode="decimal" placeholder="0" value={piCurrent.discountPerc} onChange={e=>setPiCurrent(p=>({...p,discountPerc:e.target.value}))} />
+              </div>
+              <div style={{ flex:"0 0 54px" }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>VAT%</div>
+                <input style={inp()} inputMode="decimal" placeholder="5" value={piCurrent.taxPerc} onChange={e=>setPiCurrent(p=>({...p,taxPerc:e.target.value}))} />
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>💰 {t.pi_salePrice}</div>
+                <input style={{ ...inp(), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder={t.pi_salePricePh} value={piCurrent.salePrice}
+                  onChange={e=>setPiCurrent(p=>({...p,salePrice:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
+              </div>
+              <button onClick={piAddCurrentItem}
+                style={{ padding:"10px 18px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", flexShrink:0, height:42, alignSelf:"flex-end" }}>
+                {lang==="bn"?"যোগ →":"Add →"}
+              </button>
+            </div>
+          ) : (
+            /* ── Mobile: stacked layout ── */
+            <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_qty}</div>
+                  <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="0" value={piCurrent.qty}
+                    onChange={e=>setPiCurrent(p=>({...p,qty:e.target.value}))}
+                    onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_unit}</div>
+                  <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={piCurrent.unit} onChange={e=>setPiCurrent(p=>({...p,unit:e.target.value}))}>
+                    {PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_unitCost}</div>
+                  <input style={inp()} inputMode="decimal" placeholder="0.00" value={piCurrent.unitCost}
+                    onChange={e=>setPiCurrent(p=>({...p,unitCost:e.target.value}))}
+                    onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
+                </div>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_discPerc}</div>
+                  <input style={inp()} inputMode="decimal" placeholder="0" value={piCurrent.discountPerc} onChange={e=>setPiCurrent(p=>({...p,discountPerc:e.target.value}))} />
+                </div>
+                <div>
+                  <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>VAT% ({lang==="bn"?"ডিফল্ট":"default"} 5%)</div>
+                  <input style={inp()} inputMode="decimal" placeholder="5" value={piCurrent.taxPerc} onChange={e=>setPiCurrent(p=>({...p,taxPerc:e.target.value}))} />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>💰 {t.pi_salePrice}</div>
+                <input style={{ ...inp(), borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder={t.pi_salePricePh} value={piCurrent.salePrice}
+                  onChange={e=>setPiCurrent(p=>({...p,salePrice:e.target.value}))}
+                  onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
+              </div>
+              <button onClick={piAddCurrentItem}
+                style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:15, fontWeight:800, cursor:"pointer" }}>
+                {t.pi_addItem}
+              </button>
+            </div>
+          )}
+
+          {/* Live total preview */}
+          {(piN2(piCurrent.qty)>0&&piN2(piCurrent.unitCost)>0)&&(()=>{
+            const { total } = piCalcLine(piCurrent);
+            return <div style={{ marginTop:8, textAlign:"right", fontSize:13, fontWeight:700, color:"#f97316" }}>= {t.cur} {piFmt2(total)}</div>;
+          })()}
+        </div>
+
+        {/* ── Confirmed Items List ── */}
+        {piLines.length===0&&<div style={{ textAlign:"center", padding:"16px 10px", color:th.txtFaint, fontSize:13 }}>
+          {lang==="bn"?"↑ উপরে পণ্য যোগ করুন":"↑ Add items above"}
+        </div>}
+        {piLines.map((item,idx)=>{
+          const { disc, tax, total } = piCalcLine(item);
+          return (
+            <div key={item.id} style={{ display:"flex", alignItems:"flex-start", gap:8, padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}` }}>
+              <span style={{ fontSize:12, fontWeight:800, color:"#f97316", flexShrink:0, width:20, paddingTop:2 }}>{idx+1}</span>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{item.name}</div>
+                <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
+                  {item.code&&<span>📋 {item.code}</span>}
+                  {item.brand&&<span>🏷️ {item.brand}</span>}
+                  <span>{item.qty} {item.unit}</span>
+                  {piN2(item.unitCost)>0&&<span>{t.cur}{piFmt2(item.unitCost)}</span>}
+                  {piN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{item.discountPerc}% (-{piFmt2(disc)})</span>}
+                  {piN2(item.taxPerc)>0&&<span style={{ color:"#06b6d4" }}>VAT {item.taxPerc}% (+{piFmt2(tax)})</span>}
+                  {piN2(item.salePrice)>0&&<span style={{ color:"#22c55e", fontWeight:700 }}>💰 {t.cur}{piFmt2(item.salePrice)}</span>}
+                </div>
+              </div>
+              <span style={{ fontSize:14, fontWeight:800, color:"#f97316", flexShrink:0, paddingTop:2 }}>{t.cur}{piFmt2(total)}</span>
+              {/* ✏️ Edit — loads item back into the entry row */}
+              <button title={lang==="bn"?"এডিট করুন":"Edit"} onClick={()=>piEditLine(item)}
+                style={{ width:26, height:26, borderRadius:6, border:"1px solid #1d4ed8", background:"rgba(29,78,216,0.08)", color:"#60a5fa", cursor:"pointer", fontSize:12, flexShrink:0 }}>✏️</button>
+              {/* ✕ Delete */}
+              <button onClick={()=>piDelLine(item.id)}
+                style={{ width:26, height:26, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12, flexShrink:0 }}>✕</button>
+            </div>
+          );
+        })}
       </div>
 
       {/* Summary */}
