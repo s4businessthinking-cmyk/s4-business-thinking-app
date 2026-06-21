@@ -458,13 +458,35 @@ const TR = {
     pi_createdBy:"তৈরি করেছেন",
     pi_backToList:"← তালিকায় ফিরুন",
     pi_itemsCount:"টি পণ্য",
-    // ── Payment Receipt / Cheque Receipt ──
-    pi_paymentHistory:"💳 পেমেন্ট হিস্টরি",
-    pi_addPayment:"+ পেমেন্ট রিসিট যোগ করুন",
-    pi_noPayments:"এখনো কোনো পেমেন্ট রিসিট নেই",
-    pi_paymentNo:"রিসিট নং",
+    // ── Vendor Payment Voucher (Cash / Cheque, partial payment against open invoices) ──
+    pi_makePayment:"💳 পেমেন্ট করুন",
+    pi_relatedPayments:"💳 এই ইনভয়েসে পেমেন্ট",
+    pi_newPayment:"+ নতুন পেমেন্ট",
+    pi_paymentVoucherTitle:"ভেন্ডর পেমেন্ট",
+    pi_selectVendor:"ভেন্ডর সিলেক্ট করুন",
+    pi_changeVendor:"ভেন্ডর পরিবর্তন করুন",
+    pi_searchVendor:"ভেন্ডরের নাম খুঁজুন...",
+    pi_vendorTotalDue:"মোট বাকি",
+    pi_openInvoices:"বকেয়া ইনভয়েস",
+    pi_noOpenInvoices:"এই ভেন্ডরের কোনো বকেয়া ইনভয়েস নেই",
+    pi_payFull:"পুরো",
+    pi_autoDistribute:"⚡ স্বয়ংক্রিয় বণ্টন",
+    pi_autoDistributeAmt:"মোট পরিমাণ লিখে বণ্টন করুন",
+    pi_autoDistributePh:"যেমন: 5000",
+    pi_totalPayment:"সর্বমোট পেমেন্ট",
+    pi_voucherSaved:"✅ পেমেন্ট ভাউচার সেভ হয়েছে!",
+    pi_noVouchers:"এখনো কোনো পেমেন্ট ভাউচার নেই",
+    pi_allocations:"কোন ইনভয়েসে কত গেলো",
+    pi_vendorRequired:"ভেন্ডর সিলেক্ট করুন!",
+    pi_amountRequired:"অন্তত একটি ইনভয়েসে পরিমাণ লিখুন!",
+    pi_backToPayments:"← পেমেন্ট তালিকায় ফিরুন",
+    pi_payToVendor:"যাকে পরিশোধ",
+    pi_cancelVoucher:"ভাউচার বাতিল করুন",
+    pi_confirmCancelVoucher:"এই পেমেন্ট ভাউচারটি বাতিল করবেন? এতে সংশ্লিষ্ট সব ইনভয়েসের বাকি টাকা আবার আগের মতো হয়ে যাবে।",
+    pi_voucherCancelled:"🚫 পেমেন্ট ভাউচার বাতিল হয়েছে।",
+    pi_searchVoucherPh:"ভেন্ডর বা ভাউচার নং খুঁজুন...",
+    pi_paymentNo:"ভাউচার নং",
     pi_paymentDate:"পেমেন্টের তারিখ",
-    pi_paymentAmount:"পরিমাণ (৳) *",
     pi_paymentNote:"নোট (ঐচ্ছিক)",
     pi_paymentNotePh:"যেকোনো মন্তব্য...",
     pi_fullAmount:"পুরো বাকি টাকা",
@@ -477,22 +499,13 @@ const TR = {
     pi_chequeStatusBounced:"❌ বাউন্স হয়েছে",
     pi_markCleared:"✅ ক্লিয়ার চিহ্নিত করুন",
     pi_markBounced:"❌ বাউন্স চিহ্নিত করুন",
-    pi_cancelPayment:"বাতিল করুন",
-    pi_confirmCancelPayment:"এই পেমেন্ট রিসিটটি বাতিল করবেন? বাতিল করলে বাকি টাকার পরিমাণ আবার বেড়ে যাবে।",
-    pi_confirmBounce:"চেকটি বাউন্স হয়েছে হিসেবে চিহ্নিত করবেন? এতে এই পেমেন্টের টাকা আবার বাকিতে যোগ হয়ে যাবে।",
-    pi_paymentAdded:"✅ পেমেন্ট রিসিট যোগ হয়েছে!",
-    pi_paymentCancelled:"🚫 পেমেন্ট রিসিট বাতিল হয়েছে।",
+    pi_confirmBounce:"চেকটি বাউন্স হয়েছে হিসেবে চিহ্নিত করবেন? এতে এই ভাউচারের সব ইনভয়েসের বাকি টাকা আবার আগের মতো হয়ে যাবে।",
     pi_chequeUpdated:"✅ চেকের অবস্থা আপডেট হয়েছে!",
     pi_chequeBounced:"❌ চেক বাউন্স হিসেবে চিহ্নিত হয়েছে। বাকি টাকা আপডেট হয়েছে।",
     pi_errPaymentAmount:"সঠিক পরিমাণ লিখুন!",
     pi_errPaymentExceeds:"পরিমাণ বাকি টাকার চেয়ে বেশি হতে পারবে না!",
     pi_errChequeNo:"চেক নম্বর লিখুন!",
-    pi_printReceipt:"🖨️ রিসিট প্রিন্ট",
-    pi_paymentReceiptTitle:"পেমেন্ট রিসিট",
-    pi_chequeReceiptTitle:"চেক রিসিট",
-    pi_receiptFor:"পেমেন্ট বাবদ",
-    pi_receivedFrom:"গ্রহণ করা হয়েছে",
-    pi_paidTo:"প্রদান করা হয়েছে",
+    pi_printReceipt:"🖨️ প্রিন্ট",
     pi_alreadyFullyPaid:"✅ এই ইনভয়েসটি ইতিমধ্যে সম্পূর্ণ পরিশোধিত!",
     pi_pmSearch:"পণ্য খুঁজুন...",
     pi_totalInvoices:"মোট ইনভয়েস",
@@ -923,13 +936,35 @@ const TR = {
     pi_createdBy:"Created by",
     pi_backToList:"← Back to List",
     pi_itemsCount:" items",
-    // ── Payment Receipt / Cheque Receipt ──
-    pi_paymentHistory:"💳 Payment History",
-    pi_addPayment:"+ Add Payment Receipt",
-    pi_noPayments:"No payment receipts yet",
-    pi_paymentNo:"Receipt No.",
+    // ── Vendor Payment Voucher (Cash / Cheque, partial payment against open invoices) ──
+    pi_makePayment:"💳 Make Payment",
+    pi_relatedPayments:"💳 Payments For This Invoice",
+    pi_newPayment:"+ New Payment",
+    pi_paymentVoucherTitle:"Vendor Payment",
+    pi_selectVendor:"Select Vendor",
+    pi_changeVendor:"Change Vendor",
+    pi_searchVendor:"Search vendor name...",
+    pi_vendorTotalDue:"Total Due",
+    pi_openInvoices:"Open Invoices",
+    pi_noOpenInvoices:"This vendor has no open invoices",
+    pi_payFull:"Full",
+    pi_autoDistribute:"⚡ Auto-Distribute",
+    pi_autoDistributeAmt:"Enter a total amount to auto-distribute",
+    pi_autoDistributePh:"e.g. 5000",
+    pi_totalPayment:"Total Payment",
+    pi_voucherSaved:"✅ Payment voucher saved!",
+    pi_noVouchers:"No payment vouchers yet",
+    pi_allocations:"Allocated To Invoices",
+    pi_vendorRequired:"Select a vendor!",
+    pi_amountRequired:"Enter an amount for at least one invoice!",
+    pi_backToPayments:"← Back to Payments",
+    pi_payToVendor:"Paid To",
+    pi_cancelVoucher:"Cancel Voucher",
+    pi_confirmCancelVoucher:"Cancel this payment voucher? The balance due on all its invoices will be restored.",
+    pi_voucherCancelled:"🚫 Payment voucher cancelled.",
+    pi_searchVoucherPh:"Search vendor or voucher no...",
+    pi_paymentNo:"Voucher No.",
     pi_paymentDate:"Payment Date",
-    pi_paymentAmount:"Amount (AED) *",
     pi_paymentNote:"Note (Optional)",
     pi_paymentNotePh:"Any remarks...",
     pi_fullAmount:"Full Balance Due",
@@ -942,22 +977,13 @@ const TR = {
     pi_chequeStatusBounced:"❌ Bounced",
     pi_markCleared:"✅ Mark Cleared",
     pi_markBounced:"❌ Mark Bounced",
-    pi_cancelPayment:"Cancel",
-    pi_confirmCancelPayment:"Cancel this payment receipt? The balance due will increase again.",
-    pi_confirmBounce:"Mark this cheque as bounced? This payment's amount will be added back to the balance due.",
-    pi_paymentAdded:"✅ Payment receipt added!",
-    pi_paymentCancelled:"🚫 Payment receipt cancelled.",
+    pi_confirmBounce:"Mark this cheque as bounced? The balance due on all this voucher's invoices will be restored.",
     pi_chequeUpdated:"✅ Cheque status updated!",
     pi_chequeBounced:"❌ Cheque marked as bounced. Balance due updated.",
     pi_errPaymentAmount:"Enter a valid amount!",
     pi_errPaymentExceeds:"Amount cannot exceed the balance due!",
     pi_errChequeNo:"Enter cheque number!",
-    pi_printReceipt:"🖨️ Print Receipt",
-    pi_paymentReceiptTitle:"Payment Receipt",
-    pi_chequeReceiptTitle:"Cheque Receipt",
-    pi_receiptFor:"Payment For",
-    pi_receivedFrom:"Received From",
-    pi_paidTo:"Paid To",
+    pi_printReceipt:"🖨️ Print",
     pi_alreadyFullyPaid:"✅ This invoice is already fully paid!",
     pi_pmSearch:"Search products...",
     pi_totalInvoices:"Total Invoices",
@@ -1623,11 +1649,10 @@ const PI_PAY_METHODS  = {
   cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
   credit: { bn:"বাকি (ক্রেডিট)",  en:"Credit",         icon:"📅" },
 };
-// Methods valid for an actual money Payment Receipt (credit excluded — credit isn't a real payment)
-const PI_RECEIPT_METHODS = {
-  cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
-  bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
-  cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
+// Methods for the Vendor Payment Voucher system — cash & cheque only, as requested
+const PI_VOUCHER_METHODS = {
+  cash:   { bn:"নগদ", en:"Cash",   icon:"💵" },
+  cheque: { bn:"চেক",  en:"Cheque", icon:"📃" },
 };
 const PI_CHEQUE_STATUSES = {
   pending:  { bn:"⏳ অপেক্ষমান",      en:"⏳ Pending",  color:"#f59e0b", bg:"#451a03" },
@@ -1776,7 +1801,7 @@ function PiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ─── PI: DETAIL VIEW ──────────────────────────────────────────
-function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack, t, th, lang, isOwner, payments, paymentsLoading, onOpenPaymentModal, onCancelPayment, onSetChequeStatus, onPrintPayment }) {
+function PiDetailView({ invoice, onEdit, onCancel, onDelete, onBack, t, th, lang, isOwner, relatedPayments, onMakePayment, onViewVoucher }) {
   const { sub, disc, tax, grand } = piCalcTotals(invoice.items||[]);
   const balance = grand - invoice.amountPaid;
   const canEdit   = ["draft","confirmed"].includes(invoice.status);
@@ -1854,37 +1879,28 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
           <span style={{ fontSize:13, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.pi_balanceDue}</span>
           <span style={{ fontSize:16, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.cur} {piFmt2(Math.max(0,balance))}</span>
         </div>
+        {isOwner&&canPay&&(
+          <button onClick={onMakePayment} style={{ width:"100%", marginTop:12, padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer" }}>{t.pi_makePayment}</button>
+        )}
+        {balance<=0.01&&invoice.status!=="draft"&&invoice.status!=="cancelled"&&(
+          <div style={{ marginTop:12, padding:"9px 12px", borderRadius:8, background:"rgba(34,197,94,0.08)", border:"1px solid #22c55e", color:"#22c55e", fontSize:12, fontWeight:700, textAlign:"center" }}>{t.pi_alreadyFullyPaid}</div>
+        )}
       </div>
 
-      {/* Payment History — Payment Receipts / Cheque Receipts */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-          <span style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0 }}>{t.pi_paymentHistory}</span>
-          {payments?.length>0&&<span style={{ fontSize:11, fontWeight:800, color:"#f97316", background:"rgba(249,115,22,0.1)", padding:"2px 10px", borderRadius:20 }}>{payments.length}</span>}
+      {/* Related Payments — read-only trail; manage from the Payments tab */}
+      {relatedPayments?.length>0&&(
+        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
+          <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>{t.pi_relatedPayments}</div>
+          {relatedPayments.map(rp=>(
+            <PiRelatedPaymentRow key={rp.payment.id} entry={rp} t={t} th={th} lang={lang} onClick={()=>onViewVoucher(rp.payment)} />
+          ))}
         </div>
-        {isOwner&&canPay&&(
-          <button onClick={onOpenPaymentModal} style={{ width:"100%", marginBottom:10, padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:800, cursor:"pointer" }}>{t.pi_addPayment}</button>
-        )}
-        {!canPay&&balance<=0.01&&invoice.status!=="draft"&&invoice.status!=="cancelled"&&(
-          <div style={{ padding:"9px 12px", borderRadius:8, background:"rgba(34,197,94,0.08)", border:"1px solid #22c55e", color:"#22c55e", fontSize:12, fontWeight:700, textAlign:"center", marginBottom:10 }}>{t.pi_alreadyFullyPaid}</div>
-        )}
-        {paymentsLoading&&<div style={{ textAlign:"center", padding:"14px", color:th.txtFaint, fontSize:12 }}>⏳</div>}
-        {!paymentsLoading&&(!payments||payments.length===0)&&(
-          <div style={{ textAlign:"center", padding:"14px", color:th.txtFaint, fontSize:12 }}>{t.pi_noPayments}</div>
-        )}
-        {!paymentsLoading&&(payments||[]).map(p=>(
-          <PiPaymentRow key={p.id} payment={p} t={t} th={th} lang={lang} isOwner={isOwner}
-            onCancel={()=>onCancelPayment(p)}
-            onSetChequeStatus={(st)=>onSetChequeStatus(p,st)}
-            onPrint={()=>onPrintPayment(p)} />
-        ))}
-      </div>
+      )}
 
       {/* Actions */}
       {isOwner&&(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {canEdit&&<button onClick={onEdit} style={{ padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.pi_editBtn}</button>}
-          {canPay&&<button onClick={onMarkPaid} style={{ padding:"12px", borderRadius:10, border:"1.5px solid #22c55e", background:"transparent", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_markPaid}</button>}
           {canCancel&&<button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelBtn}</button>}
           {invoice.status==="draft"&&<button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_deleteBtn}</button>}
         </div>
@@ -1893,249 +1909,26 @@ function PiDetailView({ invoice, onEdit, onMarkPaid, onCancel, onDelete, onBack,
   );
 }
 
-// ─── PI: PAYMENT RECEIPT ROW (within Payment History) ─────────
-function PiPaymentRow({ payment, t, th, lang, isOwner, onCancel, onSetChequeStatus, onPrint }) {
+// ─── PI: READ-ONLY ROW — one voucher's allocation against THIS invoice ──
+// (Full voucher management — cancel / cheque status / print — lives in the Payments tab)
+function PiRelatedPaymentRow({ entry, t, th, lang, onClick }) {
+  const { payment, allocAmount } = entry;
   const isCheque = payment.method==="cheque";
   const isCancelled = payment.status==="cancelled";
   const chequeSt = PI_CHEQUE_STATUSES[payment.chequeStatus]||PI_CHEQUE_STATUSES.pending;
   return (
-    <div style={{ padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:8, border:`1px solid ${th.border}`, opacity:isCancelled?0.55:1 }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8 }}>
-        <div style={{ flex:1, minWidth:0 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
-            <span style={{ fontSize:12, fontWeight:800, color:"#f97316" }}>{PI_RECEIPT_METHODS[payment.method]?.icon||"💵"} {payment.paymentNo}</span>
-            {isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:"#ef4444", background:"#450a0a", padding:"2px 7px", borderRadius:10 }}>{lang==="bn"?"বাতিল":"CANCELLED"}</span>}
-            {isCheque&&!isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:chequeSt.color, background:chequeSt.bg, padding:"2px 7px", borderRadius:10 }}>{chequeSt[lang]}</span>}
-          </div>
-          <div style={{ fontSize:11, color:th.txtMuted, marginTop:3 }}>📅 {payment.paymentDate}</div>
-          {isCheque&&(payment.chequeNo||payment.chequeBank)&&(
-            <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
-              {payment.chequeNo&&<span>📃 {payment.chequeNo}</span>}
-              {payment.chequeBank&&<span>🏦 {payment.chequeBank}</span>}
-              {payment.chequeDate&&<span>📅 {payment.chequeDate}</span>}
-            </div>
-          )}
-          {payment.note&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📝 {payment.note}</div>}
+    <button onClick={onClick} style={{ width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", gap:8, padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit", opacity:isCancelled?0.55:1 }}>
+      <div style={{ minWidth:0 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+          <span style={{ fontSize:12, fontWeight:800, color:"#f97316" }}>{PI_VOUCHER_METHODS[payment.method]?.icon||"💵"} {payment.paymentNo}</span>
+          {isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:"#ef4444", background:"#450a0a", padding:"2px 7px", borderRadius:10 }}>{lang==="bn"?"বাতিল":"CANCELLED"}</span>}
+          {isCheque&&!isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:chequeSt.color, background:chequeSt.bg, padding:"2px 7px", borderRadius:10 }}>{chequeSt[lang]}</span>}
         </div>
-        <span style={{ fontSize:15, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", flexShrink:0, textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(payment.amount)}</span>
+        <div style={{ fontSize:11, color:th.txtMuted, marginTop:3 }}>📅 {payment.paymentDate}</div>
       </div>
-      <div style={{ display:"flex", gap:6, marginTop:8, flexWrap:"wrap" }}>
-        <button onClick={onPrint} style={{ padding:"5px 10px", borderRadius:7, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:10, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>
-        {isOwner&&!isCancelled&&isCheque&&payment.chequeStatus==="pending"&&(
-          <>
-            <button onClick={()=>onSetChequeStatus("cleared")} style={{ padding:"5px 10px", borderRadius:7, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:10, fontWeight:700, cursor:"pointer" }}>{t.pi_markCleared}</button>
-            <button onClick={()=>onSetChequeStatus("bounced")} style={{ padding:"5px 10px", borderRadius:7, border:"1px solid #ef4444", background:"rgba(239,68,68,0.08)", color:"#ef4444", fontSize:10, fontWeight:700, cursor:"pointer" }}>{t.pi_markBounced}</button>
-          </>
-        )}
-        {isOwner&&!isCancelled&&(
-          <button onClick={onCancel} style={{ padding:"5px 10px", borderRadius:7, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:10, fontWeight:700, cursor:"pointer", marginLeft:"auto" }}>✕ {t.pi_cancelPayment}</button>
-        )}
-      </div>
-    </div>
+      <span style={{ fontSize:14, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", flexShrink:0, textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(allocAmount)}</span>
+    </button>
   );
-}
-
-// ─── PI: PAYMENT RECEIPT MODAL (Add Payment / Cheque Receipt) ─
-function PiPaymentModal({ invoice, balance, onClose, onSave, t, th, lang, saving }) {
-  const [amount,setAmount]       = useState(piFmt2(balance));
-  const [method,setMethod]       = useState("cash");
-  const [paymentDate,setPaymentDate] = useState(piToday());
-  const [note,setNote]           = useState("");
-  const [chequeNo,setChequeNo]   = useState("");
-  const [chequeBank,setChequeBank] = useState("");
-  const [chequeDate,setChequeDate] = useState(piToday());
-
-  const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
-  const lbl={ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 };
-
-  const handleSave = () => {
-    onSave({
-      amount, method, paymentDate, note,
-      chequeNo: method==="cheque"?chequeNo:"",
-      chequeBank: method==="cheque"?chequeBank:"",
-      chequeDate: method==="cheque"?chequeDate:"",
-    });
-  };
-
-  return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:10000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
-      <div style={{ width:"100%", maxWidth:520, background:th.bgCard, borderRadius:"16px 16px 0 0", maxHeight:"88vh", display:"flex", flexDirection:"column", border:`1px solid ${th.border}` }}>
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"14px 16px", borderBottom:`1px solid ${th.border}` }}>
-          <span style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{method==="cheque"?`📃 ${t.pi_chequeReceiptTitle}`:`💳 ${t.pi_paymentReceiptTitle}`}</span>
-          <button onClick={onClose} style={{ background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:20, lineHeight:1 }}>✕</button>
-        </div>
-
-        <div style={{ overflowY:"auto", flex:1, padding:16 }}>
-          {/* Invoice + Balance context */}
-          <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px", marginBottom:14, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <div>
-              <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{invoice.invoiceNo}</div>
-              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>🏭 {invoice.vendorName||"—"}</div>
-            </div>
-            <div style={{ textAlign:"right" }}>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700 }}>{t.pi_balanceDue}</div>
-              <div style={{ fontSize:16, fontWeight:900, color:"#ef4444" }}>{t.cur} {piFmt2(balance)}</div>
-            </div>
-          </div>
-
-          {/* Method */}
-          <div style={lbl}>{t.pi_paymentMethod}</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:14 }}>
-            {Object.entries(PI_RECEIPT_METHODS).map(([key,pm])=>(
-              <button key={key} onClick={()=>setMethod(key)} style={{ padding:"10px 6px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", border:`1.5px solid ${method===key?"#f97316":th.borderMid}`, background:method===key?"rgba(249,115,22,0.12)":"transparent", color:method===key?"#f97316":th.txtMuted, fontSize:12, fontWeight:700, display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-                <span style={{ fontSize:18 }}>{pm.icon}</span><span>{pm[lang]}</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Amount + Date */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12 }}>
-            <div>
-              <div style={lbl}>{t.pi_paymentAmount}</div>
-              <input style={{ ...inp(), fontSize:16, fontWeight:700, borderColor:"#22c55e", color:"#22c55e" }} inputMode="decimal" placeholder="0.00" value={amount} onChange={e=>setAmount(e.target.value)} />
-            </div>
-            <div>
-              <div style={lbl}>{t.pi_paymentDate}</div>
-              <input type="date" style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
-            </div>
-          </div>
-          {balance>0&&(
-            <button onClick={()=>setAmount(piFmt2(balance))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer", marginBottom:14 }}>
-              {t.pi_fullAmount} ({t.cur} {piFmt2(balance)})
-            </button>
-          )}
-
-          {/* Cheque-specific fields */}
-          {method==="cheque"&&(
-            <div style={{ background:"rgba(99,102,241,0.06)", border:"1px solid #6366f1", borderRadius:10, padding:12, marginBottom:14 }}>
-              <div style={{ fontSize:11, color:"#818cf8", fontWeight:700, marginBottom:10 }}>📃 {t.pi_chequeReceiptTitle}</div>
-              <div style={{ marginBottom:8 }}>
-                <div style={lbl}>{t.pi_chequeNo}</div>
-                <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="000123" value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
-              </div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
-                <div>
-                  <div style={lbl}>{t.pi_chequeBank}</div>
-                  <select style={{ ...inp(), background:th.bgCard }} value={chequeBank} onChange={e=>setChequeBank(e.target.value)}>
-                    <option value="">{lang==="bn"?"নির্বাচন করুন":"Select bank"}</option>
-                    {UAE_BANKS.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <div style={lbl}>{t.pi_chequeDate}</div>
-                  <input type="date" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Note */}
-          <div style={{ marginBottom:8 }}>
-            <div style={lbl}>{t.pi_paymentNote}</div>
-            <AutoTA style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", overflow:"hidden", minHeight:56, boxSizing:"border-box", fontFamily:"inherit" }}
-              placeholder={t.pi_paymentNotePh} value={note} onChange={e=>setNote(e.target.value)} />
-          </div>
-        </div>
-
-        <div style={{ padding:14, borderTop:`1px solid ${th.border}` }}>
-          <button onClick={handleSave} disabled={saving} style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:saving?"#1e3a5f":"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:saving?"not-allowed":"pointer" }}>
-            {saving?"...":t.pi_addPayment}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── PI: PAYMENT/CHEQUE RECEIPT — PRINTABLE HTML ───────────────
-function generatePaymentReceiptHTML(payment, invoice, shop, lang) {
-  const isBn = lang==="bn";
-  const isCheque = payment.method==="cheque";
-  const title = isCheque ? (isBn?"চেক রিসিট":"Cheque Receipt") : (isBn?"পেমেন্ট রিসিট":"Payment Receipt");
-  const methodLabel = PI_RECEIPT_METHODS[payment.method]?.[lang] || payment.method;
-  const cur = "AED";
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} - ${payment.paymentNo}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
-.receipt{max-width:560px;margin:0 auto;border:2px solid #f97316;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
-.hdr{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:18px 22px}
-.shop-name{font-size:19px;font-weight:900}
-.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}
-.title-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.3)}
-.rc-title{font-size:18px;font-weight:900;letter-spacing:1px}
-.rc-no{font-size:13px;font-weight:700;opacity:0.95}
-.body{padding:20px 22px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}
-.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}
-.info-value{font-size:14px;font-weight:700;color:#111}
-.amount-box{background:#f0fdf4;border:2px solid #22c55e;border-radius:10px;padding:16px;text-align:center;margin-bottom:16px}
-.amount-label{font-size:11px;color:#15803d;font-weight:700;text-transform:uppercase}
-.amount-val{font-size:32px;font-weight:900;color:#15803d;margin-top:4px}
-.cheque-box{background:#eef2ff;border:1px solid #6366f1;border-radius:10px;padding:13px;margin-bottom:16px}
-.cheque-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px}
-.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:16px;font-size:12px;color:#92400e}
-.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px;padding-top:14px;border-top:1px dashed #e5e7eb}
-.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
-.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid #f97316;font-size:11px;color:#f97316;font-weight:700}
-@media print{body{padding:0}.no-print{display:none!important}.receipt{border-radius:0;box-shadow:none}}
-</style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="padding:10px 28px;background:#ea580c;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
-  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
-</div>
-<div class="receipt">
-  <div class="hdr">
-    <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
-    <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
-    ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
-    <div class="title-row"><span class="rc-title">${title}</span><span class="rc-no">${payment.paymentNo}</span></div>
-  </div>
-  <div class="body">
-    <div class="info-grid">
-      <div class="info-box"><div class="info-label">📅 ${isBn?"তারিখ":"Date"}</div><div class="info-value">${payment.paymentDate}</div></div>
-      <div class="info-box"><div class="info-label">💳 ${isBn?"পদ্ধতি":"Method"}</div><div class="info-value">${PI_RECEIPT_METHODS[payment.method]?.icon||""} ${methodLabel}</div></div>
-      <div class="info-box"><div class="info-label">🏭 ${isBn?"প্রদান করা হয়েছে":"Paid To"}</div><div class="info-value">${invoice.vendorName||"—"}</div></div>
-      <div class="info-box"><div class="info-label">🧾 ${isBn?"ইনভয়েস নং":"Against Invoice"}</div><div class="info-value">${invoice.invoiceNo}</div></div>
-    </div>
-    <div class="amount-box">
-      <div class="amount-label">${isBn?"পরিমাণ":"Amount Paid"}</div>
-      <div class="amount-val">${cur} ${piFmt2(payment.amount)}</div>
-    </div>
-    ${isCheque?`<div class="cheque-box">
-      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📃 ${isBn?"চেক নম্বর":"Cheque No."}</span><span style="font-weight:700">${payment.chequeNo||"—"}</span></div>
-      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${payment.chequeBank||"—"}</span></div>
-      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📅 ${isBn?"চেকের তারিখ":"Cheque Date"}</span><span style="font-weight:700">${payment.chequeDate||"—"}</span></div>
-      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📊 ${isBn?"অবস্থা":"Status"}</span><span style="font-weight:700">${PI_CHEQUE_STATUSES[payment.chequeStatus]?.[lang]||payment.chequeStatus}</span></div>
-    </div>`:""}
-    ${payment.note?`<div class="note-box">📝 ${payment.note}</div>`:""}
-    <div class="sigs">
-      <div><div class="sig-line">${isBn?"প্রদানকারীর স্বাক্ষর":"Paid By Signature"}</div></div>
-      <div><div class="sig-line">${isBn?"গ্রহণকারীর স্বাক্ষর":"Received By Signature"}</div></div>
-    </div>
-  </div>
-  <div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div>
-</div>
-</body></html>`;
-}
-
-function printPaymentReceipt(payment, invoice, shop, lang) {
-  const html = generatePaymentReceiptHTML(payment, invoice, shop, lang);
-  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
-  const w    = window.open(url, "_blank", "width=680,height=780");
-  if (!w) {
-    URL.revokeObjectURL(url);
-    alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups.");
-    return;
-  }
-  w.addEventListener("load", () => {
-    setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
-  });
 }
 
 // ─── AUTO-RESIZE TEXTAREA ────────────────────────────────────
@@ -3324,14 +3117,14 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
 }
 
 // ─── PI: SUPPLIER LEDGER ──────────────────────────────────────
-function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
+function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices, onPayVendor }) {
   const [selVendor,setSelVendor] = useState(null);
 
   // Aggregate invoices by vendor
   const ledger = {};
   invoices.forEach(inv=>{
     const key = inv.vendorId||inv.vendorName||"—";
-    if (!ledger[key]) ledger[key]={ vendorName:inv.vendorName||"—", vendorMobile:inv.vendorMobile||"", invoices:[], total:0, paid:0, balance:0 };
+    if (!ledger[key]) ledger[key]={ vendorId:inv.vendorId||null, vendorName:inv.vendorName||"—", vendorMobile:inv.vendorMobile||"", invoices:[], total:0, paid:0, balance:0 };
     ledger[key].invoices.push(inv);
     ledger[key].total   += inv.grandTotal||0;
     ledger[key].paid    += inv.amountPaid||0;
@@ -3347,8 +3140,16 @@ function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices }) {
         <button onClick={()=>setSelVendor(null)} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>
           ← {lang==="bn"?"লেজারে ফিরুন":"Back to Ledger"}
         </button>
-        <div style={{ fontSize:15, fontWeight:800, color:"#f97316", marginBottom:4 }}>🏭 {vd.vendorName}</div>
-        {vd.vendorMobile&&<div style={{ fontSize:12, color:"#a1a1aa", marginBottom:12 }}>📱 {vd.vendorMobile}</div>}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
+          <div>
+            <div style={{ fontSize:15, fontWeight:800, color:"#f97316" }}>🏭 {vd.vendorName}</div>
+            {vd.vendorMobile&&<div style={{ fontSize:12, color:"#a1a1aa", marginTop:2 }}>📱 {vd.vendorMobile}</div>}
+          </div>
+          {vd.balance>0.01&&(
+            <button onClick={()=>onPayVendor(vd)} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:12, fontWeight:800, cursor:"pointer", flexShrink:0 }}>{t.pi_makePayment}</button>
+          )}
+        </div>
+        <div style={{ marginBottom:12 }} />
         {/* Summary row */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
           {[
@@ -3635,6 +3436,419 @@ function PiSalesmanView({ t, lang, th, shopId }) {
   );
 }
 
+// ─── PI: PAYMENTS TAB — list of Vendor Payment Vouchers ───────
+function PiPaymentsListTab({ payments, loading, t, th, lang, onOpen }) {
+  const [q,setQ] = useState("");
+  const filtered = payments.filter(p=>{
+    if (!q.trim()) return true;
+    const s = q.toLowerCase();
+    return (p.vendorName||"").toLowerCase().includes(s) || (p.paymentNo||"").toLowerCase().includes(s);
+  });
+  const inp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+  return (
+    <div>
+      <div style={{ position:"relative", marginBottom:12 }}>
+        <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+        <input style={{ ...inp, paddingLeft:38 }} placeholder={t.pi_searchVoucherPh} value={q} onChange={e=>setQ(e.target.value)} />
+        {q&&<button onClick={()=>setQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+      </div>
+      {loading&&<div style={{ textAlign:"center", padding:"50px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>⏳</div></div>}
+      {!loading&&payments.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>💳</div><div>{t.pi_noVouchers}</div></div>}
+      {!loading&&payments.length>0&&filtered.length===0&&<div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.pi_noResults}</div></div>}
+      {!loading&&filtered.map(p=>(
+        <PiVoucherCard key={p.id} voucher={p} t={t} th={th} lang={lang} onClick={()=>onOpen(p)} />
+      ))}
+    </div>
+  );
+}
+
+function PiVoucherCard({ voucher, t, th, lang, onClick }) {
+  const isCancelled = voucher.status==="cancelled";
+  const chequeSt = PI_CHEQUE_STATUSES[voucher.chequeStatus]||PI_CHEQUE_STATUSES.pending;
+  return (
+    <div onClick={onClick} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer", opacity:isCancelled?0.55:1 }}
+      onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
+      onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:800, color:"#f97316" }}>{PI_VOUCHER_METHODS[voucher.method]?.icon||"💵"} {voucher.paymentNo}</div>
+          <div style={{ fontSize:12, color:th.txtMuted, marginTop:1 }}>📅 {voucher.paymentDate}</div>
+        </div>
+        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+          {isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:"#ef4444", background:"#450a0a", padding:"3px 8px", borderRadius:10 }}>{lang==="bn"?"বাতিল":"CANCELLED"}</span>}
+          {voucher.method==="cheque"&&!isCancelled&&<span style={{ fontSize:9, fontWeight:700, color:chequeSt.color, background:chequeSt.bg, padding:"3px 8px", borderRadius:10 }}>{chequeSt[lang]}</span>}
+        </div>
+      </div>
+      <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>🏭 {voucher.vendorName||"—"}</div>
+      <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center", marginTop:6 }}>
+        <span style={{ fontSize:11, color:th.txtMuted }}>{(voucher.allocations||[]).length}{lang==="bn"?"টি ইনভয়েস":" invoices"}</span>
+        <span style={{ fontSize:15, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── PI: NEW VENDOR PAYMENT VOUCHER FORM ───────────────────────
+// Select a vendor → see all their open invoices → allocate Cash/Cheque payment, full or partial, per invoice.
+function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, saving, onSave, onCancel, t, th, lang, isDesktop }) {
+  const [vendorQ,setVendorQ]       = useState("");
+  const [vendorDropOpen,setVendorDropOpen] = useState(false);
+  const [vendor,setVendor]         = useState(null); // { id, name, mobile }
+  const [amounts,setAmounts]       = useState({});   // { [invoiceId]: "123.45" }
+  const [method,setMethod]         = useState("cash");
+  const [paymentDate,setPaymentDate] = useState(piToday());
+  const [note,setNote]             = useState("");
+  const [chequeNo,setChequeNo]     = useState("");
+  const [chequeBank,setChequeBank] = useState("");
+  const [chequeDate,setChequeDate] = useState(piToday());
+  const [distAmt,setDistAmt]       = useState("");
+  const vendorBoxRef = useRef(null);
+
+  // Pre-fill vendor if navigated here from an Invoice or the Supplier Ledger
+  useEffect(()=>{
+    if (!prefillVendorId || !vendors?.length) return;
+    const v = vendors.find(x=>x.id===prefillVendorId || x.vendorName===prefillVendorId);
+    if (v) setVendor({ id:v.id, name:v.vendorName, mobile:v.mobileNumber||v.whatsappNumber||"" });
+  },[prefillVendorId, vendors]);
+
+  useEffect(()=>{
+    const handler=(e)=>{ if (vendorBoxRef.current && !vendorBoxRef.current.contains(e.target)) setVendorDropOpen(false); };
+    document.addEventListener("mousedown",handler);
+    return ()=>document.removeEventListener("mousedown",handler);
+  },[]);
+
+  const openInvoices = vendor ? getVendorOpenInvoices(vendor.id, vendor.name) : [];
+  const filteredVendors = (vendors||[]).filter(v=>(v.vendorName||"").toLowerCase().includes(vendorQ.toLowerCase())).slice(0,30);
+
+  const setAmt = (invId,val) => setAmounts(p=>({ ...p, [invId]:val }));
+  const payFull = (inv) => setAmt(inv.id, piFmt2(piN2(inv.balanceDue)));
+
+  const totalPayment = Object.values(amounts).reduce((s,v)=>s+piN2(v),0);
+
+  // Auto-distribute a lump sum FIFO across open invoices (oldest first), still editable afterward
+  const autoDistribute = () => {
+    let remaining = piN2(distAmt);
+    if (remaining<=0) return;
+    const next = {};
+    for (const inv of openInvoices) {
+      if (remaining<=0) { next[inv.id]=""; continue; }
+      const bal = piN2(inv.balanceDue);
+      const give = Math.min(bal, remaining);
+      next[inv.id] = give>0 ? piFmt2(give) : "";
+      remaining = parseFloat((remaining-give).toFixed(2));
+    }
+    setAmounts(next);
+  };
+
+  const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
+  const lbl={ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 };
+
+  const handleSave = () => {
+    const allocations = openInvoices
+      .filter(inv => piN2(amounts[inv.id])>0)
+      .map(inv => ({ invoiceId:inv.id, invoiceNo:inv.invoiceNo, invoiceDate:inv.invoiceDate||"", amount:piN2(amounts[inv.id]) }));
+    onSave({
+      vendorId:vendor?.id||null, vendorName:vendor?.name||"", vendorMobile:vendor?.mobile||"",
+      method, paymentDate, note,
+      chequeNo: method==="cheque"?chequeNo:"",
+      chequeBank: method==="cheque"?chequeBank:"",
+      chequeDate: method==="cheque"?chequeDate:"",
+      allocations,
+    });
+  };
+
+  return (
+    <div>
+      <button onClick={onCancel} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.pi_backToPayments}</button>
+
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+        <div style={{ fontSize:14, fontWeight:800, color:"#f97316", marginBottom:12 }}>💳 {t.pi_paymentVoucherTitle}</div>
+
+        {/* Vendor selector */}
+        <div style={{ marginBottom:14 }}>
+          <div style={lbl}>{t.pi_selectVendor}</div>
+          {!vendor ? (
+            <div ref={vendorBoxRef} style={{ position:"relative" }}>
+              <input style={inp()} placeholder={t.pi_searchVendor} value={vendorQ}
+                onFocus={()=>setVendorDropOpen(true)} onChange={e=>{ setVendorQ(e.target.value); setVendorDropOpen(true); }} />
+              {vendorDropOpen&&filteredVendors.length>0&&(
+                <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, maxHeight:240, overflowY:"auto", background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, zIndex:50, boxShadow:"0 8px 24px rgba(0,0,0,0.3)" }}>
+                  {filteredVendors.map(v=>(
+                    <div key={v.id} onClick={()=>{ setVendor({ id:v.id, name:v.vendorName, mobile:v.mobileNumber||v.whatsappNumber||"" }); setVendorDropOpen(false); setVendorQ(""); }}
+                      style={{ padding:"10px 12px", cursor:"pointer", borderBottom:`1px solid ${th.border}`, fontSize:13 }}
+                      onMouseEnter={e=>e.currentTarget.style.background=th.bgInp}
+                      onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                      <div style={{ fontWeight:700, color:th.txtPrimary }}>🏭 {v.vendorName}</div>
+                      {(v.mobileNumber||v.whatsappNumber)&&<div style={{ fontSize:11, color:th.txtMuted }}>📱 {v.mobileNumber||v.whatsappNumber}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", background:th.bgInp, borderRadius:10, border:`1px solid ${th.border}` }}>
+              <div>
+                <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>🏭 {vendor.name}</div>
+                {vendor.mobile&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:1 }}>📱 {vendor.mobile}</div>}
+              </div>
+              <button onClick={()=>{ setVendor(null); setAmounts({}); }} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.pi_changeVendor}</button>
+            </div>
+          )}
+        </div>
+
+        {vendor&&(<>
+          {/* Method */}
+          <div style={lbl}>{t.pi_paymentMethod}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
+            {Object.entries(PI_VOUCHER_METHODS).map(([key,pm])=>(
+              <button key={key} onClick={()=>setMethod(key)} style={{ padding:"10px 6px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", border:`1.5px solid ${method===key?"#f97316":th.borderMid}`, background:method===key?"rgba(249,115,22,0.12)":"transparent", color:method===key?"#f97316":th.txtMuted, fontSize:13, fontWeight:700, display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                <span style={{ fontSize:17 }}>{pm.icon}</span><span>{pm[lang]}</span>
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginBottom:14 }}>
+            <div style={lbl}>{t.pi_paymentDate}</div>
+            <input type="date" style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
+          </div>
+
+          {method==="cheque"&&(
+            <div style={{ background:"rgba(99,102,241,0.06)", border:"1px solid #6366f1", borderRadius:10, padding:12, marginBottom:14 }}>
+              <div style={{ fontSize:11, color:"#818cf8", fontWeight:700, marginBottom:10 }}>📃 {lang==="bn"?"চেকের তথ্য":"Cheque Details"}</div>
+              <div style={{ marginBottom:8 }}>
+                <div style={lbl}>{t.pi_chequeNo}</div>
+                <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="000123" value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div>
+                  <div style={lbl}>{t.pi_chequeBank}</div>
+                  <select style={{ ...inp(), background:th.bgCard }} value={chequeBank} onChange={e=>setChequeBank(e.target.value)}>
+                    <option value="">{lang==="bn"?"নির্বাচন করুন":"Select bank"}</option>
+                    {UAE_BANKS.map(b=><option key={b.id} value={b.name}>{b.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={lbl}>{t.pi_chequeDate}</div>
+                  <input type="date" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto-distribute helper */}
+          {openInvoices.length>1&&(
+            <div style={{ display:"flex", gap:8, marginBottom:14, alignItems:"flex-end" }}>
+              <div style={{ flex:1 }}>
+                <div style={lbl}>{t.pi_autoDistributeAmt}</div>
+                <input style={inp()} inputMode="decimal" placeholder={t.pi_autoDistributePh} value={distAmt} onChange={e=>setDistAmt(e.target.value)} />
+              </div>
+              <button onClick={autoDistribute} style={{ padding:"10px 14px", borderRadius:8, border:"1px solid #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:12, fontWeight:700, cursor:"pointer", height:42 }}>{t.pi_autoDistribute}</button>
+            </div>
+          )}
+
+          {/* Open invoices */}
+          <div style={lbl}>{t.pi_openInvoices} ({openInvoices.length})</div>
+          {openInvoices.length===0&&<div style={{ textAlign:"center", padding:"20px", color:th.txtFaint, fontSize:12 }}>{t.pi_noOpenInvoices}</div>}
+          {openInvoices.map(inv=>(
+            <div key={inv.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}` }}>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{inv.invoiceNo}</div>
+                <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📅 {inv.invoiceDate} · {t.pi_balanceDue}: <span style={{ color:"#ef4444", fontWeight:700 }}>{t.cur} {piFmt2(inv.balanceDue)}</span></div>
+              </div>
+              <input style={{ ...inp(), width:100, flex:"0 0 100px", textAlign:"right", fontWeight:700, color:"#22c55e", borderColor:piN2(amounts[inv.id])>0?"#22c55e":th.borderMid }}
+                inputMode="decimal" placeholder="0.00" value={amounts[inv.id]||""} onChange={e=>setAmt(inv.id,e.target.value)} />
+              <button onClick={()=>payFull(inv)} style={{ padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:10, fontWeight:700, cursor:"pointer", flexShrink:0 }}>{t.pi_payFull}</button>
+            </div>
+          ))}
+
+          {/* Note */}
+          <div style={{ marginTop:10, marginBottom:4 }}>
+            <div style={lbl}>{t.pi_paymentNote}</div>
+            <AutoTA style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:13, outline:"none", resize:"none", overflow:"hidden", minHeight:50, boxSizing:"border-box", fontFamily:"inherit" }}
+              placeholder={t.pi_paymentNotePh} value={note} onChange={e=>setNote(e.target.value)} />
+          </div>
+        </>)}
+      </div>
+
+      {vendor&&openInvoices.length>0&&(
+        <div style={{ position:isDesktop?"static":"sticky", bottom:0, background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:12 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+            <span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span>
+            <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {piFmt2(totalPayment)}</span>
+          </div>
+          <button onClick={handleSave} disabled={saving||totalPayment<=0} style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:(saving||totalPayment<=0)?"#1e3a5f":"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:(saving||totalPayment<=0)?"not-allowed":"pointer" }}>
+            {saving?"...":t.pi_newPayment}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PI: VOUCHER DETAIL VIEW ────────────────────────────────────
+function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onSetChequeStatus, onPrint, onViewInvoice }) {
+  const isCheque = voucher.method==="cheque";
+  const isCancelled = voucher.status==="cancelled";
+  const chequeSt = PI_CHEQUE_STATUSES[voucher.chequeStatus]||PI_CHEQUE_STATUSES.pending;
+  const dr = { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
+  return (
+    <div>
+      <button onClick={onBack} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.pi_backToPayments}</button>
+
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:10 }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+          <div>
+            <div style={{ fontSize:20, fontWeight:900, color:"#f97316", letterSpacing:1 }}>{PI_VOUCHER_METHODS[voucher.method]?.icon} {voucher.paymentNo}</div>
+            <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📅 {voucher.paymentDate}</div>
+          </div>
+          {isCancelled
+            ? <span style={{ fontSize:10, fontWeight:700, color:"#ef4444", background:"#450a0a", padding:"4px 10px", borderRadius:10 }}>{lang==="bn"?"বাতিল":"CANCELLED"}</span>
+            : isCheque&&<span style={{ fontSize:10, fontWeight:700, color:chequeSt.color, background:chequeSt.bg, padding:"4px 10px", borderRadius:10 }}>{chequeSt[lang]}</span>}
+        </div>
+        <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏭 {t.pi_payToVendor}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorName}</span></div>
+        <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.pi_paymentMethod}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{PI_VOUCHER_METHODS[voucher.method]?.icon} {PI_VOUCHER_METHODS[voucher.method]?.[lang]}</span></div>
+        {isCheque&&(
+          <>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📃 {t.pi_chequeNo}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeNo||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏦 {t.pi_chequeBank}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeBank||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📅 {t.pi_chequeDate}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeDate||"—"}</span></div>
+          </>
+        )}
+        <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span><span style={{ fontSize:18, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span></div>
+        {voucher.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #f97316" }}>📝 {voucher.note}</div>}
+      </div>
+
+      {/* Allocations table */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
+        <div style={{ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>{t.pi_allocations}</div>
+        {(voucher.allocations||[]).map((a,i)=>(
+          <button key={i} onClick={()=>onViewInvoice(a.invoiceId)} style={{ width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit" }}>
+            <div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{a.invoiceNo}</div>
+              {a.invoiceDate&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📅 {a.invoiceDate}</div>}
+            </div>
+            <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {piFmt2(a.amount)}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Actions */}
+      {isOwner&&(
+        <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+          <button onClick={onPrint} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>
+          {!isCancelled&&isCheque&&voucher.chequeStatus==="pending"&&(
+            <>
+              <button onClick={()=>onSetChequeStatus("cleared")} style={{ padding:"12px", borderRadius:10, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_markCleared}</button>
+              <button onClick={()=>onSetChequeStatus("bounced")} style={{ padding:"12px", borderRadius:10, border:"1px solid #ef4444", background:"rgba(239,68,68,0.08)", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_markBounced}</button>
+            </>
+          )}
+          {!isCancelled&&(
+            <button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelVoucher}</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PI: VOUCHER — PRINTABLE HTML ───────────────────────────────
+function generatePaymentVoucherHTML(voucher, shop, lang) {
+  const isBn = lang==="bn";
+  const isCheque = voucher.method==="cheque";
+  const methodLabel = PI_VOUCHER_METHODS[voucher.method]?.[lang] || voucher.method;
+  const cur = "AED";
+  const rows = (voucher.allocations||[]).map(a=>`
+    <tr><td>${a.invoiceNo}</td><td>${a.invoiceDate||"—"}</td><td style="text-align:right">${cur} ${piFmt2(a.amount)}</td></tr>
+  `).join("");
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment Voucher - ${voucher.paymentNo}</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
+.receipt{max-width:600px;margin:0 auto;border:2px solid #f97316;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
+.hdr{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:18px 22px}
+.shop-name{font-size:19px;font-weight:900}
+.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}
+.title-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.3)}
+.rc-title{font-size:18px;font-weight:900;letter-spacing:1px}
+.rc-no{font-size:13px;font-weight:700;opacity:0.95}
+.body{padding:20px 22px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}
+.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}
+.info-value{font-size:14px;font-weight:700;color:#111}
+.amount-box{background:#f0fdf4;border:2px solid #22c55e;border-radius:10px;padding:16px;text-align:center;margin-bottom:16px}
+.amount-label{font-size:11px;color:#15803d;font-weight:700;text-transform:uppercase}
+.amount-val{font-size:32px;font-weight:900;color:#15803d;margin-top:4px}
+.cheque-box{background:#eef2ff;border:1px solid #6366f1;border-radius:10px;padding:13px;margin-bottom:16px}
+.cheque-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px}
+.alloc-table{width:100%;border-collapse:collapse;margin-bottom:16px}
+.alloc-table th{background:#f9fafb;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280;padding:8px 10px;border-bottom:2px solid #e5e7eb}
+.alloc-table td{padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:12px}
+.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:16px;font-size:12px;color:#92400e}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px;padding-top:14px;border-top:1px dashed #e5e7eb}
+.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
+.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid #f97316;font-size:11px;color:#f97316;font-weight:700}
+@media print{body{padding:0}.no-print{display:none!important}.receipt{border-radius:0;box-shadow:none}}
+</style></head><body>
+<div class="no-print" style="text-align:center;margin-bottom:14px">
+  <button onclick="window.print()" style="padding:10px 28px;background:#ea580c;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
+  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
+</div>
+<div class="receipt">
+  <div class="hdr">
+    <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
+    <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
+    ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
+    <div class="title-row"><span class="rc-title">${isBn?"পেমেন্ট ভাউচার":"Payment Voucher"}</span><span class="rc-no">${voucher.paymentNo}</span></div>
+  </div>
+  <div class="body">
+    <div class="info-grid">
+      <div class="info-box"><div class="info-label">📅 ${isBn?"তারিখ":"Date"}</div><div class="info-value">${voucher.paymentDate}</div></div>
+      <div class="info-box"><div class="info-label">💳 ${isBn?"পদ্ধতি":"Method"}</div><div class="info-value">${PI_VOUCHER_METHODS[voucher.method]?.icon||""} ${methodLabel}</div></div>
+      <div class="info-box" style="grid-column:1/3"><div class="info-label">🏭 ${isBn?"প্রদান করা হয়েছে":"Paid To"}</div><div class="info-value">${voucher.vendorName||"—"}</div></div>
+    </div>
+    <div class="amount-box">
+      <div class="amount-label">${isBn?"সর্বমোট পরিমাণ":"Total Amount Paid"}</div>
+      <div class="amount-val">${cur} ${piFmt2(voucher.totalAmount)}</div>
+    </div>
+    ${isCheque?`<div class="cheque-box">
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📃 ${isBn?"চেক নম্বর":"Cheque No."}</span><span style="font-weight:700">${voucher.chequeNo||"—"}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${voucher.chequeBank||"—"}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📅 ${isBn?"চেকের তারিখ":"Cheque Date"}</span><span style="font-weight:700">${voucher.chequeDate||"—"}</span></div>
+    </div>`:""}
+    <table class="alloc-table">
+      <thead><tr><th>${isBn?"ইনভয়েস নং":"Invoice No."}</th><th>${isBn?"তারিখ":"Date"}</th><th style="text-align:right">${isBn?"পরিমাণ":"Amount"}</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${voucher.note?`<div class="note-box">📝 ${voucher.note}</div>`:""}
+    <div class="sigs">
+      <div><div class="sig-line">${isBn?"প্রদানকারীর স্বাক্ষর":"Paid By Signature"}</div></div>
+      <div><div class="sig-line">${isBn?"গ্রহণকারীর স্বাক্ষর":"Received By Signature"}</div></div>
+    </div>
+  </div>
+  <div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div>
+</div>
+</body></html>`;
+}
+
+function printPaymentVoucher(voucher, shop, lang) {
+  const html = generatePaymentVoucherHTML(voucher, shop, lang);
+  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const w    = window.open(url, "_blank", "width=680,height=780");
+  if (!w) {
+    URL.revokeObjectURL(url);
+    alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups.");
+    return;
+  }
+  w.addEventListener("load", () => {
+    setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
+  });
+}
+
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
 function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
   const isOwner = profile?.role==="owner";
@@ -3645,15 +3859,17 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── View state: "list" | "form" | "detail" ──
   const [piView,setPiView]         = useState("list");
-  const [piSubTab,setPiSubTab]     = useState("invoices"); // "invoices" | "ledger"
+  const [piSubTab,setPiSubTab]     = useState("invoices"); // "invoices" | "ledger" | "payments"
   const [selInvoice,setSelInvoice] = useState(null);
   const [editInvoiceId,setEditInvoiceId] = useState(null);
 
-  // ── Payment Receipt / Cheque Receipt state ──
-  const [invoicePayments,setInvoicePayments] = useState([]);
-  const [paymentsLoading,setPaymentsLoading] = useState(false);
-  const [showPaymentModal,setShowPaymentModal] = useState(false);
-  const [paymentSaving,setPaymentSaving] = useState(false);
+  // ── Vendor Payment Voucher state (Cash/Cheque, partial payment against open invoices) ──
+  const [payments,setPayments]         = useState([]);       // all vouchers for this shop (live)
+  const [pmtLoading,setPmtLoading]     = useState(true);
+  const [pmtView,setPmtView]           = useState("list");   // "list" | "new" | "detail"
+  const [selVoucher,setSelVoucher]     = useState(null);
+  const [pmtPrefillVendorId,setPmtPrefillVendorId] = useState(null);
+  const [pmtSaving,setPmtSaving]       = useState(false);
 
   // ── Form state ──
   const [piInvoiceNo,setPiInvoiceNo] = useState("");
@@ -3729,7 +3945,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     }
   };
 
-  // ── Generate payment receipt no (3-layer fallback, mirrors genInvoiceNo) ──
+  // ── Generate payment voucher no (3-layer fallback, mirrors genInvoiceNo) ──
   const genPaymentNo = async () => {
     try {
       const serial = await runTransaction(db,async tx=>{
@@ -3749,129 +3965,159 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     }
   };
 
-  // ── Payment Receipts listener — scoped to the currently open invoice ──
+  // ── Payment Vouchers listener — shop-wide, live (powers Payments tab + the "Related Payments" trail on each invoice) ──
   useEffect(()=>{
-    if (piView!=="detail" || !selInvoice?.id) { setInvoicePayments([]); return; }
-    setPaymentsLoading(true);
+    if (!shopId) return;
+    setPmtLoading(true);
     let unsub2=null;
-    const q=query(collection(db,"purchasePayments"),where("invoiceId","==",selInvoice.id),orderBy("createdAt","desc"));
+    const q=query(collection(db,"purchasePayments"),where("shopId","==",shopId),orderBy("createdAt","desc"));
     const unsub1=onSnapshot(q,snap=>{
-      setInvoicePayments(snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() })));
-      setPaymentsLoading(false);
+      setPayments(snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() })));
+      setPmtLoading(false);
     },()=>{
-      const q2=query(collection(db,"purchasePayments"),where("invoiceId","==",selInvoice.id));
+      const q2=query(collection(db,"purchasePayments"),where("shopId","==",shopId));
       unsub2=onSnapshot(q2,snap=>{
         const docs=snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() }));
         docs.sort((a,b)=>b.createdAt-a.createdAt);
-        setInvoicePayments(docs);
-        setPaymentsLoading(false);
-      },err2=>{ console.error(err2); setPaymentsLoading(false); });
+        setPayments(docs);
+        setPmtLoading(false);
+      },err2=>{ console.error(err2); setPmtLoading(false); });
     });
     return ()=>{ unsub1(); unsub2&&unsub2(); };
-  },[piView, selInvoice?.id]);
+  },[shopId]);
 
-  // ── Add a Payment Receipt / Cheque Receipt — atomically reduces invoice balance ──
-  const piAddPayment = async (payload) => {
-    if (!selInvoice) return;
-    const amt = piN2(payload.amount);
-    if (!amt || amt<=0) { toast(t.pi_errPaymentAmount,"err"); return; }
-    const currentBalance = Math.max(0, piN2(selInvoice.grandTotal) - piN2(selInvoice.amountPaid));
-    if (amt > currentBalance + 0.01) { toast(t.pi_errPaymentExceeds,"err"); return; }
+  // ── This vendor's open (payable) invoices — confirmed/partial with balance > 0, oldest first ──
+  const getVendorOpenInvoices = (vendorId, vendorName) => invoices
+    .filter(inv => ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01 && (vendorId ? inv.vendorId===vendorId : inv.vendorName===vendorName))
+    .sort((a,b) => new Date(a.invoiceDate||0) - new Date(b.invoiceDate||0));
+
+  // ── Active (non-cancelled) voucher allocations that touch a given invoice — for the read-only trail on Invoice Detail ──
+  const getRelatedPayments = (invoiceId) => payments
+    .filter(p => (p.allocations||[]).some(a=>a.invoiceId===invoiceId))
+    .map(p => ({ payment:p, allocAmount: (p.allocations||[]).find(a=>a.invoiceId===invoiceId)?.amount||0 }))
+    .sort((a,b)=>b.payment.createdAt-a.payment.createdAt);
+
+  // ── Save a Vendor Payment Voucher — one Cash/Cheque payment allocated across one or more open invoices ──
+  const piSavePaymentVoucher = async (payload) => {
+    // payload: { vendorId, vendorName, vendorMobile, method, paymentDate, note, chequeNo, chequeBank, chequeDate, allocations:[{invoiceId,invoiceNo,invoiceDate,amount}] }
+    if (!payload.vendorName) { toast(t.pi_vendorRequired,"err"); return; }
+    const allocations = (payload.allocations||[]).filter(a=>piN2(a.amount)>0);
+    if (!allocations.length) { toast(t.pi_amountRequired,"err"); return; }
     if (payload.method==="cheque" && !String(payload.chequeNo||"").trim()) { toast(t.pi_errChequeNo,"err"); return; }
 
-    setPaymentSaving(true);
+    setPmtSaving(true);
     try {
       const paymentNo = await genPaymentNo();
-      const invRef = doc(db,"purchaseInvoices",selInvoice.id);
-      let newAmountPaid, newBalance, newStatus;
+      const totalAmount = parseFloat(piFmt2(allocations.reduce((s,a)=>s+piN2(a.amount),0)));
       await runTransaction(db, async tx=>{
-        const snap = await tx.get(invRef);
-        if (!snap.exists()) throw new Error(lang==="bn"?"ইনভয়েস খুঁজে পাওয়া যায়নি":"Invoice not found");
-        const cur = snap.data();
-        if (cur.status==="draft"||cur.status==="cancelled") throw new Error(lang==="bn"?"ড্রাফট বা বাতিল ইনভয়েসে পেমেন্ট যোগ করা যাবে না":"Cannot add a payment to a draft or cancelled invoice");
-        const curPaid = piN2(cur.amountPaid);
-        const grand   = piN2(cur.grandTotal);
-        // Re-validate against the freshly-read balance (guards against a race with another concurrent payment)
-        if (amt > Math.max(0, grand-curPaid) + 0.01) throw new Error(t.pi_errPaymentExceeds);
-        newAmountPaid = parseFloat(piFmt2(curPaid + amt));
-        newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
-        newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : cur.status);
-        tx.update(invRef, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:serverTimestamp() });
+        // 1) Read every involved invoice FRESH inside the transaction (race-safe), validate, compute new totals
+        const updates = [];
+        for (const alloc of allocations) {
+          const invRef = doc(db,"purchaseInvoices",alloc.invoiceId);
+          const snap = await tx.get(invRef);
+          if (!snap.exists()) throw new Error(lang==="bn"?`ইনভয়েস ${alloc.invoiceNo} খুঁজে পাওয়া যায়নি`:`Invoice ${alloc.invoiceNo} not found`);
+          const cur = snap.data();
+          if (cur.status==="draft"||cur.status==="cancelled") throw new Error(lang==="bn"?`${alloc.invoiceNo} ড্রাফট বা বাতিল — পেমেন্ট করা যাবে না`:`${alloc.invoiceNo} is draft/cancelled — cannot pay`);
+          const curPaid = piN2(cur.amountPaid);
+          const grand   = piN2(cur.grandTotal);
+          const curBalance = Math.max(0, grand-curPaid);
+          const amt = piN2(alloc.amount);
+          if (amt > curBalance + 0.01) throw new Error(lang==="bn"?`${alloc.invoiceNo}-এর বাকির চেয়ে বেশি পরিমাণ দেওয়া হয়েছে`:`Amount for ${alloc.invoiceNo} exceeds its balance due`);
+          const newAmountPaid = parseFloat(piFmt2(curPaid+amt));
+          const newBalance    = Math.max(0, parseFloat(piFmt2(grand-newAmountPaid)));
+          const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : cur.status);
+          updates.push({ invRef, newAmountPaid, newBalance, newStatus });
+        }
+        // 2) Apply all invoice updates
+        updates.forEach(u=>{
+          tx.update(u.invRef, { amountPaid:u.newAmountPaid, balanceDue:u.newBalance, status:u.newStatus, updatedAt:serverTimestamp() });
+        });
+        // 3) Create the voucher doc with the confirmed allocations
         const payRef = doc(collection(db,"purchasePayments"));
         tx.set(payRef, {
           shopId, paymentNo,
-          invoiceId:selInvoice.id, invoiceNo:selInvoice.invoiceNo,
-          vendorId:selInvoice.vendorId||null, vendorName:selInvoice.vendorName||"",
-          amount:amt, method:payload.method, paymentDate:payload.paymentDate||piToday(),
-          note:(payload.note||"").trim(),
+          vendorId:payload.vendorId||null, vendorName:payload.vendorName, vendorMobile:payload.vendorMobile||"",
+          method:payload.method, paymentDate:payload.paymentDate||piToday(),
+          totalAmount,
           chequeNo:   payload.method==="cheque" ? (payload.chequeNo||"").trim()   : "",
           chequeBank: payload.method==="cheque" ? (payload.chequeBank||"").trim() : "",
           chequeDate: payload.method==="cheque" ? (payload.chequeDate||"")        : "",
           chequeStatus: payload.method==="cheque" ? "pending" : null,
+          note:(payload.note||"").trim(),
+          allocations: allocations.map(a=>({ invoiceId:a.invoiceId, invoiceNo:a.invoiceNo, invoiceDate:a.invoiceDate||"", amount:parseFloat(piFmt2(a.amount)) })),
           status:"active",
           createdBy:user.uid, createdByName:profile.personName, createdAt:serverTimestamp(),
         });
       });
-      setSelInvoice(p=>p&&p.id===selInvoice.id?{...p, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus}:p);
-      setShowPaymentModal(false);
-      toast(t.pi_paymentAdded);
+      toast(t.pi_voucherSaved);
+      setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null);
     } catch(e) { toast(e.message,"err"); }
-    finally { setPaymentSaving(false); }
+    finally { setPmtSaving(false); }
   };
 
-  // ── Cancel a Payment Receipt — reverses the amount back onto the invoice balance ──
-  const piCancelPayment = async (payment) => {
-    if (!window.confirm(t.pi_confirmCancelPayment)) return;
+  // ── Cancel a Payment Voucher — reverses every allocation back onto its invoice's balance ──
+  const piCancelPaymentVoucher = async (payment) => {
+    if (!window.confirm(t.pi_confirmCancelVoucher)) return;
     try {
-      const invRef = doc(db,"purchaseInvoices",payment.invoiceId);
       const payRef = doc(db,"purchasePayments",payment.id);
-      let newAmountPaid, newBalance, newStatus;
       await runTransaction(db, async tx=>{
-        const invSnap = await tx.get(invRef), paySnap = await tx.get(payRef);
-        if (!invSnap.exists()) throw new Error(lang==="bn"?"ইনভয়েস খুঁজে পাওয়া যায়নি":"Invoice not found");
-        if (!paySnap.exists()) throw new Error(lang==="bn"?"পেমেন্ট খুঁজে পাওয়া যায়নি":"Payment not found");
+        const paySnap = await tx.get(payRef);
+        if (!paySnap.exists()) throw new Error(lang==="bn"?"ভাউচার খুঁজে পাওয়া যায়নি":"Voucher not found");
         const payData = paySnap.data();
-        if (payData.status==="cancelled") throw new Error(lang==="bn"?"পেমেন্টটি ইতিমধ্যে বাতিল":"Payment already cancelled");
-        const cur = invSnap.data();
-        const grand = piN2(cur.grandTotal);
-        newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(payData.amount))));
-        newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
-        newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
-        tx.update(invRef, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:serverTimestamp() });
+        if (payData.status==="cancelled") throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
+        const updates = [];
+        for (const alloc of (payData.allocations||[])) {
+          const invRef = doc(db,"purchaseInvoices",alloc.invoiceId);
+          const snap = await tx.get(invRef);
+          if (!snap.exists()) continue; // invoice may have been deleted separately — skip gracefully
+          const cur = snap.data();
+          const grand = piN2(cur.grandTotal);
+          const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(alloc.amount))));
+          const newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+          const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
+          updates.push({ invRef, newAmountPaid, newBalance, newStatus });
+        }
+        updates.forEach(u=>tx.update(u.invRef, { amountPaid:u.newAmountPaid, balanceDue:u.newBalance, status:u.newStatus, updatedAt:serverTimestamp() }));
         tx.update(payRef, { status:"cancelled", cancelledAt:serverTimestamp(), cancelledBy:user.uid });
       });
-      setSelInvoice(p=>p&&p.id===payment.invoiceId?{...p, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus}:p);
-      toast(t.pi_paymentCancelled,"err");
+      setSelVoucher(p=>p&&p.id===payment.id?{...p,status:"cancelled"}:p);
+      toast(t.pi_voucherCancelled,"err");
     } catch(e) { toast(e.message,"err"); }
   };
 
-  // ── Update a cheque's clearance status. Bounced ⇒ auto-reverses the payment. ──
-  const piSetChequeStatus = async (payment, newChequeStatus) => {
+  // ── Update a voucher's cheque clearance status. Bounced ⇒ auto-reverses every allocation. ──
+  const piSetVoucherChequeStatus = async (payment, newChequeStatus) => {
     if (newChequeStatus==="bounced") {
       if (!window.confirm(t.pi_confirmBounce)) return;
       try {
-        const invRef = doc(db,"purchaseInvoices",payment.invoiceId);
         const payRef = doc(db,"purchasePayments",payment.id);
-        let newAmountPaid, newBalance, newStatus;
         await runTransaction(db, async tx=>{
-          const invSnap = await tx.get(invRef), paySnap = await tx.get(payRef);
-          if (!invSnap.exists()||!paySnap.exists()) throw new Error(lang==="bn"?"তথ্য খুঁজে পাওয়া যায়নি":"Record not found");
+          const paySnap = await tx.get(payRef);
+          if (!paySnap.exists()) throw new Error(lang==="bn"?"ভাউচার খুঁজে পাওয়া যায়নি":"Voucher not found");
           const payData = paySnap.data();
-          if (payData.status==="cancelled") throw new Error(lang==="bn"?"পেমেন্টটি ইতিমধ্যে বাতিল":"Payment already cancelled");
-          const cur = invSnap.data();
-          const grand = piN2(cur.grandTotal);
-          newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(payData.amount))));
-          newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
-          newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
-          tx.update(invRef, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:serverTimestamp() });
+          if (payData.status==="cancelled") throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
+          const updates = [];
+          for (const alloc of (payData.allocations||[])) {
+            const invRef = doc(db,"purchaseInvoices",alloc.invoiceId);
+            const snap = await tx.get(invRef);
+            if (!snap.exists()) continue;
+            const cur = snap.data();
+            const grand = piN2(cur.grandTotal);
+            const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(alloc.amount))));
+            const newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+            const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
+            updates.push({ invRef, newAmountPaid, newBalance, newStatus });
+          }
+          updates.forEach(u=>tx.update(u.invRef, { amountPaid:u.newAmountPaid, balanceDue:u.newBalance, status:u.newStatus, updatedAt:serverTimestamp() }));
           tx.update(payRef, { chequeStatus:"bounced", status:"cancelled", cancelledAt:serverTimestamp(), cancelledBy:user.uid, cancelReason:"cheque_bounced" });
         });
-        setSelInvoice(p=>p&&p.id===payment.invoiceId?{...p, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus}:p);
+        setSelVoucher(p=>p&&p.id===payment.id?{...p,chequeStatus:"bounced",status:"cancelled"}:p);
         toast(t.pi_chequeBounced,"err");
       } catch(e) { toast(e.message,"err"); }
     } else {
       try {
         await updateDoc(doc(db,"purchasePayments",payment.id),{ chequeStatus:newChequeStatus, updatedAt:serverTimestamp() });
+        setSelVoucher(p=>p&&p.id===payment.id?{...p,chequeStatus:newChequeStatus}:p);
         toast(t.pi_chequeUpdated);
       } catch(e) { toast(e.message,"err"); }
     }
@@ -3977,12 +4223,15 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     setPiSaving(true);
     try { if (editInvoiceId){ await updateDoc(doc(db,"purchaseInvoices",editInvoiceId),{...payload,updatedAt:serverTimestamp()}); toast(t.pi_updated); } else { await addDoc(collection(db,"purchaseInvoices"),{...payload,createdAt:serverTimestamp()}); toast(t.pi_confirmed); } setPiView("list"); } catch(e){ toast(e.message,"err"); } finally { setPiSaving(false); }
   };
-  // Mark fully paid = record a Payment Receipt (method: cash) for the entire remaining balance.
-  // Routed through piAddPayment so every settlement — full or partial — leaves a receipt in the Payment History.
-  const piMarkPaid = async (inv) => {
-    const bal = Math.max(0, piN2(inv.grandTotal) - piN2(inv.amountPaid));
-    if (bal<=0.009) { toast(t.pi_alreadyFullyPaid,"err"); return; }
-    await piAddPayment({ amount:piFmt2(bal), method:"cash", paymentDate:piToday(), note: lang==="bn"?"সম্পূর্ণ পরিশোধ হিসেবে চিহ্নিত":"Marked as fully paid" });
+  // "Make Payment" from an invoice: jump to the Payments tab, New Voucher form, pre-selected for this vendor.
+  // The new voucher form pre-fills this exact invoice's row with its full balance — other open invoices for
+  // the same vendor are shown too, so the user can combine them into one voucher if they want.
+  const piGoToMakePayment = (inv) => {
+    setPmtPrefillVendorId(inv.vendorId || inv.vendorName);
+    setSelVoucher(null);
+    setPmtView("new");
+    setPiSubTab("payments");
+    setPiView("list");
   };
   const piCancelInv = async (inv) => {
     if (!window.confirm(t.pi_confirmCancel)) return;
@@ -4017,6 +4266,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.pi_title}</div>
         {isOwner&&piSubTab==="invoices"&&<button onClick={piOpenNew} disabled={piSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:piSaving?"#7c2d12":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:piSaving?"not-allowed":"pointer", opacity:piSaving?0.7:1 }}>{piSaving?"...":(lang==="bn"?"+ নতুন ইনভয়েস":"+ New Invoice")}</button>}
+        {isOwner&&piSubTab==="payments"&&pmtView==="list"&&<button onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_newPayment}</button>}
       </div>
 
       {/* Sub-tab bar */}
@@ -4024,8 +4274,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         {[
           { key:"invoices", icon:"📋", bn:"ইনভয়েস", en:"Invoices" },
           { key:"ledger",   icon:"🏭", bn:"সাপ্লায়ার লেজার", en:"Supplier Ledger" },
+          { key:"payments", icon:"💳", bn:"পেমেন্ট", en:"Payments" },
         ].map(tab=>(
-          <button key={tab.key} onClick={()=>setPiSubTab(tab.key)} style={{ flex:1, padding:"9px 8px", borderRadius:9, border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, transition:"all 0.15s", background:piSubTab===tab.key?"#f97316":"transparent", color:piSubTab===tab.key?"#fff":th.txtMuted }}>
+          <button key={tab.key} onClick={()=>{ setPiSubTab(tab.key); if(tab.key==="payments"){ setPmtView("list"); setSelVoucher(null); } }} style={{ flex:1, padding:"9px 8px", borderRadius:9, border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, transition:"all 0.15s", background:piSubTab===tab.key?"#f97316":"transparent", color:piSubTab===tab.key?"#fff":th.txtMuted }}>
             {tab.icon} {lang==="bn"?tab.bn:tab.en}
           </button>
         ))}
@@ -4034,7 +4285,29 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       {/* ── SUB-TAB: SUPPLIER LEDGER ── */}
       {piSubTab==="ledger"&&(
         <PiSupplierLedger invoices={invoices} t={t} th={th} lang={lang}
-          onViewInvoices={(inv)=>{ setSelInvoice(inv); setShowPaymentModal(false); setPiView("detail"); }} />
+          onViewInvoices={(inv)=>{ setSelInvoice(inv); setPiView("detail"); }}
+          onPayVendor={(vd)=>{ setPmtPrefillVendorId(vd.vendorId||vd.vendorName); setSelVoucher(null); setPmtView("new"); setPiSubTab("payments"); }} />
+      )}
+
+      {/* ── SUB-TAB: PAYMENTS (Vendor Payment Voucher — Cash/Cheque, partial across open invoices) ── */}
+      {piSubTab==="payments"&&pmtView==="list"&&(
+        <PiPaymentsListTab payments={payments} loading={pmtLoading} t={t} th={th} lang={lang}
+          onOpen={(v)=>{ setSelVoucher(v); setPmtView("detail"); }} />
+      )}
+      {piSubTab==="payments"&&pmtView==="new"&&(
+        <PiNewPaymentForm vendors={vendors} prefillVendorId={pmtPrefillVendorId}
+          getVendorOpenInvoices={getVendorOpenInvoices} saving={pmtSaving}
+          onSave={piSavePaymentVoucher} onCancel={()=>{ setPmtView("list"); setPmtPrefillVendorId(null); }}
+          t={t} th={th} lang={lang} isDesktop={isDesktop} />
+      )}
+      {piSubTab==="payments"&&pmtView==="detail"&&selVoucher&&(
+        <PiVoucherDetailView voucher={selVoucher} t={t} th={th} lang={lang} isOwner={isOwner}
+          onBack={()=>{ setPmtView("list"); setSelVoucher(null); }}
+          onCancel={()=>piCancelPaymentVoucher(selVoucher)}
+          onSetChequeStatus={(st)=>piSetVoucherChequeStatus(selVoucher,st)}
+          onPrint={()=>printPaymentVoucher(selVoucher, shop, lang)}
+          onViewInvoice={(invoiceId)=>{ const inv=invoices.find(i=>i.id===invoiceId); if(inv){ setSelInvoice(inv); setPiSubTab("invoices"); setPiView("detail"); } }}
+        />
       )}
 
       {/* ── SUB-TAB: INVOICES ── */}
@@ -4074,7 +4347,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         {!piLoading&&invoices.length>0&&piFiltered.length===0&&<div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.pi_noResults}</div></div>}
         {!piLoading&&piFiltered.map(inv=>(
           <PiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang}
-            onClick={()=>{ setSelInvoice(inv); setShowPaymentModal(false); setPiView("detail"); }} />
+            onClick={()=>{ setSelInvoice(inv); setPiView("detail"); }} />
         ))}
       </>)}
     </div>
@@ -4084,28 +4357,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   if (piView==="detail"&&selInvoice) return (
     <div style={panel}>
       <PiDetailView invoice={selInvoice} t={t} th={th} lang={lang} isOwner={isOwner}
-        onBack={()=>{ setPiView("list"); setSelInvoice(null); setShowPaymentModal(false); }}
+        onBack={()=>{ setPiView("list"); setSelInvoice(null); }}
         onEdit={()=>piOpenEdit(selInvoice)}
-        onMarkPaid={()=>piMarkPaid(selInvoice)}
         onCancel={()=>piCancelInv(selInvoice)}
         onDelete={()=>piDelete(selInvoice)}
-        payments={invoicePayments}
-        paymentsLoading={paymentsLoading}
-        onOpenPaymentModal={()=>setShowPaymentModal(true)}
-        onCancelPayment={piCancelPayment}
-        onSetChequeStatus={piSetChequeStatus}
-        onPrintPayment={(p)=>printPaymentReceipt(p, selInvoice, shop, lang)}
+        relatedPayments={getRelatedPayments(selInvoice.id)}
+        onMakePayment={()=>piGoToMakePayment(selInvoice)}
+        onViewVoucher={(voucher)=>{ setSelVoucher(voucher); setPmtView("detail"); setPiSubTab("payments"); setPiView("list"); }}
       />
-      {showPaymentModal&&(
-        <PiPaymentModal
-          invoice={selInvoice}
-          balance={Math.max(0, piN2(selInvoice.grandTotal) - piN2(selInvoice.amountPaid))}
-          onClose={()=>setShowPaymentModal(false)}
-          onSave={piAddPayment}
-          saving={paymentSaving}
-          t={t} th={th} lang={lang}
-        />
-      )}
     </div>
   );
 
