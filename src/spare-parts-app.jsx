@@ -1150,11 +1150,35 @@ function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }
 // ─── HEADER ──────────────────────────────────────────────────
 function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
   const _s = s || _globalS;
+  const [titleFx, setTitleFx] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTitleFx(v => (v + 1) % 4), 2400);
+    return () => clearInterval(timer);
+  }, []);
+  const titleStyle = { ..._s.title3dBase, ..._s.title3dVariants[titleFx] };
   return (
     <div style={_s.hdr}>
+      <style>{`
+        @keyframes s4TitleFloat {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-1px) scale(1.015); }
+        }
+        @keyframes s4TitleShine {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes s4TitleGlowPulse {
+          0%, 100% { filter: drop-shadow(0 0 2px rgba(96,165,250,.55)); }
+          50% { filter: drop-shadow(0 0 10px rgba(96,165,250,.95)); }
+        }
+      `}</style>
       <div style={_s.hLeft}>
         <img src={LOGO_URL} alt="S4" style={_s.headerLogo} />
-        <div><div style={_s.title}>{APP_NAME}</div><div style={_s.sub}>{t.appSub}</div></div>
+        <div>
+          <div className="s4-live-3d-title" style={titleStyle}>{APP_NAME}</div>
+          <div style={_s.sub}>{t.appSub}</div>
+        </div>
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
         {setTheme && (
@@ -9841,6 +9865,28 @@ function getStyles(th) { return {
   hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
   hLeft:       { display:"flex", alignItems:"center", gap:10 },
   title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
+  title3dBase: {
+    fontSize:16,
+    fontWeight:900,
+    lineHeight:1.08,
+    letterSpacing:.2,
+    display:"inline-block",
+    color:th.accent,
+    backgroundClip:"text",
+    WebkitBackgroundClip:"text",
+    WebkitTextFillColor:"transparent",
+    backgroundSize:"250% 250%",
+    animation:"s4TitleFloat 2.4s ease-in-out infinite, s4TitleShine 4.8s ease-in-out infinite, s4TitleGlowPulse 2.8s ease-in-out infinite",
+    transition:"all .45s ease",
+    transformStyle:"preserve-3d",
+    whiteSpace:"nowrap",
+  },
+  title3dVariants: [
+    { backgroundImage:"linear-gradient(135deg,#bfdbfe,#60a5fa,#2563eb,#93c5fd)", textShadow:"0 1px 0 #0b1220, 0 2px 0 #0f172a, 0 8px 16px rgba(37,99,235,.45)" },
+    { backgroundImage:"linear-gradient(135deg,#fff7ed,#fbbf24,#f97316,#fde68a)", textShadow:"0 1px 0 #451a03, 0 2px 0 #78350f, 0 8px 18px rgba(251,191,36,.38)" },
+    { backgroundImage:"linear-gradient(135deg,#ecfeff,#22d3ee,#3b82f6,#a78bfa)", textShadow:"0 1px 0 #082f49, 0 2px 0 #1e1b4b, 0 0 18px rgba(34,211,238,.55)" },
+    { backgroundImage:"linear-gradient(135deg,#ffffff,#cbd5e1,#60a5fa,#ffffff)", textShadow:"0 1px 0 #1e293b, 0 2px 0 #334155, 0 10px 20px rgba(148,163,184,.36)" },
+  ],
   sub:         { fontSize:10, color:th.txtMuted },
   langSw:      { display:"flex", borderRadius:8, overflow:"hidden", border:`1px solid ${th.borderMid}` },
   lBtn:        { padding:"6px 12px", border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:700 },
