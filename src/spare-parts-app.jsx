@@ -3131,52 +3131,190 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
 // ─── PI: SUPPLIER LEDGER ──────────────────────────────────────
 function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvoices, onPayVendor }) {
   const [selVendor,setSelVendor] = useState(null);
+  const [supplierSearch,setSupplierSearch] = useState("");
+  const [ledgerDateFrom,setLedgerDateFrom] = useState("");
+  const [ledgerDateTo,setLedgerDateTo] = useState("");
+  const [vendorInvoiceSearch,setVendorInvoiceSearch] = useState("");
+  const [vendorDateFrom,setVendorDateFrom] = useState("");
+  const [vendorDateTo,setVendorDateTo] = useState("");
 
-  // Aggregate invoices by vendor
-  const ledger = {};
-  invoices.forEach(inv=>{
-    const key = inv.vendorId||inv.vendorName||"—";
-    if (!ledger[key]) ledger[key]={ vendorId:inv.vendorId||null, vendorName:inv.vendorName||"—", vendorMobile:inv.vendorMobile||"", invoices:[], total:0, paid:0, balance:0 };
-    ledger[key].invoices.push(inv);
-    ledger[key].total   += inv.grandTotal||0;
-    ledger[key].paid    += inv.amountPaid||0;
-    ledger[key].balance += inv.balanceDue||0;
+  const isBn = lang === "bn";
+  const searchPlaceholder = isBn ? "সাপ্লায়ার নাম, মোবাইল, ইনভয়েস নং বা পণ্য খুঁজুন..." : "Search supplier, mobile, invoice no or item...";
+  const invoiceSearchPlaceholder = isBn ? "ইনভয়েস নং, পণ্য বা তারিখ খুঁজুন..." : "Search invoice no, item or date...";
+  const fromLabel = isBn ? "শুরু তারিখ" : "From";
+  const toLabel = isBn ? "শেষ তারিখ" : "To";
+  const clearLabel = isBn ? "ক্লিয়ার" : "Clear";
+  const dateFilterTitle = isBn ? "ইনভয়েস তারিখ ফিল্টার" : "Invoice date filter";
+
+  const normalizeDate = (v) => String(v || "").slice(0,10);
+  const inDateRange = (dateValue, from, to) => {
+    const d = normalizeDate(dateValue);
+    if (!d) return !from && !to;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  };
+  const invoiceHay = (inv) => [
+    inv.invoiceNo,
+    inv.supplierInvoiceNo,
+    inv.invoiceDate,
+    inv.vendorName,
+    inv.vendorMobile,
+    inv.createdByName,
+    ...(inv.items || []).map(it => `${it.name || ""} ${it.code || ""} ${it.brand || ""}`)
+  ].filter(Boolean).join(" ");
+
+  const baseInvoices = (invoices || []).filter(inv => inDateRange(inv.invoiceDate || inv.createdAt, ledgerDateFrom, ledgerDateTo));
+  const searchedInvoices = baseInvoices.filter(inv => {
+    const q = supplierSearch.trim();
+    if (!q) return true;
+    return nsmatch(invoiceHay(inv), q);
   });
-  const vendors = Object.values(ledger).sort((a,b)=>b.balance-a.balance);
+
+  // Aggregate invoices by vendor after search/date filter.
+  const ledger = {};
+  searchedInvoices.forEach(inv=>{
+    const key = inv.vendorId || inv.vendorName || "—";
+    if (!ledger[key]) {
+      ledger[key] = {
+        key,
+        vendorId:inv.vendorId || null,
+        vendorName:inv.vendorName || "—",
+        vendorMobile:inv.vendorMobile || "",
+        invoices:[],
+        total:0,
+        paid:0,
+        balance:0
+      };
+    }
+    ledger[key].invoices.push(inv);
+    ledger[key].total   += inv.grandTotal || 0;
+    ledger[key].paid    += inv.amountPaid || 0;
+    ledger[key].balance += inv.balanceDue || 0;
+  });
+
+  const vendors = Object.values(ledger)
+    .map(v => ({ ...v, invoices:[...v.invoices].sort((a,b)=>String(b.invoiceDate||"").localeCompare(String(a.invoiceDate||""))) }))
+    .sort((a,b)=>b.balance-a.balance);
+
+  const allVendorCount = new Set((invoices || []).map(inv => inv.vendorId || inv.vendorName || "—")).size;
+  const clearMainFilters = () => {
+    setSupplierSearch("");
+    setLedgerDateFrom("");
+    setLedgerDateTo("");
+  };
+  const clearVendorFilters = () => {
+    setVendorInvoiceSearch("");
+    setVendorDateFrom("");
+    setVendorDateTo("");
+  };
+
+  const inputStyle = {
+    padding:"10px 12px",
+    borderRadius:10,
+    border:`1px solid ${th.borderMid}`,
+    background:th.bgCard,
+    color:th.txtPrimary,
+    fontSize:13,
+    outline:"none",
+    width:"100%",
+    boxSizing:"border-box",
+    fontFamily:"inherit"
+  };
+  const labelStyle = { fontSize:10, color:th.txtMuted, fontWeight:800, textTransform:"uppercase", marginBottom:4 };
 
   if (selVendor) {
-    const vd = vendors.find(v=>v.vendorName===selVendor);
+    const vd = vendors.find(v=>v.key===selVendor) || (() => {
+      const fullLedger = {};
+      (invoices || []).forEach(inv=>{
+        const key = inv.vendorId || inv.vendorName || "—";
+        if (!fullLedger[key]) fullLedger[key] = { key, vendorId:inv.vendorId || null, vendorName:inv.vendorName || "—", vendorMobile:inv.vendorMobile || "", invoices:[], total:0, paid:0, balance:0 };
+        fullLedger[key].invoices.push(inv);
+        fullLedger[key].total += inv.grandTotal || 0;
+        fullLedger[key].paid += inv.amountPaid || 0;
+        fullLedger[key].balance += inv.balanceDue || 0;
+      });
+      return fullLedger[selVendor] || null;
+    })();
+
     if (!vd) { setSelVendor(null); return null; }
+
+    const detailInvoices = (vd.invoices || [])
+      .filter(inv => inDateRange(inv.invoiceDate || inv.createdAt, vendorDateFrom, vendorDateTo))
+      .filter(inv => {
+        const q = vendorInvoiceSearch.trim();
+        if (!q) return true;
+        return nsmatch(invoiceHay(inv), q);
+      })
+      .sort((a,b)=>String(b.invoiceDate||"").localeCompare(String(a.invoiceDate||"")));
+
+    const detailTotal = detailInvoices.reduce((a,inv)=>{
+      a.total += inv.grandTotal || 0;
+      a.paid += inv.amountPaid || 0;
+      a.balance += inv.balanceDue || 0;
+      return a;
+    }, { total:0, paid:0, balance:0 });
+
     return (
       <div>
-        <button onClick={()=>setSelVendor(null)} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>
-          ← {lang==="bn"?"লেজারে ফিরুন":"Back to Ledger"}
+        <button onClick={()=>{ setSelVendor(null); clearVendorFilters(); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>
+          ← {isBn ? "লেজারে ফিরুন" : "Back to Ledger"}
         </button>
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:4 }}>
+
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10, gap:10 }}>
           <div>
-            <div style={{ fontSize:15, fontWeight:800, color:"#f97316" }}>🏭 {vd.vendorName}</div>
-            {vd.vendorMobile&&<div style={{ fontSize:12, color:"#a1a1aa", marginTop:2 }}>📱 {vd.vendorMobile}</div>}
+            <div style={{ fontSize:16, fontWeight:900, color:"#f97316" }}>🏭 {vd.vendorName}</div>
+            {vd.vendorMobile&&<div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📱 {vd.vendorMobile}</div>}
           </div>
           {canVendorPayments&&vd.balance>0.01&&(
             <button onClick={()=>onPayVendor(vd)} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:12, fontWeight:800, cursor:"pointer", flexShrink:0 }}>{t.pi_makePayment}</button>
           )}
         </div>
-        <div style={{ marginBottom:12 }} />
+
+        {/* Supplier invoice search + invoice date filter */}
+        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:12, marginBottom:12 }}>
+          <div style={{ position:"relative", marginBottom:10 }}>
+            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+            <input style={{ ...inputStyle, paddingLeft:38 }} placeholder={invoiceSearchPlaceholder} value={vendorInvoiceSearch} onChange={e=>setVendorInvoiceSearch(e.target.value)} />
+            {vendorInvoiceSearch&&<button onClick={()=>setVendorInvoiceSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+          </div>
+          <div style={{ fontSize:11, color:"#f97316", fontWeight:800, marginBottom:8 }}>📅 {dateFilterTitle}</div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:8, alignItems:"end" }}>
+            <div>
+              <div style={labelStyle}>{fromLabel}</div>
+              <input type="date" style={inputStyle} value={vendorDateFrom} onChange={e=>setVendorDateFrom(e.target.value)} />
+            </div>
+            <div>
+              <div style={labelStyle}>{toLabel}</div>
+              <input type="date" style={inputStyle} value={vendorDateTo} onChange={e=>setVendorDateTo(e.target.value)} />
+            </div>
+            <button onClick={clearVendorFilters} style={{ padding:"10px 12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>{clearLabel}</button>
+          </div>
+        </div>
+
         {/* Summary row */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
           {[
-            { l:lang==="bn"?"মোট ক্রয়":"Total",   v:piFmt2(vd.total),   c:"#f97316" },
-            { l:lang==="bn"?"পরিশোধ":"Paid",       v:piFmt2(vd.paid),    c:"#22c55e" },
-            { l:lang==="bn"?"বাকি":"Balance",       v:piFmt2(vd.balance), c:vd.balance>0?"#ef4444":"#22c55e" },
+            { l:isBn?"মোট ক্রয়":"Total",   v:piFmt2(detailTotal.total),   c:"#f97316" },
+            { l:isBn?"পরিশোধ":"Paid",       v:piFmt2(detailTotal.paid),    c:"#22c55e" },
+            { l:isBn?"বাকি":"Balance",      v:piFmt2(detailTotal.balance), c:detailTotal.balance>0?"#ef4444":"#22c55e" },
           ].map((k,i)=>(
             <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 10px", textAlign:"center" }}>
               <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{t.cur}{k.v}</div>
-              <div style={{ fontSize:9, color:"#a1a1aa", textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
+              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
             </div>
           ))}
         </div>
+
+        {detailInvoices.length===0&&(
+          <div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}>
+            <div style={{ fontSize:34 }}>🔍</div>
+            <div>{t.pi_noResults}</div>
+          </div>
+        )}
+
         {/* Invoice list for this vendor */}
-        {vd.invoices.map(inv=>(
+        {detailInvoices.map(inv=>(
           <div key={inv.id} onClick={()=>onViewInvoices(inv)} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
             onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
             onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
@@ -3184,7 +3322,7 @@ function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvo
               <span style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{inv.invoiceNo}</span>
               <PiStatusBadge status={inv.status} lang={lang} />
             </div>
-            <div style={{ fontSize:11, color:"#a1a1aa" }}>📅 {inv.invoiceDate} · {inv.items?.length||0}{lang==="bn"?"টি পণ্য":" items"}</div>
+            <div style={{ fontSize:11, color:th.txtMuted }}>📅 {inv.invoiceDate} · {inv.items?.length||0}{isBn?"টি পণ্য":" items"}</div>
             <div style={{ display:"flex", gap:10, marginTop:6, flexWrap:"wrap" }}>
               <span style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{t.cur}{piFmt2(inv.grandTotal)}</span>
               {inv.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e" }}>✅ {t.cur}{piFmt2(inv.amountPaid)}</span>}
@@ -3198,45 +3336,80 @@ function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvo
 
   return (
     <div>
-      <div style={{ fontSize:16, fontWeight:800, color:"#f97316", marginBottom:4 }}>🏭 {lang==="bn"?"সাপ্লায়ার লেজার":"Supplier Ledger"}</div>
-      <div style={{ fontSize:12, color:"#a1a1aa", marginBottom:16 }}>{lang==="bn"?"প্রতিটি সাপ্লায়ারের মোট ক্রয়, পরিশোধ ও বাকি":"Total purchase, paid & balance per supplier"}</div>
+      <div style={{ fontSize:16, fontWeight:800, color:"#f97316", marginBottom:4 }}>🏭 {isBn ? "সাপ্লায়ার লেজার" : "Supplier Ledger"}</div>
+      <div style={{ fontSize:12, color:th.txtMuted, marginBottom:12 }}>{isBn ? "প্রতিটি সাপ্লায়ারের মোট ক্রয়, পরিশোধ ও বাকি" : "Total purchase, paid & balance per supplier"}</div>
 
-      {vendors.length===0&&(
-        <div style={{ textAlign:"center", padding:"60px 20px", color:"#3f3f46" }}>
+      {/* Supplier search + invoice date search/filter */}
+      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:12, marginBottom:14 }}>
+        <div style={{ position:"relative", marginBottom:10 }}>
+          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+          <input style={{ ...inputStyle, paddingLeft:38 }} placeholder={searchPlaceholder} value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)} />
+          {supplierSearch&&<button onClick={()=>setSupplierSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+        </div>
+
+        <div style={{ fontSize:11, color:"#f97316", fontWeight:800, marginBottom:8 }}>📅 {dateFilterTitle}</div>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:8, alignItems:"end" }}>
+          <div>
+            <div style={labelStyle}>{fromLabel}</div>
+            <input type="date" style={inputStyle} value={ledgerDateFrom} onChange={e=>setLedgerDateFrom(e.target.value)} />
+          </div>
+          <div>
+            <div style={labelStyle}>{toLabel}</div>
+            <input type="date" style={inputStyle} value={ledgerDateTo} onChange={e=>setLedgerDateTo(e.target.value)} />
+          </div>
+          <button onClick={clearMainFilters} style={{ padding:"10px 12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>{clearLabel}</button>
+        </div>
+
+        {(supplierSearch || ledgerDateFrom || ledgerDateTo) && (
+          <div style={{ marginTop:8, fontSize:11, color:th.txtMuted, fontWeight:700 }}>
+            {isBn ? `${vendors.length} জন সাপ্লায়ার পাওয়া গেছে` : `${vendors.length} suppliers found`}
+          </div>
+        )}
+      </div>
+
+      {allVendorCount===0&&(
+        <div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}>
           <div style={{ fontSize:40, marginBottom:10 }}>🏭</div>
-          <div style={{ fontSize:13 }}>{lang==="bn"?"এখনো কোনো সাপ্লায়ার নেই":"No suppliers yet"}</div>
+          <div style={{ fontSize:13 }}>{isBn ? "এখনো কোনো সাপ্লায়ার নেই" : "No suppliers yet"}</div>
         </div>
       )}
 
-      {vendors.map((vd,i)=>{
+      {allVendorCount>0&&vendors.length===0&&(
+        <div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}>
+          <div style={{ fontSize:36 }}>🔍</div>
+          <div>{t.pi_noResults}</div>
+        </div>
+      )}
+
+      {vendors.map((vd)=>{
         const paidPerc = vd.total>0 ? Math.min(100, vd.paid/vd.total*100) : 0;
         return (
-          <div key={i} onClick={()=>setSelVendor(vd.vendorName)} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"14px 16px", marginBottom:10, cursor:"pointer" }}
+          <div key={vd.key} onClick={()=>setSelVendor(vd.key)} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"14px 16px", marginBottom:10, cursor:"pointer" }}
             onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
             onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
             {/* Header */}
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
               <div>
-                <div style={{ fontSize:15, fontWeight:800, color:"#f2f2f2" }}>🏭 {vd.vendorName}</div>
-                {vd.vendorMobile&&<div style={{ fontSize:11, color:"#a1a1aa", marginTop:2 }}>📱 {vd.vendorMobile}</div>}
+                <div style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>🏭 {vd.vendorName}</div>
+                {vd.vendorMobile&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📱 {vd.vendorMobile}</div>}
               </div>
-              <span style={{ fontSize:11, color:"#a1a1aa", background:th.bgInp, padding:"3px 8px", borderRadius:8, whiteSpace:"nowrap" }}>
-                {vd.invoices.length}{lang==="bn"?"টি ইনভয়েস":" invoices"}
+              <span style={{ fontSize:11, color:th.txtMuted, background:th.bgInp, padding:"3px 8px", borderRadius:8, whiteSpace:"nowrap" }}>
+                {vd.invoices.length}{isBn ? "টি ইনভয়েস" : " invoices"}
               </span>
             </div>
             {/* 3 KPI boxes */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:10 }}>
               <div style={{ textAlign:"center", padding:"8px 6px", background:th.bgInp, borderRadius:8 }}>
                 <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{t.cur}{piFmt2(vd.total)}</div>
-                <div style={{ fontSize:9, color:"#a1a1aa", fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{lang==="bn"?"মোট ক্রয়":"Total"}</div>
+                <div style={{ fontSize:9, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{isBn ? "মোট ক্রয়" : "Total"}</div>
               </div>
               <div style={{ textAlign:"center", padding:"8px 6px", background:"rgba(34,197,94,0.06)", borderRadius:8 }}>
                 <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{t.cur}{piFmt2(vd.paid)}</div>
-                <div style={{ fontSize:9, color:"#a1a1aa", fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{lang==="bn"?"পরিশোধ":"Paid"}</div>
+                <div style={{ fontSize:9, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{isBn ? "পরিশোধ" : "Paid"}</div>
               </div>
               <div style={{ textAlign:"center", padding:"8px 6px", background:vd.balance>0?"rgba(239,68,68,0.06)":"rgba(34,197,94,0.06)", borderRadius:8, border:vd.balance>0?"1px solid rgba(239,68,68,0.2)":"none" }}>
                 <div style={{ fontSize:13, fontWeight:800, color:vd.balance>0?"#ef4444":"#22c55e" }}>{t.cur}{piFmt2(vd.balance)}</div>
-                <div style={{ fontSize:9, color:"#a1a1aa", fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{lang==="bn"?"বাকি":"Balance"}</div>
+                <div style={{ fontSize:9, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{isBn ? "বাকি" : "Balance"}</div>
               </div>
             </div>
             {/* Progress bar */}
@@ -3244,8 +3417,8 @@ function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvo
               <div style={{ height:"100%", width:`${paidPerc}%`, background:"linear-gradient(90deg,#22c55e,#16a34a)", borderRadius:6, transition:"width 0.4s" }} />
             </div>
             <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-              <span style={{ fontSize:9, color:"#22c55e", fontWeight:700 }}>{paidPerc.toFixed(0)}% {lang==="bn"?"পরিশোধ":"paid"}</span>
-              {vd.balance>0&&<span style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{lang==="bn"?"বাকি আছে":"outstanding"} {t.cur}{piFmt2(vd.balance)}</span>}
+              <span style={{ fontSize:9, color:"#22c55e", fontWeight:700 }}>{paidPerc.toFixed(0)}% {isBn ? "পরিশোধ" : "paid"}</span>
+              {vd.balance>0&&<span style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{isBn ? "বাকি আছে" : "outstanding"} {t.cur}{piFmt2(vd.balance)}</span>}
             </div>
           </div>
         );
