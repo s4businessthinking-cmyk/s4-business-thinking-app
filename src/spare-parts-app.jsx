@@ -1063,12 +1063,26 @@ const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {
 // ─── THEME PALETTES ──────────────────────────────────────────
 const THEMES = {
   dark: {
-    bgRoot:"#09090b", bgCard:"#18181b", bgInp:"#09090b", bgSel:"#18181b",
-    bgHdr:"#18181b", bgSidebar:"#18181b", bgOiCard:"#09090b",
-    border:"#27272a", borderMid:"#3f3f46",
-    txtPrimary:"#f4f4f5", txtSecondary:"#e4e4e7", txtMuted:"#71717a", txtFaint:"#52525b",
-    accent:"#f97316", accentDim:"#451a03",
-  },
+  bgRoot:"#0f172a",
+  bgCard:"#1e293b",
+  bgInp:"#334155",
+  bgSel:"#1e293b",
+
+  bgHdr:"#1e293b",
+  bgSidebar:"#1d4ed8",
+  bgOiCard:"#1e293b",
+
+  border:"#475569",
+  borderMid:"#64748b",
+
+  txtPrimary:"#f8fafc",
+  txtSecondary:"#e2e8f0",
+  txtMuted:"#cbd5e1",
+  txtFaint:"#94a3b8",
+
+  accent:"#60a5fa",
+  accentDim:"#082f49",
+},
   light: {
     bgRoot:"#f1f5f9", bgCard:"#ffffff", bgInp:"#f8fafc", bgSel:"#ffffff",
     bgHdr:"#ffffff", bgSidebar:"#ffffff", bgOiCard:"#f8fafc",
