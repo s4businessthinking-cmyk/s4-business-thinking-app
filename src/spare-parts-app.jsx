@@ -1080,11 +1080,11 @@ const THEMES = {
     accentDim:"#0b3b6a",
   },
   light: {
-    bgRoot:"#f1f5f9", bgCard:"#ffffff", bgInp:"#f8fafc", bgSel:"#ffffff",
-    bgHdr:"#ffffff", bgSidebar:"#ffffff", bgOiCard:"#f8fafc",
-    border:"#e2e8f0", borderMid:"#cbd5e1",
-    txtPrimary:"#0f172a", txtSecondary:"#1e293b", txtMuted:"#64748b", txtFaint:"#94a3b8",
-    accent:"#f97316", accentDim:"#fff7ed",
+    bgRoot:"#eef6ff", bgCard:"#ffffff", bgInp:"#f8fbff", bgSel:"#ffffff",
+    bgHdr:"#ffffff", bgSidebar:"#ffffff", bgOiCard:"#f8fbff",
+    border:"#dbeafe", borderMid:"#bfdbfe",
+    txtPrimary:"#0f172a", txtSecondary:"#1e293b", txtMuted:"#475569", txtFaint:"#64748b",
+    accent:"#2563eb", accentDim:"#dbeafe",
   },
 };
 
@@ -7065,6 +7065,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 // ─── DASHBOARD TAB ───────────────────────────────────────────
 function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===profile.uid);
+  const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
   const delivered  = myOrders.filter(o=>o.overall==="delivered").length;
   const cancelled  = myOrders.filter(o=>o.overall==="cancelled").length;
@@ -7073,12 +7074,16 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
   const panelStyle = isDesktop
     ? {
         ...s.desktopPanel,
-        background:`radial-gradient(circle at 8% 0%, rgba(96,165,250,0.18), transparent 34%), linear-gradient(180deg, ${th.bgRoot}, ${th.bgRoot})`,
+        background:isLightDash
+          ? "linear-gradient(180deg,#f8fafc,#eef6ff)"
+          : `radial-gradient(circle at 8% 0%, rgba(96,165,250,0.18), transparent 34%), linear-gradient(180deg, ${th.bgRoot}, ${th.bgRoot})`,
       }
     : {
         ...s.panel,
-        padding:"18px 14px 92px",
-        background:`radial-gradient(circle at 15% 0%, rgba(96,165,250,0.20), transparent 34%), radial-gradient(circle at 92% 8%, rgba(14,165,233,0.10), transparent 30%), linear-gradient(180deg, ${th.bgRoot}, #07111f)`,
+        padding:"16px 14px 96px",
+        background:isLightDash
+          ? "radial-gradient(circle at 14% 0%, rgba(59,130,246,0.18), transparent 34%), linear-gradient(180deg,#f8fafc,#eaf3ff)"
+          : `radial-gradient(circle at 15% 0%, rgba(96,165,250,0.20), transparent 34%), radial-gradient(circle at 92% 8%, rgba(14,165,233,0.10), transparent 30%), linear-gradient(180deg, ${th.bgRoot}, #07111f)`,
       };
 
   const sectionTitle = {
@@ -7094,9 +7099,11 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
   };
 
   const glassCard = {
-    background:"linear-gradient(145deg, rgba(30,41,59,0.92), rgba(15,23,42,0.86))",
-    border:"1px solid rgba(148,163,184,0.25)",
-    boxShadow:"0 14px 35px rgba(2,6,23,0.32)",
+    background:isLightDash
+      ? "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(239,246,255,0.96))"
+      : "linear-gradient(145deg, rgba(30,41,59,0.92), rgba(15,23,42,0.86))",
+    border:isLightDash ? "1px solid rgba(59,130,246,0.18)" : "1px solid rgba(148,163,184,0.25)",
+    boxShadow:isLightDash ? "0 12px 28px rgba(30,64,175,0.10)" : "0 14px 35px rgba(2,6,23,0.32)",
     backdropFilter:"blur(14px)",
   };
 
@@ -7301,7 +7308,7 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
       </div>
 
       {!isDesktop && (
-        <div style={{ position:"fixed", left:12, right:12, bottom:10, zIndex:20, borderRadius:24, padding:"10px 12px", background:"rgba(15,23,42,0.86)", border:"1px solid rgba(148,163,184,0.25)", boxShadow:"0 20px 40px rgba(2,6,23,0.48)", backdropFilter:"blur(16px)", display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:6 }}>
+        <div style={{ position:"fixed", left:12, right:12, bottom:10, zIndex:20, borderRadius:24, padding:"10px 12px", background:isLightDash?"rgba(255,255,255,0.92)":"rgba(15,23,42,0.86)", border:isLightDash?"1px solid rgba(59,130,246,0.18)":"1px solid rgba(148,163,184,0.25)", boxShadow:isLightDash?"0 20px 40px rgba(30,64,175,0.14)":"0 20px 40px rgba(2,6,23,0.48)", backdropFilter:"blur(16px)", display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:6 }}>
           {[
             { key:"dashboard", icon:"🏠", label:lang==="bn"?"হোম":"Home" },
             { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
@@ -9679,14 +9686,16 @@ const startEditOrder = (order) => {
   return (
     <div style={s.root}>
       <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}>
-        <div style={s.tabs}>
-          {visibleTabs.map(([k,label])=>(
-            <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
-              {label}
-              {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.badge}>{unread}</span>}
-            </button>
-          ))}
-        </div>
+        {tab !== "dashboard" && (
+          <div style={s.tabs}>
+            {visibleTabs.map(([k,label])=>(
+              <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
+                {label}
+                {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.badge}>{unread}</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </Header>
 
       {isDesktop ? (
