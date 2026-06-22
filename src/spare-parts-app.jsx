@@ -1063,26 +1063,22 @@ const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {
 // ─── THEME PALETTES ──────────────────────────────────────────
 const THEMES = {
   dark: {
-  bgRoot:"#0f172a",
-  bgCard:"#1e293b",
-  bgInp:"#334155",
-  bgSel:"#1e293b",
-
-  bgHdr:"#1e293b",
-  bgSidebar:"#1d4ed8",
-  bgOiCard:"#1e293b",
-
-  border:"#475569",
-  borderMid:"#64748b",
-
-  txtPrimary:"#f8fafc",
-  txtSecondary:"#e2e8f0",
-  txtMuted:"#cbd5e1",
-  txtFaint:"#94a3b8",
-
-  accent:"#60a5fa",
-  accentDim:"#082f49",
-},
+    bgRoot:"#071427",
+    bgCard:"#132238",
+    bgInp:"#1e3350",
+    bgSel:"#172a44",
+    bgHdr:"#132238",
+    bgSidebar:"#0f2a4f",
+    bgOiCard:"#14243a",
+    border:"#34506f",
+    borderMid:"#4f6f92",
+    txtPrimary:"#f8fafc",
+    txtSecondary:"#dbeafe",
+    txtMuted:"#b6c7df",
+    txtFaint:"#8fa8c6",
+    accent:"#60a5fa",
+    accentDim:"#0b3b6a",
+  },
   light: {
     bgRoot:"#f1f5f9", bgCard:"#ffffff", bgInp:"#f8fafc", bgSel:"#ffffff",
     bgHdr:"#ffffff", bgSidebar:"#ffffff", bgOiCard:"#f8fafc",
@@ -7068,43 +7064,42 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 }
 // ─── DASHBOARD TAB ───────────────────────────────────────────
 function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread }) {
-  const cur = lang==="bn"?"৳":"AED";
-
-  // ── stats ──
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===profile.uid);
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
   const delivered  = myOrders.filter(o=>o.overall==="delivered").length;
   const cancelled  = myOrders.filter(o=>o.overall==="cancelled").length;
   const inProgress = myOrders.filter(o=>!["pending","delivered","cancelled"].includes(o.overall)).length;
-  const outBranch  = myOrders.filter(o=>o.overall==="out_for_branch").length;
-  const recent5    = myOrders.slice(0,5);
 
-  const STATUS_COLOR = {
-    pending:"#f59e0b", order_confirmed:"#22c55e", ordered_supplier:"#06b6d4",
-    in_stock:"#22c55e", out_of_stock:"#ef4444", waiting_delivery:"#f97316",
-    arrived_main_shop:"#a855f7", out_for_branch:"#06b6d4", delivered:"#818cf8", cancelled:"#71717a",
-  };
-  const STATUS_LABEL_BN = {
-    pending:"⏳ অপেক্ষায়", order_confirmed:"✅ গ্রহণ", ordered_supplier:"📦 কোম্পানিকে",
-    in_stock:"✅ স্টকে", out_of_stock:"❌ নেই", waiting_delivery:"⏳ আসছে",
-    arrived_main_shop:"🏪 মেইন শপে", out_for_branch:"🚚 ব্রাঞ্চে", delivered:"✅ ডেলিভারি", cancelled:"🚫 বাতিল",
-  };
-  const STATUS_LABEL_EN = {
-    pending:"⏳ Pending", order_confirmed:"✅ Confirmed", ordered_supplier:"📦 Ordered",
-    in_stock:"✅ In Stock", out_of_stock:"❌ No Stock", waiting_delivery:"⏳ Waiting",
-    arrived_main_shop:"🏪 Main Shop", out_for_branch:"🚚 Outgoing", delivered:"✅ Delivered", cancelled:"🚫 Cancelled",
-  };
-  const SL = lang==="bn" ? STATUS_LABEL_BN : STATUS_LABEL_EN;
+  const panelStyle = isDesktop
+    ? {
+        ...s.desktopPanel,
+        background:`radial-gradient(circle at 8% 0%, rgba(96,165,250,0.18), transparent 34%), linear-gradient(180deg, ${th.bgRoot}, ${th.bgRoot})`,
+      }
+    : {
+        ...s.panel,
+        padding:"18px 14px 92px",
+        background:`radial-gradient(circle at 15% 0%, rgba(96,165,250,0.20), transparent 34%), radial-gradient(circle at 92% 8%, rgba(14,165,233,0.10), transparent 30%), linear-gradient(180deg, ${th.bgRoot}, #07111f)`,
+      };
 
-  const fmtDate = (d) => {
-    if (!d) return "";
-    const dt = d instanceof Date ? d : new Date(d);
-    return dt.toLocaleDateString(lang==="bn"?"bn-BD":"en-GB",{day:"2-digit",month:"short"});
+  const sectionTitle = {
+    display:"flex",
+    justifyContent:"space-between",
+    alignItems:"center",
+    margin:"20px 2px 10px",
+    color:th.txtPrimary,
+    fontSize:isDesktop?13:12,
+    fontWeight:900,
+    textTransform:"uppercase",
+    letterSpacing:0.7,
   };
 
-  const panelStyle = isDesktop ? s.desktopPanel : { ...s.panel, paddingBottom:80 };
+  const glassCard = {
+    background:"linear-gradient(145deg, rgba(30,41,59,0.92), rgba(15,23,42,0.86))",
+    border:"1px solid rgba(148,163,184,0.25)",
+    boxShadow:"0 14px 35px rgba(2,6,23,0.32)",
+    backdropFilter:"blur(14px)",
+  };
 
-  // owner quick nav items
   const ownerNavItems = [
     { key:"owner",    icon:"📋", label:lang==="bn"?"অর্ডার":"Orders",         badge:unread },
     { key:"companies",icon:"🏢", label:lang==="bn"?"কোম্পানি":"Companies",    badge:cos.length },
@@ -7113,114 +7108,217 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
     { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
     { key:"vendors",  icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors",        badge:vendors.length },
     { key:"customers",icon:"👥", label:lang==="bn"?"কাস্টমার":"Customers",    badge:customers.length },
-    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক প্রিন্ট":"Cheque",    badge:null },
+    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
+
   const salesNavItems = [
     { key:"shop",     icon:"📋", label:lang==="bn"?"অর্ডার":"New Order",      badge:unread },
     { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:null },
     { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
     { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
-    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক প্রিন্ট":"Cheque",    badge:null },
+    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
+
   const navItems = isOwner ? ownerNavItems : salesNavItems;
 
-  const cardStyle = (accent) => ({
-    background: th.bgCard,
-    border: `1px solid ${th.border}`,
-    borderRadius: 14,
-    padding: "16px 18px",
-    flex: 1,
-    minWidth: 100,
-    borderTop: `3px solid ${accent}`,
-  });
+  const miniTopItems = [
+    { key:"dashboard", icon:"🏠", label:lang==="bn"?"ড্যাশবোর্ড":"Dashboard" },
+    { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
+    { key:"purchase", icon:"🛍️", label:lang==="bn"?"ক্রয়":"Purchase" },
+    { key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" },
+    { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products" },
+    { key:"settings", icon:"•••", label:lang==="bn"?"আরও":"More" },
+  ].filter(x => isOwner || !["vendors"].includes(x.key));
 
-  const statNum  = { fontSize: 28, fontWeight: 800, color: th.txtPrimary, lineHeight: 1.1 };
-  const statLbl  = { fontSize: 11, color: th.txtMuted, marginTop: 4, fontWeight: 600, textTransform:"uppercase", letterSpacing:0.4 };
+  const statusCards = [
+    { label:t.dashPending,    value:pending,    icon:"⏳", color:"#f59e0b", glow:"rgba(245,158,11,0.26)" },
+    { label:t.dashInProgress, value:inProgress, icon:"🔄", color:"#0ea5e9", glow:"rgba(14,165,233,0.26)" },
+    { label:t.dashDelivered,  value:delivered,  icon:"✅", color:"#22c55e", glow:"rgba(34,197,94,0.24)" },
+    { label:t.dashCancelled,  value:cancelled,  icon:"✖", color:"#ef4444", glow:"rgba(239,68,68,0.24)" },
+  ];
+
+  const shopCards = [
+    { label:t.dashProducts,  value:products.length,  icon:"📦", color:"#a855f7" },
+    { label:t.dashCompanies, value:cos.length,       icon:"🏢", color:"#f97316" },
+    { label:t.dashTeam,      value:team.length,      icon:"👥", color:"#3b82f6" },
+    { label:t.dashCustomers, value:customers.length, icon:"👥", color:"#22c55e" },
+    { label:t.dashVendors,   value:vendors.length,   icon:"🏭", color:"#06b6d4" },
+  ];
+
+  const statCard = (item, wide=false) => (
+    <div
+      key={item.label}
+      style={{
+        ...glassCard,
+        borderRadius:18,
+        padding:isDesktop?"18px 20px":"14px 13px",
+        minHeight:isDesktop?110:104,
+        position:"relative",
+        overflow:"hidden",
+        borderBottom:`4px solid ${item.color}`,
+        gridColumn:wide ? "span 2" : "span 1",
+      }}
+    >
+      <div style={{ position:"absolute", inset:"auto -40px -50px auto", width:110, height:110, borderRadius:"50%", background:item.glow||`${item.color}22`, filter:"blur(4px)" }} />
+      <div style={{ width:42, height:42, borderRadius:22, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:21, boxShadow:`0 10px 24px ${item.color}55`, marginBottom:12 }}>
+        {item.icon}
+      </div>
+      <div style={{ color:th.txtPrimary, fontSize:isDesktop?34:30, lineHeight:1, fontWeight:900, letterSpacing:-1 }}>{item.value}</div>
+      <div style={{ color:th.txtSecondary, fontSize:isDesktop?13:12, fontWeight:700, marginTop:8, lineHeight:1.25 }}>{item.label}</div>
+    </div>
+  );
+
+  const shopCard = (item, idx) => (
+    <div
+      key={item.label}
+      style={{
+        ...glassCard,
+        borderRadius:18,
+        padding:isDesktop?"18px 20px":"14px 13px",
+        minHeight:isDesktop?95:86,
+        display:"flex",
+        alignItems:"center",
+        gap:14,
+        borderBottom:`4px solid ${item.color}`,
+        gridColumn:(!isDesktop && idx>2) ? "span 2" : "span 1",
+      }}
+    >
+      <div style={{ width:46, height:46, borderRadius:24, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, boxShadow:`0 10px 24px ${item.color}55`, flexShrink:0 }}>
+        {item.icon}
+      </div>
+      <div>
+        <div style={{ color:th.txtPrimary, fontSize:isDesktop?26:24, lineHeight:1, fontWeight:900 }}>{item.value}</div>
+        <div style={{ color:th.txtSecondary, fontSize:12, fontWeight:700, marginTop:6, lineHeight:1.25 }}>{item.label}</div>
+      </div>
+    </div>
+  );
+
+  const quickCard = (item) => (
+    <button
+      key={item.key}
+      onClick={()=>setTab(item.key)}
+      style={{
+        ...glassCard,
+        borderRadius:16,
+        padding:isDesktop?"18px 10px":"14px 8px",
+        minHeight:isDesktop?104:94,
+        cursor:"pointer",
+        fontFamily:"inherit",
+        display:"flex",
+        flexDirection:"column",
+        alignItems:"center",
+        justifyContent:"center",
+        gap:9,
+        position:"relative",
+        color:th.txtPrimary,
+      }}
+    >
+      {item.badge>0 && (
+        <span style={{ position:"absolute", top:8, right:8, background:"linear-gradient(135deg,#fb7185,#ef4444)", color:"#fff", borderRadius:999, padding:"2px 8px", fontSize:10, fontWeight:900, boxShadow:"0 8px 18px rgba(239,68,68,0.35)" }}>
+          {item.badge}
+        </span>
+      )}
+      <span style={{ fontSize:isDesktop?28:25, filter:"drop-shadow(0 8px 14px rgba(96,165,250,0.28))" }}>{item.icon}</span>
+      <span style={{ fontSize:isDesktop?13:12, fontWeight:800, color:th.txtSecondary, textAlign:"center", lineHeight:1.2 }}>{item.label}</span>
+    </button>
+  );
 
   return (
     <div style={panelStyle}>
-      {/* ── greeting ── */}
-      <div style={{ background:`linear-gradient(135deg, rgba(249,115,22,0.12), rgba(249,115,22,0.04))`, border:`1px solid rgba(249,115,22,0.25)`, borderRadius:16, padding:"20px 22px", marginBottom:20, display:"flex", alignItems:"center", gap:16 }}>
-        <div style={{ fontSize:46 }}>{isOwner?"🏢":"👨‍💼"}</div>
-        <div>
-          <div style={{ fontSize:20, fontWeight:800, color:th.txtPrimary }}>
-            {t.dashGreeting}, {profile.personName}! 👋
+      {!isDesktop && (
+        <div style={{ display:"flex", gap:12, overflowX:"auto", padding:"2px 0 16px", margin:"0 -2px 2px", scrollbarWidth:"none" }}>
+          {miniTopItems.map((item, idx)=>(
+            <button
+              key={item.key}
+              onClick={()=>setTab(item.key)}
+              style={{
+                minWidth:idx===0?84:78,
+                height:78,
+                borderRadius:17,
+                border:idx===0?"1px solid rgba(96,165,250,0.95)":"1px solid rgba(148,163,184,0.22)",
+                background:idx===0?"linear-gradient(135deg,#3b82f6,#60a5fa)":"linear-gradient(145deg,rgba(30,41,59,0.92),rgba(15,23,42,0.88))",
+                color:"#fff",
+                boxShadow:idx===0?"0 12px 28px rgba(59,130,246,0.34)":"0 10px 22px rgba(2,6,23,0.22)",
+                fontFamily:"inherit",
+                display:"flex",
+                flexDirection:"column",
+                alignItems:"center",
+                justifyContent:"center",
+                gap:7,
+                flexShrink:0,
+              }}
+            >
+              <span style={{ fontSize:24 }}>{item.icon}</span>
+              <span style={{ fontSize:12, fontWeight:850, whiteSpace:"nowrap" }}>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ ...glassCard, borderRadius:22, padding:isDesktop?"28px 30px":"18px 16px", marginBottom:22, display:"flex", alignItems:"center", gap:isDesktop?22:14, position:"relative", overflow:"hidden", border:"1px solid rgba(96,165,250,0.28)" }}>
+        <div style={{ position:"absolute", inset:"-60px -70px auto auto", width:170, height:170, borderRadius:"50%", background:"rgba(59,130,246,0.22)", filter:"blur(12px)" }} />
+        <div style={{ fontSize:isDesktop?62:54, flexShrink:0, filter:"drop-shadow(0 12px 22px rgba(96,165,250,0.25))" }}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div style={{ minWidth:0, flex:1, position:"relative", zIndex:1 }}>
+          <div style={{ fontSize:isDesktop?26:20, fontWeight:900, color:th.txtPrimary, lineHeight:1.15, letterSpacing:-0.4 }}>
+            {lang==="bn"?"স্বাগতম":"Welcome"}, <span style={{ color:"#60a5fa" }}>{(profile.personName||"").toUpperCase()}</span>! 👋
           </div>
-          <div style={{ fontSize:13, color:th.txtMuted, marginTop:3 }}>
+          <div style={{ fontSize:isDesktop?15:13, color:th.txtSecondary, marginTop:8, lineHeight:1.35, fontWeight:650 }}>
             🏪 {localShop?.companyName||""}
-            {!isOwner && profile.position && <span style={{ marginLeft:8, color:th.accent, fontWeight:600 }}> · {profile.position}</span>}
+            {!isOwner && profile.position && <span style={{ color:"#60a5fa", fontWeight:800 }}> · {profile.position}</span>}
           </div>
         </div>
+        {!isDesktop && (
+          <button onClick={()=>setTab(isOwner?"owner":"shop")} style={{ width:46, height:46, borderRadius:23, border:"1px solid rgba(96,165,250,0.30)", background:"rgba(59,130,246,0.16)", color:"#60a5fa", fontSize:24, fontWeight:900, flexShrink:0 }}>
+            ›
+          </button>
+        )}
       </div>
 
-      {/* ── stat cards ── */}
-      <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>
-        {isOwner ? t.dashTotalOrders : t.dashMyOrders}
+      <div style={sectionTitle}>
+        <span>{isOwner ? (lang==="bn"?"আজকের অর্ডার":"Today Overview") : t.dashMyOrders}</span>
+        <button onClick={()=>setTab(isOwner?"owner":"shop")} style={{ background:"transparent", border:0, color:"#60a5fa", fontWeight:800, fontSize:12, cursor:"pointer" }}>
+          {lang==="bn"?"সব দেখুন":"View all"}
+        </button>
       </div>
-      <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
-        <div style={cardStyle("#f59e0b")}>
-          <div style={statNum}>{pending}</div>
-          <div style={statLbl}>⏳ {t.dashPending}</div>
-        </div>
-        <div style={cardStyle("#06b6d4")}>
-          <div style={statNum}>{inProgress}</div>
-          <div style={statLbl}>🔄 {t.dashInProgress}</div>
-        </div>
-        <div style={cardStyle("#22c55e")}>
-          <div style={statNum}>{delivered}</div>
-          <div style={statLbl}>✅ {t.dashDelivered}</div>
-        </div>
-        <div style={cardStyle("#ef4444")}>
-          <div style={statNum}>{cancelled}</div>
-          <div style={statLbl}>🚫 {t.dashCancelled}</div>
-        </div>
+      <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(4, minmax(0,1fr))":"repeat(2, minmax(0,1fr))", gap:isDesktop?14:12, marginBottom:22 }}>
+        {statusCards.map(c=>statCard(c, !isDesktop && c.label===t.dashCancelled))}
       </div>
 
-      {/* ── owner extra stats ── */}
       {isOwner && (
         <>
-          <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>
-            {lang==="bn"?"দোকানের সংক্ষিপ্ত তথ্য":"Shop Overview"}
-          </div>
-          <div style={{ display:"flex", gap:10, flexWrap:"wrap", marginBottom:20 }}>
-            <div style={cardStyle("#a855f7")}>
-              <div style={statNum}>{products.length}</div>
-              <div style={statLbl}>📦 {t.dashProducts}</div>
-            </div>
-            <div style={cardStyle("#f97316")}>
-              <div style={statNum}>{cos.length}</div>
-              <div style={statLbl}>🏢 {t.dashCompanies}</div>
-            </div>
-            <div style={cardStyle("#818cf8")}>
-              <div style={statNum}>{team.length}</div>
-              <div style={statLbl}>👥 {t.dashTeam}</div>
-            </div>
-            <div style={cardStyle("#22c55e")}>
-              <div style={statNum}>{customers.length}</div>
-              <div style={statLbl}>👤 {t.dashCustomers}</div>
-            </div>
-            <div style={cardStyle("#06b6d4")}>
-              <div style={statNum}>{vendors.length}</div>
-              <div style={statLbl}>🏭 {t.dashVendors}</div>
-            </div>
+          <div style={sectionTitle}><span>{lang==="bn"?"দোকানের সংক্ষিপ্ত তথ্য":"Shop Overview"}</span></div>
+          <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(3, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?14:12, marginBottom:22 }}>
+            {shopCards.map((c,i)=>shopCard(c,i))}
           </div>
         </>
       )}
 
-      {/* ── quick navigation ── */}
-      <div style={{ fontSize:12, fontWeight:700, color:th.txtMuted, textTransform:"uppercase", letterSpacing:0.5, marginBottom:10 }}>{t.dashQuickNav}</div>
-      <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(100px,1fr))", gap:10 }}>
-        {navItems.map(n=>(
-          <button key={n.key} onClick={()=>setTab(n.key)}
-            style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 8px", cursor:"pointer", fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:6, position:"relative" }}>
-            {n.badge>0 && <span style={{ position:"absolute", top:6, right:6, background:"#ef4444", color:"#fff", borderRadius:10, padding:"1px 6px", fontSize:9, fontWeight:800 }}>{n.badge}</span>}
-            <span style={{ fontSize:22 }}>{n.icon}</span>
-            <span style={{ fontSize:11, fontWeight:700, color:th.txtSecondary, textAlign:"center", lineHeight:1.3 }}>{n.label}</span>
-          </button>
-        ))}
+      <div style={sectionTitle}><span>{t.dashQuickNav}</span></div>
+      <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(6, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?14:12, marginBottom:!isDesktop?18:0 }}>
+        {navItems.map(quickCard)}
       </div>
+
+      {!isDesktop && (
+        <div style={{ position:"fixed", left:12, right:12, bottom:10, zIndex:20, borderRadius:24, padding:"10px 12px", background:"rgba(15,23,42,0.86)", border:"1px solid rgba(148,163,184,0.25)", boxShadow:"0 20px 40px rgba(2,6,23,0.48)", backdropFilter:"blur(16px)", display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:6 }}>
+          {[
+            { key:"dashboard", icon:"🏠", label:lang==="bn"?"হোম":"Home" },
+            { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
+            { key:"purchase", icon:"＋", label:lang==="bn"?"নতুন":"New", main:true },
+            { key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" },
+            { key:"settings", icon:"⚙️", label:lang==="bn"?"আরও":"More" },
+          ].filter(x=>isOwner || x.key!=="vendors").map(item=>(
+            <button key={item.key} onClick={()=>setTab(item.key)}
+              style={{ border:0, background:"transparent", color:item.main?"#fff":th.txtSecondary, fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:3, fontSize:10, fontWeight:800 }}>
+              <span style={{ width:item.main?50:30, height:item.main?50:30, marginTop:item.main?-24:0, borderRadius:999, background:item.main?"linear-gradient(135deg,#2563eb,#60a5fa)":"transparent", boxShadow:item.main?"0 12px 28px rgba(59,130,246,0.46)":"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:item.main?34:22 }}>
+                {item.icon}
+              </span>
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
