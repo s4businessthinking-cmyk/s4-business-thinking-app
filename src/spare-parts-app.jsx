@@ -45,13 +45,20 @@ const PRESET_POSITIONS = {
 
 // ─── PERMISSIONS ────────────────────────────────────────────
 const PERMISSIONS_LIST = [
-  { key: "sendOrder",       bn: "অর্ডার দেওয়া",           en: "Send Orders" },
-  { key: "manageCompanies", bn: "কোম্পানি ম্যানেজ করা",    en: "Manage Companies" },
-  { key: "setPrices",       bn: "দাম সেট করা",             en: "Set Prices" },
-  { key: "setStatus",       bn: "স্ট্যাটাস পরিবর্তন করা",  en: "Change Item Status" },
-  { key: "markDelivery",    bn: "ডেলিভারি মার্ক করা",      en: "Mark as Delivered" },
-  { key: "deleteOrder",     bn: "অর্ডার ডিলিট করা",        en: "Delete Orders" },
-  { key: "viewProducts",   bn: "পণ্য তালিকা দেখা",          en: "View Product List" },
+  { key: "sendOrder",        bn: "অর্ডার দেওয়া",              en: "Send Orders" },
+  { key: "manageCompanies",  bn: "কোম্পানি ম্যানেজ করা",       en: "Manage Companies" },
+  { key: "setPrices",        bn: "দাম সেট করা",                en: "Set Prices" },
+  { key: "setStatus",        bn: "স্ট্যাটাস পরিবর্তন করা",     en: "Change Item Status" },
+  { key: "markDelivery",     bn: "ডেলিভারি মার্ক করা",         en: "Mark as Delivered" },
+  { key: "deleteOrder",      bn: "অর্ডার ডিলিট করা",           en: "Delete Orders" },
+  { key: "viewProducts",     bn: "পণ্য তালিকা দেখা",           en: "View Product List" },
+
+  // Owner-controlled purchase/supplier/payment access for staff.
+  // OFF by default. Salesman can see/use these options only after owner turns them ON from Settings → Team.
+  { key: "viewVendors",      bn: "সাপ্লায়ার / ভেন্ডর দেখা",   en: "View Suppliers / Vendors" },
+  { key: "viewSupplierLedger", bn: "সাপ্লায়ার লেজার দেখা",    en: "View Supplier Ledger" },
+  { key: "vendorPayments",   bn: "সাপ্লায়ার পেমেন্ট করা",     en: "Make Supplier Payments" },
+  { key: "managePurchase",   bn: "ক্রয় ইনভয়েস ম্যানেজ করা",  en: "Manage Purchase Invoices" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -62,6 +69,11 @@ const DEFAULT_PERMISSIONS = {
   markDelivery: false,
   deleteOrder: false,
   viewProducts: false,
+
+  viewVendors: false,
+  viewSupplierLedger: false,
+  vendorPayments: false,
+  managePurchase: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -1801,7 +1813,7 @@ function PiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ─── PI: DETAIL VIEW ──────────────────────────────────────────
-function PiDetailView({ invoice, onEdit, onCancel, onDelete, onBack, t, th, lang, isOwner, relatedPayments, onMakePayment, onViewVoucher }) {
+function PiDetailView({ invoice, onEdit, onCancel, onDelete, onBack, t, th, lang, isOwner, canVendorPayments, relatedPayments, onMakePayment, onViewVoucher }) {
   const { sub, disc, tax, grand } = piCalcTotals(invoice.items||[]);
   const balance = grand - invoice.amountPaid;
   const canEdit   = ["draft","confirmed"].includes(invoice.status);
@@ -1879,7 +1891,7 @@ function PiDetailView({ invoice, onEdit, onCancel, onDelete, onBack, t, th, lang
           <span style={{ fontSize:13, fontWeight:700, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.pi_balanceDue}</span>
           <span style={{ fontSize:16, fontWeight:900, color:balance>0.01?"#ef4444":"#22c55e" }}>{t.cur} {piFmt2(Math.max(0,balance))}</span>
         </div>
-        {isOwner&&canPay&&(
+        {canVendorPayments&&canPay&&(
           <button onClick={onMakePayment} style={{ width:"100%", marginTop:12, padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer" }}>{t.pi_makePayment}</button>
         )}
         {balance<=0.01&&invoice.status!=="draft"&&invoice.status!=="cancelled"&&(
@@ -3117,7 +3129,7 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
 }
 
 // ─── PI: SUPPLIER LEDGER ──────────────────────────────────────
-function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices, onPayVendor }) {
+function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvoices, onPayVendor }) {
   const [selVendor,setSelVendor] = useState(null);
 
   // Aggregate invoices by vendor
@@ -3145,7 +3157,7 @@ function PiSupplierLedger({ invoices, t, th, lang, onViewInvoices, onPayVendor }
             <div style={{ fontSize:15, fontWeight:800, color:"#f97316" }}>🏭 {vd.vendorName}</div>
             {vd.vendorMobile&&<div style={{ fontSize:12, color:"#a1a1aa", marginTop:2 }}>📱 {vd.vendorMobile}</div>}
           </div>
-          {vd.balance>0.01&&(
+          {canVendorPayments&&vd.balance>0.01&&(
             <button onClick={()=>onPayVendor(vd)} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:12, fontWeight:800, cursor:"pointer", flexShrink:0 }}>{t.pi_makePayment}</button>
           )}
         </div>
@@ -3852,6 +3864,12 @@ function printPaymentVoucher(voucher, shop, lang) {
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
 function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
   const isOwner = profile?.role==="owner";
+  const perms = profile?.permissions || DEFAULT_PERMISSIONS;
+  const can = (key) => isOwner || perms[key] === true;
+
+  const canManagePurchase = can("managePurchase");
+  const canViewSupplierLedger = can("viewSupplierLedger") || can("viewVendors") || can("vendorPayments") || canManagePurchase;
+  const canVendorPayments = can("vendorPayments");
 
   // ── Firestore state ──
   const [invoices,setInvoices]     = useState([]);
@@ -3859,7 +3877,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── View state: "list" | "form" | "detail" ──
   const [piView,setPiView]         = useState("list");
-  const [piSubTab,setPiSubTab]     = useState("invoices"); // "invoices" | "ledger" | "payments"
+  const [piSubTab,setPiSubTab]     = useState(
+    canManagePurchase ? "invoices" : (canViewSupplierLedger ? "ledger" : (canVendorPayments ? "payments" : "invoices"))
+  ); // "invoices" | "ledger" | "payments"
   const [selInvoice,setSelInvoice] = useState(null);
   const [editInvoiceId,setEditInvoiceId] = useState(null);
 
@@ -3899,6 +3919,21 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ── Filter state ──
   const [piSearch,setPiSearch]       = useState("");
   const [piStatusF,setPiStatusF]     = useState("ALL");
+
+  const allowedPiSubTabs = [
+    ...(canManagePurchase ? ["invoices"] : []),
+    ...(canViewSupplierLedger ? ["ledger"] : []),
+    ...(canVendorPayments ? ["payments"] : []),
+  ];
+
+  useEffect(()=>{
+    if (!allowedPiSubTabs.length) return;
+    if (!allowedPiSubTabs.includes(piSubTab)) {
+      setPiSubTab(allowedPiSubTabs[0]);
+      setPmtView("list");
+      setSelVoucher(null);
+    }
+  }, [piSubTab, canManagePurchase, canViewSupplierLedger, canVendorPayments]);
 
   // ── Real-time listener (fallback if index missing) ──
   useEffect(()=>{
@@ -4227,6 +4262,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // The new voucher form pre-fills this exact invoice's row with its full balance — other open invoices for
   // the same vendor are shown too, so the user can combine them into one voucher if they want.
   const piGoToMakePayment = (inv) => {
+    if (!canVendorPayments) return;
     setPmtPrefillVendorId(inv.vendorId || inv.vendorName);
     setSelVoucher(null);
     setPmtView("new");
@@ -4265,16 +4301,16 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       {/* Title + New button */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.pi_title}</div>
-        {isOwner&&piSubTab==="invoices"&&<button onClick={piOpenNew} disabled={piSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:piSaving?"#7c2d12":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:piSaving?"not-allowed":"pointer", opacity:piSaving?0.7:1 }}>{piSaving?"...":(lang==="bn"?"+ নতুন ইনভয়েস":"+ New Invoice")}</button>}
-        {isOwner&&piSubTab==="payments"&&pmtView==="list"&&<button onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_newPayment}</button>}
+        {canManagePurchase&&piSubTab==="invoices"&&<button onClick={piOpenNew} disabled={piSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:piSaving?"#7c2d12":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:piSaving?"not-allowed":"pointer", opacity:piSaving?0.7:1 }}>{piSaving?"...":(lang==="bn"?"+ নতুন ইনভয়েস":"+ New Invoice")}</button>}
+        {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&<button onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_newPayment}</button>}
       </div>
 
       {/* Sub-tab bar */}
       <div style={{ display:"flex", gap:0, marginBottom:16, background:th.bgInp, borderRadius:12, padding:4 }}>
         {[
-          { key:"invoices", icon:"📋", bn:"ইনভয়েস", en:"Invoices" },
-          { key:"ledger",   icon:"🏭", bn:"সাপ্লায়ার লেজার", en:"Supplier Ledger" },
-          { key:"payments", icon:"💳", bn:"পেমেন্ট", en:"Payments" },
+          ...(canManagePurchase ? [{ key:"invoices", icon:"📋", bn:"ইনভয়েস", en:"Invoices" }] : []),
+          ...(canViewSupplierLedger ? [{ key:"ledger", icon:"🏭", bn:"সাপ্লায়ার লেজার", en:"Supplier Ledger" }] : []),
+          ...(canVendorPayments ? [{ key:"payments", icon:"💳", bn:"পেমেন্ট", en:"Payments" }] : []),
         ].map(tab=>(
           <button key={tab.key} onClick={()=>{ setPiSubTab(tab.key); if(tab.key==="payments"){ setPmtView("list"); setSelVoucher(null); } }} style={{ flex:1, padding:"9px 8px", borderRadius:9, border:"none", cursor:"pointer", fontFamily:"inherit", fontWeight:700, fontSize:12, transition:"all 0.15s", background:piSubTab===tab.key?"#f97316":"transparent", color:piSubTab===tab.key?"#fff":th.txtMuted }}>
             {tab.icon} {lang==="bn"?tab.bn:tab.en}
@@ -4283,24 +4319,25 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       </div>
 
       {/* ── SUB-TAB: SUPPLIER LEDGER ── */}
-      {piSubTab==="ledger"&&(
+      {piSubTab==="ledger"&&canViewSupplierLedger&&(
         <PiSupplierLedger invoices={invoices} t={t} th={th} lang={lang}
+          canVendorPayments={canVendorPayments}
           onViewInvoices={(inv)=>{ setSelInvoice(inv); setPiView("detail"); }}
-          onPayVendor={(vd)=>{ setPmtPrefillVendorId(vd.vendorId||vd.vendorName); setSelVoucher(null); setPmtView("new"); setPiSubTab("payments"); }} />
+          onPayVendor={(vd)=>{ if(!canVendorPayments) return; setPmtPrefillVendorId(vd.vendorId||vd.vendorName); setSelVoucher(null); setPmtView("new"); setPiSubTab("payments"); }} />
       )}
 
       {/* ── SUB-TAB: PAYMENTS (Vendor Payment Voucher — Cash/Cheque, partial across open invoices) ── */}
-      {piSubTab==="payments"&&pmtView==="list"&&(
+      {piSubTab==="payments"&&canVendorPayments&&pmtView==="list"&&(
         <PiPaymentsListTab payments={payments} loading={pmtLoading} t={t} th={th} lang={lang}
           onOpen={(v)=>{ setSelVoucher(v); setPmtView("detail"); }} />
       )}
-      {piSubTab==="payments"&&pmtView==="new"&&(
+      {piSubTab==="payments"&&canVendorPayments&&pmtView==="new"&&(
         <PiNewPaymentForm vendors={vendors} prefillVendorId={pmtPrefillVendorId}
           getVendorOpenInvoices={getVendorOpenInvoices} saving={pmtSaving}
           onSave={piSavePaymentVoucher} onCancel={()=>{ setPmtView("list"); setPmtPrefillVendorId(null); }}
           t={t} th={th} lang={lang} isDesktop={isDesktop} />
       )}
-      {piSubTab==="payments"&&pmtView==="detail"&&selVoucher&&(
+      {piSubTab==="payments"&&canVendorPayments&&pmtView==="detail"&&selVoucher&&(
         <PiVoucherDetailView voucher={selVoucher} t={t} th={th} lang={lang} isOwner={isOwner}
           onBack={()=>{ setPmtView("list"); setSelVoucher(null); }}
           onCancel={()=>piCancelPaymentVoucher(selVoucher)}
@@ -4311,7 +4348,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       )}
 
       {/* ── SUB-TAB: INVOICES ── */}
-      {piSubTab==="invoices"&&(<>
+      {piSubTab==="invoices"&&canManagePurchase&&(<>
         {invoices.length>0&&(
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))", gap:8, marginBottom:14 }}>
             {[
@@ -4356,7 +4393,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ══════ DETAIL VIEW ══════
   if (piView==="detail"&&selInvoice) return (
     <div style={panel}>
-      <PiDetailView invoice={selInvoice} t={t} th={th} lang={lang} isOwner={isOwner}
+      <PiDetailView invoice={selInvoice} t={t} th={th} lang={lang} isOwner={isOwner} canVendorPayments={canVendorPayments}
         onBack={()=>{ setPiView("list"); setSelInvoice(null); }}
         onEdit={()=>piOpenEdit(selInvoice)}
         onCancel={()=>piCancelInv(selInvoice)}
@@ -7610,6 +7647,8 @@ const startEditOrder = (order) => {
     return Object.entries(groups); // [ [dateStr, [orders]], ... ]
   };
 
+  const canStaffSupplierArea = can("viewVendors") || can("viewSupplierLedger") || can("vendorPayments") || can("managePurchase");
+
   const visibleTabs = isOwner
     ? [["dashboard",t.tabDashboard],["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["settings",t.tabSettings]]
     : [
@@ -7618,7 +7657,8 @@ const startEditOrder = (order) => {
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
         ["sales", t.tabSales],
-        ["purchase", lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info"],
+        ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
+        ...(can("viewVendors")?[["vendors",t.tabVendor]]:[]),
         ["cheque",t.tabCheque],
         ["settings",t.tabSettings],
       ];
@@ -8926,7 +8966,7 @@ const startEditOrder = (order) => {
         />
       )}
 
-      {isOwner&&tab==="vendors"&&(
+      {(isOwner || can("viewVendors"))&&tab==="vendors"&&(
         <VendorMasterWindow
           t={t} lang={lang} th={th}
           shopId={shopId} user={user}
@@ -8937,7 +8977,7 @@ const startEditOrder = (order) => {
         />
       )}
 
-      {isOwner&&tab==="purchase"&&(
+      {tab==="purchase"&&canStaffSupplierArea&&(
         <PurchaseInvoiceTab
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
@@ -8946,7 +8986,7 @@ const startEditOrder = (order) => {
         />
       )}
 
-      {!isOwner&&tab==="purchase"&&(
+      {tab==="purchase"&&!canStaffSupplierArea&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           <PiSalesmanView t={t} lang={lang} th={th} shopId={shopId} />
         </div>
