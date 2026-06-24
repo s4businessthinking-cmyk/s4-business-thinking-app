@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">S4 Business Thinking</string>
+    <string name="title_activity_main">S4 Business Thinking</string>
+    <string name="package_name">com.s4businessthinking.app</string>
+    <string name="custom_url_scheme">com.s4businessthinking.app</string>
+</resources>

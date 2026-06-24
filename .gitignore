@@ -5,3 +5,24 @@ dist
 .DS_Store
 *.log
 .vite
+
+# Build outputs
+dist/
+release/
+android/app/build/
+android/build/
+
+# Android local/private files
+android/local.properties
+android/*.jks
+android/*.keystore
+
+# Logs
+*.log
+
+# Android signing secrets
+android/keystore.properties
+
+# Android Studio local files
+android/.idea/
+*.iml
