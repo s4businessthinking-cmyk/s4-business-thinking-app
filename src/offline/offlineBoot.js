@@ -8,15 +8,24 @@ import {
   offlineSearch,
   offlineEngineStatus,
 } from "./offlineRepository";
+import {
+  syncPendingQueueToFirebase,
+  startAutoFirebaseSync,
+} from "./firebaseSyncWorker";
 
 export async function startOfflineEngine() {
   try {
     const boot = await bootOfflineSqlite();
     const status = await getOfflineStatus();
 
+    const autoSync = startAutoFirebaseSync({
+      intervalMs: 30000,
+    });
+
     window.S4Offline = {
       ready: true,
       boot,
+      autoSync,
       status: offlineEngineStatus,
       create: offlineCreate,
       update: offlineUpdate,
@@ -24,6 +33,7 @@ export async function startOfflineEngine() {
       remove: offlineRemove,
       list: offlineList,
       search: offlineSearch,
+      syncNow: syncPendingQueueToFirebase,
       test: async () => {
         const created = await offlineCreate("offline_test", {
           name: "S4 Offline Test",
@@ -37,6 +47,21 @@ export async function startOfflineEngine() {
           ok: true,
           created,
           status: latestStatus,
+        };
+      },
+      testSync: async () => {
+        const created = await offlineCreate("offline_test", {
+          name: "S4 Firebase Sync Test",
+          note: "SQLite → Sync Queue → Firebase test",
+          createdFrom: "window.S4Offline.testSync",
+        });
+
+        const sync = await syncPendingQueueToFirebase();
+
+        return {
+          ok: true,
+          created,
+          sync,
         };
       },
     };
