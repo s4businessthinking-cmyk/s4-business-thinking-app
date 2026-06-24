@@ -7668,13 +7668,41 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   // ── Products — one-time fetch (not real-time, too heavy for 3000+ items) ──
   const [productsLoading,setProductsLoading]=useState(false);
   const fetchProducts = async () => {
+    if (!shopId) return;
+
     setProductsLoading(true);
+
+    const loadLocalProducts = async () => {
+      const local = await offlineList("products");
+      const docs = local.records
+        .map(r => ({ id: r.document_id, ...(r.data || {}) }))
+        .filter(p => p.shopId === shopId)
+        .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+
+      setProducts(docs);
+      setSyncState("offline");
+      return docs;
+    };
+
     try {
       const snap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId), orderBy("name")));
-      setProducts(snap.docs.map(d=>({...d.data(),id:d.id})));
-    } catch(e) { console.error(e); }
-    finally { setProductsLoading(false); }
+      const docs = snap.docs.map(d=>({...d.data(),id:d.id}));
+
+      setProducts(docs);
+      offlineCacheCloudRecords("products", docs).catch(err => console.warn("[S4 Offline] product cache failed", err));
+      setSyncState("connected");
+    } catch(e) {
+      console.error(e);
+      try {
+        await loadLocalProducts();
+      } catch(localErr) {
+        console.error("products offline fallback:", localErr);
+      }
+    } finally {
+      setProductsLoading(false);
+    }
   };
+
   useEffect(() => { fetchProducts(); },[shopId]);
 
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
@@ -7778,29 +7806,91 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const addProduct = async () => {
     if (!pmForm.name.trim()) return toast(t.e3,"err");
+
+    const now = new Date().toISOString();
+
+    const payload = {
+      shopId,
+      ...pmForm,
+      name: pmForm.name.trim(),
+      createdBy: user.uid,
+      createdAt: now,
+      updatedAt: now,
+    };
+
     try {
-      await addDoc(collection(db,"products"),{ shopId, ...pmForm, name:pmForm.name.trim(), createdAt:serverTimestamp() });
-      pmReset(); setPmShowAdd(false); toast(t.pmAdded);
-      await fetchProducts();
-    } catch(e) { hErr(e); }
+      const result = await offlineCreate("products", payload);
+      const created = { ...result.data, id: result.documentId };
+
+      setProducts(prev =>
+        [created, ...prev.filter(p => p.id !== created.id)]
+          .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+      );
+
+      pmReset();
+      setPmShowAdd(false);
+      toast(t.pmAdded);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product sync failed", err));
+      }
+    } catch(e) {
+      hErr(e);
+    }
   };
 
   const editProduct = async (id) => {
     if (!pmForm.name.trim()) return toast(t.e3,"err");
+
+    const now = new Date().toISOString();
+
+    const payload = {
+      ...pmForm,
+      shopId,
+      name: pmForm.name.trim(),
+      updatedBy: user.uid,
+      updatedAt: now,
+    };
+
     try {
-      await updateDoc(doc(db,"products",id),{ ...pmForm, name:pmForm.name.trim() });
-      pmReset(); setPmEditId(null); setPmDetailId(null); toast(t.pmUpdated);
-      await fetchProducts();
-    } catch(e) { hErr(e); }
+      const result = await offlineUpdate("products", id, payload);
+      const updated = { ...result.data, id };
+
+      setProducts(prev =>
+        prev
+          .map(p => p.id === id ? updated : p)
+          .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+      );
+
+      pmReset();
+      setPmEditId(null);
+      setPmDetailId(null);
+      toast(t.pmUpdated);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product update sync failed", err));
+      }
+    } catch(e) {
+      hErr(e);
+    }
   };
 
   const deleteProduct = async (id) => {
     if (!window.confirm(lang==="bn"?"এই পণ্যটি মুছে ফেলবেন?":"Delete this product?")) return;
+
     try {
-      await deleteDoc(doc(db,"products",id));
+      await offlineRemove("products", id);
+
       setProducts(p=>p.filter(x=>x.id!==id));
-      setPmDetailId(null); toast(t.pmDeleted,"err");
-    } catch(e) { hErr(e); }
+      setPmDetailId(null);
+      toast(t.pmDeleted,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product delete sync failed", err));
+      }
+    } catch(e) {
+      hErr(e);
+    }
   };
 
   const selectProductToOrder = (prod) => {
