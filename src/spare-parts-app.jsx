@@ -38,6 +38,7 @@ import {
   offlineUpdate,
   offlineRemove,
   offlineList,
+  offlineCacheCloudRecords,
 } from "./offline/offlineRepository";
 
 const LOGO_URL = "https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/refs/heads/main/WhatsApp%20Image%202026-04-09%20at%2011.44.43%20AM.jpeg";
@@ -7565,6 +7566,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         .sort((a,b)=>(a.vendorName||"").localeCompare(b.vendorName||""));
 
       setVendors(docs);
+      offlineCacheCloudRecords("vendors", docs).catch(err => console.warn("[S4 Offline] vendor cache failed", err));
       setSyncState("connected");
     };
 
@@ -7617,6 +7619,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         .sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
 
       setCustomers(docs);
+      offlineCacheCloudRecords("customers", docs).catch(err => console.warn("[S4 Offline] customer cache failed", err));
       setSyncState("connected");
     };
 

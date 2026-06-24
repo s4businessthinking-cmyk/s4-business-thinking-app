@@ -217,6 +217,77 @@ export async function saveLocalRecord(collectionName, documentId, data) {
   return { ok: true, id, collectionName, documentId };
 }
 
+export async function cacheCloudRecord(collectionName, documentId, data) {
+  await bootOfflineSqlite();
+
+  const now = new Date().toISOString();
+  const id = `${collectionName}:${documentId}`;
+
+  const existing = query(
+    `SELECT dirty
+     FROM local_records
+     WHERE collection_name = ? AND document_id = ?`,
+    [collectionName, documentId]
+  );
+
+  if (Number(existing?.[0]?.dirty || 0) === 1) {
+    return {
+      ok: true,
+      skipped: true,
+      reason: "LOCAL_DIRTY_NOT_OVERWRITTEN",
+      collectionName,
+      documentId,
+    };
+  }
+
+  const dataJson = JSON.stringify({
+    ...(data || {}),
+    id: documentId,
+    _cloud_cached_at: now,
+  });
+
+  db.run(
+    `INSERT INTO local_records
+      (id, collection_name, document_id, data_json, deleted, dirty, version, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 0, 0, 1, ?, ?)
+     ON CONFLICT(collection_name, document_id)
+     DO UPDATE SET
+      data_json = excluded.data_json,
+      deleted = 0,
+      dirty = 0,
+      version = local_records.version + 1,
+      updated_at = excluded.updated_at`,
+    [id, collectionName, documentId, dataJson, now, now]
+  );
+
+  await persist();
+
+  return { ok: true, collectionName, documentId };
+}
+
+export async function cacheCloudRecords(collectionName, records = []) {
+  await bootOfflineSqlite();
+
+  let cached = 0;
+  let skipped = 0;
+
+  for (const record of records) {
+    const documentId = record?.id || record?.docId || record?.uid;
+
+    if (!documentId) {
+      skipped += 1;
+      continue;
+    }
+
+    const result = await cacheCloudRecord(collectionName, documentId, record);
+
+    if (result?.skipped) skipped += 1;
+    else cached += 1;
+  }
+
+  return { ok: true, collectionName, cached, skipped };
+}
+
 export async function deleteLocalRecord(collectionName, documentId) {
   await bootOfflineSqlite();
 
@@ -299,12 +370,30 @@ export async function markSyncDone(queueId) {
 
   const now = new Date().toISOString();
 
+  const rows = query(
+    `SELECT collection_name, document_id
+     FROM sync_queue
+     WHERE id = ?`,
+    [queueId]
+  );
+
   db.run(
     `UPDATE sync_queue
      SET status = 'DONE', updated_at = ?
      WHERE id = ?`,
     [now, queueId]
   );
+
+  const item = rows?.[0];
+
+  if (item?.collection_name && item?.document_id) {
+    db.run(
+      `UPDATE local_records
+       SET dirty = 0, updated_at = ?
+       WHERE collection_name = ? AND document_id = ?`,
+      [now, item.collection_name, item.document_id]
+    );
+  }
 
   await persist();
 

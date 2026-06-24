@@ -5,6 +5,9 @@ import {
   getLocalRecords,
   enqueueSync,
   getOfflineStatus,
+
+  cacheCloudRecord,
+  cacheCloudRecords,
 } from "./sqliteDb";
 
 function nowIso() {
@@ -160,4 +163,12 @@ export async function offlineSearch(collectionName, keyword = "") {
 
 export async function offlineEngineStatus() {
   return getOfflineStatus();
+}
+
+export async function offlineCacheCloudRecord(collectionName, documentId, data = {}) {
+  return cacheCloudRecord(collectionName, documentId, data);
+}
+
+export async function offlineCacheCloudRecords(collectionName, records = []) {
+  return cacheCloudRecords(collectionName, records);
 }
