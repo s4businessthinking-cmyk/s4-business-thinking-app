@@ -7523,14 +7523,70 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     );
   },[shopId]);
 
+  // ── Orders real-time listener with offline cache fallback ──
   useEffect(() => {
+    if (!shopId) return;
+
+    const sortOrders = (list) =>
+      [...list].sort((a,b) => {
+        const av = a.createdAt?.toDate?.() || a.createdAt || a.createdAtIso || 0;
+        const bv = b.createdAt?.toDate?.() || b.createdAt || b.createdAtIso || 0;
+        return new Date(bv).getTime() - new Date(av).getTime();
+      });
+
+    const loadLocalOrders = async () => {
+      try {
+        const local = await offlineList("orders");
+
+        let docs = local.records
+          .map(r => ({ id: r.document_id, ...(r.data || {}) }))
+          .filter(o => o.shopId === shopId);
+
+        if (!isOwner && !isOrderManager) {
+          docs = docs.filter(o => o.createdBy === user.uid);
+        }
+
+        setOrders(sortOrders(docs));
+        setSyncState("offline");
+      } catch (err) {
+        console.error("orders offline fallback:", err);
+        setSyncState("offline");
+      }
+    };
+
+    const applyDocs = (snap) => {
+      const docs = snap.docs.map(d => {
+        const data = d.data();
+        return {
+          ...data,
+          id: d.id,
+          createdAt: data.createdAt?.toDate?.() || data.createdAt || new Date(),
+        };
+      });
+
+      setOrders(sortOrders(docs));
+      offlineCacheCloudRecords("orders", docs).catch(err => console.warn("[S4 Offline] order cache failed", err));
+      setSyncState("connected");
+    };
+
     const q = (isOwner||isOrderManager)
       ? query(collection(db,"orders"), where("shopId","==",shopId), orderBy("createdAt","desc"))
       : query(collection(db,"orders"), where("shopId","==",shopId), where("createdBy","==",user.uid), orderBy("createdAt","desc"));
-    return onSnapshot(q,
-      snap => { setOrders(snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()}))); setSyncState("connected"); },
-      err  => { console.error(err); setSyncState("offline"); }
+
+    const unsub = onSnapshot(
+      q,
+      applyDocs,
+      err => {
+        console.error("orders listener:", err);
+        loadLocalOrders();
+      }
     );
+
+    if (!navigator.onLine) {
+      loadLocalOrders();
+    }
+
+    return () => unsub();
   },[shopId,isOwner,isOrderManager]);
 
   // ── Companies real-time listener with offline fallback ──
