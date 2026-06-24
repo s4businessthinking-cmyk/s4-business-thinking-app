@@ -33,6 +33,12 @@ import {
   generateInviteCode,
   friendlyAuthError,
 } from "./firebase-config";
+import {
+  offlineCreate,
+  offlineUpdate,
+  offlineRemove,
+  offlineList,
+} from "./offline/offlineRepository";
 
 const LOGO_URL = "https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/refs/heads/main/WhatsApp%20Image%202026-04-09%20at%2011.44.43%20AM.jpeg";
 const APP_NAME = "S4 Business Thinking";
@@ -2720,60 +2726,112 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
     totalCL: customers.reduce((s,c)=>s+(c.creditLimit||0),0),
   };
 
-  // ── save ──
+  // ── save (offline-first) ──
   const cmSave = async () => {
     if (!cmForm.customerName.trim()) { toast(t.cm_errName,"err"); return; }
     if (!cmForm.mobileNumber.trim()) { toast(t.cm_errMobile,"err"); return; }
+
     setCmSaving(true);
+
+    const now = new Date().toISOString();
+
     const payload = {
-      shopId, updatedBy:user.uid, updatedAt:serverTimestamp(),
-      customerName:cmForm.customerName.trim(), customerCode:cmForm.customerCode.trim(),
-      customerType:cmForm.customerType||"", status:cmForm.status||"active",
-      paymentType:cmForm.paymentType||"cash",
-      contactPerson:cmForm.contactPerson.trim(),
-      mobileNumber:cmForm.mobileNumber.trim(), phoneNumber:cmForm.phoneNumber.trim(),
-      whatsappNumber:cmForm.whatsappNumber.trim(), email:cmForm.email.trim(),
-      address:cmForm.address.trim(), area:cmForm.area.trim(),
-      city:cmForm.city.trim(), country:cmForm.country.trim(), mapLink:cmForm.mapLink.trim(),
-      emirate:(cmForm.emirate||"").trim(), fax:(cmForm.fax||"").trim(),
-      trnNumber:cmForm.trnNumber.trim(), tradeLicenseNumber:cmForm.tradeLicenseNumber.trim(),
-      tinNumber:cmForm.tinNumber.trim(), binNumber:cmForm.binNumber.trim(), vatNumber:cmForm.vatNumber.trim(),
-      bankName:cmForm.bankName.trim(), bankBranch:cmForm.bankBranch.trim(),
-      accountName:cmForm.accountName.trim(), accountNumber:cmForm.accountNumber.trim(),
-      ibanNumber:cmForm.ibanNumber.trim(), swiftCode:cmForm.swiftCode.trim(),
-      creditLimit:Number(cmForm.creditLimit||0),
-      openingBalance:Number(cmForm.openingBalance||0),
-      paymentTerms:Number(cmForm.paymentTerms||0),
-      discountPerc:Number(cmForm.discountPerc||0),
-      assignedSalesman:cmForm.assignedSalesman.trim(),
-      notes:cmForm.notes.trim(),
+      shopId,
+      updatedBy: user.uid,
+      updatedAt: now,
+      customerName: cmForm.customerName.trim(),
+      customerCode: cmForm.customerCode.trim(),
+      customerType: cmForm.customerType || "",
+      status: cmForm.status || "active",
+      paymentType: cmForm.paymentType || "cash",
+      contactPerson: cmForm.contactPerson.trim(),
+      mobileNumber: cmForm.mobileNumber.trim(),
+      phoneNumber: cmForm.phoneNumber.trim(),
+      whatsappNumber: cmForm.whatsappNumber.trim(),
+      email: cmForm.email.trim(),
+      address: cmForm.address.trim(),
+      area: cmForm.area.trim(),
+      city: cmForm.city.trim(),
+      country: cmForm.country.trim(),
+      mapLink: cmForm.mapLink.trim(),
+      emirate: (cmForm.emirate || "").trim(),
+      fax: (cmForm.fax || "").trim(),
+      trnNumber: cmForm.trnNumber.trim(),
+      tradeLicenseNumber: cmForm.tradeLicenseNumber.trim(),
+      tinNumber: cmForm.tinNumber.trim(),
+      binNumber: cmForm.binNumber.trim(),
+      vatNumber: cmForm.vatNumber.trim(),
+      bankName: cmForm.bankName.trim(),
+      bankBranch: cmForm.bankBranch.trim(),
+      accountName: cmForm.accountName.trim(),
+      accountNumber: cmForm.accountNumber.trim(),
+      ibanNumber: cmForm.ibanNumber.trim(),
+      swiftCode: cmForm.swiftCode.trim(),
+      creditLimit: Number(cmForm.creditLimit || 0),
+      openingBalance: Number(cmForm.openingBalance || 0),
+      paymentTerms: Number(cmForm.paymentTerms || 0),
+      discountPerc: Number(cmForm.discountPerc || 0),
+      assignedSalesman: cmForm.assignedSalesman.trim(),
+      notes: cmForm.notes.trim(),
     };
+
     try {
       if (editCustomerId) {
-        await updateDoc(doc(db,"customers",editCustomerId),payload);
+        const result = await offlineUpdate("customers", editCustomerId, payload);
+        const updated = { ...result.data, id: editCustomerId };
+
+        // Customer list will refresh from Firebase listener when online.
+        // Offline record is already saved in SQLite.
         toast(t.cm_updated);
-        const updated = {...payload, id:editCustomerId};
         setSelCustomer(updated);
         setCmView("detail");
       } else {
-        const ref = await addDoc(collection(db,"customers"),{...payload,createdBy:user.uid,createdAt:serverTimestamp()});
+        const result = await offlineCreate("customers", {
+          ...payload,
+          createdBy: user.uid,
+          createdAt: now,
+        });
+
+        const created = { ...result.data, id: result.documentId };
+
+        // Customer list will refresh from Firebase listener when online.
+        // Offline record is already saved in SQLite.
         toast(t.cm_saved);
-        setSelCustomer({...payload, id:ref.id});
+        setSelCustomer(created);
         setCmView("detail");
       }
+
       setCmForm({...emptyCustomer});
       setEditCustomerId(null);
-    } catch(e) { toast(e.message,"err"); }
-    finally { setCmSaving(false); }
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] customer sync failed", err));
+      }
+    } catch(e) {
+      toast(e.message || String(e), "err");
+    } finally {
+      setCmSaving(false);
+    }
   };
 
   const cmDelete = async (c) => {
     if (!window.confirm(t.cm_confirmDelete)) return;
+
     try {
-      await deleteDoc(doc(db,"customers",c.id));
-      toast(t.cm_deleted,"err");
-      setCmView("list"); setSelCustomer(null);
-    } catch(e) { toast(e.message,"err"); }
+      await offlineRemove("customers", c.id);
+
+      // Customer list will refresh from Firebase listener when online.
+      // Offline delete is already saved in SQLite.
+      toast(t.cm_deleted, "err");
+      setCmView("list");
+      setSelCustomer(null);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] customer delete sync failed", err));
+      }
+    } catch(e) {
+      toast(e.message || String(e), "err");
+    }
   };
 
   const openEdit = (c) => {
@@ -7459,25 +7517,55 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
 
-  // ── Customers real-time listener ──
+  // ── Customers real-time listener with offline fallback ──
   useEffect(() => {
     if (!shopId) return;
+
+    const loadLocalCustomers = async () => {
+      try {
+        const local = await offlineList("customers");
+        const docs = local.records
+          .map(r => ({ id: r.document_id, ...(r.data || {}) }))
+          .filter(c => c.shopId === shopId)
+          .sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
+
+        setCustomers(docs);
+        setSyncState("offline");
+      } catch (err) {
+        console.error("customers offline fallback:", err);
+      }
+    };
+
+    const applyDocs = (snap) => {
+      const docs = snap.docs
+        .map(d=>({ id:d.id, ...d.data() }))
+        .sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
+
+      setCustomers(docs);
+      setSyncState("connected");
+    };
+
     let unsub2 = null;
+
     const unsub1 = onSnapshot(
       query(collection(db,"customers"), where("shopId","==",shopId), orderBy("customerName")),
-      (snap) => setCustomers(snap.docs.map(d=>({ id:d.id, ...d.data() }))),
+      applyDocs,
       () => {
         unsub2 = onSnapshot(
           query(collection(db,"customers"), where("shopId","==",shopId)),
-          (snap) => {
-            const docs = snap.docs.map(d=>({ id:d.id, ...d.data() }));
-            docs.sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
-            setCustomers(docs);
-          },
-          (err) => console.error("customers listener:", err)
+          applyDocs,
+          (err) => {
+            console.error("customers listener:", err);
+            loadLocalCustomers();
+          }
         );
       }
     );
+
+    if (!navigator.onLine) {
+      loadLocalCustomers();
+    }
+
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
 
