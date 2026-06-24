@@ -8050,42 +8050,38 @@ const startEditOrder = (order) => {
       return;
     }
     try {
-      let serialNo = null;
-      let orderNo = "";
-      try {
-        serialNo = await runTransaction(db, async (tx) => {
-          const shopRef = doc(db, "shops", shopId);
-          const shopSnap = await tx.get(shopRef);
-          const current = Number(shopSnap.data()?.lastOrderSerial || 0);
-          const next = current + 1;
-          tx.update(shopRef, { lastOrderSerial: next });
-          return next;
-        });
-        orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
-      } catch (serialErr) {
-        console.warn("Serial transaction failed, using fallback order number", serialErr);
-        const recentSnap = await getDocs(query(
-          collection(db, "orders"),
-          where("shopId", "==", shopId),
-          orderBy("createdAt", "desc"),
-          limit(25),
-        ));
-        const maxSerial = recentSnap.docs.reduce((mx, d) => {
-          const data = d.data() || {};
-          if (Number.isFinite(data.serialNo)) return Math.max(mx, data.serialNo);
-          const m = String(data.orderNo || "").match(/^S4-?(\d+)$/);
-          return m ? Math.max(mx, Number(m[1])) : mx;
-        }, 0);
-        serialNo = maxSerial + 1;
-        orderNo = `${ORDER_PREFIX}${String(serialNo).padStart(4, "0")}`;
+      const now = new Date();
+      const nowIso = now.toISOString();
+
+      const localSerial = Date.now();
+      const orderNo = `${ORDER_PREFIX}${String(localSerial).slice(-6)}`;
+
+      const payload = {
+        shopId,
+        createdBy: user.uid,
+        createdByName: profile.personName,
+        serialNo: localSerial,
+        orderNo,
+        items: valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
+        note: note || "",
+        createdAt: now,
+        createdAtIso: nowIso,
+        overall: "pending",
+        read: false,
+      };
+
+      const result = await offlineCreate("orders", payload);
+      const created = { ...result.data, id: result.documentId };
+
+      setOrders(prev => [created, ...prev.filter(o => o.id !== created.id)]);
+      setItems([]);
+      setCurrentItem(newItem());
+      setNote("");
+      toast(t.n1);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] order create sync failed", err));
       }
-      await addDoc(collection(db,"orders"),{
-        shopId, createdBy:user.uid, createdByName:profile.personName,
-        serialNo, orderNo,
-        items:valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
-        note:note||"", createdAt:serverTimestamp(), overall:"pending", read:false,
-      });
-      setItems([]); setCurrentItem(newItem()); setNote(""); toast(t.n1);
     } catch(e) { hErr(e); }
   };
 
