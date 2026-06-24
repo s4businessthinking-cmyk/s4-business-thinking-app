@@ -2261,55 +2261,103 @@ function VendorMasterWindow({ t, lang, th, shopId, user, vendors, toast, isDeskt
     credit: vendors.reduce((s,v)=>s+(v.creditLimit||0),0),
   };
 
-  // ── save / update ──
+  // ── save / update (offline-first) ──
   const vmSave = async () => {
     if (!vmForm.vendorName.trim()) { toast(t.vm_errName,"err"); return; }
     if (!vmForm.mobileNumber.trim()) { toast(t.vm_errMobile,"err"); return; }
+
     setVmSaving(true);
+
+    const now = new Date().toISOString();
+
     const payload = {
-      shopId, updatedBy:user.uid, updatedAt:serverTimestamp(),
-      vendorName:vmForm.vendorName.trim(), vendorCode:vmForm.vendorCode.trim(),
-      category:vmForm.category||"", status:vmForm.status||"active",
-      contactPerson:vmForm.contactPerson.trim(),
-      mobileNumber:vmForm.mobileNumber.trim(), phoneNumber:vmForm.phoneNumber.trim(),
-      whatsappNumber:vmForm.whatsappNumber.trim(), email:vmForm.email.trim(),
-      address:vmForm.address.trim(), area:vmForm.area.trim(),
-      city:vmForm.city.trim(), country:vmForm.country.trim(), mapLink:vmForm.mapLink.trim(),
-      emirate:(vmForm.emirate||"").trim(), fax:(vmForm.fax||"").trim(),
-      trnNumber:vmForm.trnNumber.trim(),
-      tradeLicenseNumber:vmForm.tradeLicenseNumber.trim(),
-      tinNumber:vmForm.tinNumber.trim(), binNumber:vmForm.binNumber.trim(), vatNumber:vmForm.vatNumber.trim(),
-      bankName:vmForm.bankName.trim(), bankBranch:vmForm.bankBranch.trim(),
-      accountName:vmForm.accountName.trim(), accountNumber:vmForm.accountNumber.trim(),
-      ibanNumber:vmForm.ibanNumber.trim(), swiftCode:vmForm.swiftCode.trim(),
-      creditLimit:Number(vmForm.creditLimit||0), openingBalance:Number(vmForm.openingBalance||0),
-      paymentTerms:Number(vmForm.paymentTerms||0), notes:vmForm.notes.trim(),
+      shopId,
+      updatedBy: user.uid,
+      updatedAt: now,
+      vendorName: vmForm.vendorName.trim(),
+      vendorCode: vmForm.vendorCode.trim(),
+      category: vmForm.category || "",
+      status: vmForm.status || "active",
+      contactPerson: vmForm.contactPerson.trim(),
+      mobileNumber: vmForm.mobileNumber.trim(),
+      phoneNumber: vmForm.phoneNumber.trim(),
+      whatsappNumber: vmForm.whatsappNumber.trim(),
+      email: vmForm.email.trim(),
+      address: vmForm.address.trim(),
+      area: vmForm.area.trim(),
+      city: vmForm.city.trim(),
+      country: vmForm.country.trim(),
+      mapLink: vmForm.mapLink.trim(),
+      emirate: (vmForm.emirate || "").trim(),
+      fax: (vmForm.fax || "").trim(),
+      trnNumber: vmForm.trnNumber.trim(),
+      tradeLicenseNumber: vmForm.tradeLicenseNumber.trim(),
+      tinNumber: vmForm.tinNumber.trim(),
+      binNumber: vmForm.binNumber.trim(),
+      vatNumber: vmForm.vatNumber.trim(),
+      bankName: vmForm.bankName.trim(),
+      bankBranch: vmForm.bankBranch.trim(),
+      accountName: vmForm.accountName.trim(),
+      accountNumber: vmForm.accountNumber.trim(),
+      ibanNumber: vmForm.ibanNumber.trim(),
+      swiftCode: vmForm.swiftCode.trim(),
+      creditLimit: Number(vmForm.creditLimit || 0),
+      openingBalance: Number(vmForm.openingBalance || 0),
+      paymentTerms: Number(vmForm.paymentTerms || 0),
+      notes: vmForm.notes.trim(),
     };
+
     try {
       if (editVendorId) {
-        await updateDoc(doc(db,"vendors",editVendorId),payload);
+        const result = await offlineUpdate("vendors", editVendorId, payload);
+        const updated = { ...result.data, id: editVendorId };
+
         toast(t.vm_updated);
-        setSelVendor({...payload, id:editVendorId});
+        setSelVendor(updated);
         setVmView("detail");
       } else {
-        const ref = await addDoc(collection(db,"vendors"),{...payload,createdBy:user.uid,createdAt:serverTimestamp()});
+        const result = await offlineCreate("vendors", {
+          ...payload,
+          createdBy: user.uid,
+          createdAt: now,
+        });
+
+        const created = { ...result.data, id: result.documentId };
+
         toast(t.vm_saved);
-        setSelVendor({...payload, id:ref.id});
+        setSelVendor(created);
         setVmView("detail");
       }
+
       setVmForm({...emptyVendor});
       setEditVendorId(null);
-    } catch(e) { toast(e.message,"err"); }
-    finally { setVmSaving(false); }
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] vendor sync failed", err));
+      }
+    } catch(e) {
+      toast(e.message || String(e), "err");
+    } finally {
+      setVmSaving(false);
+    }
   };
 
   const vmDelete = async (v) => {
     if (!window.confirm(t.vm_confirmDelete)) return;
+
     try {
-      await deleteDoc(doc(db,"vendors",v.id));
-      toast(t.vm_deleted,"err");
-      setVmView("list"); setSelVendor(null);
-    } catch(e) { toast(e.message,"err"); }
+      await offlineRemove("vendors", v.id);
+
+      toast(t.vm_deleted, "err");
+      setVmView("list");
+      setSelVendor(null);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] vendor delete sync failed", err));
+      }
+    } catch(e) {
+      toast(e.message || String(e), "err");
+    }
   };
 
   const openEdit = (v) => {
@@ -7492,28 +7540,55 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     );
   },[shopId]);
   
+  // ── Vendors real-time listener with offline fallback ──
   useEffect(() => {
     if (!shopId) return;
+
+    const loadLocalVendors = async () => {
+      try {
+        const local = await offlineList("vendors");
+        const docs = local.records
+          .map(r => ({ id: r.document_id, ...(r.data || {}) }))
+          .filter(v => v.shopId === shopId)
+          .sort((a,b)=>(a.vendorName||"").localeCompare(b.vendorName||""));
+
+        setVendors(docs);
+        setSyncState("offline");
+      } catch (err) {
+        console.error("vendors offline fallback:", err);
+      }
+    };
+
+    const applyDocs = (snap) => {
+      const docs = snap.docs
+        .map(d => ({ id:d.id, ...d.data() }))
+        .sort((a,b)=>(a.vendorName||"").localeCompare(b.vendorName||""));
+
+      setVendors(docs);
+      setSyncState("connected");
+    };
+
     let unsub2 = null;
-    // orderBy("vendorName") needs Firestore index — fallback if missing
+
     const unsub1 = onSnapshot(
       query(collection(db,"vendors"), where("shopId","==",shopId), orderBy("vendorName")),
-      (snap) => {
-        setVendors(snap.docs.map(d => ({ id:d.id, ...d.data() })));
-      },
+      applyDocs,
       () => {
-        // fallback: no orderBy, sort client-side
         unsub2 = onSnapshot(
           query(collection(db,"vendors"), where("shopId","==",shopId)),
-          (snap) => {
-            const docs = snap.docs.map(d => ({ id:d.id, ...d.data() }));
-            docs.sort((a,b) => (a.vendorName||"").localeCompare(b.vendorName||""));
-            setVendors(docs);
-          },
-          (err) => console.error("vendors listener error:", err)
+          applyDocs,
+          (err) => {
+            console.error("vendors listener error:", err);
+            loadLocalVendors();
+          }
         );
       }
     );
+
+    if (!navigator.onLine) {
+      loadLocalVendors();
+    }
+
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
 
