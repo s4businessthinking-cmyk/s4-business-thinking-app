@@ -7533,12 +7533,49 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     );
   },[shopId,isOwner,isOrderManager]);
 
+  // ── Companies real-time listener with offline fallback ──
   useEffect(() => {
-    return onSnapshot(
+    if (!shopId) return;
+
+    const loadLocalCompanies = async () => {
+      try {
+        const local = await offlineList("companies");
+        const docs = local.records
+          .map(r => ({ id: r.document_id, ...(r.data || {}) }))
+          .filter(c => c.shopId === shopId)
+          .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+
+        setCos(docs);
+        setSyncState("offline");
+      } catch (err) {
+        console.error("companies offline fallback:", err);
+      }
+    };
+
+    const applyDocs = (snap) => {
+      const docs = snap.docs
+        .map(d=>({...d.data(),id:d.id}))
+        .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+
+      setCos(docs);
+      offlineCacheCloudRecords("companies", docs).catch(err => console.warn("[S4 Offline] company cache failed", err));
+      setSyncState("connected");
+    };
+
+    const unsub = onSnapshot(
       query(collection(db,"companies"), where("shopId","==",shopId), orderBy("name")),
-      snap => setCos(snap.docs.map(d=>({...d.data(),id:d.id}))),
-      err  => console.error(err)
+      applyDocs,
+      (err) => {
+        console.error("companies listener:", err);
+        loadLocalCompanies();
+      }
     );
+
+    if (!navigator.onLine) {
+      loadLocalCompanies();
+    }
+
+    return () => unsub();
   },[shopId]);
   
   // ── Vendors real-time listener with offline fallback ──
@@ -8070,19 +8107,90 @@ const startEditOrder = (order) => {
 
   const startEdit = (c) => { setEditId(c.id); setEditNm(c.name); setEditPh(c.phone||""); };
   const cancelEdit = () => { setEditId(null); setEditNm(""); setEditPh(""); };
+
   const saveEdit = async (id) => {
     if (!editNm.trim()) return toast(t.e2,"err");
-    try { await updateDoc(doc(db,"companies",id),{name:editNm.trim(),phone:editPh.trim()}); cancelEdit(); toast(t.n5); } catch(e) { hErr(e); }
+
+    const now = new Date().toISOString();
+
+    const payload = {
+      shopId,
+      name: editNm.trim(),
+      phone: editPh.trim(),
+      updatedBy: user?.uid || "",
+      updatedAt: now,
+    };
+
+    try {
+      const result = await offlineUpdate("companies", id, payload);
+      const updated = { ...result.data, id };
+
+      setCos(prev =>
+        prev
+          .map(c => c.id === id ? updated : c)
+          .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+      );
+
+      cancelEdit();
+      toast(t.n5);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] company update sync failed", err));
+      }
+    } catch(e) {
+      hErr(e);
+    }
   };
+
   const delCo = async (id) => {
-    try { await deleteDoc(doc(db,"companies",id)); toast(t.n6,"err"); } catch(e) { hErr(e); }
+    try {
+      await offlineRemove("companies", id);
+
+      setCos(prev => prev.filter(c => c.id !== id));
+      toast(t.n6,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] company delete sync failed", err));
+      }
+    } catch(e) {
+      hErr(e);
+    }
   };
+
   const addCo = async () => {
     if (!newNm.trim()) return toast(t.e3,"err");
+
+    const now = new Date().toISOString();
+
+    const payload = {
+      shopId,
+      name: newNm.trim(),
+      phone: newPh.trim(),
+      createdBy: user?.uid || "",
+      createdAt: now,
+      updatedAt: now,
+    };
+
     try {
-      await addDoc(collection(db,"companies"),{shopId,name:newNm.trim(),phone:newPh.trim()});
-      setNewNm(""); setNewPh(""); setShowAdd(false); toast(t.n4);
-    } catch(e) { hErr(e); }
+      const result = await offlineCreate("companies", payload);
+      const created = { ...result.data, id: result.documentId };
+
+      setCos(prev =>
+        [created, ...prev.filter(c => c.id !== created.id)]
+          .sort((a,b)=>(a.name||"").localeCompare(b.name||""))
+      );
+
+      setNewNm("");
+      setNewPh("");
+      setShowAdd(false);
+      toast(t.n4);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] company sync failed", err));
+      }
+    } catch(e) {
+      hErr(e);
+    }
   };
 
 
