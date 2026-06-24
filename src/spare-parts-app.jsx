@@ -8040,12 +8040,32 @@ const startEditOrder = (order) => {
     // ── EDIT MODE: update existing order ──
     if (editingOrderId) {
       try {
-        await updateDoc(doc(db,"orders",editingOrderId),{
-          items:valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
-          note:note||"",
-        });
-        setEditingOrderId(null); setItems([]); setCurrentItem(newItem()); setNote("");
+        const existing = orders.find(o => o.id === editingOrderId) || {};
+        const nowIso = new Date().toISOString();
+
+        const payload = {
+          ...existing,
+          shopId,
+          items: valid.map(it=>({name:it.name,code:it.code||"",brand:it.brand||"",qty:it.qty||"",unit:it.unit||"Pcs",price:"",status:"pending",co:null})),
+          note: note || "",
+          updatedAt: nowIso,
+          updatedBy: user?.uid || "",
+        };
+
+        const result = await offlineUpdate("orders", editingOrderId, payload);
+        const updated = { ...result.data, id: editingOrderId };
+
+        setOrders(prev => prev.map(o => o.id === editingOrderId ? updated : o));
+
+        setEditingOrderId(null);
+        setItems([]);
+        setCurrentItem(newItem());
+        setNote("");
         toast(lang==="bn"?"✅ অর্ডার আপডেট হয়েছে!":"✅ Order updated!");
+
+        if (navigator.onLine) {
+          window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] order edit sync failed", err));
+        }
       } catch(e){ hErr(e); }
       return;
     }
