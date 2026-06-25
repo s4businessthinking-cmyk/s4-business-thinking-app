@@ -4657,11 +4657,39 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
   const piCancelInv = async (inv) => {
     if (!window.confirm(t.pi_confirmCancel)) return;
-    try { await updateDoc(doc(db,"purchaseInvoices",inv.id),{status:"cancelled",updatedAt:serverTimestamp()}); setSelInvoice(p=>({...p,status:"cancelled"})); toast(t.pi_cancelledMsg,"err"); } catch(e){ toast(e.message,"err"); }
+    try {
+      const nowIso = new Date().toISOString();
+      const result = await offlineUpdate("purchaseInvoices", inv.id, {
+        ...inv,
+        status:"cancelled",
+        updatedAt:nowIso,
+        updatedBy:user?.uid || "",
+      });
+
+      const updated = { ...result.data, id: inv.id };
+      setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
+      setSelInvoice(updated);
+      toast(t.pi_cancelledMsg,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice cancel sync failed", err));
+      }
+    } catch(e){ toast(e.message,"err"); }
   };
   const piDelete = async (inv) => {
     if (!window.confirm(t.pi_confirmDelete)) return;
-    try { await deleteDoc(doc(db,"purchaseInvoices",inv.id)); setPiView("list"); setSelInvoice(null); toast(t.pi_deleted,"err"); } catch(e){ toast(e.message,"err"); }
+    try {
+      await offlineRemove("purchaseInvoices", inv.id);
+
+      setInvoices(prev => prev.filter(x => x.id !== inv.id));
+      setPiView("list");
+      setSelInvoice(null);
+      toast(t.pi_deleted,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice delete sync failed", err));
+      }
+    } catch(e){ toast(e.message,"err"); }
   };
 
   // ── Filter ──
