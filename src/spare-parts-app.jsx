@@ -8105,6 +8105,32 @@ const startEditOrder = (order) => {
     } catch(e) { hErr(e); }
   };
 
+  const patchOrderOffline = async (oId, patch, successMessage = null) => {
+    const existing = orders.find(o => o.id === oId) || {};
+    const nowIso = new Date().toISOString();
+
+    const payload = {
+      ...existing,
+      ...patch,
+      shopId,
+      updatedAt: nowIso,
+      updatedBy: user?.uid || "",
+    };
+
+    const result = await offlineUpdate("orders", oId, payload);
+    const updated = { ...result.data, id: oId };
+
+    setOrders(prev => prev.map(o => o.id === oId ? updated : o));
+
+    if (successMessage) toast(successMessage);
+
+    if (navigator.onLine) {
+      window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] order patch sync failed", err));
+    }
+
+    return updated;
+  };
+
   const savePrice = async (oId, iIdx, directVal) => {
     if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
@@ -8112,7 +8138,7 @@ const startEditOrder = (order) => {
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
     if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,price:String(directVal??"")}:it);
-    try { await updateDoc(doc(db,"orders",oId),{items:upd}); toast(t.n2); } catch(e) { hErr(e); }
+    try { await patchOrderOffline(oId, {items:upd}, t.n2); } catch(e) { hErr(e); }
   };
 
   const setItemStatus = async (oId,iIdx,status) => {
@@ -8127,7 +8153,7 @@ const startEditOrder = (order) => {
     const upd = order.items.map((it,x)=>x===iIdx?{...it,status}:it);
     let newOverall = order.overall;
     if (isRecheck && order.overall!=="cancelled") newOverall = "order_confirmed";
-    try { await updateDoc(doc(db,"orders",oId),{overall:newOverall,items:upd}); } catch(e) { hErr(e); }
+    try { await patchOrderOffline(oId, {overall:newOverall,items:upd}); } catch(e) { hErr(e); }
   };
 
   const deliverItem = async (oId,iIdx) => {
@@ -8140,7 +8166,7 @@ const startEditOrder = (order) => {
     const activeItems = upd.filter(it=>it.status!=="cancelled" && it.status!=="out_of_stock");
     const allDelivered = activeItems.length>0 && activeItems.every(it=>it.status==="delivered");
     const overall = allDelivered ? "delivered" : order.overall;
-    try { await updateDoc(doc(db,"orders",oId),{overall,items:upd}); toast(t.n3); } catch(e) { hErr(e); }
+    try { await patchOrderOffline(oId, {overall,items:upd}, t.n3); } catch(e) { hErr(e); }
   };
 
   const delOrder = async (oId) => {
@@ -8169,12 +8195,12 @@ const startEditOrder = (order) => {
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
     if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
-    try { await updateDoc(doc(db,"orders",oId),{items:upd}); } catch(e) { hErr(e); }
+    try { await patchOrderOffline(oId, {items:upd}); } catch(e) { hErr(e); }
   };
 
   const markRead = async (oId) => {
     const order = orders.find(o=>o.id===oId); if (!order||order.read) return;
-    try { await updateDoc(doc(db,"orders",oId),{read:true}); } catch(e) { console.error(e); }
+    try { await patchOrderOffline(oId, {read:true}); } catch(e) { console.error(e); }
   };
 
   const startEdit = (c) => { setEditId(c.id); setEditNm(c.name); setEditPh(c.phone||""); };
@@ -8454,7 +8480,7 @@ const startEditOrder = (order) => {
             : { ...it, status:newStatus }
         )
       : order.items;
-    try { await updateDoc(doc(db,"orders",oId),{overall:newStatus,items:newItems}); }
+    try { await patchOrderOffline(oId, {overall:newStatus,items:newItems}); }
     catch(e) { hErr(e); }
   };
 
