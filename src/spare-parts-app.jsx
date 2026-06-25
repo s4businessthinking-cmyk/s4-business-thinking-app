@@ -4339,23 +4339,49 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     }
   };
 
-  // ── Payment Vouchers listener — shop-wide, live (powers Payments tab + the "Related Payments" trail on each invoice) ──
+  // ── Payment Vouchers listener + offline SQLite cache fallback ──
   useEffect(()=>{
     if (!shopId) return;
     setPmtLoading(true);
     let unsub2=null;
+
+    const normalizePiPayment = (d) => ({
+      ...d.data(),
+      id:d.id,
+      createdAt:d.data().createdAt?.toDate?.() || d.data().createdAt || new Date().toISOString(),
+    });
+
+    const sortPiPayments = (rows=[]) => [...rows].sort((a,b)=>
+      new Date(b.createdAt||b.paymentDate||0) - new Date(a.createdAt||a.paymentDate||0)
+    );
+
+    const loadOfflinePiPayments = async () => {
+      const res = await offlineList("purchasePayments");
+      const rawRows = Array.isArray(res) ? res : (res.records || []).map(r => r.data || r);
+      const rows = rawRows.filter(p => p.shopId === shopId);
+      if (rows.length) setPayments(sortPiPayments(rows));
+      return rows.length;
+    };
+
+    loadOfflinePiPayments().catch(err => console.warn("[S4 Offline] purchasePayments offline load failed", err));
+
     const q=query(collection(db,"purchasePayments"),where("shopId","==",shopId),orderBy("createdAt","desc"));
     const unsub1=onSnapshot(q,snap=>{
-      setPayments(snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() })));
+      const rows = snap.docs.map(normalizePiPayment);
+      setPayments(rows);
+      offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments cache failed", err));
       setPmtLoading(false);
     },()=>{
       const q2=query(collection(db,"purchasePayments"),where("shopId","==",shopId));
       unsub2=onSnapshot(q2,snap=>{
-        const docs=snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() }));
-        docs.sort((a,b)=>b.createdAt-a.createdAt);
-        setPayments(docs);
+        const rows = sortPiPayments(snap.docs.map(normalizePiPayment));
+        setPayments(rows);
+        offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments fallback cache failed", err));
         setPmtLoading(false);
-      },err2=>{ console.error(err2); setPmtLoading(false); });
+      },err2=>{
+        console.error(err2);
+        loadOfflinePiPayments().finally(()=>setPmtLoading(false));
+      });
     });
     return ()=>{ unsub1(); unsub2&&unsub2(); };
   },[shopId]);
