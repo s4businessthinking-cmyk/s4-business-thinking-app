@@ -5575,32 +5575,62 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const [siStatusF,setSiStatusF]   = useState("ALL");
   const [siViewAll,setSiViewAll]   = useState(isOwner);
 
-  // Listener
+  // Listener + offline SQLite cache fallback
   useEffect(()=>{
     if (!shopId) return;
     setSiLoading(true);
     let u2=null;
+
+    const normalizeSiInvoice = (d) => ({
+      ...d.data(),
+      id:d.id,
+      createdAt:d.data().createdAt?.toDate?.() || d.data().createdAt || new Date().toISOString(),
+    });
+
+    const sortSiInvoices = (rows=[]) => [...rows].sort((a,b)=>
+      new Date(b.createdAt||b.invoiceDate||0) - new Date(a.createdAt||a.invoiceDate||0)
+    );
+
+    const filterSiRows = (rows=[]) => rows.filter(inv =>
+      inv.shopId === shopId && (isOwner || inv.createdBy === user.uid)
+    );
+
+    const loadOfflineSiInvoices = async () => {
+      const res = await offlineList("salesInvoices");
+      const rawRows = Array.isArray(res) ? res : (res.records || []).map(r => r.data || r);
+      const rows = filterSiRows(rawRows);
+      if (rows.length) setInvoices(sortSiInvoices(rows));
+      return rows.length;
+    };
+
+    loadOfflineSiInvoices().catch(err => console.warn("[S4 Offline] salesInvoices offline load failed", err));
+
     const baseQ = isOwner
       ? query(collection(db,"salesInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"))
       : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
+
     const u1=onSnapshot(baseQ,snap=>{
-      setInvoices(snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()})));
+      const rows = snap.docs.map(normalizeSiInvoice);
+      setInvoices(rows);
+      offlineCacheCloudRecords("salesInvoices", rows).catch(err => console.warn("[S4 Offline] salesInvoices cache failed", err));
       setSiLoading(false);
     },()=>{
       const fbQ=isOwner
         ? query(collection(db,"salesInvoices"),where("shopId","==",shopId))
         : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid));
       u2=onSnapshot(fbQ,snap=>{
-        const docs=snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()}));
-        docs.sort((a,b)=>b.createdAt-a.createdAt);
-        setInvoices(docs);
+        const rows = sortSiInvoices(snap.docs.map(normalizeSiInvoice));
+        setInvoices(rows);
+        offlineCacheCloudRecords("salesInvoices", rows).catch(err => console.warn("[S4 Offline] salesInvoices fallback cache failed", err));
         setSiLoading(false);
-      },err=>{ console.error(err); setSiLoading(false); });
+      },err=>{
+        console.error(err);
+        loadOfflineSiInvoices().finally(()=>setSiLoading(false));
+      });
     });
     return ()=>{ u1(); u2&&u2(); };
   },[shopId,isOwner,user.uid]);
 
-  // Generate invoice no
   const genSiNo = async () => {
     try {
       const serial=await runTransaction(db,async tx=>{
