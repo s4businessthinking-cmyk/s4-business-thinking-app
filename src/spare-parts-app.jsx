@@ -8561,6 +8561,9 @@ const startEditOrder = (order) => {
   const saveVendor = async (editId=null) => {
     if (!vendorForm.vendorName.trim()) return toast(t.vm_errName||"Enter vendor name!","err");
     if (!vendorForm.mobileNumber.trim()) return toast(t.vm_errMobile||"Enter mobile number!","err");
+
+    const nowIso = new Date().toISOString();
+
     const payload = {
       shopId,
       vendorName:vendorForm.vendorName.trim(), vendorCode:vendorForm.vendorCode.trim(),
@@ -8581,21 +8584,40 @@ const startEditOrder = (order) => {
       openingBalance:Number(vendorForm.openingBalance||0),
       paymentTerms:Number(vendorForm.paymentTerms||0),
       notes:vendorForm.notes.trim(),
-      updatedBy:user.uid, updatedAt:serverTimestamp(),
+      updatedBy:user.uid,
+      updatedAt:nowIso,
     };
+
     try {
       if (editId) {
-        await updateDoc(doc(db,"vendors",editId),payload);
+        const result = await offlineUpdate("vendors", editId, payload);
+        const updated = { ...result.data, id: editId };
+
+        setVendors(prev => prev.map(v => v.id === editId ? updated : v));
         toast(t.vm_updated||"Vendor updated!");
       } else {
-        await addDoc(collection(db,"vendors"),{...payload,createdBy:user.uid,createdAt:serverTimestamp()});
+        const result = await offlineCreate("vendors", {
+          ...payload,
+          createdBy:user.uid,
+          createdAt:nowIso,
+        });
+        const created = { ...result.data, id: result.documentId };
+
+        setVendors(prev => [created, ...prev]);
         toast(t.vm_saved||"Vendor saved!");
       }
+
       setVendorForm(emptyVendor);
       setShowVendorModal(false);
-    } catch(e) { console.error(e); toast(e.message,"err"); }
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] vendor modal save sync failed", err));
+      }
+    } catch(e) {
+      console.error(e);
+      toast(e.message,"err");
+    }
   };
-  
 
   const addPosition = async () => {
     if (!newPosition.trim()) return;
