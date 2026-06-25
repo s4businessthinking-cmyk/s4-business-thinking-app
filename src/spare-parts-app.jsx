@@ -41,7 +41,7 @@ import {
   offlineCacheCloudRecords,
 } from "./offline/offlineRepository";
 
-const LOGO_URL = "https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/refs/heads/main/WhatsApp%20Image%202026-04-09%20at%2011.44.43%20AM.jpeg";
+const LOGO_URL = "/s4-logo.png";
 const APP_NAME = "S4 Business Thinking";
 
 // ─── PRESET POSITIONS ────────────────────────────────────────
@@ -1066,6 +1066,39 @@ const loadWaStyle  = () => { try { return localStorage.getItem(WA_STYLE_KEY)||"1
 const saveWaStyle  = (v) => { try { localStorage.setItem(WA_STYLE_KEY,v); } catch {} };
 const loadTheme    = () => { try { return localStorage.getItem(THEME_KEY)||"dark"; } catch { return "dark"; } };
 const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {} };
+
+const S4_PROFILE_CACHE_KEY = "s4-auth-profile-cache-v1";
+const S4_SHOP_CACHE_KEY = "s4-auth-shop-cache-v1";
+
+const safeGetJson = (key) => {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const safeSetJson = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+};
+
+const profileCacheKey = (uid) => `${S4_PROFILE_CACHE_KEY}:${uid}`;
+const shopCacheKey = (shopId) => `${S4_SHOP_CACHE_KEY}:${shopId}`;
+
+const loadCachedProfile = (uid) => uid ? safeGetJson(profileCacheKey(uid)) : null;
+const saveCachedProfile = (uid, profile) => {
+  if (!uid || !profile) return;
+  safeSetJson(profileCacheKey(uid), { ...profile, uid, cachedAt: new Date().toISOString() });
+};
+
+const loadCachedShop = (shopId) => shopId ? safeGetJson(shopCacheKey(shopId)) : null;
+const saveCachedShop = (shopId, shop) => {
+  if (!shopId || !shop) return;
+  safeSetJson(shopCacheKey(shopId), { ...shop, id: shop.id || shopId, cachedAt: new Date().toISOString() });
+};
 
 // ─── THEME PALETTES ──────────────────────────────────────────
 const THEMES = {
@@ -10549,23 +10582,75 @@ export default function App() {
   const loadProfile = async (u) => {
     setProfileError(null);
     if (!u) { setProfile(null); setShop(null); return; }
-    try { await u.getIdToken(true); } catch(e) { console.warn(e); }
-    let lastErr=null;
-    for (let attempt=0; attempt<5; attempt++) {
+
+    const cachedProfile = loadCachedProfile(u.uid);
+
+    if (cachedProfile) {
+      setProfile(cachedProfile);
+
+      if (cachedProfile.shopId) {
+        const cachedShop = loadCachedShop(cachedProfile.shopId);
+        if (cachedShop) setShop(cachedShop);
+      }
+    }
+
+    const online = typeof navigator === "undefined" ? true : navigator.onLine;
+
+    if (!online && cachedProfile) {
+      return;
+    }
+
+    if (!online && !cachedProfile) {
+      setProfileError("Offline profile cache missing. Please connect internet once and login.");
+      return;
+    }
+
+    try { await u.getIdToken(false); } catch(e) { console.warn(e); }
+
+    let lastErr = null;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const profSnap = await getDoc(doc(db,"users",u.uid));
+
         if (profSnap.exists()) {
-          const prof = profSnap.data(); setProfile(prof);
+          const prof = { uid: u.uid, id: profSnap.id, ...profSnap.data() };
+
+          setProfile(prof);
+          saveCachedProfile(u.uid, prof);
+
           if (prof.shopId) {
-            const shopSnap = await getDoc(doc(db,"shops",prof.shopId));
-            if (shopSnap.exists()) setShop({id:shopSnap.id,...shopSnap.data()});
+            const cachedShop = loadCachedShop(prof.shopId);
+            if (cachedShop) setShop(cachedShop);
+
+            try {
+              const shopSnap = await getDoc(doc(db,"shops",prof.shopId));
+              if (shopSnap.exists()) {
+                const shopData = { id: shopSnap.id, ...shopSnap.data() };
+                setShop(shopData);
+                saveCachedShop(prof.shopId, shopData);
+              }
+            } catch (shopErr) {
+              console.warn("Shop online load failed, using cache if available:", shopErr);
+            }
           }
+
           return;
         }
-      } catch(e) { lastErr=e; console.error(`Attempt ${attempt+1} failed:`,e); }
-      await new Promise(r=>setTimeout(r,1500));
+      } catch(e) {
+        lastErr = e;
+        console.error(`Profile load attempt ${attempt+1} failed:`, e);
+      }
+
+      await new Promise(r => setTimeout(r, 700));
     }
-    setProfileError(lastErr?.message||"Profile not found");
+
+    if (cachedProfile) {
+      setProfileError(null);
+      return;
+    }
+
+    setProfileError(lastErr?.message || "Profile not found");
   };
 
   useEffect(() => {
