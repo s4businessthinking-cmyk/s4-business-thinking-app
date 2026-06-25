@@ -4249,24 +4249,49 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     }
   }, [piSubTab, canManagePurchase, canViewSupplierLedger, canVendorPayments]);
 
-  // ── Real-time listener (fallback if index missing) ──
+  // ── Real-time listener + offline SQLite cache fallback ──
   useEffect(()=>{
     if (!shopId) return;
     setPiLoading(true);
     let unsub2=null;
+
+    const normalizePiInvoice = (d) => ({
+      ...d.data(),
+      id:d.id,
+      createdAt:d.data().createdAt?.toDate?.() || d.data().createdAt || new Date().toISOString(),
+    });
+
+    const sortPiInvoices = (rows=[]) => [...rows].sort((a,b)=>
+      new Date(b.createdAt||b.invoiceDate||0) - new Date(a.createdAt||a.invoiceDate||0)
+    );
+
+    const loadOfflinePiInvoices = async () => {
+      const rows = (await offlineList("purchaseInvoices")).filter(inv => inv.shopId === shopId);
+      if (rows.length) setInvoices(sortPiInvoices(rows));
+      return rows.length;
+    };
+
+    loadOfflinePiInvoices().catch(err => console.warn("[S4 Offline] purchaseInvoices offline load failed", err));
+
     const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
     const unsub1=onSnapshot(q,snap=>{
-      setInvoices(snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() })));
+      const rows = snap.docs.map(normalizePiInvoice);
+      setInvoices(rows);
+      offlineCacheCloudRecords("purchaseInvoices", rows).catch(err => console.warn("[S4 Offline] purchaseInvoices cache failed", err));
       setPiLoading(false);
     },()=>{
       // Index নেই — orderBy ছাড়া fallback query, client-side sort
       const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
       unsub2=onSnapshot(q2,snap=>{
-        const docs=snap.docs.map(d=>({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()||new Date() }));
-        docs.sort((a,b)=>b.createdAt-a.createdAt);
-        setInvoices(docs);
+        const docs=snap.docs.map(normalizePiInvoice);
+        const rows=sortPiInvoices(docs);
+        setInvoices(rows);
+        offlineCacheCloudRecords("purchaseInvoices", rows).catch(err => console.warn("[S4 Offline] purchaseInvoices fallback cache failed", err));
         setPiLoading(false);
-      },err2=>{ console.error(err2); setPiLoading(false); });
+      },err2=>{
+        console.error(err2);
+        loadOfflinePiInvoices().finally(()=>setPiLoading(false));
+      });
     });
     return ()=>{ unsub1(); unsub2&&unsub2(); };
   },[shopId]);
