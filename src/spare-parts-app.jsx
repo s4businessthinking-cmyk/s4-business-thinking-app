@@ -8172,9 +8172,17 @@ const startEditOrder = (order) => {
   const delOrder = async (oId) => {
     if (!can("deleteOrder")) return;
     if (!window.confirm(t.delConfirm)) return;
+
     try {
-      await deleteDoc(doc(db,"orders",oId));
-      if (selOrder===oId) setSelOrder(null); toast(t.n7,"err");
+      await offlineRemove("orders", oId);
+
+      setOrders(prev => prev.filter(o => o.id !== oId));
+      if (selOrder===oId) setSelOrder(null);
+      toast(t.n7,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] order delete sync failed", err));
+      }
     } catch(e) { hErr(e); }
   };
 
@@ -8183,7 +8191,7 @@ const startEditOrder = (order) => {
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const cancelledItems = order.items.map(it=>({...it, status:"cancelled"}));
     try {
-      await updateDoc(doc(db,"orders",oId),{ overall:"cancelled", items:cancelledItems });
+      await patchOrderOffline(oId, { overall:"cancelled", items:cancelledItems });
       toast(t.n8,"err");
     } catch(e) { hErr(e); }
   };
