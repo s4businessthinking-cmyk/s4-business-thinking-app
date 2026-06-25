@@ -5814,9 +5814,66 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     }
   };
 
-  const siMarkPaid=async(inv)=>{ try { await updateDoc(doc(db,"salesInvoices",inv.id),{amountPaid:inv.grandTotal,balanceDue:0,status:"paid",updatedAt:serverTimestamp()}); setSelInv(p=>({...p,amountPaid:inv.grandTotal,balanceDue:0,status:"paid"})); toast(t.si_paidMarked); } catch(e){ toast(e.message,"err"); } };
-  const siCancel=async(inv)=>{ if (!window.confirm(t.si_confirmCancel)) return; try { await updateDoc(doc(db,"salesInvoices",inv.id),{status:"cancelled",updatedAt:serverTimestamp()}); setSelInv(p=>({...p,status:"cancelled"})); toast(t.si_cancelledMsg,"err"); } catch(e){ toast(e.message,"err"); } };
-  const siDelete=async(inv)=>{ if (!window.confirm(t.si_confirmDelete)) return; try { await deleteDoc(doc(db,"salesInvoices",inv.id)); setSiView("list"); setSelInv(null); toast(t.si_deleted,"err"); } catch(e){ toast(e.message,"err"); } };
+  const siMarkPaid = async (inv) => {
+    try {
+      const nowIso = new Date().toISOString();
+      const result = await offlineUpdate("salesInvoices", inv.id, {
+        ...inv,
+        amountPaid:inv.grandTotal,
+        balanceDue:0,
+        status:"paid",
+        updatedAt:nowIso,
+        updatedBy:user?.uid || "",
+      });
+
+      const updated = { ...result.data, id: inv.id };
+      setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
+      setSelInv(updated);
+      toast(t.si_paidMarked);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice mark paid sync failed", err));
+      }
+    } catch(e){ toast(e.message,"err"); }
+  };
+
+  const siCancel = async (inv) => {
+    if (!window.confirm(t.si_confirmCancel)) return;
+    try {
+      const nowIso = new Date().toISOString();
+      const result = await offlineUpdate("salesInvoices", inv.id, {
+        ...inv,
+        status:"cancelled",
+        updatedAt:nowIso,
+        updatedBy:user?.uid || "",
+      });
+
+      const updated = { ...result.data, id: inv.id };
+      setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
+      setSelInv(updated);
+      toast(t.si_cancelledMsg,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice cancel sync failed", err));
+      }
+    } catch(e){ toast(e.message,"err"); }
+  };
+
+  const siDelete = async (inv) => {
+    if (!window.confirm(t.si_confirmDelete)) return;
+    try {
+      await offlineRemove("salesInvoices", inv.id);
+
+      setInvoices(prev => prev.filter(x => x.id !== inv.id));
+      setSiView("list");
+      setSelInv(null);
+      toast(t.si_deleted,"err");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice delete sync failed", err));
+      }
+    } catch(e){ toast(e.message,"err"); }
+  };
 
   const siFiltered=invoices.filter(inv=>{
     const matchSt=siStatusF==="ALL"||inv.status===siStatusF;
