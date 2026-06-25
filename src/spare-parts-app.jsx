@@ -8634,7 +8634,11 @@ const startEditOrder = (order) => {
             {isSalesman&&order.items?.some(it=>it.status==="out_for_branch")&&<span style={s.nBadge}>{t.newTag}</span>}
           </div>
           <div style={{ display:"flex", gap:7, alignItems:"center" }}>
-            <span style={{ color:"#6b7280", fontSize:11 }}>{order.createdAt.toLocaleTimeString()}</span>
+            <span style={{ color:"#6b7280", fontSize:11 }}>{(() => {
+  const raw = order.createdAt || order.createdAtIso || Date.now();
+  const d = raw?.toDate?.() || (raw instanceof Date ? raw : new Date(raw));
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString();
+})()}</span>
             <span style={{ ...s.sBadge, color:SC[order.overall]?.color||"#71717a", background:SC[order.overall]?.bg||"#18181b" }}>{t.status[order.overall]}</span>
           </div>
         </div>
