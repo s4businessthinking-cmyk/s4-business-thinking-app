@@ -4518,9 +4518,22 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       } catch(e) { toast(e.message,"err"); }
     } else {
       try {
-        await updateDoc(doc(db,"purchasePayments",payment.id),{ chequeStatus:newChequeStatus, updatedAt:serverTimestamp() });
-        setSelVoucher(p=>p&&p.id===payment.id?{...p,chequeStatus:newChequeStatus}:p);
+        const nowIso = new Date().toISOString();
+        const result = await offlineUpdate("purchasePayments", payment.id, {
+          ...payment,
+          chequeStatus:newChequeStatus,
+          updatedAt:nowIso,
+          updatedBy:user?.uid || "",
+        });
+
+        const updated = { ...result.data, id: payment.id };
+        setPayments(prev => prev.map(p => p.id === payment.id ? updated : p));
+        setSelVoucher(p=>p&&p.id===payment.id?{...p,...updated}:p);
         toast(t.pi_chequeUpdated);
+
+        if (navigator.onLine) {
+          window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase payment cheque clear sync failed", err));
+        }
       } catch(e) { toast(e.message,"err"); }
     }
   };
