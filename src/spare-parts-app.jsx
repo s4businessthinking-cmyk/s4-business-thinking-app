@@ -5750,27 +5750,70 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     return { shopId, invoiceNo:siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
-  const siSaveDraft=async()=>{ const p=siBuild("draft"); if (!p) return; setSiSaving(true); try { if (editInvId){ await updateDoc(doc(db,"salesInvoices",editInvId),{...p,updatedAt:serverTimestamp()}); toast(t.si_updated); } else { await addDoc(collection(db,"salesInvoices"),{...p,createdAt:serverTimestamp()}); toast(t.si_saved); } setSiView("list"); } catch(e){ toast(e.message,"err"); } finally{ setSiSaving(false); } };
-  const siConfirm=async()=>{
+  const saveSalesInvoiceOffline = async (payload, successMessage, options = {}) => {
+    const nowIso = new Date().toISOString();
+    let savedInvoice;
+
+    if (editInvId) {
+      const result = await offlineUpdate("salesInvoices", editInvId, {
+        ...payload,
+        updatedAt: nowIso,
+        updatedBy: user?.uid || "",
+      });
+
+      savedInvoice = { ...result.data, id: editInvId };
+      setInvoices(prev => prev.map(inv => inv.id === editInvId ? savedInvoice : inv));
+      setSelInv(prev => prev && prev.id === editInvId ? savedInvoice : prev);
+      toast(successMessage || t.si_updated);
+    } else {
+      const result = await offlineCreate("salesInvoices", {
+        ...payload,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+
+      savedInvoice = { ...result.data, id: result.id };
+      setInvoices(prev => [savedInvoice, ...prev]);
+      toast(successMessage);
+    }
+
+    if (navigator.onLine) {
+      window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice save sync failed", err));
+    }
+
+    setSiView("list");
+
+    if (options.print) {
+      setSiPrintModal(savedInvoice);
+    }
+
+    return savedInvoice;
+  };
+
+  const siSaveDraft = async () => {
+    const p=siBuild("draft"); if (!p) return;
+    setSiSaving(true);
+    try {
+      await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_saved);
+    } catch(e) {
+      toast(e.message,"err");
+    } finally {
+      setSiSaving(false);
+    }
+  };
+
+  const siConfirm = async () => {
     const p=siBuild("confirmed"); if (!p) return;
     setSiSaving(true);
     try {
-      let savedInvoice = {...p};
-      if (editInvId){
-        await updateDoc(doc(db,"salesInvoices",editInvId),{...p,updatedAt:serverTimestamp()});
-        savedInvoice = {...p, id:editInvId};
-        toast(t.si_updated);
-      } else {
-        const ref = await addDoc(collection(db,"salesInvoices"),{...p,createdAt:serverTimestamp()});
-        savedInvoice = {...p, id:ref.id};
-        toast(t.si_confirmed);
-      }
-      setSiView("list");
-      // Show print modal immediately after confirm
-      setSiPrintModal(savedInvoice);
-    } catch(e){ toast(e.message,"err"); }
-    finally{ setSiSaving(false); }
+      await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_confirmed, { print:true });
+    } catch(e) {
+      toast(e.message,"err");
+    } finally {
+      setSiSaving(false);
+    }
   };
+
   const siMarkPaid=async(inv)=>{ try { await updateDoc(doc(db,"salesInvoices",inv.id),{amountPaid:inv.grandTotal,balanceDue:0,status:"paid",updatedAt:serverTimestamp()}); setSelInv(p=>({...p,amountPaid:inv.grandTotal,balanceDue:0,status:"paid"})); toast(t.si_paidMarked); } catch(e){ toast(e.message,"err"); } };
   const siCancel=async(inv)=>{ if (!window.confirm(t.si_confirmCancel)) return; try { await updateDoc(doc(db,"salesInvoices",inv.id),{status:"cancelled",updatedAt:serverTimestamp()}); setSelInv(p=>({...p,status:"cancelled"})); toast(t.si_cancelledMsg,"err"); } catch(e){ toast(e.message,"err"); } };
   const siDelete=async(inv)=>{ if (!window.confirm(t.si_confirmDelete)) return; try { await deleteDoc(doc(db,"salesInvoices",inv.id)); setSiView("list"); setSelInv(null); toast(t.si_deleted,"err"); } catch(e){ toast(e.message,"err"); } };
