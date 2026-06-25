@@ -4266,7 +4266,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     );
 
     const loadOfflinePiInvoices = async () => {
-      const rows = (await offlineList("purchaseInvoices")).filter(inv => inv.shopId === shopId);
+      const res = await offlineList("purchaseInvoices");
+      const rawRows = Array.isArray(res) ? res : (res.records || []).map(r => r.data || r);
+      const rows = rawRows.filter(inv => inv.shopId === shopId);
       if (rows.length) setInvoices(sortPiInvoices(rows));
       return rows.length;
     };
