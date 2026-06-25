@@ -4586,17 +4586,64 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     return { shopId, invoiceNo:piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
+  const savePurchaseInvoiceOffline = async (payload, successMessage) => {
+    const nowIso = new Date().toISOString();
+
+    if (editInvoiceId) {
+      const result = await offlineUpdate("purchaseInvoices", editInvoiceId, {
+        ...payload,
+        updatedAt: nowIso,
+        updatedBy: user?.uid || "",
+      });
+
+      const updated = { ...result.data, id: editInvoiceId };
+      setInvoices(prev => prev.map(inv => inv.id === editInvoiceId ? updated : inv));
+      setSelInvoice(prev => prev && prev.id === editInvoiceId ? updated : prev);
+      toast(successMessage || t.pi_updated);
+    } else {
+      const result = await offlineCreate("purchaseInvoices", {
+        ...payload,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      });
+
+      const created = { ...result.data, id: result.id };
+      setInvoices(prev => [created, ...prev]);
+      toast(successMessage);
+    }
+
+    if (navigator.onLine) {
+      window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
+    }
+
+    setPiView("list");
+  };
+
   // ── Save ──
   const piSaveDraft = async () => {
     const payload=piBuild("draft"); if (!payload) return;
     setPiSaving(true);
-    try { if (editInvoiceId){ await updateDoc(doc(db,"purchaseInvoices",editInvoiceId),{...payload,updatedAt:serverTimestamp()}); toast(t.pi_updated); } else { await addDoc(collection(db,"purchaseInvoices"),{...payload,createdAt:serverTimestamp()}); toast(t.pi_saved); } setPiView("list"); } catch(e){ toast(e.message,"err"); } finally { setPiSaving(false); }
+    try {
+      await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_saved);
+    } catch(e) {
+      toast(e.message,"err");
+    } finally {
+      setPiSaving(false);
+    }
   };
+
   const piConfirm = async () => {
     const payload=piBuild("confirmed"); if (!payload) return;
     setPiSaving(true);
-    try { if (editInvoiceId){ await updateDoc(doc(db,"purchaseInvoices",editInvoiceId),{...payload,updatedAt:serverTimestamp()}); toast(t.pi_updated); } else { await addDoc(collection(db,"purchaseInvoices"),{...payload,createdAt:serverTimestamp()}); toast(t.pi_confirmed); } setPiView("list"); } catch(e){ toast(e.message,"err"); } finally { setPiSaving(false); }
+    try {
+      await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_confirmed);
+    } catch(e) {
+      toast(e.message,"err");
+    } finally {
+      setPiSaving(false);
+    }
   };
+
   // "Make Payment" from an invoice: jump to the Payments tab, New Voucher form, pre-selected for this vendor.
   // The new voucher form pre-fills this exact invoice's row with its full balance — other open invoices for
   // the same vendor are shown too, so the user can combine them into one voucher if they want.
