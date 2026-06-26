@@ -41,7 +41,7 @@ import {
   offlineCacheCloudRecords,
 } from "./offline/offlineRepository";
 
-const LOGO_URL = "/s4-logo.png";
+const LOGO_URL = "./s4-logo.png";
 const APP_NAME = "S4 Business Thinking";
 
 // ─── PRESET POSITIONS ────────────────────────────────────────
@@ -7859,6 +7859,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     };
 
     const applyDocs = (snap) => {
+      if (snap.metadata?.fromCache && snap.empty) {
+        loadLocalOrders();
+        return;
+      }
+
       const docs = snap.docs.map(d => {
         const data = d.data();
         return {
@@ -7886,9 +7891,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     );
 
-    if (!navigator.onLine) {
-      loadLocalOrders();
-    }
+    loadLocalOrders();
 
     return () => unsub();
   },[shopId,isOwner,isOrderManager]);
@@ -7913,6 +7916,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     };
 
     const applyDocs = (snap) => {
+      if (snap.metadata?.fromCache && snap.empty) {
+        loadLocalCompanies();
+        return;
+      }
+
       const docs = snap.docs
         .map(d=>({...d.data(),id:d.id}))
         .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
@@ -7931,9 +7939,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     );
 
-    if (!navigator.onLine) {
-      loadLocalCompanies();
-    }
+    loadLocalCompanies();
 
     return () => unsub();
   },[shopId]);
@@ -7958,6 +7964,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     };
 
     const applyDocs = (snap) => {
+      if (snap.metadata?.fromCache && snap.empty) {
+        loadLocalVendors();
+        return;
+      }
+
       const docs = snap.docs
         .map(d => ({ id:d.id, ...d.data() }))
         .sort((a,b)=>(a.vendorName||"").localeCompare(b.vendorName||""));
@@ -7984,9 +7995,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     );
 
-    if (!navigator.onLine) {
-      loadLocalVendors();
-    }
+    loadLocalVendors();
 
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
@@ -8011,6 +8020,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     };
 
     const applyDocs = (snap) => {
+      if (snap.metadata?.fromCache && snap.empty) {
+        loadLocalCustomers();
+        return;
+      }
+
       const docs = snap.docs
         .map(d=>({ id:d.id, ...d.data() }))
         .sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
@@ -8037,9 +8051,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     );
 
-    if (!navigator.onLine) {
-      loadLocalCustomers();
-    }
+    loadLocalCustomers();
 
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
