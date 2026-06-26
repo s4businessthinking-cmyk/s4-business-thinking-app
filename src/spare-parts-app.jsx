@@ -7814,6 +7814,112 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
 
+  // -- Manual full cloud ? SQLite offline cache downloader --
+  useEffect(() => {
+    if (!shopId) return;
+
+    window.S4Offline = window.S4Offline || {};
+
+    window.S4Offline.downloadAllShopData = async () => {
+      const collectionNames = [
+        "products",
+        "companies",
+        "customers",
+        "vendors",
+        "orders",
+        "purchaseInvoices",
+        "purchasePayments",
+        "supplierPayments",
+        "salesInvoices",
+        "users"
+      ];
+
+      const results = [];
+
+      const byName = (field) => (a,b) => String(a?.[field] || "").localeCompare(String(b?.[field] || ""));
+      const byCreatedDesc = (a,b) => {
+        const av = a.createdAt?.toDate?.() || a.createdAt || a.createdAtIso || 0;
+        const bv = b.createdAt?.toDate?.() || b.createdAt || b.createdAtIso || 0;
+        return new Date(bv).getTime() - new Date(av).getTime();
+      };
+
+      for (const name of collectionNames) {
+        try {
+          console.log("[S4 Offline Download] start:", name);
+
+          const snap = await getDocs(
+            query(collection(db, name), where("shopId", "==", shopId))
+          );
+
+          const docs = snap.docs.map(d => ({
+            id: d.id,
+            ...d.data()
+          }));
+
+          await offlineCacheCloudRecords(name, docs);
+
+          if (name === "products") {
+            setProducts([...docs].sort(byName("name")));
+          }
+
+          if (name === "companies") {
+            setCos([...docs].sort(byName("name")));
+          }
+
+          if (name === "customers") {
+            setCustomers([...docs].sort(byName("customerName")));
+          }
+
+          if (name === "vendors") {
+            setVendors([...docs].sort(byName("vendorName")));
+          }
+
+          if (name === "orders") {
+            let orderDocs = [...docs];
+
+            if (!isOwner && !isOrderManager) {
+              orderDocs = orderDocs.filter(o => o.createdBy === user?.uid);
+            }
+
+            setOrders(orderDocs.sort(byCreatedDesc));
+          }
+
+          if (name === "users") {
+            setTeam([...docs].map(x => ({ ...x, id: x.id })));
+          }
+
+          results.push({
+            collection: name,
+            cloud: docs.length,
+            cached: docs.length,
+            ok: true
+          });
+
+          console.log("[S4 Offline Download] done:", name, docs.length);
+        } catch (err) {
+          console.error("[S4 Offline Download] failed:", name, err);
+
+          results.push({
+            collection: name,
+            cloud: 0,
+            cached: 0,
+            ok: false,
+            error: err?.message || String(err)
+          });
+        }
+      }
+
+      console.table(results);
+      return results;
+    };
+
+    return () => {
+      if (window.S4Offline?.downloadAllShopData) {
+        delete window.S4Offline.downloadAllShopData;
+      }
+    };
+  }, [shopId, isOwner, isOrderManager, user?.uid]);
+
   const [showChequePrinter,setShowChequePrinter]=useState(false);
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
