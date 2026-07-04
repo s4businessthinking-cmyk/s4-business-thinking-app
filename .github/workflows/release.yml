@@ -41,6 +41,8 @@ jobs:
 
       - name: Build Windows installer
         run: npm run desktop:build
+        env:
+          EP_PUBLISH: never
 
       - name: Setup Java
         uses: actions/setup-java@v4
