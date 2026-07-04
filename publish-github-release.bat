@@ -66,7 +66,10 @@ if errorlevel 1 (
   goto :done
 )
 
-gh release upload "v%APP_VERSION%" "android/app/build/outputs/apk/release/app-release.apk#S4-Business-Thinking-%APP_VERSION%.apk" --clobber
+gh release upload "v%APP_VERSION%" "android/app/build/outputs/apk/release/app-release-unsigned.apk#S4-Business-Thinking-%APP_VERSION%.apk" --clobber
+if errorlevel 1 (
+  gh release upload "v%APP_VERSION%" "android/app/build/outputs/apk/release/app-release.apk#S4-Business-Thinking-%APP_VERSION%.apk" --clobber
+)
 if errorlevel 1 goto :fail
 
 :done
