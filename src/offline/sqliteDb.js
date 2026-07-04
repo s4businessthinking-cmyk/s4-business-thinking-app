@@ -1,5 +1,6 @@
 import initSqlJs from "sql.js";
 import { v4 as uuidv4 } from "uuid";
+import { migrateLocalAuthSchema } from "../auth/schemaMigration";
 
 const DB_NAME = "s4_business_thinking_offline_sqlite_v1";
 const DB_STORE = "sqlite";
@@ -95,6 +96,18 @@ async function persist() {
   return true;
 }
 
+export function executeSql(sql, params = []) {
+  exec(sql, params);
+}
+
+export function queryRows(sql, params = []) {
+  return query(sql, params);
+}
+
+export async function persistOfflineDb() {
+  return persist();
+}
+
 function initSchema() {
   db.run(`
     PRAGMA foreign_keys = ON;
@@ -170,6 +183,10 @@ export async function bootOfflineSqlite() {
     db = savedBytes ? new SQL.Database(new Uint8Array(savedBytes)) : new SQL.Database();
 
     initSchema();
+    const migration = migrateLocalAuthSchema({
+      executeSql: exec,
+      queryRows: query,
+    });
 
     const now = new Date().toISOString();
     db.run(
@@ -185,6 +202,7 @@ export async function bootOfflineSqlite() {
       engine: "SQLite",
       mode: "offline-primary-ready",
       database: DB_NAME,
+      schemaVersion: migration.schemaVersion,
     };
   })();
 

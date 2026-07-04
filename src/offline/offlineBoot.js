@@ -12,6 +12,51 @@ import {
   syncPendingQueueToFirebase,
   startAutoFirebaseSync,
 } from "./firebaseSyncWorker";
+import {
+  activateLicenseOffline,
+  createLicenseFingerprint,
+  getLocalAccessStatus,
+  getLocalLicenseStatus,
+  getOrCreateTrialStatus,
+  parseLicenseKey,
+  verifyOfflineLicensePayload,
+} from "../auth/licenseService";
+
+function exposeLicenseHelpers() {
+  try {
+    window.S4License = {
+      getStatus: getLocalLicenseStatus,
+      fingerprint: createLicenseFingerprint,
+      parse: parseLicenseKey,
+      verifyOffline: verifyOfflineLicensePayload,
+      activateOffline: activateLicenseOffline,
+      trialStatus: getOrCreateTrialStatus,
+      accessStatus: getLocalAccessStatus,
+    };
+
+  } catch (error) {
+    console.warn("[S4 License] Developer helpers unavailable", error);
+  }
+}
+
+function exposeDevLicenseHelpers() {
+  if (!import.meta.env.DEV) return;
+
+  import("../auth/licenseService")
+    .then((mod) => {
+      if (!window.S4License) return;
+
+      window.S4License.dev = {
+        getDebugStatus: mod.getDebugStatus,
+        clearLocalLicenseForTest: mod.clearLocalLicenseForTest,
+        expireTrialForTest: mod.expireTrialForTest,
+        resetTrialForTest: mod.resetTrialForTest,
+      };
+    })
+    .catch((error) => {
+      console.warn("[S4 License] Dev helpers unavailable", error);
+    });
+}
 
 export async function startOfflineEngine() {
   try {
@@ -65,6 +110,9 @@ export async function startOfflineEngine() {
         };
       },
     };
+
+    exposeLicenseHelpers();
+    exposeDevLicenseHelpers();
 
     window.__S4_OFFLINE_ENGINE__ = {
       ready: true,

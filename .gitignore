@@ -9,6 +9,9 @@ dist
 # Build outputs
 dist/
 release/
+release-v102/
+release-*/
+*.blockmap
 android/app/build/
 android/build/
 

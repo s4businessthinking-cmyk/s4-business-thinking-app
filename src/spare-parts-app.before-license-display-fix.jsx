@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import {
   createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   signOut,
   sendEmailVerification,
   sendPasswordResetEmail,
+  onAuthStateChanged,
 } from "firebase/auth";
 import {
   collection,
@@ -38,45 +40,6 @@ import {
   offlineList,
   offlineCacheCloudRecords,
 } from "./offline/offlineRepository";
-import {
-  loadCachedShop,
-  saveCachedShop,
-  loadShopRecord,
-  saveShopRecord,
-  shopNeedsSetup,
-} from "./offline/shopService";
-import {
-  pullShopFromCloud,
-  uploadPendingShopChanges,
-  getSyncDashboardStatus,
-  shouldAutoPullShop,
-  getShopCloudPulledAt,
-  sortPulledRecords,
-} from "./offline/cloudPullService";
-import {
-  ensureLocalAuthBootstrap,
-  restoreLocalAuthSession,
-  loginWithLocalCredentials,
-  loginWithCredentials,
-  logoutLocalAuth,
-  friendlyLocalAuthError,
-  buildProfileFromLocal,
-  registerLocalOwnerAccount,
-  registerLocalSalesmanAccount,
-  addLocalInviteCode,
-} from "./auth/localAuthBootstrap";
-import { updateLocalUserPassword } from "./auth/localAuthService";
-import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
-import { APP_VERSION } from "./update/githubUpdateService";
-import {
-  createShopStaffUser,
-  listShopTeamMembers,
-  mergeTeamMembers,
-  updateShopMemberPermissions,
-  updateShopMemberPosition,
-  resetShopMemberPassword,
-  updateOwnPassword,
-} from "./auth/userManagementService";
 
 const LOGO_URL = "./s4-logo.png";
 const APP_NAME = "S4 Business Thinking";
@@ -132,28 +95,8 @@ const TR = {
     backBtn:"← ফিরে যান",
     companyName:"দোকানের নাম *", personName:"আপনার নাম *",
     countryLbl:"দেশ *", areaLbl:"এলাকা / শহর *",
-    mobileLbl:"মোবাইল নম্বর *", emailLbl:"ইমেইল *", usernameLbl:"ইউজারনেম *",
-    usernameOrEmailLbl:"ইউজারনেম বা ইমেইল *",
+    mobileLbl:"মোবাইল নম্বর *", emailLbl:"ইমেইল *",
     passwordLbl:"পাসওয়ার্ড * (অন্তত ৬ অক্ষর)", confirmPwLbl:"পাসওয়ার্ড নিশ্চিত করুন *",
-    loginOfflineHint:"🆕 নতুন দোকান (মালিক): Username admin + Password admin → প্রথম login-এ password বদলান",
-    loginStaffHint:"👨‍💼 কর্মী/সেলসম্যান: Create Account → Invite Code দিয়ে join করুন",
-    changePwTitle:"নতুন পাসওয়ার্ড সেট করুন",
-    changePwSub:"নিরাপত্তার জন্য ডিফল্ট পাসওয়ার্ড পরিবর্তন করুন",
-    changePwBtn:"পাসওয়ার্ড সেভ করুন",
-    changePwSaved:"✅ পাসওয়ার্ড আপডেট হয়েছে",
-    shopSetupTitle:"🏢 দোকান সেটআপ",
-    shopSetupSub:"প্রথমে দোকানের মূল তথ্য দিন — internet ছাড়াই save হবে",
-    shopSetupBtn:"✅ সেটআপ সম্পন্ন",
-    addStaffTitle:"➕ নতুন কর্মী যোগ করুন",
-    addStaffBtn:"কর্মী যোগ করুন",
-    staffAddedOk:"✅ কর্মী যোগ হয়েছে",
-    resetPwLbl:"নতুন পাসওয়ার্ড",
-    resetPwBtn:"পাসওয়ার্ড রিসেট",
-    resetPwOk:"✅ পাসওয়ার্ড আপডেট হয়েছে",
-    currentPwLbl:"বর্তমান পাসওয়ার্ড",
-    newPwLbl:"নতুন পাসওয়ার্ড",
-    changePwSettingsBtn:"পাসওয়ার্ড পরিবর্তন",
-    ownPwChangedOk:"✅ আপনার পাসওয়ার্ড আপডেট হয়েছে",
     inviteCodeLbl:"Invite Code * (মালিকের কাছ থেকে নিন)",
     forgotPw:"পাসওয়ার্ড ভুলে গেছেন?",
     noAccount:"অ্যাকাউন্ট নেই?", haveAccount:"ইতিমধ্যে অ্যাকাউন্ট আছে?",
@@ -182,16 +125,6 @@ const TR = {
     inviteCodeDesc:"এই কোডটি আপনার কর্মীদের দিন। তারা signup এর সময় এই কোড দিয়ে আপনার দোকানে যুক্ত হতে পারবে।",
     copyCode:"📋 কপি করুন", codeCopied:"✅ কপি হয়েছে!",
     languageLbl:"ভাষা", syncStatus:"সিঙ্ক স্ট্যাটাস",
-    updateTitle:"🔄 অ্যাপ আপডেট", updateSub:"GitHub থেকে auto update",
-    syncUploadBtn:"☁️ Local → Cloud Upload",
-    syncDownloadBtn:"⬇️ Cloud → Local Download",
-    syncPendingLbl:"অপেক্ষমান upload",
-    syncLocalRecordsLbl:"Local records",
-    syncLastPullLbl:"শেষ cloud download",
-    syncDownloadOk:"✅ Cloud data download সম্পন্ন",
-    syncUploadOk:"✅ Cloud upload সম্পন্ন",
-    syncNeedInternet:"Internet সংযোগ লাগবে",
-    syncAutoPullOk:"☁️ Cloud data auto-download হয়েছে",
     connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
     confirmLogout:"লগআউট করতে চান?",
@@ -233,7 +166,7 @@ const TR = {
     n1:"✅ অর্ডার পাঠানো হয়েছে!", n2:"দাম সেভ হয়েছে ✅", n3:"🚚 ডেলিভারি সম্পন্ন!",
     n4:"কোম্পানি যোগ হয়েছে ✅", n5:"কোম্পানি আপডেট হয়েছে ✅",
     n6:"কোম্পানি মুছে ফেলা হয়েছে।", n7:"অর্ডার মুছে ফেলা হয়েছে।", n8:"🚫 অর্ডার বাতিল হয়েছে।",
-    n9:"✅ অ্যাকাউন্ট তৈরি হয়েছে!",
+    n9:"অ্যাকাউন্ট তৈরি হয়েছে! ইমেইল যাচাই করুন।",
     n10:"✅ ইমেইল যাচাই সম্পন্ন!", n11:"📤 যাচাই ইমেইল আবার পাঠানো হয়েছে।",
     e1:"অন্তত একটা আইটেম দিন!", e2:"নাম খালি রাখা যাবে না!", e3:"নাম দিন!",
     delConfirm:"এই অর্ডারটি মুছে ফেলবেন?",
@@ -640,28 +573,8 @@ const TR = {
     backBtn:"← Back",
     companyName:"Shop / Company Name *", personName:"Your Name *",
     countryLbl:"Country *", areaLbl:"Area / City *",
-    mobileLbl:"Mobile Number *", emailLbl:"Email *", usernameLbl:"Username *",
-    usernameOrEmailLbl:"Username or Email *",
+    mobileLbl:"Mobile Number *", emailLbl:"Email *",
     passwordLbl:"Password * (min 6 characters)", confirmPwLbl:"Confirm Password *",
-    loginOfflineHint:"🆕 New shop (owner): Username admin + Password admin → change password on first login",
-    loginStaffHint:"👨‍💼 Staff/Salesman: use Create Account and join with Invite Code",
-    changePwTitle:"Set a new password",
-    changePwSub:"Replace the default password for security",
-    changePwBtn:"Save password",
-    changePwSaved:"✅ Password updated",
-    shopSetupTitle:"🏢 Shop Setup",
-    shopSetupSub:"Enter your shop details first — saves offline and syncs when online",
-    shopSetupBtn:"✅ Complete setup",
-    addStaffTitle:"➕ Add New Staff",
-    addStaffBtn:"Add staff member",
-    staffAddedOk:"✅ Staff member added",
-    resetPwLbl:"New password",
-    resetPwBtn:"Reset password",
-    resetPwOk:"✅ Password updated",
-    currentPwLbl:"Current password",
-    newPwLbl:"New password",
-    changePwSettingsBtn:"Change password",
-    ownPwChangedOk:"✅ Your password was updated",
     inviteCodeLbl:"Invite Code * (get from your owner)",
     forgotPw:"Forgot password?",
     noAccount:"Don't have an account?", haveAccount:"Already have an account?",
@@ -690,16 +603,6 @@ const TR = {
     inviteCodeDesc:"Share this code with your staff. They can use it during signup to join your shop.",
     copyCode:"📋 Copy", codeCopied:"✅ Copied!",
     languageLbl:"Language", syncStatus:"Sync Status",
-    updateTitle:"🔄 App Update", updateSub:"Auto update from GitHub",
-    syncUploadBtn:"☁️ Upload Local → Cloud",
-    syncDownloadBtn:"⬇️ Download Cloud → Local",
-    syncPendingLbl:"Pending uploads",
-    syncLocalRecordsLbl:"Local records",
-    syncLastPullLbl:"Last cloud download",
-    syncDownloadOk:"✅ Cloud download complete",
-    syncUploadOk:"✅ Cloud upload complete",
-    syncNeedInternet:"Internet connection required",
-    syncAutoPullOk:"☁️ Cloud data auto-downloaded",
     connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
     confirmLogout:"Do you want to logout?",
@@ -741,7 +644,7 @@ const TR = {
     n1:"✅ Order sent!", n2:"Price saved ✅", n3:"🚚 Delivery completed!",
     n4:"Company added ✅", n5:"Company updated ✅",
     n6:"Company deleted.", n7:"Order deleted.", n8:"🚫 Order cancelled.",
-    n9:"✅ Account created!",
+    n9:"Account created! Please verify your email.",
     n10:"✅ Email verified successfully!", n11:"📤 Verification email resent.",
     e1:"Add at least one item!", e2:"Name cannot be empty!", e3:"Please enter a name!",
     delConfirm:"Delete this order?",
@@ -1165,6 +1068,7 @@ const loadTheme    = () => { try { return localStorage.getItem(THEME_KEY)||"dark
 const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {} };
 
 const S4_PROFILE_CACHE_KEY = "s4-auth-profile-cache-v1";
+const S4_SHOP_CACHE_KEY = "s4-auth-shop-cache-v1";
 
 const safeGetJson = (key) => {
   try {
@@ -1182,11 +1086,18 @@ const safeSetJson = (key, value) => {
 };
 
 const profileCacheKey = (uid) => `${S4_PROFILE_CACHE_KEY}:${uid}`;
+const shopCacheKey = (shopId) => `${S4_SHOP_CACHE_KEY}:${shopId}`;
 
 const loadCachedProfile = (uid) => uid ? safeGetJson(profileCacheKey(uid)) : null;
 const saveCachedProfile = (uid, profile) => {
   if (!uid || !profile) return;
   safeSetJson(profileCacheKey(uid), { ...profile, uid, cachedAt: new Date().toISOString() });
+};
+
+const loadCachedShop = (shopId) => shopId ? safeGetJson(shopCacheKey(shopId)) : null;
+const saveCachedShop = (shopId, shop) => {
+  if (!shopId || !shop) return;
+  safeSetJson(shopCacheKey(shopId), { ...shop, id: shop.id || shopId, cachedAt: new Date().toISOString() });
 };
 
 // ─── THEME PALETTES ──────────────────────────────────────────
@@ -1350,32 +1261,16 @@ function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
 }
 
 // ─── LOGIN ───────────────────────────────────────────────────
-function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, onLoginSuccess, onSwitchToSignup, onEmailVerificationRequired }) {
+function LoginScreen({ t, lang, setLang, onSwitchToSignup, onSwitchToReset, toast, s:sp, theme, setTheme }) {
   const _s = sp||_globalS;
-  const [username,setUsername]=useState("");
-  const [pw,setPw]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [showPw,setShowPw]=useState(false);
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [busy,setBusy]=useState(false); const [showPw,setShowPw]=useState(false);
   const submit = async (e) => {
     e?.preventDefault?.();
-    if (!username.trim()||!pw) {
-      return toast(lang==="bn"?"ইউজারনেম/ইমেইল ও পাসওয়ার্ড দিন":"Username/email and password required","err");
-    }
+    if (!email.trim()||!pw) return toast(friendlyAuthError({code:"validation/required"},lang),"err");
     setBusy(true);
-    try {
-      const result = await loginWithCredentials(username.trim(), pw);
-      if (!result.ok) {
-        if (result.reason === "EMAIL_NOT_VERIFIED" && result.rawFirebaseUser) {
-          onEmailVerificationRequired(result.rawFirebaseUser);
-          return;
-        }
-        toast(friendlyLocalAuthError(result, lang), "err");
-        return;
-      }
-      onLoginSuccess(result);
-    } catch(err) {
-      toast(err?.message || String(err), "err");
-    } finally { setBusy(false); }
+    try { await signInWithEmailAndPassword(auth,email.trim(),pw); }
+    catch(err) { toast(friendlyAuthError(err,lang),"err"); }
+    finally { setBusy(false); }
   };
   return (
     <div
@@ -1395,140 +1290,18 @@ function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, onLoginSu
         <div style={_s.authTitle}>{t.welcomeBack}</div>
         <div style={_s.authSub}>{t.welcomeBackSub}</div>
         <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type="text" placeholder={t.usernameOrEmailLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
           <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
             <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
             <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
           </label>
           <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
+          <button type="button" style={_s.linkBtn} onClick={onSwitchToReset}>{t.forgotPw}</button>
         </form>
-        <div style={{ ..._s.authSub, marginTop:14, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginOfflineHint}</div>
-        <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginStaffHint}</div>
-        <div style={{ ..._s.authFooter, marginTop:16 }}>{t.noAccount}{" "}
-          <button type="button" style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
+        <div style={_s.authFooter}>{t.noAccount}{" "}
+          <button style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── CHANGE PASSWORD (bootstrap / forced) ────────────────────
-function ChangePasswordScreen({ t, lang, setLang, profile, toast, s:sp, theme, setTheme, onPasswordChanged, onLogout }) {
-  const _s = sp||_globalS;
-  const [newPw,setNewPw]=useState("");
-  const [newPw2,setNewPw2]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [showPw,setShowPw]=useState(false);
-
-  const submit = async (e) => {
-    e?.preventDefault?.();
-    if (!newPw || !newPw2) {
-      return toast(lang==="bn"?"নতুন পাসওয়ার্ড দিন":"Enter a new password","err");
-    }
-    if (newPw.length < 6) {
-      return toast(friendlyAuthError({ code:"validation/short-password" }, lang), "err");
-    }
-    if (newPw !== newPw2) {
-      return toast(friendlyAuthError({ code:"validation/password-mismatch" }, lang), "err");
-    }
-    setBusy(true);
-    try {
-      const updatedUser = await updateLocalUserPassword(profile.localUserId, newPw, {
-        mustChangePassword: false,
-        clearEmergencyBootstrap: true,
-      });
-      toast(t.changePwSaved);
-      onPasswordChanged(updatedUser);
-    } catch(err) {
-      toast(err?.message || String(err), "err");
-    } finally { setBusy(false); }
-  };
-
-  return (
-    <div style={_s.root}>
-      <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🔐</div>
-        <div style={_s.authTitle}>{t.changePwTitle}</div>
-        <div style={_s.authSub}>{t.changePwSub}</div>
-        <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
-          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
-          <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
-            <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
-            <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
-          </label>
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.changePwBtn}</button>
-        </form>
-        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onLogout}>{t.logout}</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── SHOP SETUP (first-time owner) ───────────────────────────
-function ShopSetupWizard({ t, lang, setLang, localShop, shopId, profile, user, toast, s:sp, theme, setTheme, onShopSaved }) {
-  const _s = sp||_globalS;
-  const [form, setForm] = useState({
-    companyName: localShop?.companyName || "",
-    mobile: localShop?.mobile || profile?.mobile || "",
-    email: localShop?.email || profile?.email || "",
-    area: localShop?.area || profile?.area || "",
-    country: localShop?.country || profile?.country || "BD",
-  });
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e) => {
-    e?.preventDefault?.();
-    if (!form.companyName.trim() || !form.mobile.trim() || !form.area.trim()) {
-      return toast(lang==="bn"?"দোকানের নাম, মোবাইল ও এলাকা দিন":"Shop name, mobile and area are required","err");
-    }
-
-    setBusy(true);
-    try {
-      const countryObj = COUNTRIES.find(c => c.code === form.country);
-      const updated = await saveShopRecord(
-        shopId,
-        {
-          companyName: form.companyName.trim(),
-          ownerName: profile?.personName || localShop?.ownerName || "",
-          mobile: form.mobile.trim(),
-          email: form.email.trim(),
-          area: form.area.trim(),
-          country: form.country,
-          countryName: countryObj?.name || form.country,
-        },
-        { ownerUid: user?.uid, profile, user }
-      );
-      toast(lang==="bn"?"✅ দোকান সেটআপ সম্পন্ন!":"✅ Shop setup complete!");
-      onShopSaved(updated);
-    } catch (err) {
-      toast(err?.message || String(err), "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sinp = { ..._s.inp, marginBottom: 10, width: "100%", boxSizing: "border-box" };
-
-  return (
-    <div style={_s.root}>
-      <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🏢</div>
-        <div style={_s.authTitle}>{t.shopSetupTitle}</div>
-        <div style={_s.authSub}>{t.shopSetupSub}</div>
-        <form onSubmit={submit} style={_s.authCard}>
-          <input style={sinp} placeholder={t.companyName} value={form.companyName} onChange={e=>setForm(p=>({...p,companyName:e.target.value}))} />
-          <select style={{ ..._s.sel, marginBottom: 10, width: "100%" }} value={form.country} onChange={e=>setForm(p=>({...p,country:e.target.value}))}>
-            {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
-          </select>
-          <input style={sinp} placeholder={t.areaLbl} value={form.area} onChange={e=>setForm(p=>({...p,area:e.target.value}))} />
-          <input style={sinp} type="tel" placeholder={t.mobileLbl} value={form.mobile} onChange={e=>setForm(p=>({...p,mobile:e.target.value}))} />
-          <input style={sinp} type="email" placeholder={lang==="bn"?"ইমেইল (ঐচ্ছিক)":"Email (optional)"} value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} />
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.shopSetupBtn}</button>
-        </form>
       </div>
     </div>
   );
@@ -1592,11 +1365,10 @@ function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:sp, the
 }
 
 // ─── SIGNUP FORM ─────────────────────────────────────────────
-function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme, onSignupSuccess }) {
+function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme }) {
   const _s = sp||_globalS;
   const [companyName,setCompanyName]=useState("");
   const [personName,setPersonName]=useState("");
-  const [username,setUsername]=useState("");
   const [country,setCountry]=useState("BD");
   const [area,setArea]=useState("");
   const [mobile,setMobile]=useState("");
@@ -1610,7 +1382,7 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
 
   const submit = async (e) => {
     e?.preventDefault?.();
-    if (!personName.trim()||!username.trim()||!pw||!pw2||!mobile.trim()||!area.trim())
+    if (!personName.trim()||!email.trim()||!pw||!pw2||!mobile.trim()||!area.trim())
       return toast(friendlyAuthError({code:"validation/required"},lang),"err");
     if (isOwner&&!companyName.trim())
       return toast(friendlyAuthError({code:"validation/required"},lang),"err");
@@ -1620,49 +1392,71 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
     if (pw!==pw2) return toast(friendlyAuthError({code:"validation/password-mismatch"},lang),"err");
     setBusy(true);
     try {
-      const countryObj = COUNTRIES.find(c=>c.code===country);
-      const payload = {
-        username: username.trim(),
-        password: pw,
-        personName: personName.trim(),
-        country,
-        countryName: countryObj?.name || country,
-        area: area.trim(),
-        mobile: mobile.trim(),
-        email: email.trim(),
-      };
-
-      const result = isOwner
-        ? await registerLocalOwnerAccount({
-            ...payload,
-            companyName: companyName.trim(),
-          })
-        : await registerLocalSalesmanAccount({
-            ...payload,
-            inviteCode: inviteCode.trim(),
-            permissions: { ...DEFAULT_PERMISSIONS },
-          });
-
-      if (!result.ok) {
-        if (result.code === "invite/already-used") {
-          toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
-        } else if (result.code === "invite/not-found") {
-          toast(lang==="bn"?"❌ Invite Code সঠিক নয়":"❌ Invalid invite code","err");
-        } else {
-          toast(result.message || friendlyLocalAuthError(result, lang), "err");
-        }
-        return;
+      let shopId=null, shopData=null;
+      if (!isOwner) {
+        // ── Single-use invite code lookup ──
+        const codeRef = doc(db,"inviteCodes", inviteCode.trim().toUpperCase());
+        const codeSnap = await getDoc(codeRef);
+        if (!codeSnap.exists()) throw { code:"invite/not-found" };
+        if (codeSnap.data().used === true) throw { code:"invite/already-used" };
+        shopId = codeSnap.data().shopId;
+        const shopSnap2 = await getDoc(doc(db,"shops",shopId));
+        if (!shopSnap2.exists()) throw { code:"invite/not-found" };
+        shopData = shopSnap2.data();
       }
-
+      const cred = await createUserWithEmailAndPassword(auth,email.trim(),pw);
+      const uid = cred.user.uid;
+      if (isOwner) shopId=uid;
+      const countryObj = COUNTRIES.find(c=>c.code===country);
+      const userPayload = {
+        uid, role:isOwner?"owner":"salesman", shopId,
+        personName:personName.trim(), email:email.trim(),
+        mobile:mobile.trim(), country,
+        countryName:countryObj?.name||country, area:area.trim(),
+        createdAt:serverTimestamp(),
+        position: isOwner ? "মালিক" : "Salesman",
+        permissions: isOwner ? null : { ...DEFAULT_PERMISSIONS },
+        ...(isOwner ? {companyName:companyName.trim()} : {joinedShopName:shopData?.companyName||""}),
+      };
+      let userCreated=false;
+      try { await setDoc(doc(db,"users",uid),userPayload); userCreated=true; }
+      catch(e) { try { await cred.user.delete(); } catch {} throw {code:"profile/create-failed",message:e.message}; }
+      if (isOwner) {
+        try {
+          await setDoc(doc(db,"shops",shopId),{
+            companyName:companyName.trim(), ownerName:personName.trim(), ownerUid:uid,
+            country, area:area.trim(), mobile:mobile.trim(), email:email.trim(),
+            positions:[],
+            createdAt:serverTimestamp(),
+          });
+          // ── Create 3 initial single-use invite codes ──
+          for (let i=0; i<3; i++) {
+            const code = generateInviteCode();
+            await setDoc(doc(db,"inviteCodes",code),{
+              shopId:uid, used:false, createdAt:serverTimestamp(),
+            });
+          }
+        } catch(e) {
+          if (userCreated) { try { await deleteDoc(doc(db,"users",uid)); } catch {} }
+          try { await cred.user.delete(); } catch {}
+          throw {code:"shop/create-failed",message:e.message};
+        }
+      } else {
+        // ── Mark this invite code as used ──
+        try {
+          await updateDoc(doc(db,"inviteCodes",inviteCode.trim().toUpperCase()),{
+            used:true, usedBy:uid, usedByName:personName.trim(), usedAt:serverTimestamp(),
+          });
+        } catch(e) { console.warn("Could not mark code used:",e); }
+      }
+      try { await sendEmailVerification(cred.user); } catch(e) { console.warn(e); }
       toast(t.n9);
-      onSignupSuccess(result);
     } catch(err) {
+      // Handle invite/already-used error with friendly message
       if (err.code === "invite/already-used") {
         toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
-      } else if (err.code === "invite/not-found") {
-        toast(lang==="bn"?"❌ Invite Code সঠিক নয়":"❌ Invalid invite code","err");
       } else {
-        toast(err?.message || friendlyAuthError(err,lang),"err");
+        toast(friendlyAuthError(err,lang),"err");
       }
     }
     finally { setBusy(false); }
@@ -1687,13 +1481,12 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
             </>
           )}
           <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="text" placeholder={t.usernameLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" />
           <select style={{ ..._s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
             {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
           </select>
           <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
           <input style={{ ..._s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={lang==="bn"?"ইমেইল (ঐচ্ছিক)":"Email (optional)"} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
           <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
@@ -4538,45 +4331,26 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     return ()=>{ unsub1(); unsub2&&unsub2(); };
   },[shopId]);
 
-  // ── Generate invoice no — preview instantly, commit on save ──
-  const piMaxLocalSerial = () => invoices.reduce((mx, inv) => {
-    const m = String(inv.invoiceNo || "").match(/PI-?(\d+)$/i);
-    return m ? Math.max(mx, Number(m[1])) : mx;
-  }, Number(shop?.lastPISerial || 0));
-
-  const piFormatInvoiceNo = (serial) =>
-    `${PI_PREFIX}${String(serial).padStart(4, "0")}`;
-
-  const piPreviewNextInvoiceNo = () =>
-    piFormatInvoiceNo(piMaxLocalSerial() + 1);
-
+  // ── Generate invoice no (3-layer fallback) ──
   const genInvoiceNo = async () => {
+    // Layer 1: runTransaction on shops doc
     try {
-      const serial = await runTransaction(db, async tx => {
-        const shopRef = doc(db, "shops", shopId);
-        const shopSnap = await tx.get(shopRef);
-        const next = Number(shopSnap.data()?.lastPISerial || 0) + 1;
-        tx.update(shopRef, { lastPISerial: next });
-        return next;
+      const serial = await runTransaction(db,async tx=>{
+        const shopRef=doc(db,"shops",shopId), shopSnap=await tx.get(shopRef);
+        const next=Number(shopSnap.data()?.lastPISerial||0)+1;
+        tx.update(shopRef,{lastPISerial:next}); return next;
       });
-      return piFormatInvoiceNo(serial);
-    } catch (e1) {
-      console.warn("[S4 PI] genInvoiceNo transaction failed, using local serial", e1);
-      return piPreviewNextInvoiceNo();
-    }
-  };
-
-  const ensureNewPiInvoiceNo = async () => {
-    if (editInvoiceId) return piInvoiceNo;
-    try {
-      const no = await genInvoiceNo();
-      setPiInvoiceNo(no);
-      return no;
-    } catch (e) {
-      console.warn("[S4 PI] ensureNewPiInvoiceNo failed, keeping preview number", e);
-      const fallback = piInvoiceNo || piPreviewNextInvoiceNo();
-      setPiInvoiceNo(fallback);
-      return fallback;
+      return `${PI_PREFIX}${String(serial).padStart(4,"0")}`;
+    } catch(e1) {
+      // Layer 2: scan purchaseInvoices WITHOUT orderBy (no index needed)
+      try {
+        const snap=await getDocs(query(collection(db,"purchaseInvoices"),where("shopId","==",shopId)));
+        const max=snap.docs.reduce((mx,d)=>{ const m=String(d.data().invoiceNo||"").match(/PI-?(\d+)$/); return m?Math.max(mx,Number(m[1])):mx; },0);
+        return `${PI_PREFIX}${String(max+1).padStart(4,"0")}`;
+      } catch(e2) {
+        // Layer 3: timestamp fallback — never fails
+        return `${PI_PREFIX}${String(Date.now()).slice(-4)}`;
+      }
     }
   };
 
@@ -4798,15 +4572,13 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
 
   // ── Open new form ──
-  const piOpenNew = () => {
-    setPiInvoiceNo(piPreviewNextInvoiceNo());
-    setPiForm(piEmptyForm());
-    setPiLines([]);
-    setPiCurrent(piEmptyCurrent());
-    setEditInvoiceId(null);
-    setPiView("form");
-    setVendorSearchQ("");
-    setVendorDropOpen(false);
+  const piOpenNew = async () => {
+    try {
+      const no=await genInvoiceNo();
+      setPiInvoiceNo(no); setPiForm(piEmptyForm()); setPiLines([]); setPiCurrent(piEmptyCurrent()); setEditInvoiceId(null); setPiView("form"); setVendorSearchQ(""); setVendorDropOpen(false);
+    } catch(e) {
+      toast(lang==="bn"?"ইনভয়েস খুলতে সমস্যা হয়েছে!":"Failed to open invoice form!","err");
+    }
   };
 
   // ── Open edit form ──
@@ -4873,7 +4645,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   });
 
   // ── Build payload ──
-  const piBuild=(status, invoiceNoOverride)=>{
+  const piBuild=(status)=>{
     const valid=piLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.pi_errItems,"err"); return null; }
     for (const it of valid){
@@ -4885,7 +4657,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const { sub, disc, tax, grand } = piCalcTotals(piLines);
     const paid=piN2(piForm.amountPaid), balanceDue=Math.max(0,grand-paid);
     const derivedStatus = status==="confirmed" ? (balanceDue<0.01?"paid":paid>0?"partial":"confirmed") : status;
-    return { shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+    return { shopId, invoiceNo:piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
   const savePurchaseInvoiceOffline = async (payload, successMessage) => {
@@ -4923,11 +4695,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── Save ──
   const piSaveDraft = async () => {
+    const payload=piBuild("draft"); if (!payload) return;
     setPiSaving(true);
     try {
-      const invoiceNo = editInvoiceId ? piInvoiceNo : await ensureNewPiInvoiceNo();
-      const payload = piBuild("draft", invoiceNo);
-      if (!payload) return;
       await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_saved);
     } catch(e) {
       toast(e.message,"err");
@@ -4937,11 +4707,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
 
   const piConfirm = async () => {
+    const payload=piBuild("confirmed"); if (!payload) return;
     setPiSaving(true);
     try {
-      const invoiceNo = editInvoiceId ? piInvoiceNo : await ensureNewPiInvoiceNo();
-      const payload = piBuild("confirmed", invoiceNo);
-      if (!payload) return;
       await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_confirmed);
     } catch(e) {
       toast(e.message,"err");
@@ -5909,54 +5677,28 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     return ()=>{ u1(); u2&&u2(); };
   },[shopId,isOwner,user.uid]);
 
-  const siMaxLocalSerial = () => invoices.reduce((mx, inv) => {
-    const m = String(inv.invoiceNo || "").match(/SI-?(\d+)$/i);
-    return m ? Math.max(mx, Number(m[1])) : mx;
-  }, Number(shop?.lastSISerial || 0));
-
-  const siFormatInvoiceNo = (serial) =>
-    `${SI_PREFIX}${String(serial).padStart(4, "0")}`;
-
-  const siPreviewNextInvoiceNo = () =>
-    siFormatInvoiceNo(siMaxLocalSerial() + 1);
-
   const genSiNo = async () => {
     try {
-      const serial = await runTransaction(db, async tx => {
-        const shopRef = doc(db, "shops", shopId);
-        const shopSnap = await tx.get(shopRef);
-        const next = Number(shopSnap.data()?.lastSISerial || 0) + 1;
-        tx.update(shopRef, { lastSISerial: next });
-        return next;
+      const serial=await runTransaction(db,async tx=>{
+        const shopRef=doc(db,"shops",shopId), shopSnap=await tx.get(shopRef);
+        const next=Number(shopSnap.data()?.lastSISerial||0)+1;
+        tx.update(shopRef,{lastSISerial:next}); return next;
       });
-      return siFormatInvoiceNo(serial);
-    } catch (e1) {
-      console.warn("[S4 SI] genSiNo transaction failed, using local serial", e1);
-      return siPreviewNextInvoiceNo();
+      return `${SI_PREFIX}${String(serial).padStart(4,"0")}`;
+    } catch(e1) {
+      try {
+        const snap=await getDocs(query(collection(db,"salesInvoices"),where("shopId","==",shopId)));
+        const max=snap.docs.reduce((mx,d)=>{ const m=String(d.data().invoiceNo||"").match(/SI-?(\d+)$/); return m?Math.max(mx,Number(m[1])):mx; },0);
+        return `${SI_PREFIX}${String(max+1).padStart(4,"0")}`;
+      } catch { return `${SI_PREFIX}${String(Date.now()).slice(-4)}`; }
     }
   };
 
-  const ensureNewSiInvoiceNo = async () => {
-    if (editInvId) return siInvoiceNo;
+  const siOpenNew = async () => {
     try {
-      const no = await genSiNo();
-      setSiInvoiceNo(no);
-      return no;
-    } catch (e) {
-      console.warn("[S4 SI] ensureNewSiInvoiceNo failed, keeping preview number", e);
-      const fallback = siInvoiceNo || siPreviewNextInvoiceNo();
-      setSiInvoiceNo(fallback);
-      return fallback;
-    }
-  };
-
-  const siOpenNew = () => {
-    setSiInvoiceNo(siPreviewNextInvoiceNo());
-    setSiForm(siEmptyForm());
-    setSiLines([]);
-    setSiCurrent(siEmptyCurrent());
-    setEditInvId(null);
-    setSiView("form");
+      const no=await genSiNo();
+      setSiInvoiceNo(no); setSiForm(siEmptyForm()); setSiLines([]); setSiCurrent(siEmptyCurrent()); setEditInvId(null); setSiView("form");
+    } catch(e) { toast(lang==="bn"?"ইনভয়েস খুলতে সমস্যা!":"Failed to open form!","err"); }
   };
 
   const siOpenEdit=(inv)=>{
@@ -6027,7 +5769,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     setShowCustPicker(false);
   };
 
-  const siBuild=(status, invoiceNoOverride)=>{
+  const siBuild=(status)=>{
     const valid=siLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.si_errItems,"err"); return null; }
     const isDelivery = siForm.invoiceType==="delivery";
@@ -6051,7 +5793,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const bal  = isDelivery ? 0 : Math.max(0, grand - paid);
     const derivedStatus = isDelivery ? "confirmed"
                         : (status==="confirmed" ? (bal<0.01?"paid":paid>0?"partial":"confirmed") : status);
-    return { shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+    return { shopId, invoiceNo:siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
   };
 
   const saveSalesInvoiceOffline = async (payload, successMessage, options = {}) => {
@@ -6095,11 +5837,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   };
 
   const siSaveDraft = async () => {
+    const p=siBuild("draft"); if (!p) return;
     setSiSaving(true);
     try {
-      const invoiceNo = editInvId ? siInvoiceNo : await ensureNewSiInvoiceNo();
-      const p = siBuild("draft", invoiceNo);
-      if (!p) return;
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_saved);
     } catch(e) {
       toast(e.message,"err");
@@ -6109,11 +5849,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   };
 
   const siConfirm = async () => {
+    const p=siBuild("confirmed"); if (!p) return;
     setSiSaving(true);
     try {
-      const invoiceNo = editInvId ? siInvoiceNo : await ensureNewSiInvoiceNo();
-      const p = siBuild("confirmed", invoiceNo);
-      if (!p) return;
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_confirmed, { print:true });
     } catch(e) {
       toast(e.message,"err");
@@ -6648,7 +6386,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 }
 
 // ─── SHOP INFO SETTINGS ──────────────────────────────────────
-function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast, onShopUpdated }) {
+function ShopInfoSettings({ localShop, shopId, th, s, lang, toast }) {
   const [shopEdit, setShopEdit] = useState({
     companyName: localShop.companyName||"",
     trnNumber:   localShop.trnNumber||"",
@@ -6659,44 +6397,20 @@ function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast
   });
   const [shopSaving, setShopSaving] = useState(false);
 
-  useEffect(() => {
-    setShopEdit({
-      companyName: localShop.companyName||"",
-      trnNumber:   localShop.trnNumber||"",
-      vatNumber:   localShop.vatNumber||"",
-      mobile:      localShop.mobile||"",
-      email:       localShop.email||"",
-      area:        localShop.area||"",
-    });
-  }, [localShop]);
-
   const saveShop = async () => {
-    if (!shopEdit.companyName.trim()) {
-      return toast(lang==="bn"?"দোকানের নাম দিন":"Shop name is required","err");
-    }
-
     setShopSaving(true);
     try {
-      const updated = await saveShopRecord(
-        shopId,
-        {
-          companyName: shopEdit.companyName.trim(),
-          trnNumber: shopEdit.trnNumber.trim(),
-          vatNumber: shopEdit.vatNumber.trim(),
-          mobile: shopEdit.mobile.trim(),
-          email: shopEdit.email.trim(),
-          area: shopEdit.area.trim(),
-          ownerName: localShop.ownerName || profile?.personName || "",
-        },
-        { ownerUid: user?.uid || localShop.ownerUid, profile, user }
-      );
-      onShopUpdated?.(updated);
+      await updateDoc(doc(db,"shops",shopId),{
+        companyName: shopEdit.companyName.trim(),
+        trnNumber:   shopEdit.trnNumber.trim(),
+        vatNumber:   shopEdit.vatNumber.trim(),
+        mobile:      shopEdit.mobile.trim(),
+        email:       shopEdit.email.trim(),
+        area:        shopEdit.area.trim(),
+      });
       toast(lang==="bn"?"✅ দোকানের তথ্য আপডেট হয়েছে!":"✅ Shop info updated!");
-    } catch(e) {
-      toast(e.message||String(e),"err");
-    } finally {
-      setShopSaving(false);
-    }
+    } catch(e) { toast(e.message,"err"); }
+    finally { setShopSaving(false); }
   };
 
   const sinp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
@@ -6856,25 +6570,8 @@ function LicenseActivationPanel({ lang, th, s, toast, locked = false, onActivate
   const statusColor =
     statusText === "ACTIVE" ? "#22c55e" : statusText === "NOT_FOUND" ? "#f59e0b" : "#ef4444";
   const trial = accessStatus?.trial;
-  const licenseInfo = accessStatus?.license || status || {};
-  const showingLicense = accessStatus?.accessReason === "LICENSE_ACTIVE";
-
-  const licenseExpiresAt = licenseInfo?.expiresAt || status?.expiresAt || "";
-  const licenseEndsAtMs = licenseExpiresAt ? new Date(licenseExpiresAt).getTime() : NaN;
-  const licenseDaysRemaining = Number.isFinite(licenseEndsAtMs)
-    ? Math.max(0, Math.ceil((licenseEndsAtMs - Date.now()) / 86400000))
-    : null;
-
-  const displayDaysRemaining = showingLicense
-    ? (licenseDaysRemaining ?? (licenseInfo?.plan === "LIFETIME" ? "Lifetime" : "—"))
-    : (trial?.daysRemaining ?? "—");
-
-  const displayEndsAt = showingLicense
-    ? licenseExpiresAt
-    : trial?.trialEndsAt;
-
   const trialStatusText =
-    showingLicense
+    accessStatus?.accessReason === "LICENSE_ACTIVE"
       ? txt.licenseActive
       : trial?.status === "TRIAL_EXPIRED"
         ? txt.trialExpired
@@ -6882,7 +6579,7 @@ function LicenseActivationPanel({ lang, th, s, toast, locked = false, onActivate
           ? txt.trialActive
           : trial?.status || "UNKNOWN";
   const trialColor =
-    showingLicense || trial?.status === "TRIAL_ACTIVE"
+    accessStatus?.accessReason === "LICENSE_ACTIVE" || trial?.status === "TRIAL_ACTIVE"
       ? "#22c55e"
       : trial?.status === "TRIAL_EXPIRED"
         ? "#ef4444"
@@ -6911,11 +6608,11 @@ function LicenseActivationPanel({ lang, th, s, toast, locked = false, onActivate
           <span style={{ fontSize:11, color:th.txtMuted }}>{accessStatus?.accessReason || "..."}</span>
         </div>
         <div style={{ fontSize:12, color:th.txtMuted }}>
-          {txt.daysRemaining}: <b style={{ color:th.txtPrimary }}>{displayDaysRemaining}</b>
+          {txt.daysRemaining}: <b style={{ color:th.txtPrimary }}>{trial?.daysRemaining ?? "—"}</b>
         </div>
-        {displayEndsAt&&(
+        {trial?.trialEndsAt&&(
           <div style={{ fontSize:11, color:th.txtMuted, marginTop:4 }}>
-            {isBn ? "শেষ হবে" : "Ends"}: {new Date(displayEndsAt).toLocaleString(isBn ? "bn-BD" : "en-GB")}
+            {isBn ? "শেষ হবে" : "Ends"}: {new Date(trial.trialEndsAt).toLocaleString(isBn ? "bn-BD" : "en-GB")}
           </div>
         )}
       </div>
@@ -8024,22 +7721,12 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
     display:"flex",
     justifyContent:"space-between",
     alignItems:"center",
-    margin:"12px 2px 8px",
+    margin:"20px 2px 10px",
     color:th.txtPrimary,
-    fontSize:isDesktop?12:11,
+    fontSize:isDesktop?13:12,
     fontWeight:900,
     textTransform:"uppercase",
     letterSpacing:0.7,
-  };
-
-  const dashRow = {
-    display:"flex",
-    gap:10,
-    marginBottom:14,
-    overflowX:"auto",
-    flexWrap:"nowrap",
-    scrollbarWidth:"none",
-    WebkitOverflowScrolling:"touch",
   };
 
   const glassCard = {
@@ -8098,62 +7785,51 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
     { label:t.dashVendors,   value:vendors.length,   icon:"🏭", color:"#06b6d4" },
   ];
 
-  const statCard = (item) => (
+  const statCard = (item, wide=false) => (
     <div
       key={item.label}
       style={{
         ...glassCard,
-        borderRadius:14,
-        padding:isDesktop?"10px 12px":"8px 8px",
-        minHeight:isDesktop?72:64,
-        height:isDesktop?72:64,
-        boxSizing:"border-box",
+        borderRadius:18,
+        padding:isDesktop?"18px 20px":"14px 13px",
+        minHeight:isDesktop?110:104,
         position:"relative",
         overflow:"hidden",
-        borderBottom:`3px solid ${item.color}`,
-        display:"flex",
-        flexDirection:"column",
-        justifyContent:"space-between",
-        flex:"1 1 0",
-        minWidth:isDesktop?0:74,
+        borderBottom:`4px solid ${item.color}`,
+        gridColumn:wide ? "span 2" : "span 1",
       }}
     >
-      <div style={{ position:"absolute", inset:"auto -28px -32px auto", width:72, height:72, borderRadius:"50%", background:item.glow||`${item.color}22`, filter:"blur(4px)" }} />
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, position:"relative", zIndex:1 }}>
-        <div style={{ width:30, height:30, borderRadius:15, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, boxShadow:`0 6px 14px ${item.color}44`, flexShrink:0 }}>
-          {item.icon}
-        </div>
-        <div style={{ color:th.txtPrimary, fontSize:isDesktop?22:20, lineHeight:1, fontWeight:900, letterSpacing:-0.5 }}>{item.value}</div>
+      <div style={{ position:"absolute", inset:"auto -40px -50px auto", width:110, height:110, borderRadius:"50%", background:item.glow||`${item.color}22`, filter:"blur(4px)" }} />
+      <div style={{ width:42, height:42, borderRadius:22, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:21, boxShadow:`0 10px 24px ${item.color}55`, marginBottom:12 }}>
+        {item.icon}
       </div>
-      <div style={{ color:th.txtSecondary, fontSize:isDesktop?11:10, fontWeight:700, marginTop:6, lineHeight:1.2, position:"relative", zIndex:1 }}>{item.label}</div>
+      <div style={{ color:th.txtPrimary, fontSize:isDesktop?34:30, lineHeight:1, fontWeight:900, letterSpacing:-1 }}>{item.value}</div>
+      <div style={{ color:th.txtSecondary, fontSize:isDesktop?13:12, fontWeight:700, marginTop:8, lineHeight:1.25 }}>{item.label}</div>
     </div>
   );
 
-  const shopCard = (item) => (
+  const shopCard = (item, idx) => (
     <div
       key={item.label}
       style={{
         ...glassCard,
-        borderRadius:14,
-        padding:isDesktop?"10px 8px":"8px 6px",
-        minHeight:72,
-        height:72,
-        boxSizing:"border-box",
+        borderRadius:18,
+        padding:isDesktop?"18px 20px":"14px 13px",
+        minHeight:isDesktop?95:86,
         display:"flex",
-        flexDirection:"column",
         alignItems:"center",
-        justifyContent:"center",
-        gap:4,
-        borderBottom:`3px solid ${item.color}`,
-        flex:isDesktop?"1 1 0":"0 0 92px",
-        minWidth:isDesktop?0:92,
+        gap:14,
+        borderBottom:`4px solid ${item.color}`,
+        gridColumn:(!isDesktop && idx>2) ? "span 2" : "span 1",
       }}
     >
-      <div style={{ width:28, height:28, borderRadius:14, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, boxShadow:`0 6px 14px ${item.color}44`, flexShrink:0 }}>
+      <div style={{ width:46, height:46, borderRadius:24, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, boxShadow:`0 10px 24px ${item.color}55`, flexShrink:0 }}>
         {item.icon}
       </div>
-      <div style={{ color:th.txtPrimary, fontSize:isDesktop?18:17, lineHeight:1, fontWeight:900 }}>{item.value}</div>
-      <div style={{ color:th.txtSecondary, fontSize:10, fontWeight:700, lineHeight:1.15, textAlign:"center", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%", paddingInline:2 }}>{item.label}</div>
+      <div>
+        <div style={{ color:th.txtPrimary, fontSize:isDesktop?26:24, lineHeight:1, fontWeight:900 }}>{item.value}</div>
+        <div style={{ color:th.txtSecondary, fontSize:12, fontWeight:700, marginTop:6, lineHeight:1.25 }}>{item.label}</div>
+      </div>
     </div>
   );
 
@@ -8219,11 +7895,11 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
         </div>
       )}
 
-      <div style={{ ...glassCard, borderRadius:22, padding:isDesktop?"22px 24px":"16px 14px", marginBottom:16, display:"flex", alignItems:"center", gap:isDesktop?18:12, position:"relative", overflow:"hidden", border:"1px solid rgba(96,165,250,0.28)" }}>
+      <div style={{ ...glassCard, borderRadius:22, padding:isDesktop?"28px 30px":"18px 16px", marginBottom:22, display:"flex", alignItems:"center", gap:isDesktop?22:14, position:"relative", overflow:"hidden", border:"1px solid rgba(96,165,250,0.28)" }}>
         <div style={{ position:"absolute", inset:"-60px -70px auto auto", width:170, height:170, borderRadius:"50%", background:"rgba(59,130,246,0.22)", filter:"blur(12px)" }} />
-        <div style={{ fontSize:isDesktop?48:42, flexShrink:0, filter:"drop-shadow(0 12px 22px rgba(96,165,250,0.25))" }}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div style={{ fontSize:isDesktop?62:54, flexShrink:0, filter:"drop-shadow(0 12px 22px rgba(96,165,250,0.25))" }}>{isOwner?"🏢":"👨‍💼"}</div>
         <div style={{ minWidth:0, flex:1, position:"relative", zIndex:1 }}>
-          <div style={{ fontSize:isDesktop?22:18, fontWeight:900, color:th.txtPrimary, lineHeight:1.15, letterSpacing:-0.4 }}>
+          <div style={{ fontSize:isDesktop?26:20, fontWeight:900, color:th.txtPrimary, lineHeight:1.15, letterSpacing:-0.4 }}>
             {lang==="bn"?"স্বাগতম":"Welcome"}, <span style={{ color:"#60a5fa" }}>{(profile.personName||"").toUpperCase()}</span>! 👋
           </div>
           <div style={{ fontSize:isDesktop?15:13, color:th.txtSecondary, marginTop:8, lineHeight:1.35, fontWeight:650 }}>
@@ -8244,21 +7920,21 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
           {lang==="bn"?"সব দেখুন":"View all"}
         </button>
       </div>
-      <div style={dashRow}>
-        {statusCards.map(c=>statCard(c))}
+      <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(4, minmax(0,1fr))":"repeat(2, minmax(0,1fr))", gap:isDesktop?14:12, marginBottom:22 }}>
+        {statusCards.map(c=>statCard(c, !isDesktop && c.label===t.dashCancelled))}
       </div>
 
       {isOwner && (
         <>
           <div style={sectionTitle}><span>{lang==="bn"?"দোকানের সংক্ষিপ্ত তথ্য":"Shop Overview"}</span></div>
-          <div style={dashRow}>
-            {shopCards.map(c=>shopCard(c))}
+          <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(3, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?14:12, marginBottom:22 }}>
+            {shopCards.map((c,i)=>shopCard(c,i))}
           </div>
         </>
       )}
 
       <div style={sectionTitle}><span>{t.dashQuickNav}</span></div>
-      <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(6, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?10:8, marginBottom:!isDesktop?18:0 }}>
+      <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(6, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?14:12, marginBottom:!isDesktop?18:0 }}>
         {navItems.map(quickCard)}
       </div>
 
@@ -8285,144 +7961,8 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
   );
 }
 
-// ─── PROFILE PASSWORD ────────────────────────────────────────
-function ProfilePasswordSettings({ t, lang, profile, toast, th, s }) {
-  const [currentPw, setCurrentPw] = useState("");
-  const [newPw, setNewPw] = useState("");
-  const [newPw2, setNewPw2] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e) => {
-    e?.preventDefault?.();
-    if (!currentPw || !newPw || !newPw2) {
-      return toast(lang==="bn"?"সব password field পূরণ করুন":"Fill all password fields","err");
-    }
-    if (newPw.length < 6) {
-      return toast(lang==="bn"?"নতুন password অন্তত ৬ অক্ষর":"New password must be at least 6 characters","err");
-    }
-    if (newPw !== newPw2) {
-      return toast(lang==="bn"?"নতুন password match করছে না":"New passwords do not match","err");
-    }
-
-    setBusy(true);
-    try {
-      await updateOwnPassword(profile.localUserId, currentPw, newPw);
-      setCurrentPw("");
-      setNewPw("");
-      setNewPw2("");
-      toast(t.ownPwChangedOk);
-    } catch (err) {
-      toast(err?.message || String(err), "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (!profile?.localUserId) return null;
-
-  const inp = {
-    padding:"10px 12px",
-    borderRadius:8,
-    border:`1px solid ${th.borderMid}`,
-    background:th.bgInp,
-    color:th.txtPrimary,
-    fontSize:14,
-    outline:"none",
-    width:"100%",
-    boxSizing:"border-box",
-    fontFamily:"inherit",
-    marginBottom:10,
-  };
-
-  return (
-    <div style={{ ...s.card, marginTop:12 }}>
-      <div style={s.settingsLbl}>{lang==="bn"?"🔐 পাসওয়ার্ড পরিবর্তন":"🔐 Change Password"}</div>
-      <form onSubmit={submit}>
-        <input style={inp} type="password" placeholder={t.currentPwLbl} value={currentPw} onChange={e=>setCurrentPw(e.target.value)} autoComplete="current-password" />
-        <input style={inp} type="password" placeholder={t.newPwLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
-        <input style={inp} type="password" placeholder={t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
-        <button type="submit" style={s.sendBtn} disabled={busy}>{busy?"...":t.changePwSettingsBtn}</button>
-      </form>
-    </div>
-  );
-}
-
-// ─── SYNC SETTINGS ───────────────────────────────────────────
-function SyncSettingsPanel({
-  t,
-  lang,
-  th,
-  s,
-  toast,
-  syncState,
-  syncDashboard,
-  lastCloudPullAt,
-  cloudUploadBusy,
-  cloudPullBusy,
-  onUpload,
-  onDownload,
-  onRefresh,
-}) {
-  const isOnline = typeof navigator !== "undefined" ? navigator.onLine : false;
-
-  return (
-    <div style={s.card}>
-      <div style={s.settingsLbl}>{t.syncStatus}</div>
-      <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", marginBottom:12 }}>
-        {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
-      </div>
-
-      <div style={{ display:"grid", gap:8, marginBottom:14 }}>
-        <div style={{ fontSize:12, color:th.txtMuted }}>
-          {t.syncPendingLbl}: <strong style={{ color:th.txtPrimary }}>{syncDashboard?.pendingSync ?? 0}</strong>
-        </div>
-        <div style={{ fontSize:12, color:th.txtMuted }}>
-          {t.syncLocalRecordsLbl}: <strong style={{ color:th.txtPrimary }}>{syncDashboard?.localRecords ?? 0}</strong>
-        </div>
-        <div style={{ fontSize:12, color:th.txtMuted }}>
-          {t.syncLastPullLbl}: <strong style={{ color:th.txtPrimary }}>{lastCloudPullAt ? new Date(lastCloudPullAt).toLocaleString(lang==="bn"?"bn-BD":"en-GB") : "—"}</strong>
-        </div>
-      </div>
-
-      <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-        <button
-          type="button"
-          onClick={onUpload}
-          disabled={cloudUploadBusy || !isOnline}
-          style={{ ...s.sendBtn, opacity:cloudUploadBusy || !isOnline ? 0.6 : 1 }}
-        >
-          {cloudUploadBusy ? "..." : t.syncUploadBtn}
-        </button>
-        <button
-          type="button"
-          onClick={onDownload}
-          disabled={cloudPullBusy || !isOnline}
-          style={{ ...s.sendBtn, background:"linear-gradient(135deg,#2563eb,#1d4ed8)", opacity:cloudPullBusy || !isOnline ? 0.6 : 1 }}
-        >
-          {cloudPullBusy ? "..." : t.syncDownloadBtn}
-        </button>
-        <button type="button" onClick={onRefresh} style={s.stBtn}>
-          {lang==="bn"?"🔄 রিফ্রেশ":"🔄 Refresh"}
-        </button>
-      </div>
-
-      {!isOnline && (
-        <div style={{ fontSize:11, color:"#f59e0b", marginTop:12 }}>
-          {t.syncNeedInternet}
-        </div>
-      )}
-
-      <div style={{ fontSize:11, color:th.txtMuted, marginTop:12, lineHeight:1.5 }}>
-        {lang==="bn"
-          ? "নতুন PC/mobile-এ প্রথমবার internet দিয়ে Cloud Download চাপুন। পরে local data offline-এ কাজ করবে।"
-          : "On a new PC/mobile, tap Cloud Download once while online. After that, local data works offline."}
-      </div>
-    </div>
-  );
-}
-
 // ─── MAIN APP ─────────────────────────────────────────────────
-function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme, onLogout }) {
+function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme }) {
   const isOwner = profile.role==="owner";
   const isSalesman = !isOwner;
   const shopId  = profile.shopId;
@@ -8471,105 +8011,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const isDesktop = windowWidth >= 768;
   const [licenseAccess, setLicenseAccess] = useState(null);
   const [licenseAccessLoading, setLicenseAccessLoading] = useState(true);
-  const [syncDashboard, setSyncDashboard] = useState(null);
-  const [cloudPullBusy, setCloudPullBusy] = useState(false);
-  const [cloudUploadBusy, setCloudUploadBusy] = useState(false);
-  const [lastCloudPullAt, setLastCloudPullAt] = useState(null);
-  const [settingsPage,setSettingsPage]=useState(null);
-  const [staffForm, setStaffForm] = useState({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
-  const [staffSaving, setStaffSaving] = useState(false);
-  const [staffPwReset, setStaffPwReset] = useState({});
-
-  const refreshSyncDashboard = async () => {
-    try {
-      setSyncDashboard(await getSyncDashboardStatus());
-    } catch (error) {
-      console.warn("[S4 Sync] dashboard refresh failed", error);
-    }
-  };
-
-  const applyCloudPullResult = (pullResult) => {
-    if (!pullResult?.data) return;
-    const sorted = sortPulledRecords(pullResult.data);
-
-    if (sorted.products.length) setProducts(sorted.products);
-    if (sorted.companies.length) setCos(sorted.companies);
-    if (sorted.customers.length) setCustomers(sorted.customers);
-    if (sorted.vendors.length) setVendors(sorted.vendors);
-    if (sorted.orders.length) setOrders(sorted.orders);
-    if (sorted.team.length) setTeam(sorted.team);
-    if (sorted.shop) setLocalShop(sorted.shop);
-    if (sorted.inviteCodes.length) {
-      setInviteCodes(sorted.inviteCodes.map((c) => ({ ...c, code: c.code || c.id })));
-    }
-
-    setSyncState(typeof navigator !== "undefined" && navigator.onLine ? "connected" : "offline");
-  };
-
-  const runCloudDownload = async ({ silent = false } = {}) => {
-    if (!shopId) return null;
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      if (!silent) toast(t.syncNeedInternet, "err");
-      return null;
-    }
-
-    setCloudPullBusy(true);
-    try {
-      const result = await pullShopFromCloud(shopId, {
-        filterOrdersForUserId: user?.uid,
-        includeAllOrders: isOwner || isOrderManager,
-      });
-
-      if (result?.reason === "OFFLINE") {
-        if (!silent) toast(t.syncNeedInternet, "err");
-        return null;
-      }
-
-      applyCloudPullResult(result);
-      setLastCloudPullAt(result.pulledAt || getShopCloudPulledAt(shopId));
-
-      if (!silent) {
-        const msg = lang==="bn"
-          ? `${t.syncDownloadOk} (${result.totalDocs || 0})`
-          : `${t.syncDownloadOk} (${result.totalDocs || 0})`;
-        toast(result.partial ? `${msg} ⚠️` : msg, result.partial ? "err" : "ok");
-      }
-
-      await refreshSyncDashboard();
-      return result;
-    } catch (error) {
-      if (!silent) toast(error?.message || String(error), "err");
-      return null;
-    } finally {
-      setCloudPullBusy(false);
-    }
-  };
-
-  const runCloudUpload = async () => {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
-      toast(t.syncNeedInternet, "err");
-      return;
-    }
-
-    setCloudUploadBusy(true);
-    try {
-      const result = await uploadPendingShopChanges();
-      if (result?.reason === "OFFLINE" || result?.skipped) {
-        toast(t.syncNeedInternet, "err");
-        return;
-      }
-
-      const msg = lang==="bn"
-        ? `${t.syncUploadOk} (${result.done || 0}/${result.total || 0})`
-        : `${t.syncUploadOk} (${result.done || 0}/${result.total || 0})`;
-      toast(result.failed ? `${msg} ⚠️` : msg, result.failed ? "err" : "ok");
-      await refreshSyncDashboard();
-    } catch (error) {
-      toast(error?.message || String(error), "err");
-    } finally {
-      setCloudUploadBusy(false);
-    }
-  };
 
   const refreshLicenseAccess = async () => {
     setLicenseAccessLoading(true);
@@ -8601,87 +8042,124 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     refreshLicenseAccess();
   }, []);
 
+  // -- Manual full cloud ? SQLite offline cache downloader --
   useEffect(() => {
     if (!shopId) return;
-    setLastCloudPullAt(getShopCloudPulledAt(shopId));
-    refreshSyncDashboard();
 
-    const handleConnectivity = () => {
-      refreshSyncDashboard();
-    };
+    window.S4Offline = window.S4Offline || {};
 
-    window.addEventListener("online", handleConnectivity);
-    window.addEventListener("offline", handleConnectivity);
-    return () => {
-      window.removeEventListener("online", handleConnectivity);
-      window.removeEventListener("offline", handleConnectivity);
-    };
-  }, [shopId]);
+    window.S4Offline.downloadAllShopData = async () => {
+      const collectionNames = [
+        "products",
+        "companies",
+        "customers",
+        "vendors",
+        "orders",
+        "purchaseInvoices",
+        "purchasePayments",
+        "supplierPayments",
+        "salesInvoices",
+        "users"
+      ];
 
-  useEffect(() => {
-    if (settingsPage !== "sync") return;
-    refreshSyncDashboard();
-  }, [settingsPage]);
+      const results = [];
 
-  useEffect(() => {
-    if (!shopId) return;
-    let cancelled = false;
+      const byName = (field) => (a,b) => String(a?.[field] || "").localeCompare(String(b?.[field] || ""));
+      const byCreatedDesc = (a,b) => {
+        const av = a.createdAt?.toDate?.() || a.createdAt || a.createdAtIso || 0;
+        const bv = b.createdAt?.toDate?.() || b.createdAt || b.createdAtIso || 0;
+        return new Date(bv).getTime() - new Date(av).getTime();
+      };
 
-    (async () => {
-      try {
-        if (!(await shouldAutoPullShop(shopId))) return;
-        const result = await runCloudDownload({ silent: true });
-        if (!cancelled && result?.ok) {
-          toast(t.syncAutoPullOk);
+      for (const name of collectionNames) {
+        try {
+          console.log("[S4 Offline Download] start:", name);
+
+          const snap = await getDocs(
+            query(collection(db, name), where("shopId", "==", shopId))
+          );
+
+          const docs = snap.docs.map(d => ({
+            id: d.id,
+            ...d.data()
+          }));
+
+          await offlineCacheCloudRecords(name, docs);
+
+          if (name === "products") {
+            setProducts([...docs].sort(byName("name")));
+          }
+
+          if (name === "companies") {
+            setCos([...docs].sort(byName("name")));
+          }
+
+          if (name === "customers") {
+            setCustomers([...docs].sort(byName("customerName")));
+          }
+
+          if (name === "vendors") {
+            setVendors([...docs].sort(byName("vendorName")));
+          }
+
+          if (name === "orders") {
+            let orderDocs = [...docs];
+
+            if (!isOwner && !isOrderManager) {
+              orderDocs = orderDocs.filter(o => o.createdBy === user?.uid);
+            }
+
+            setOrders(orderDocs.sort(byCreatedDesc));
+          }
+
+          if (name === "users") {
+            setTeam([...docs].map(x => ({ ...x, id: x.id })));
+          }
+
+          results.push({
+            collection: name,
+            cloud: docs.length,
+            cached: docs.length,
+            ok: true
+          });
+
+          console.log("[S4 Offline Download] done:", name, docs.length);
+        } catch (err) {
+          console.error("[S4 Offline Download] failed:", name, err);
+
+          results.push({
+            collection: name,
+            cloud: 0,
+            cached: 0,
+            ok: false,
+            error: err?.message || String(err)
+          });
         }
-      } catch (error) {
-        console.warn("[S4 Sync] auto cloud pull failed", error);
       }
-    })();
 
-    return () => { cancelled = true; };
+      console.table(results);
+      return results;
+    };
+
+    return () => {
+      if (window.S4Offline?.downloadAllShopData) {
+        delete window.S4Offline.downloadAllShopData;
+      }
+    };
   }, [shopId, isOwner, isOrderManager, user?.uid]);
 
   const [showChequePrinter,setShowChequePrinter]=useState(false);
   const [newPosition,setNewPosition]=useState("");
   const [showAddPos,setShowAddPos]=useState(false);
-
-  useEffect(() => {
-    if (shopProp) setLocalShop(shopProp);
-  }, [shopProp]);
+  const [settingsPage,setSettingsPage]=useState(null); // null = menu list
 
   useEffect(() => {
     if (!shopId) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const local = await loadShopRecord(shopId);
-        if (!cancelled && local) setLocalShop(local);
-      } catch (err) {
-        console.warn("[S4 Shop] local load failed", err);
-      }
-    })();
-
-    const unsub = onSnapshot(
-      doc(db, "shops", shopId),
-      (snap) => {
-        if (!snap.exists()) return;
-        const data = { id: snap.id, ...snap.data() };
-        setLocalShop(data);
-        saveCachedShop(shopId, data);
-        offlineCacheCloudRecords("shops", [data]).catch((err) =>
-          console.warn("[S4 Offline] shop cache failed", err)
-        );
-      },
-      (err) => console.warn("[S4 Shop] online listener failed", err)
+    return onSnapshot(doc(db,"shops",shopId),
+      snap => { if (snap.exists()) setLocalShop({id:snap.id,...snap.data()}); },
+      err  => console.error(err)
     );
-
-    return () => {
-      cancelled = true;
-      unsub();
-    };
-  }, [shopId]);
+  },[shopId]);
 
   // ── Orders real-time listener with offline cache fallback ──
   useEffect(() => {
@@ -8913,34 +8391,10 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   }, [shopId]);
 
   useEffect(() => {
-    if (!shopId) return;
-
-    const refreshLocalTeam = async () => {
-      try {
-        const localTeam = await listShopTeamMembers(shopId);
-        setTeam((prev) => mergeTeamMembers(prev, localTeam));
-      } catch (err) {
-        console.error("[S4 Team] local load failed", err);
-      }
-    };
-
-    refreshLocalTeam();
-
     return onSnapshot(
       query(collection(db,"users"), where("shopId","==",shopId)),
-      async (snap) => {
-        const cloudTeam = snap.docs.map((d) => ({
-          ...d.data(),
-          id: d.id,
-          uid: d.data().uid || d.id,
-        }));
-        const localTeam = await listShopTeamMembers(shopId);
-        setTeam(mergeTeamMembers(cloudTeam, localTeam));
-      },
-      (err) => {
-        console.error(err);
-        refreshLocalTeam();
-      }
+      snap => setTeam(snap.docs.map(d=>({...d.data(),id:d.id}))),
+      err  => console.error(err)
     );
   },[shopId]);
 
@@ -9000,12 +8454,9 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const generateNewCode = async () => {
     try {
       const code = generateInviteCode();
-      addLocalInviteCode(shopId, code);
-      if (navigator.onLine && db) {
-        await setDoc(doc(db,"inviteCodes",code),{
-          shopId, used:false, createdAt:serverTimestamp(),
-        });
-      }
+      await setDoc(doc(db,"inviteCodes",code),{
+        shopId, used:false, createdAt:serverTimestamp(),
+      });
       toast(lang==="bn"?"✅ নতুন Invite Code তৈরি হয়েছে!":"✅ New invite code created!");
     } catch(e) { hErr(e); }
   };
@@ -9563,83 +9014,18 @@ const startEditOrder = (order) => {
   const addPosition = async () => {
     if (!newPosition.trim()) return;
     const positions=[...(localShop?.positions||[]),newPosition.trim()];
-    try {
-      const updated = await saveShopRecord(shopId, { positions }, { ownerUid: user?.uid, profile, user });
-      setLocalShop(updated);
-      setNewPosition("");
-      setShowAddPos(false);
-      toast(t.positionAdded);
-    } catch(e) { hErr(e); }
+    try { await updateDoc(doc(db,"shops",shopId),{positions}); setNewPosition(""); setShowAddPos(false); toast(t.positionAdded); }
+    catch(e) { hErr(e); }
   };
   const deletePosition = async (pos) => {
     const positions=(localShop?.positions||[]).filter(p=>p!==pos);
-    try {
-      const updated = await saveShopRecord(shopId, { positions }, { ownerUid: user?.uid, profile, user });
-      setLocalShop(updated);
-      toast(t.positionDeleted,"err");
-    } catch(e) { hErr(e); }
+    try { await updateDoc(doc(db,"shops",shopId),{positions}); toast(t.positionDeleted,"err"); }
+    catch(e) { hErr(e); }
   };
 
-  const savePermissions = async (member, newPerms) => {
-    const memberId = member.uid || member.id;
-    try {
-      await updateShopMemberPermissions(memberId, {
-        permissions: newPerms,
-        position: member.position,
-        localUserId: member.localUserId,
-      });
-      setTeam((prev) => prev.map((m) => ((m.uid || m.id) === memberId ? { ...m, permissions: newPerms } : m)));
-      toast(t.permSaved);
-    } catch(e) { hErr(e); }
-  };
-
-  const saveMemberPosition = async (member, position) => {
-    const memberId = member.uid || member.id;
-    try {
-      await updateShopMemberPosition(memberId, position, member.localUserId);
-      setTeam((prev) => prev.map((m) => ((m.uid || m.id) === memberId ? { ...m, position } : m)));
-      toast(t.permSaved);
-    } catch(e) { hErr(e); }
-  };
-
-  const createStaffMember = async () => {
-    if (!staffForm.username.trim() || !staffForm.password || !staffForm.personName.trim()) {
-      return toast(lang==="bn"?"username, password ও নাম দিন":"Enter username, password and name","err");
-    }
-    if (staffForm.password.length < 6) {
-      return toast(lang==="bn"?"password অন্তত ৬ অক্ষর":"Password must be at least 6 characters","err");
-    }
-
-    setStaffSaving(true);
-    try {
-      const member = await createShopStaffUser({
-        username: staffForm.username.trim(),
-        password: staffForm.password,
-        personName: staffForm.personName.trim(),
-        shopId,
-        position: staffForm.position || "Salesman",
-        mobile: staffForm.mobile.trim(),
-      });
-      setTeam((prev) => mergeTeamMembers(prev, [member]));
-      setStaffForm({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
-      toast(t.staffAddedOk);
-    } catch(e) { hErr(e); }
-    finally { setStaffSaving(false); }
-  };
-
-  const resetStaffPassword = async (member) => {
-    if (!member.localUserId) {
-      return toast(lang==="bn"?"এই সদস্যের local account নেই":"No local account for this member","err");
-    }
-    const pw = staffPwReset[member.localUserId] || "";
-    if (pw.length < 6) {
-      return toast(lang==="bn"?"password অন্তত ৬ অক্ষর":"Password must be at least 6 characters","err");
-    }
-    try {
-      await resetShopMemberPassword(member.localUserId, pw);
-      setStaffPwReset((prev) => ({ ...prev, [member.localUserId]: "" }));
-      toast(t.resetPwOk);
-    } catch(e) { hErr(e); }
+  const savePermissions = async (memberId, newPerms) => {
+    try { await updateDoc(doc(db,"users",memberId),{permissions:newPerms}); toast(t.permSaved); }
+    catch(e) { hErr(e); }
   };
 
   const shortId  = (id) => id.slice(-6).toUpperCase();
@@ -9672,10 +9058,7 @@ const startEditOrder = (order) => {
 
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
-    try {
-      if (onLogout) await onLogout();
-      else await signOut(auth);
-    } catch(e) { hErr(e); }
+    try { await signOut(auth); } catch(e) { hErr(e); }
   };
 
   const copyCode = async () => {
@@ -11144,7 +10527,7 @@ const startEditOrder = (order) => {
               )}
 
               {/* Team members */}
-              {(isOwner || team.length>0)&&(
+              {team.length>0&&(
                 <button style={s.settingsRow} onClick={()=>setSettingsPage("team")}>
                   <span style={s.settingsRowIcon}>👥</span>
                   <div style={{ flex:1 }}>
@@ -11206,16 +10589,6 @@ const startEditOrder = (order) => {
                 <span style={s.settingsArrow}>›</span>
               </button>
 
-              {/* App update */}
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("update")}>
-                <span style={s.settingsRowIcon}>🔄</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{t.updateTitle}</div>
-                  <div style={s.settingsRowSub}>v{APP_VERSION} · {t.updateSub}</div>
-                </div>
-                <span style={s.settingsArrow}>›</span>
-              </button>
-
               {/* Logout */}
               <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
             </>
@@ -11229,27 +10602,22 @@ const startEditOrder = (order) => {
           )}
 
           {settingsPage==="profile"&&(
-            <>
-              <div style={s.card}>
-                <div style={s.settingsLbl}>{t.profileTitle}</div>
-                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{profile.personName}</div>
-                    <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-                    <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
-                  </div>
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.profileTitle}</div>
+              <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{profile.personName}</div>
+                  <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
+                  <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
                 </div>
               </div>
-              <ProfilePasswordSettings t={t} lang={lang} profile={profile} toast={toast} th={th} s={s} />
-            </>
+            </div>
           )}
 
           {settingsPage==="shop"&&localShop&&(
             <ShopInfoSettings
               localShop={localShop} shopId={shopId}
-              profile={profile} user={user}
-              onShopUpdated={setLocalShop}
               th={th} s={s} lang={lang} toast={toast}
             />
           )}
@@ -11261,10 +10629,6 @@ const startEditOrder = (order) => {
               s={s}
               toast={toast}
             />
-          )}
-
-          {settingsPage==="update"&&(
-            <AppUpdatePanel lang={lang} th={th} s={s} toast={toast} />
           )}
 
           {settingsPage==="invite"&&isOwner&&(
@@ -11334,53 +10698,29 @@ const startEditOrder = (order) => {
             </div>
           )}
 
-          {settingsPage==="team"&&(isOwner || team.length>0)&&(
-            <>
-              {isOwner&&(
-                <div style={{ ...s.card, marginBottom:12, border:"1px solid #3b82f6" }}>
-                  <div style={s.settingsLbl}>{t.addStaffTitle}</div>
-                  <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.personName} value={staffForm.personName} onChange={e=>setStaffForm(p=>({...p,personName:e.target.value}))} />
-                  <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.usernameLbl} value={staffForm.username} onChange={e=>setStaffForm(p=>({...p,username:e.target.value}))} autoComplete="off" autoCapitalize="none" />
-                  <input style={{ ...s.inp, marginBottom:8 }} type="password" placeholder={t.passwordLbl} value={staffForm.password} onChange={e=>setStaffForm(p=>({...p,password:e.target.value}))} autoComplete="new-password" />
-                  <input style={{ ...s.inp, marginBottom:8 }} type="tel" placeholder={t.mobileLbl} value={staffForm.mobile} onChange={e=>setStaffForm(p=>({...p,mobile:e.target.value}))} />
-                  <select style={{ ...s.sel, marginBottom:10 }} value={staffForm.position} onChange={e=>setStaffForm(p=>({...p,position:e.target.value}))}>
-                    <option value="Salesman">{t.defaultPosition}</option>
-                    {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <button style={s.sendBtn} onClick={createStaffMember} disabled={staffSaving}>{staffSaving?"...":t.addStaffBtn}</button>
-                </div>
-              )}
-
-              <div style={s.card}>
-                <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
-                {team.length===0&&(
-                  <div style={{ fontSize:12, color:"#71717a", padding:"8px 0" }}>
-                    {lang==="bn"?"এখনো কোনো কর্মী নেই। উপরে নতুন কর্মী যোগ করুন।":"No staff yet. Add a staff member above."}
-                  </div>
-                )}
-                {team.map((m,idx)=>{
-                  const memberId = m.uid || m.id;
-                  return (
-                <div key={memberId} style={{ padding:"10px 0", borderTop:idx>0?`1px solid ${th.border}`:"none" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&memberId!==user.uid?10:0 }}>
+          {settingsPage==="team"&&team.length>0&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.teamTitle} ({team.length})</div>
+              {team.map((m,idx)=>(
+                <div key={m.id} style={{ padding:"10px 0", borderTop:idx>0?`1px solid ${th.border}`:"none" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&m.uid!==user.uid?10:0 }}>
                     <div style={{ width:34, height:34, borderRadius:"50%", background:th.border, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"🏢":"👨‍💼"}</div>
                     <div style={{ flex:1 }}>
-                      <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{m.personName}{memberId===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{m.personName}{m.uid===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
                       <div style={{ fontSize:11, color:"#71717a" }}>
                         {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)}
-                        {m.username&&<span> · @{m.username}</span>}
                         {m.mobile&&<span> · 📱 {m.mobile}</span>}
                         {m.area&&<span> · {m.area}</span>}
                       </div>
                     </div>
                   </div>
-                  {isOwner&&m.role!=="owner"&&memberId!==user.uid&&(
+                  {isOwner&&m.role!=="owner"&&m.uid!==user.uid&&(
                     <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
                       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:10 }}>
                         <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase", letterSpacing:0 }}>{t.positionLbl}</span>
                         <select style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
                           value={m.position||"Salesman"}
-                          onChange={e=>saveMemberPosition(m, e.target.value)}>
+                          onChange={async e=>{ try { await updateDoc(doc(db,"users",m.id),{position:e.target.value}); toast(t.permSaved); } catch(err) { hErr(err); } }}>
                           <option value="Salesman">{t.defaultPosition}</option>
                           {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
                         </select>
@@ -11393,28 +10733,15 @@ const startEditOrder = (order) => {
                         return (
                           <div key={perm.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderTop:pi>0?`1px solid ${th.border}`:"none" }}>
                             <span style={{ fontSize:12, color:"#d4d4d8" }}>{perm[lang]}</span>
-                            <PermToggle isOn={isOn} onToggle={()=>{ savePermissions(m,{ ...mPerms, [perm.key]:!isOn }); }} />
+                            <PermToggle isOn={isOn} onToggle={()=>{ savePermissions(m.id,{ ...mPerms, [perm.key]:!isOn }); }} />
                           </div>
                         );
                       })}
-                      {m.localUserId&&(
-                        <>
-                          <div style={{ height:1, background:th.bgCard, margin:"10px 0 8px" }} />
-                          <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>{t.resetPwLbl}</div>
-                          <div style={s.row}>
-                            <input style={{ ...s.inp, flex:1 }} type="password" placeholder={t.resetPwLbl} value={staffPwReset[m.localUserId]||""}
-                              onChange={e=>setStaffPwReset(prev=>({ ...prev, [m.localUserId]: e.target.value }))} autoComplete="new-password" />
-                            <button style={s.savBtn} onClick={()=>resetStaffPassword(m)}>{t.resetPwBtn}</button>
-                          </div>
-                        </>
-                      )}
                     </div>
                   )}
                 </div>
-                  );
-                })}
-              </div>
-            </>
+              ))}
+            </div>
           )}
 
           {settingsPage==="invoice"&&(
@@ -11533,21 +10860,12 @@ const startEditOrder = (order) => {
           )}
 
           {settingsPage==="sync"&&(
-            <SyncSettingsPanel
-              t={t}
-              lang={lang}
-              th={th}
-              s={s}
-              toast={toast}
-              syncState={syncState}
-              syncDashboard={syncDashboard}
-              lastCloudPullAt={lastCloudPullAt}
-              cloudUploadBusy={cloudUploadBusy}
-              cloudPullBusy={cloudPullBusy}
-              onUpload={runCloudUpload}
-              onDownload={() => runCloudDownload()}
-              onRefresh={refreshSyncDashboard}
-            />
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{t.syncStatus}</div>
+              <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b" }}>
+                {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -11599,25 +10917,6 @@ const startEditOrder = (order) => {
           </button>
         </div>
       </div>
-    );
-  }
-
-  if (isOwner && shopId && shopNeedsSetup(localShop)) {
-    return (
-      <ShopSetupWizard
-        t={t}
-        lang={lang}
-        setLang={setLang}
-        localShop={localShop}
-        shopId={shopId}
-        profile={profile}
-        user={user}
-        toast={toast}
-        s={s}
-        theme={theme}
-        setTheme={setTheme}
-        onShopSaved={setLocalShop}
-      />
     );
   }
 
@@ -11693,97 +10992,89 @@ export default function App() {
     toastTimer.current = setTimeout(()=>setNotif(null),3500);
   };
 
-  const applyAuthResult = (result) => {
-    if (!result?.user || !result?.profile) return;
-    setUser(result.user);
-    setProfile(result.profile);
-    saveCachedProfile(result.user.uid, result.profile);
+  const loadProfile = async (u) => {
+    setProfileError(null);
+    if (!u) { setProfile(null); setShop(null); return; }
 
-    if (result.shop?.id) {
-      saveCachedShop(result.shop.id, result.shop);
-      setShop(result.shop);
-    } else if (result.profile.shopId) {
-      let cachedShop = loadCachedShop(result.profile.shopId);
-      if (!cachedShop && result.migratedFromFirebase) {
-        cachedShop = {
-          id: result.profile.shopId,
-          companyName: result.profile.companyName || "",
-          ownerName: result.profile.personName || "",
-          ownerUid: result.user.uid,
-          country: result.profile.country || "BD",
-          area: result.profile.area || "",
-          mobile: result.profile.mobile || "",
-          email: result.profile.email || "",
-          positions: [],
-        };
-        saveCachedShop(result.profile.shopId, cachedShop);
-      } else if (!cachedShop) {
-        cachedShop = {
-          id: result.profile.shopId,
-          companyName: "",
-          ownerName: result.profile.personName || "",
-          ownerUid: result.user.uid,
-          country: "BD",
-          area: "",
-          mobile: "",
-          email: "",
-          positions: [],
-        };
-        saveCachedShop(result.profile.shopId, cachedShop);
+    const cachedProfile = loadCachedProfile(u.uid);
+
+    if (cachedProfile) {
+      setProfile(cachedProfile);
+
+      if (cachedProfile.shopId) {
+        const cachedShop = loadCachedShop(cachedProfile.shopId);
+        if (cachedShop) setShop(cachedShop);
       }
-      setShop(cachedShop);
     }
-    setProfileError(null);
-    setAuthScreen("login");
-  };
 
-  const handleEmailVerificationRequired = (fbUser) => {
-    setUser({
-      uid: fbUser.uid,
-      email: fbUser.email,
-      emailVerified: false,
-      reload: () => fbUser.reload(),
-    });
-    setProfile(null);
-    setShop(null);
-  };
+    const online = typeof navigator === "undefined" ? true : navigator.onLine;
 
-  const handleLogout = async () => {
-    await logoutLocalAuth();
-    try { await signOut(auth); } catch {}
-    setUser(null);
-    setProfile(null);
-    setShop(null);
-    setProfileError(null);
+    if (!online && cachedProfile) {
+      return;
+    }
+
+    if (!online && !cachedProfile) {
+      setProfileError("Offline profile cache missing. Please connect internet once and login.");
+      return;
+    }
+
+    try { await u.getIdToken(false); } catch(e) { console.warn(e); }
+
+    let lastErr = null;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const profSnap = await getDoc(doc(db,"users",u.uid));
+
+        if (profSnap.exists()) {
+          const prof = { uid: u.uid, id: profSnap.id, ...profSnap.data() };
+
+          setProfile(prof);
+          saveCachedProfile(u.uid, prof);
+
+          if (prof.shopId) {
+            const cachedShop = loadCachedShop(prof.shopId);
+            if (cachedShop) setShop(cachedShop);
+
+            try {
+              const shopSnap = await getDoc(doc(db,"shops",prof.shopId));
+              if (shopSnap.exists()) {
+                const shopData = { id: shopSnap.id, ...shopSnap.data() };
+                setShop(shopData);
+                saveCachedShop(prof.shopId, shopData);
+              }
+            } catch (shopErr) {
+              console.warn("Shop online load failed, using cache if available:", shopErr);
+            }
+          }
+
+          return;
+        }
+      } catch(e) {
+        lastErr = e;
+        console.error(`Profile load attempt ${attempt+1} failed:`, e);
+      }
+
+      await new Promise(r => setTimeout(r, 700));
+    }
+
+    if (cachedProfile) {
+      setProfileError(null);
+      return;
+    }
+
+    setProfileError(lastErr?.message || "Profile not found");
   };
 
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const boot = await ensureLocalAuthBootstrap();
-        if (boot.shop) saveCachedShop(boot.shop.id, boot.shop);
-
-        const restored = await restoreLocalAuthSession();
-        if (cancelled) return;
-        if (restored) applyAuthResult(restored);
-      } catch (error) {
-        console.error("[S4 Auth] local session restore failed", error);
-      } finally {
-        if (!cancelled) setAuthReady(true);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, []);
+    if (!FIREBASE_READY||!auth) { setAuthReady(true); return; }
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u); await loadProfile(u); setAuthReady(true);
+    });
+    return ()=>unsub();
+  },[]);
 
   useEffect(()=>()=>{ if (toastTimer.current) clearTimeout(toastTimer.current); },[]);
-
-  useEffect(() => {
-    if (!user || !profile) return;
-    runStartupUpdatePrompt({ lang, toast });
-  }, [user?.uid, profile?.uid, lang]);
 
   if (!FIREBASE_READY||!auth||!db) return <SetupScreen t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />;
 
@@ -11795,112 +11086,41 @@ export default function App() {
 
   if (!user) {
     let screen;
-    if (authScreen === "signupRole") {
-      screen = (
-        <SignupRolePicker
-          t={t}
-          lang={lang}
-          setLang={setLang}
-          onPick={(r) => { setSignupRole(r); setAuthScreen("signupForm"); }}
-          onSwitchToLogin={() => setAuthScreen("login")}
-          s={s}
-          theme={theme}
-          setTheme={setTheme}
-        />
-      );
-    } else if (authScreen === "signupForm") {
-      screen = (
-        <SignupForm
-          t={t}
-          lang={lang}
-          setLang={setLang}
-          role={signupRole}
-          onBack={() => setAuthScreen("signupRole")}
-          onSwitchToLogin={() => setAuthScreen("login")}
-          toast={toast}
-          s={s}
-          theme={theme}
-          setTheme={setTheme}
-          onSignupSuccess={applyAuthResult}
-        />
-      );
-    } else {
-      screen = (
-        <LoginScreen
-          t={t}
-          lang={lang}
-          setLang={setLang}
-          toast={toast}
-          s={s}
-          theme={theme}
-          setTheme={setTheme}
-          onLoginSuccess={applyAuthResult}
-          onSwitchToSignup={() => setAuthScreen("signupRole")}
-          onEmailVerificationRequired={handleEmailVerificationRequired}
-        />
-      );
-    }
+    if      (authScreen==="reset")      screen=<ResetScreen t={t} lang={lang} setLang={setLang} onBack={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
+    else if (authScreen==="signupRole") screen=<SignupRolePicker t={t} lang={lang} setLang={setLang} onPick={r=>{ setSignupRole(r); setAuthScreen("signupForm"); }} onSwitchToLogin={()=>setAuthScreen("login")} s={s} theme={theme} setTheme={setTheme} />;
+    else if (authScreen==="signupForm") screen=<SignupForm t={t} lang={lang} setLang={setLang} role={signupRole} onBack={()=>setAuthScreen("signupRole")} onSwitchToLogin={()=>setAuthScreen("login")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
+    else                                screen=<LoginScreen t={t} lang={lang} setLang={setLang} onSwitchToSignup={()=>setAuthScreen("signupRole")} onSwitchToReset={()=>setAuthScreen("reset")} toast={toast} s={s} theme={theme} setTheme={setTheme} />;
     return <>{Notif}{screen}</>;
   }
 
-  if (user && user.emailVerified === false && !profile) {
-    return (
-      <>
-        {Notif}
-        <VerifyGate
-          t={t}
-          lang={lang}
-          setLang={setLang}
-          user={user}
-          toast={toast}
-          onLogout={handleLogout}
-          s={s}
-          theme={theme}
-          setTheme={setTheme}
-        />
-      </>
-    );
-  }
-
-  if (profile?.mustChangePassword) {
-    return (
-      <>
-        {Notif}
-        <ChangePasswordScreen
-          t={t}
-          lang={lang}
-          setLang={setLang}
-          profile={profile}
-          toast={toast}
-          s={s}
-          theme={theme}
-          setTheme={setTheme}
-          onPasswordChanged={(localUser) => {
-            const updatedProfile = buildProfileFromLocal(localUser);
-            setProfile(updatedProfile);
-            saveCachedProfile(user.uid, updatedProfile);
-          }}
-          onLogout={handleLogout}
-        />
-      </>
-    );
-  }
+  if (!user.emailVerified) return <>{Notif}<VerifyGate t={t} lang={lang} setLang={setLang} user={user} toast={toast} onLogout={()=>signOut(auth)} s={s} theme={theme} setTheme={setTheme} /></>;
 
   if (!profile) {
     return (
       <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />
         <div style={s.welcomeWrap}>
-          <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
-          <div style={{ ...s.authTitle, color:"#ef4444" }}>{lang==="bn"?"প্রোফাইল পাওয়া যায়নি":"Profile not found"}</div>
-          <div style={{ ...s.authSub, marginBottom:8 }}>{lang==="bn"?"লগআউট করে আবার লগইন করুন":"Please logout and login again"}</div>
-          {profileError&&<div style={{ fontSize:11, color:th.txtMuted, marginBottom:20 }}>{profileError}</div>}
-          <button style={s.sendBtn} onClick={handleLogout}>{lang==="bn"?"🚪 লগআউট":"🚪 Logout"}</button>
+          {profileError?(
+            <>
+              <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
+              <div style={{ ...s.authTitle, color:"#ef4444" }}>{lang==="bn"?"প্রোফাইল পাওয়া যায়নি":"Profile not found"}</div>
+              <div style={{ ...s.authSub, marginBottom:8 }}>{lang==="bn"?"আপনার প্রোফাইল ডেটা পাওয়া যায়নি। নতুন করে সাইন আপ করুন।":"Profile data missing. Please sign up again."}</div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginBottom:20 }}>{profileError}</div>
+              <button style={s.sendBtn} onClick={()=>loadProfile(user)}>{lang==="bn"?"🔄 আবার চেষ্টা করুন":"🔄 Retry"}</button>
+              <button style={{ ...s.linkBtn, marginTop:12 }} onClick={()=>signOut(auth)}>{lang==="bn"?"🚪 লগআউট":"🚪 Logout"}</button>
+            </>
+          ):(
+            <>
+              <div style={{ fontSize:48, marginBottom:12 }}>⏳</div>
+              <div style={s.authTitle}>{lang==="bn"?"প্রোফাইল লোড হচ্ছে...":"Loading profile..."}</div>
+              <div style={s.authSub}>{lang==="bn"?"একটু অপেক্ষা করুন":"Please wait"}</div>
+            </>
+          )}
         </div>
       </div>
     );
   }
 
-  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} onLogout={handleLogout} /></>;
+  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} /></>;
 }
 
 // ─── STYLES FUNCTION ─────────────────────────────────────────

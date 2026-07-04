@@ -1,0 +1,62 @@
+cd "S:\S4-WORKSPACE\s4-business-thinking-app"
+
+
+
+RUN CODE
+
+cd "S:\S4-WORKSPACE\s4-business-thinking-app"
+npm run dev
+
+BUILD:
+cd "S:\S4-WORKSPACE\s4-business-thinking-app"
+npm run build
+
+LICENSE GENERATE:
+cd "S:\S4-WORKSPACE\s4-license-generator"
+.\generate-license-menu.bat
+
+PRODUCTION PREVIEW:
+npm run preview
+
+
+
+তারপর শুধু প্রশ্নের উত্তর দিবা:
+
+Customer name
+Shop name
+Phone
+Plan
+Device fingerprint
+Note
+Plan কী লিখবে
+30 দিন = MONTHLY
+1 বছর = YEARLY
+Lifetime = LIFETIME
+নিজের মত দিন = CUSTOM
+
+CUSTOM দিলে পরে Days চাইবে, তখন:
+
+15
+25
+90
+180
+
+যা দরকার দেবে।
+
+Record দেখতে
+cd "S:\S4-WORKSPACE\s4-license-generator"
+notepad .\license-records.csv
+
+Latest key দেখতে:
+
+notepad .\license-output.txt
+এখন Agent ছাড়া যা যা করতে পারবে
+Build করা
+Preview test করা
+License generate করা
+License record দেখা
+Customer key বানানো
+App run করা
+
+cd "S:\S4-WORKSPACE\s4-license-generator"
+notepad .\license-records.csv
