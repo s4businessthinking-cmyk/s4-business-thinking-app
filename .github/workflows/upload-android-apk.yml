@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-and-upload-apk:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -31,32 +31,21 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          packages: |
-            platform-tools
-            platforms;android-36
-            build-tools;36.0.0
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          yes | sdkmanager --licenses || true
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Prepare Gradle wrapper
-        run: |
-          chmod +x android/gradlew
-          sed -i 's/\r$//' android/gradlew || true
-
-      - name: Verify Android SDK
-        run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          sdkmanager --list_installed | grep -E "platform-tools|android-36|build-tools;36" || true
-          ls -la "$ANDROID_SDK_ROOT/platforms" || true
 
       - name: Build Android APK
         run: npm run android:build
         env:
           ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
-          GRADLE_OPTS: -Dorg.gradle.daemon=false
 
       - name: Prepare APK
         id: apk
