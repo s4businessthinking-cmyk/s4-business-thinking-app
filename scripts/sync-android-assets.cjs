@@ -31,7 +31,14 @@ fs.writeFileSync(
       appId: "com.s4businessthinking.app",
       appName: "S4 Business Thinking",
       webDir: "public",
-      server: { androidScheme: "https" },
+      server: {
+        androidScheme: "https",
+        allowNavigation: [
+          "github.com",
+          "*.github.com",
+          "*.githubusercontent.com",
+        ],
+      },
     },
     null,
     2

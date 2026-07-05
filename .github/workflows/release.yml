@@ -70,6 +70,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Prepare Gradle wrapper
+        run: |
+          chmod +x android/gradlew
+          sed -i 's/\r$//' android/gradlew || true
+
       - name: Build Android APK
         run: npm run android:build
 
