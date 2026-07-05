@@ -29,7 +29,9 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           desktopHint:
             "Windows app GitHub release থেকে auto-update নেবে। App restart করলে update install হবে।",
           mobileHint:
-            "Mobile-এ নতুন APK download করে install করুন। আগে পুরনো app uninstall করলে ভালো হয়।",
+            "Mobile-এ নতুন APK download করে install করুন। Settings → অ্যাপ আপডেট থেকে চেক করুন।",
+          noApkHint:
+            "GitHub release-এ এখনো APK আপলোড হয়নি। Release page খুলে manually APK নিন, অথবা developer-কে জানান।",
           needInternet: "Internet সংযোগ লাগবে",
           later: "পরে",
         }
@@ -46,7 +48,9 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           desktopHint:
             "The Windows app checks GitHub automatically. Restart after download to install.",
           mobileHint:
-            "On mobile, download the new APK and install it. Uninstalling the old app first is recommended.",
+            "On mobile, download the new APK and install it from Settings → App Update.",
+          noApkHint:
+            "No APK is attached to the GitHub release yet. Open the release page or ask the developer to upload the APK.",
           needInternet: "Internet connection required",
           later: "Later",
         };
@@ -96,7 +100,25 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
         )}
       </div>
 
-      {result?.hasUpdate && (
+      {result?.hasUpdate && result.missingAsset && (
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid #f59e0b",
+            background: "rgba(245,158,11,0.08)",
+            color: "#f59e0b",
+            fontSize: 12,
+            fontWeight: 700,
+            marginBottom: 12,
+            lineHeight: 1.5,
+          }}
+        >
+          {txt.noApkHint}
+        </div>
+      )}
+
+      {result?.hasUpdate && !result.missingAsset && (
         <div
           style={{
             padding: "10px 12px",
@@ -171,8 +193,9 @@ export async function runStartupUpdatePrompt({ lang, toast }) {
     }
 
     const ok = window.confirm(message);
-    if (ok && update.downloadUrl) {
-      openUpdateDownload(update.downloadUrl);
+    const targetUrl = update.downloadUrl || update.releaseUrl;
+    if (ok && targetUrl) {
+      openUpdateDownload(targetUrl);
     } else if (!ok) {
       dismissAutoUpdatePrompt(update.latestVersion);
     }

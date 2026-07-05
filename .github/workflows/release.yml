@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build-windows:
     runs-on: windows-latest
 
     steps:
@@ -26,23 +26,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Resolve release tag
-        id: meta
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION=$(node -p "require('./package.json').version")
-            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-            echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build Windows installer
         run: npm run desktop:build
         env:
           EP_PUBLISH: never
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/latest.yml
+
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -54,19 +63,25 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install Android SDK packages
-        shell: bash
         run: |
           sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
           yes | sdkmanager --licenses || true
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Build Android APK
-        shell: cmd
         run: npm run android:build
 
-      - name: Prepare release files
+      - name: Prepare APK
         shell: bash
         run: |
-          VERSION="${{ steps.meta.outputs.version }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION=$(node -p "require('./package.json').version")
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
           APK_DIR="android/app/build/outputs/apk/release"
           APK_SRC="${APK_DIR}/app-release.apk"
 
@@ -81,8 +96,42 @@ jobs:
           fi
 
           cp "$APK_SRC" "S4-Business-Thinking-${VERSION}.apk"
-          ls -la release/
           ls -la "S4-Business-Thinking-${VERSION}.apk"
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: S4-Business-Thinking-*.apk
+
+  publish:
+    needs: [build-windows, build-android]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-release"
+          path: release-files
+          merge-multiple: true
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION=$(node -p "require('./package.json').version")
+            echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Files to publish:"
+          find release-files -type f | sort
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -92,10 +141,8 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          files: |
-            release/*.exe
-            release/*.exe.blockmap
-            release/latest.yml
-            S4-Business-Thinking-*.apk
+          overwrite: true
+          make_latest: true
+          files: release-files/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
