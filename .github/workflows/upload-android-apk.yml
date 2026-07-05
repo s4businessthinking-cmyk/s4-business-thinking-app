@@ -44,9 +44,6 @@ jobs:
       - name: Build web assets
         run: npm run build:android-web
 
-      - name: Sync Capacitor Android
-        run: npx cap sync android
-
       - name: Sync Android assets
         run: node scripts/sync-android-assets.cjs
 

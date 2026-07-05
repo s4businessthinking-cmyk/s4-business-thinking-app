@@ -12,7 +12,7 @@
     "cap:sync": "npm run build && npx cap sync android",
     "cap:open": "npx cap open android",
     "build:android-web": "node scripts/build-android-web.cjs",
-    "android:build": "npm run build:android-web && npx cap sync android && node scripts/sync-android-assets.cjs && node scripts/prepare-android-local-props.cjs && node scripts/run-android-gradle.cjs assembleRelease",
+    "android:build": "npm run build:android-web && node scripts/sync-android-assets.cjs && node scripts/prepare-android-local-props.cjs && node scripts/run-android-gradle.cjs assembleRelease",
     "android:build:debug": "npm run build:android-web && node scripts/sync-android-assets.cjs && node scripts/run-android-gradle.cjs assembleDebug",
     "desktop:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "desktop:build": "npm run build && electron-builder --publish never",
