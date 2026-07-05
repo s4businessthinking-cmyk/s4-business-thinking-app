@@ -42,6 +42,7 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -76,9 +77,15 @@ jobs:
           sed -i 's/\r$//' android/gradlew || true
 
       - name: Build Android APK
-        run: npm run android:build
+        run: |
+          npm run build:android-web
+          npx cap sync android
+          node scripts/sync-android-assets.cjs
+          cd android
+          ./gradlew assembleRelease --stacktrace
 
       - name: Prepare APK
+        if: success()
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -104,6 +111,7 @@ jobs:
           ls -la "S4-Business-Thinking-${VERSION}.apk"
 
       - name: Upload Android artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: android-release
@@ -111,18 +119,25 @@ jobs:
 
   publish:
     needs: [build-windows, build-android]
+    if: ${{ !cancelled() && needs.build-windows.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download release artifacts
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: "*-release"
+          name: windows-release
           path: release-files
-          merge-multiple: true
+
+      - name: Download Android artifacts
+        if: ${{ needs.build-android.result == 'success' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: release-files
 
       - name: Resolve release tag
         id: meta
