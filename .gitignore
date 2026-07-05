@@ -12,6 +12,7 @@ release/
 release-v102/
 release-*/
 *.blockmap
+S4-Business-Thinking-*.apk
 android/app/build/
 android/build/
 

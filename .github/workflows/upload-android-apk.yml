@@ -1,0 +1,98 @@
+name: Upload Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare Gradle wrapper
+        run: |
+          chmod +x android/gradlew
+          sed -i 's/\r$//' android/gradlew || true
+
+      - name: Verify Android SDK
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          sdkmanager --list_installed | grep -E "platform-tools|android-36|build-tools;36" || true
+          ls -la "$ANDROID_SDK_ROOT/platforms" || true
+
+      - name: Build Android APK
+        run: npm run android:build
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          GRADLE_OPTS: -Dorg.gradle.daemon=false
+
+      - name: Prepare APK
+        id: apk
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION=$(node -p "require('./package.json').version")
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+
+          APK_DIR="android/app/build/outputs/apk/release"
+          APK_SRC="${APK_DIR}/app-release.apk"
+
+          if [ ! -f "$APK_SRC" ]; then
+            APK_SRC="${APK_DIR}/app-release-unsigned.apk"
+          fi
+
+          if [ ! -f "$APK_SRC" ]; then
+            echo "APK not found in ${APK_DIR}"
+            ls -la "$APK_DIR" || true
+            exit 1
+          fi
+
+          APK_NAME="S4-Business-Thinking-${VERSION}.apk"
+          cp "$APK_SRC" "$APK_NAME"
+          ls -la "$APK_NAME"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.apk.outputs.tag }}
+          files: ${{ steps.apk.outputs.apk_name }}
+          overwrite: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
