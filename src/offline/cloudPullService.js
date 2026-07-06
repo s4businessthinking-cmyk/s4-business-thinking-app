@@ -6,12 +6,15 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "../firebase-config";
+import { db, auth } from "../firebase-config";
 import { offlineCacheCloudRecords } from "./offlineRepository";
 import { saveCachedShop } from "./shopService";
 import { addLocalInviteCode } from "../auth/localAuthBootstrap";
-import { syncPendingQueueToFirebase } from "./firebaseSyncWorker";
-import { getOfflineStatus } from "./sqliteDb";
+import {
+  syncPendingQueueToFirebase,
+  uploadLocalRecordsBatch,
+} from "./firebaseSyncWorker";
+import { getOfflineStatus, getLocalRecords } from "./sqliteDb";
 
 const CLOUD_PULL_META_PREFIX = "s4-cloud-pull-v1";
 
@@ -30,6 +33,30 @@ export const SHOP_PULL_COLLECTIONS = [
 
 function isOnline() {
   return typeof navigator !== "undefined" ? navigator.onLine : false;
+}
+
+export function getCloudSyncBlockReason() {
+  if (!db) return "FIREBASE_NOT_READY";
+  if (!isOnline()) return "OFFLINE";
+  if (!auth?.currentUser) return "FIREBASE_AUTH_REQUIRED";
+  return null;
+}
+
+function assertCloudSyncReady() {
+  const reason = getCloudSyncBlockReason();
+  if (!reason) return;
+
+  const error = new Error(reason);
+  error.code = reason;
+  throw error;
+}
+
+function filterRecordsForShop(collectionName, shopId, rows = []) {
+  if (!shopId) return [];
+  if (collectionName === "shops") {
+    return rows.filter((row) => String(row.document_id) === String(shopId));
+  }
+  return rows.filter((row) => String(row.data?.shopId || "") === String(shopId));
 }
 
 function cloudPullMetaKey(shopId) {
@@ -120,6 +147,7 @@ async function pullInviteCodes(shopId) {
 export async function pullShopFromCloud(shopId, options = {}) {
   if (!shopId) throw new Error("shopId is required.");
   if (!db) throw new Error("Firebase is not ready.");
+  assertCloudSyncReady();
   if (!isOnline()) {
     return { ok: false, reason: "OFFLINE" };
   }
@@ -217,12 +245,58 @@ export async function pullShopFromCloud(shopId, options = {}) {
   };
 }
 
-export async function uploadPendingShopChanges() {
-  if (!isOnline()) {
-    return { ok: false, reason: "OFFLINE" };
+export async function uploadPendingShopChanges(shopId) {
+  if (!shopId) {
+    return { ok: false, reason: "SHOP_ID_REQUIRED" };
   }
 
-  return syncPendingQueueToFirebase();
+  const blockReason = getCloudSyncBlockReason();
+  if (blockReason) {
+    return { ok: false, skipped: true, reason: blockReason };
+  }
+
+  const queueResult = await syncPendingQueueToFirebase();
+  const collections = ["shops", ...SHOP_PULL_COLLECTIONS];
+  const collectionResults = [];
+  let totalUploaded = 0;
+  let totalFailed = 0;
+
+  for (const collectionName of collections) {
+    const rows = filterRecordsForShop(collectionName, shopId, await getLocalRecords(collectionName));
+    if (!rows.length) {
+      collectionResults.push({
+        collection: collectionName,
+        uploaded: 0,
+        failed: 0,
+        skipped: true,
+      });
+      continue;
+    }
+
+    const batchResult = await uploadLocalRecordsBatch(collectionName, rows);
+    totalUploaded += batchResult.uploaded;
+    totalFailed += batchResult.failed;
+    collectionResults.push({
+      collection: collectionName,
+      ...batchResult,
+    });
+  }
+
+  const productsUploaded =
+    collectionResults.find((row) => row.collection === "products")?.uploaded || 0;
+
+  return {
+    ok: totalFailed === 0,
+    partial: totalFailed > 0 && totalUploaded > 0,
+    skipped: false,
+    queue: queueResult,
+    collections: collectionResults,
+    productsUploaded,
+    totalUploaded,
+    totalFailed,
+    done: totalUploaded,
+    total: totalUploaded + totalFailed,
+  };
 }
 
 export async function getSyncDashboardStatus() {

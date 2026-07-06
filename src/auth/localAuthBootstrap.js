@@ -203,6 +203,22 @@ function isOnline() {
   return typeof navigator !== "undefined" ? navigator.onLine : false;
 }
 
+async function ensureFirebaseSignedInAfterLocalLogin(localUser, password) {
+  if (!isOnline() || !auth || !db || auth.currentUser) return;
+
+  const email = String(localUser?.email || "").trim();
+  if (!email || !email.includes("@")) return;
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+  } catch (error) {
+    console.warn(
+      "[S4 Auth] Firebase session was not established after local login:",
+      error?.message || error
+    );
+  }
+}
+
 async function loginWithFirebaseEmail(email, password) {
   if (!auth || !db) {
     return { ok: false, reason: "FIREBASE_UNAVAILABLE" };
@@ -326,6 +342,7 @@ export async function loginWithCredentials(identifier, password) {
   }
 
   if (localResult.ok) {
+    await ensureFirebaseSignedInAfterLocalLogin(localResult.user, password);
     const shopId = localResult.user?.shopId;
     return {
       ok: true,

@@ -49,6 +49,7 @@ import {
   pullShopFromCloud,
   uploadPendingShopChanges,
   getSyncDashboardStatus,
+  getCloudSyncBlockReason,
   shouldAutoPullShop,
   getShopCloudPulledAt,
   sortPulledRecords,
@@ -193,6 +194,7 @@ const TR = {
     syncDownloadOk:"✅ Cloud data download সম্পন্ন",
     syncUploadOk:"✅ Cloud upload সম্পন্ন",
     syncNeedInternet:"Internet সংযোগ লাগবে",
+    syncNeedEmailLogin:"Cloud sync-এর জন্য online থাকা অবস্থায় email + password দিয়ে login করুন",
     syncAutoPullOk:"☁️ Cloud data auto-download হয়েছে",
     connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
@@ -701,6 +703,7 @@ const TR = {
     syncDownloadOk:"✅ Cloud download complete",
     syncUploadOk:"✅ Cloud upload complete",
     syncNeedInternet:"Internet connection required",
+    syncNeedEmailLogin:"For cloud sync, log in online with your email and password",
     syncAutoPullOk:"☁️ Cloud data auto-downloaded",
     connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
@@ -8472,6 +8475,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
   const [licenseAccess, setLicenseAccess] = useState(null);
+  const [syncRefreshKey, setSyncRefreshKey] = useState(0);
   const [licenseAccessLoading, setLicenseAccessLoading] = useState(true);
   const [syncDashboard, setSyncDashboard] = useState(null);
   const [cloudPullBusy, setCloudPullBusy] = useState(false);
@@ -8510,6 +8514,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const runCloudDownload = async ({ silent = false } = {}) => {
     if (!shopId) return null;
+    const blockReason = getCloudSyncBlockReason();
+    if (blockReason === "FIREBASE_AUTH_REQUIRED") {
+      if (!silent) toast(t.syncNeedEmailLogin, "err");
+      return null;
+    }
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       if (!silent) toast(t.syncNeedInternet, "err");
       return null;
@@ -8529,18 +8538,26 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
       applyCloudPullResult(result);
       setLastCloudPullAt(result.pulledAt || getShopCloudPulledAt(shopId));
+      setSyncRefreshKey((value) => value + 1);
 
       if (!silent) {
+        const productCount = result?.data?.products?.length || 0;
         const msg = lang==="bn"
-          ? `${t.syncDownloadOk} (${result.totalDocs || 0})`
-          : `${t.syncDownloadOk} (${result.totalDocs || 0})`;
+          ? `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`
+          : `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`;
         toast(result.partial ? `${msg} ⚠️` : msg, result.partial ? "err" : "ok");
       }
 
       await refreshSyncDashboard();
       return result;
     } catch (error) {
-      if (!silent) toast(error?.message || String(error), "err");
+      if (!silent) {
+        if (error?.code === "FIREBASE_AUTH_REQUIRED") {
+          toast(t.syncNeedEmailLogin, "err");
+        } else {
+          toast(error?.message || String(error), "err");
+        }
+      }
       return null;
     } finally {
       setCloudPullBusy(false);
@@ -8548,26 +8565,41 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   };
 
   const runCloudUpload = async () => {
-    if (typeof navigator !== "undefined" && !navigator.onLine) {
+    if (!shopId) return;
+    const blockReason = getCloudSyncBlockReason();
+    if (blockReason === "OFFLINE" || (typeof navigator !== "undefined" && !navigator.onLine)) {
       toast(t.syncNeedInternet, "err");
+      return;
+    }
+    if (blockReason === "FIREBASE_AUTH_REQUIRED") {
+      toast(t.syncNeedEmailLogin, "err");
       return;
     }
 
     setCloudUploadBusy(true);
     try {
-      const result = await uploadPendingShopChanges();
+      const result = await uploadPendingShopChanges(shopId);
       if (result?.reason === "OFFLINE" || result?.skipped) {
-        toast(t.syncNeedInternet, "err");
+        if (result?.reason === "FIREBASE_AUTH_REQUIRED") {
+          toast(t.syncNeedEmailLogin, "err");
+        } else {
+          toast(t.syncNeedInternet, "err");
+        }
         return;
       }
 
+      const productCount = result.productsUploaded || 0;
       const msg = lang==="bn"
-        ? `${t.syncUploadOk} (${result.done || 0}/${result.total || 0})`
-        : `${t.syncUploadOk} (${result.done || 0}/${result.total || 0})`;
-      toast(result.failed ? `${msg} ⚠️` : msg, result.failed ? "err" : "ok");
+        ? `${t.syncUploadOk} (${result.done || 0} records, products: ${productCount})`
+        : `${t.syncUploadOk} (${result.done || 0} records, products: ${productCount})`;
+      toast(result.failed || result.totalFailed ? `${msg} ⚠️` : msg, result.failed || result.totalFailed ? "err" : "ok");
       await refreshSyncDashboard();
     } catch (error) {
-      toast(error?.message || String(error), "err");
+      if (error?.code === "FIREBASE_AUTH_REQUIRED") {
+        toast(t.syncNeedEmailLogin, "err");
+      } else {
+        toast(error?.message || String(error), "err");
+      }
     } finally {
       setCloudUploadBusy(false);
     }
@@ -8994,7 +9026,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     }
   };
 
-  useEffect(() => { fetchProducts(); },[shopId]);
+  useEffect(() => { fetchProducts(); },[shopId, syncRefreshKey]);
 
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
 

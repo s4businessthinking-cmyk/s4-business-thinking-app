@@ -1,4 +1,4 @@
-import { doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase-config";
 import {
   getPendingSyncQueue,
@@ -73,6 +73,56 @@ async function syncOneQueueItem(item) {
   );
 
   return { ok: true, operation, collectionName, documentId };
+}
+
+export async function uploadLocalRecordsBatch(collectionName, records = []) {
+  if (!db) {
+    throw new Error("Firebase Firestore is not ready.");
+  }
+
+  const BATCH_SIZE = 400;
+  let uploaded = 0;
+  let failed = 0;
+  const errors = [];
+
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE);
+    const batch = writeBatch(db);
+
+    for (const row of chunk) {
+      const documentId = row.document_id || row.data?.id;
+      if (!documentId) {
+        failed += 1;
+        continue;
+      }
+
+      const raw = { ...(row.data || {}), id: documentId };
+      delete raw._cloud_cached_at;
+      const data = cleanForFirestore(raw);
+
+      batch.set(
+        getFirebaseDocRef(collectionName, documentId),
+        {
+          ...data,
+          _cloud_collection: collectionName,
+          _cloud_document_id: documentId,
+          _cloud_synced_at: serverTimestamp(),
+          _cloud_sync_status: "SYNCED",
+        },
+        { merge: true }
+      );
+    }
+
+    try {
+      await batch.commit();
+      uploaded += chunk.length;
+    } catch (error) {
+      failed += chunk.length;
+      errors.push(error?.message || String(error));
+    }
+  }
+
+  return { uploaded, failed, errors };
 }
 
 export async function syncPendingQueueToFirebase() {
