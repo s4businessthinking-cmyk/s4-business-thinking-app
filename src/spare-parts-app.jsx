@@ -78,7 +78,9 @@ import {
   updateOwnPassword,
 } from "./auth/userManagementService";
 
-const LOGO_URL = "./s4-logo.png";
+import s4LogoUrl from "./assets/s4-logo.png";
+
+const LOGO_URL = s4LogoUrl;
 const APP_NAME = "S4 Business Thinking";
 
 // ─── PRESET POSITIONS ────────────────────────────────────────
