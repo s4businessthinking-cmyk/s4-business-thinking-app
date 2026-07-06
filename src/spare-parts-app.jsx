@@ -195,6 +195,11 @@ const TR = {
     syncUploadOk:"✅ Cloud upload সম্পন্ন",
     syncNeedInternet:"Internet সংযোগ লাগবে",
     syncNeedEmailLogin:"Cloud sync-এর জন্য online থাকা অবস্থায় email + password দিয়ে login করুন",
+    syncProductsLbl:"Products (this device)",
+    syncShopLbl:"Shop ID",
+    syncFirebaseLbl:"Cloud login",
+    syncFirebaseOk:"✅ Connected",
+    syncFirebaseNo:"❌ Email login needed",
     syncAutoPullOk:"☁️ Cloud data auto-download হয়েছে",
     connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
@@ -704,6 +709,11 @@ const TR = {
     syncUploadOk:"✅ Cloud upload complete",
     syncNeedInternet:"Internet connection required",
     syncNeedEmailLogin:"For cloud sync, log in online with your email and password",
+    syncProductsLbl:"Products (this device)",
+    syncShopLbl:"Shop ID",
+    syncFirebaseLbl:"Cloud login",
+    syncFirebaseOk:"✅ Connected",
+    syncFirebaseNo:"❌ Email login needed",
     syncAutoPullOk:"☁️ Cloud data auto-downloaded",
     connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
@@ -8364,6 +8374,9 @@ function SyncSettingsPanel({
   lastCloudPullAt,
   cloudUploadBusy,
   cloudPullBusy,
+  shopId,
+  productCount,
+  firebaseCloudReady,
   onUpload,
   onDownload,
   onRefresh,
@@ -8378,6 +8391,15 @@ function SyncSettingsPanel({
       </div>
 
       <div style={{ display:"grid", gap:8, marginBottom:14 }}>
+        <div style={{ fontSize:12, color:th.txtMuted }}>
+          {t.syncShopLbl}: <strong style={{ color:th.txtPrimary, wordBreak:"break-all" }}>{shopId || "—"}</strong>
+        </div>
+        <div style={{ fontSize:12, color:th.txtMuted }}>
+          {t.syncFirebaseLbl}: <strong style={{ color:firebaseCloudReady ? "#22c55e" : "#ef4444" }}>{firebaseCloudReady ? t.syncFirebaseOk : t.syncFirebaseNo}</strong>
+        </div>
+        <div style={{ fontSize:12, color:th.txtMuted }}>
+          {t.syncProductsLbl}: <strong style={{ color:th.txtPrimary }}>{productCount ?? 0}</strong>
+        </div>
         <div style={{ fontSize:12, color:th.txtMuted }}>
           {t.syncPendingLbl}: <strong style={{ color:th.txtPrimary }}>{syncDashboard?.pendingSync ?? 0}</strong>
         </div>
@@ -8410,6 +8432,12 @@ function SyncSettingsPanel({
           {lang==="bn"?"🔄 রিফ্রেশ":"🔄 Refresh"}
         </button>
       </div>
+
+      {!firebaseCloudReady && isOnline && (
+        <div style={{ fontSize:11, color:"#ef4444", marginTop:12, lineHeight:1.5 }}>
+          {t.syncNeedEmailLogin}
+        </div>
+      )}
 
       {!isOnline && (
         <div style={{ fontSize:11, color:"#f59e0b", marginTop:12 }}>
@@ -8578,6 +8606,13 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     setCloudUploadBusy(true);
     try {
+      if (products.length) {
+        await offlineCacheCloudRecords(
+          "products",
+          products.map((row) => ({ ...row, shopId, id: row.id }))
+        );
+      }
+
       const result = await uploadPendingShopChanges(shopId);
       if (result?.reason === "OFFLINE" || result?.skipped) {
         if (result?.reason === "FIREBASE_AUTH_REQUIRED") {
@@ -8997,30 +9032,43 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     const loadLocalProducts = async () => {
       const local = await offlineList("products");
-      const docs = local.records
+      return local.records
         .map(r => ({ id: r.document_id, ...(r.data || {}) }))
         .filter(p => p.shopId === shopId)
         .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
-
-      setProducts(docs);
-      setSyncState("offline");
-      return docs;
     };
 
     try {
-      const snap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId), orderBy("name")));
-      const docs = snap.docs.map(d=>({...d.data(),id:d.id}));
+      const localDocs = await loadLocalProducts();
+      if (localDocs.length) {
+        setProducts(localDocs);
+      }
 
+      if (!navigator.onLine || getCloudSyncBlockReason() === "FIREBASE_AUTH_REQUIRED") {
+        setSyncState(navigator.onLine ? "connected" : "offline");
+        return;
+      }
+
+      const snap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId)));
+      const cloudDocs = snap.docs.map(d=>({...d.data(),id:d.id}))
+        .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+
+      if (cloudDocs.length) {
+        await offlineCacheCloudRecords("products", cloudDocs);
+      }
+
+      const docs = cloudDocs.length >= localDocs.length ? cloudDocs : localDocs;
       setProducts(docs);
-      offlineCacheCloudRecords("products", docs).catch(err => console.warn("[S4 Offline] product cache failed", err));
       setSyncState("connected");
     } catch(e) {
       console.error(e);
       try {
-        await loadLocalProducts();
+        const localDocs = await loadLocalProducts();
+        if (localDocs.length) setProducts(localDocs);
       } catch(localErr) {
         console.error("products offline fallback:", localErr);
       }
+      setSyncState("offline");
     } finally {
       setProductsLoading(false);
     }
@@ -10396,6 +10444,9 @@ const startEditOrder = (order) => {
                 📥 Import
                 <input type="file" accept=".csv" style={{ display:"none" }} onChange={async (e)=>{
                   const file=e.target.files[0]; if (!file) return; e.target.value='';
+                  if (getCloudSyncBlockReason() === "FIREBASE_AUTH_REQUIRED") {
+                    return toast(t.syncNeedEmailLogin, "err");
+                  }
                   if (products.length>0&&!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`${products.length} products exist. Clear first. Continue anyway?`)) return;
                   toast(lang==="bn"?"📥 ফাইল পড়া হচ্ছে...":"📥 Reading file...");
                   try {
@@ -10434,10 +10485,32 @@ const startEditOrder = (order) => {
                     if (!rows.length) return toast(lang==="bn"?"কোনো valid product নেই":"No valid products","err");
                     toast(lang==="bn"?`📥 ${rows.length}টি import হচ্ছে...`:`📥 Importing ${rows.length}...`);
                     let done=0;
+                    const now = new Date().toISOString();
                     for (let i=0;i<rows.length;i+=500) {
                       const batch=writeBatch(db);
-                      rows.slice(i,i+500).forEach(p=>batch.set(doc(collection(db,"products")),{...p,createdAt:serverTimestamp()}));
-                      await batch.commit(); done+=Math.min(500,rows.length-i);
+                      const importedDocs=[];
+                      rows.slice(i,i+500).forEach(p=>{
+                        const ref=doc(collection(db,"products"));
+                        const payload={
+                          ...p,
+                          shopId,
+                          createdBy:user.uid,
+                          createdAt:serverTimestamp(),
+                          updatedAt:now,
+                        };
+                        batch.set(ref,payload);
+                        importedDocs.push({
+                          id:ref.id,
+                          ...p,
+                          shopId,
+                          createdBy:user.uid,
+                          createdAt:now,
+                          updatedAt:now,
+                        });
+                      });
+                      await batch.commit();
+                      await offlineCacheCloudRecords("products", importedDocs);
+                      done+=importedDocs.length;
                       toast(`📥 ${done}/${rows.length}...`);
                     }
                     await fetchProducts();
@@ -11578,6 +11651,9 @@ const startEditOrder = (order) => {
               lastCloudPullAt={lastCloudPullAt}
               cloudUploadBusy={cloudUploadBusy}
               cloudPullBusy={cloudPullBusy}
+              shopId={shopId}
+              productCount={products.length}
+              firebaseCloudReady={!getCloudSyncBlockReason()}
               onUpload={runCloudUpload}
               onDownload={() => runCloudDownload()}
               onRefresh={refreshSyncDashboard}
