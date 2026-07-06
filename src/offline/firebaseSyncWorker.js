@@ -88,6 +88,7 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
   for (let i = 0; i < records.length; i += BATCH_SIZE) {
     const chunk = records.slice(i, i + BATCH_SIZE);
     const batch = writeBatch(db);
+    let queued = 0;
 
     for (const row of chunk) {
       const documentId = row.document_id || row.data?.id;
@@ -96,6 +97,7 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
         continue;
       }
 
+      queued += 1;
       const raw = { ...(row.data || {}), id: documentId };
       delete raw._cloud_cached_at;
       const data = cleanForFirestore(raw);
@@ -115,7 +117,8 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
 
     try {
       await batch.commit();
-      uploaded += chunk.length;
+      uploaded += queued;
+      failed += chunk.length - queued;
     } catch (error) {
       failed += chunk.length;
       errors.push(error?.message || String(error));

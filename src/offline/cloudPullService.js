@@ -60,7 +60,7 @@ function filterRecordsForShop(collectionName, shopId, rows = []) {
   return rows
     .filter((row) => {
       const recordShopId = String(row.data?.shopId || "").trim();
-      return !recordShopId || recordShopId === String(shopId);
+      return recordShopId === String(shopId);
     })
     .map((row) => ({
       ...row,
@@ -242,10 +242,12 @@ export async function pullShopFromCloud(shopId, options = {}) {
     }
   }
 
-  markShopCloudPulled(shopId);
-
   const totalDocs = results.reduce((sum, row) => sum + Number(row.count || 0), 0);
   const failed = results.filter((row) => !row.ok).length;
+
+  if (failed === 0) {
+    markShopCloudPulled(shopId);
+  }
 
   return {
     ok: failed === 0,
@@ -253,7 +255,7 @@ export async function pullShopFromCloud(shopId, options = {}) {
     results,
     data,
     totalDocs,
-    pulledAt: new Date().toISOString(),
+    pulledAt: failed === 0 ? new Date().toISOString() : getShopCloudPulledAt(shopId),
   };
 }
 

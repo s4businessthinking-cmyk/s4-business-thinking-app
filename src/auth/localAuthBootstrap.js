@@ -1,4 +1,4 @@
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { bootOfflineSqlite } from "../offline/sqliteDb";
 import { auth, db, generateInviteCode } from "../firebase-config";
@@ -224,10 +224,18 @@ async function loginWithFirebaseEmail(email, password) {
     return { ok: false, reason: "FIREBASE_UNAVAILABLE" };
   }
 
-  const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+  let cred;
+  try {
+    cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+  } catch (error) {
+    try { await signOut(auth); } catch {}
+    throw error;
+  }
+
   const fbUser = cred.user;
 
   if (!fbUser.emailVerified) {
+    try { await signOut(auth); } catch {}
     return {
       ok: false,
       reason: "EMAIL_NOT_VERIFIED",
@@ -237,6 +245,7 @@ async function loginWithFirebaseEmail(email, password) {
 
   const profSnap = await getDoc(doc(db, "users", fbUser.uid));
   if (!profSnap.exists()) {
+    try { await signOut(auth); } catch {}
     return { ok: false, reason: "PROFILE_NOT_FOUND" };
   }
 
@@ -513,6 +522,7 @@ async function markInviteCodeUsed(inviteInfo, usedBy, usedByName) {
     });
   } catch (error) {
     console.warn("[S4 Auth] Could not mark cloud invite code used", error);
+    throw new Error("Invite code could not be marked used in cloud. Check internet and try again.");
   }
 }
 

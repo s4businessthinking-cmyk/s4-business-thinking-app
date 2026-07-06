@@ -4595,7 +4595,15 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     }
   };
 
-  // ── Generate payment voucher no (3-layer fallback, mirrors genInvoiceNo) ──
+  // ── Generate payment voucher no (local-first, cloud when online) ──
+  const piMaxLocalPaymentSerial = () => payments.reduce((mx, payment) => {
+    const m = String(payment.paymentNo || "").match(/PMT-?(\d+)$/i);
+    return m ? Math.max(mx, Number(m[1])) : mx;
+  }, Number(shop?.lastPaymentSerial || 0));
+
+  const piFormatPaymentNo = (serial) =>
+    `${PMT_PREFIX}${String(serial).padStart(4, "0")}`;
+
   const genPaymentNo = async () => {
     try {
       const serial = await runTransaction(db,async tx=>{
@@ -4603,15 +4611,10 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         const next=Number(shopSnap.data()?.lastPaymentSerial||0)+1;
         tx.update(shopRef,{lastPaymentSerial:next}); return next;
       });
-      return `${PMT_PREFIX}${String(serial).padStart(4,"0")}`;
+      return piFormatPaymentNo(serial);
     } catch(e1) {
-      try {
-        const snap=await getDocs(query(collection(db,"purchasePayments"),where("shopId","==",shopId)));
-        const max=snap.docs.reduce((mx,d)=>{ const m=String(d.data().paymentNo||"").match(/PMT-?(\d+)$/); return m?Math.max(mx,Number(m[1])):mx; },0);
-        return `${PMT_PREFIX}${String(max+1).padStart(4,"0")}`;
-      } catch(e2) {
-        return `${PMT_PREFIX}${String(Date.now()).slice(-4)}`;
-      }
+      console.warn("[S4 PI] genPaymentNo transaction failed, using local serial", e1);
+      return piFormatPaymentNo(piMaxLocalPaymentSerial() + 1);
     }
   };
 
@@ -4673,7 +4676,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     .map(p => ({ payment:p, allocAmount: (p.allocations||[]).find(a=>a.invoiceId===invoiceId)?.amount||0 }))
     .sort((a,b)=>b.payment.createdAt-a.payment.createdAt);
 
-  // ── Save a Vendor Payment Voucher — one Cash/Cheque payment allocated across one or more open invoices ──
+  // ── Save a Vendor Payment Voucher — offline-first with local invoice updates ──
   const piSavePaymentVoucher = async (payload) => {
     // payload: { vendorId, vendorName, vendorMobile, method, paymentDate, note, chequeNo, chequeBank, chequeDate, allocations:[{invoiceId,invoiceNo,invoiceDate,amount}] }
     if (!payload.vendorName) { toast(t.pi_vendorRequired,"err"); return; }
@@ -4685,78 +4688,139 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     try {
       const paymentNo = await genPaymentNo();
       const totalAmount = parseFloat(piFmt2(allocations.reduce((s,a)=>s+piN2(a.amount),0)));
-      await runTransaction(db, async tx=>{
-        // 1) Read every involved invoice FRESH inside the transaction (race-safe), validate, compute new totals
-        const updates = [];
-        for (const alloc of allocations) {
-          const invRef = doc(db,"purchaseInvoices",alloc.invoiceId);
-          const snap = await tx.get(invRef);
-          if (!snap.exists()) throw new Error(lang==="bn"?`ইনভয়েস ${alloc.invoiceNo} খুঁজে পাওয়া যায়নি`:`Invoice ${alloc.invoiceNo} not found`);
-          const cur = snap.data();
-          if (cur.status==="draft"||cur.status==="cancelled") throw new Error(lang==="bn"?`${alloc.invoiceNo} ড্রাফট বা বাতিল — পেমেন্ট করা যাবে না`:`${alloc.invoiceNo} is draft/cancelled — cannot pay`);
-          const curPaid = piN2(cur.amountPaid);
-          const grand   = piN2(cur.grandTotal);
-          const curBalance = Math.max(0, grand-curPaid);
-          const amt = piN2(alloc.amount);
-          if (amt > curBalance + 0.01) throw new Error(lang==="bn"?`${alloc.invoiceNo}-এর বাকির চেয়ে বেশি পরিমাণ দেওয়া হয়েছে`:`Amount for ${alloc.invoiceNo} exceeds its balance due`);
-          const newAmountPaid = parseFloat(piFmt2(curPaid+amt));
-          const newBalance    = Math.max(0, parseFloat(piFmt2(grand-newAmountPaid)));
-          const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : cur.status);
-          updates.push({ invRef, newAmountPaid, newBalance, newStatus });
-        }
-        // 2) Apply all invoice updates
-        updates.forEach(u=>{
-          tx.update(u.invRef, { amountPaid:u.newAmountPaid, balanceDue:u.newBalance, status:u.newStatus, updatedAt:serverTimestamp() });
+      const nowIso = new Date().toISOString();
+      const invoiceUpdates = [];
+
+      for (const alloc of allocations) {
+        const cur = invoices.find((inv) => inv.id === alloc.invoiceId);
+        if (!cur) throw new Error(lang==="bn"?`ইনভয়েস ${alloc.invoiceNo} খুঁজে পাওয়া যায়নি`:`Invoice ${alloc.invoiceNo} not found`);
+        if (cur.status==="draft"||cur.status==="cancelled") throw new Error(lang==="bn"?`${alloc.invoiceNo} ড্রাফট বা বাতিল — পেমেন্ট করা যাবে না`:`${alloc.invoiceNo} is draft/cancelled — cannot pay`);
+        const curPaid = piN2(cur.amountPaid);
+        const grand   = piN2(cur.grandTotal);
+        const curBalance = Math.max(0, grand-curPaid);
+        const amt = piN2(alloc.amount);
+        if (amt > curBalance + 0.01) throw new Error(lang==="bn"?`${alloc.invoiceNo}-এর বাকির চেয়ে বেশি পরিমাণ দেওয়া হয়েছে`:`Amount for ${alloc.invoiceNo} exceeds its balance due`);
+        const newAmountPaid = parseFloat(piFmt2(curPaid+amt));
+        const newBalance    = Math.max(0, parseFloat(piFmt2(grand-newAmountPaid)));
+        const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : cur.status);
+        invoiceUpdates.push({ invoice: cur, newAmountPaid, newBalance, newStatus });
+      }
+
+      for (const update of invoiceUpdates) {
+        const result = await offlineUpdate("purchaseInvoices", update.invoice.id, {
+          ...update.invoice,
+          amountPaid: update.newAmountPaid,
+          balanceDue: update.newBalance,
+          status: update.newStatus,
+          updatedAt: nowIso,
+          updatedBy: user?.uid || "",
         });
-        // 3) Create the voucher doc with the confirmed allocations
-        const payRef = doc(collection(db,"purchasePayments"));
-        tx.set(payRef, {
-          shopId, paymentNo,
-          vendorId:payload.vendorId||null, vendorName:payload.vendorName, vendorMobile:payload.vendorMobile||"",
-          method:payload.method, paymentDate:payload.paymentDate||piToday(),
-          totalAmount,
-          chequeNo:   payload.method==="cheque" ? (payload.chequeNo||"").trim()   : "",
-          chequeBank: payload.method==="cheque" ? (payload.chequeBank||"").trim() : "",
-          chequeDate: payload.method==="cheque" ? (payload.chequeDate||"")        : "",
-          chequeStatus: payload.method==="cheque" ? "pending" : null,
-          note:(payload.note||"").trim(),
-          allocations: allocations.map(a=>({ invoiceId:a.invoiceId, invoiceNo:a.invoiceNo, invoiceDate:a.invoiceDate||"", amount:parseFloat(piFmt2(a.amount)) })),
-          status:"active",
-          createdBy:user.uid, createdByName:profile.personName, createdAt:serverTimestamp(),
-        });
-      });
+        const updated = { ...result.data, id: update.invoice.id };
+        setInvoices((prev) => prev.map((inv) => (inv.id === update.invoice.id ? updated : inv)));
+        setSelInvoice((prev) => prev && prev.id === update.invoice.id ? updated : prev);
+      }
+
+      const paymentPayload = {
+        shopId,
+        paymentNo,
+        vendorId: payload.vendorId || null,
+        vendorName: payload.vendorName,
+        vendorMobile: payload.vendorMobile || "",
+        method: payload.method,
+        paymentDate: payload.paymentDate || piToday(),
+        totalAmount,
+        chequeNo: payload.method === "cheque" ? (payload.chequeNo || "").trim() : "",
+        chequeBank: payload.method === "cheque" ? (payload.chequeBank || "").trim() : "",
+        chequeDate: payload.method === "cheque" ? (payload.chequeDate || "") : "",
+        chequeStatus: payload.method === "cheque" ? "pending" : null,
+        note: (payload.note || "").trim(),
+        allocations: allocations.map((a) => ({
+          invoiceId: a.invoiceId,
+          invoiceNo: a.invoiceNo,
+          invoiceDate: a.invoiceDate || "",
+          amount: parseFloat(piFmt2(a.amount)),
+        })),
+        status: "active",
+        createdBy: user.uid,
+        createdByName: profile.personName,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        updatedBy: user?.uid || "",
+      };
+
+      const result = await offlineCreate("purchasePayments", paymentPayload);
+      const created = { ...result.data, id: result.id, createdAt: nowIso };
+      setPayments((prev) => [created, ...prev]);
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] purchase payment save sync failed", err));
+      }
+
       toast(t.pi_voucherSaved);
       setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null);
     } catch(e) { toast(e.message,"err"); }
     finally { setPmtSaving(false); }
   };
 
+  const piReversePaymentAllocations = async (payment, { cancelReason = "", chequeStatus = null } = {}) => {
+    const nowIso = new Date().toISOString();
+    const invoiceUpdates = [];
+
+    for (const alloc of (payment.allocations || [])) {
+      const cur = invoices.find((inv) => inv.id === alloc.invoiceId);
+      if (!cur) continue;
+      const grand = piN2(cur.grandTotal);
+      const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(alloc.amount))));
+      const newBalance = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+      const newStatus = newBalance < 0.01 ? "paid" : (newAmountPaid > 0 ? "partial" : "confirmed");
+      invoiceUpdates.push({ invoice: cur, newAmountPaid, newBalance, newStatus });
+    }
+
+    for (const update of invoiceUpdates) {
+      const result = await offlineUpdate("purchaseInvoices", update.invoice.id, {
+        ...update.invoice,
+        amountPaid: update.newAmountPaid,
+        balanceDue: update.newBalance,
+        status: update.newStatus,
+        updatedAt: nowIso,
+        updatedBy: user?.uid || "",
+      });
+      const updated = { ...result.data, id: update.invoice.id };
+      setInvoices((prev) => prev.map((inv) => (inv.id === update.invoice.id ? updated : inv)));
+      setSelInvoice((prev) => prev && prev.id === update.invoice.id ? updated : prev);
+    }
+
+    const paymentPatch = {
+      ...payment,
+      status: "cancelled",
+      cancelledAt: nowIso,
+      cancelledBy: user?.uid || "",
+      updatedAt: nowIso,
+      updatedBy: user?.uid || "",
+      ...(cancelReason ? { cancelReason } : {}),
+      ...(chequeStatus ? { chequeStatus } : {}),
+    };
+
+    const result = await offlineUpdate("purchasePayments", payment.id, paymentPatch);
+    const updatedPayment = { ...result.data, id: payment.id };
+    setPayments((prev) => prev.map((p) => (p.id === payment.id ? updatedPayment : p)));
+
+    if (navigator.onLine) {
+      window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] purchase payment reverse sync failed", err));
+    }
+
+    return updatedPayment;
+  };
+
   // ── Cancel a Payment Voucher — reverses every allocation back onto its invoice's balance ──
   const piCancelPaymentVoucher = async (payment) => {
     if (!window.confirm(t.pi_confirmCancelVoucher)) return;
     try {
-      const payRef = doc(db,"purchasePayments",payment.id);
-      await runTransaction(db, async tx=>{
-        const paySnap = await tx.get(payRef);
-        if (!paySnap.exists()) throw new Error(lang==="bn"?"ভাউচার খুঁজে পাওয়া যায়নি":"Voucher not found");
-        const payData = paySnap.data();
-        if (payData.status==="cancelled") throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
-        const updates = [];
-        for (const alloc of (payData.allocations||[])) {
-          const invRef = doc(db,"purchaseInvoices",alloc.invoiceId);
-          const snap = await tx.get(invRef);
-          if (!snap.exists()) continue; // invoice may have been deleted separately — skip gracefully
-          const cur = snap.data();
-          const grand = piN2(cur.grandTotal);
-          const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(alloc.amount))));
-          const newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
-          const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
-          updates.push({ invRef, newAmountPaid, newBalance, newStatus });
-        }
-        updates.forEach(u=>tx.update(u.invRef, { amountPaid:u.newAmountPaid, balanceDue:u.newBalance, status:u.newStatus, updatedAt:serverTimestamp() }));
-        tx.update(payRef, { status:"cancelled", cancelledAt:serverTimestamp(), cancelledBy:user.uid });
-      });
-      setSelVoucher(p=>p&&p.id===payment.id?{...p,status:"cancelled"}:p);
+      if (payment.status === "cancelled") {
+        throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
+      }
+      const updatedPayment = await piReversePaymentAllocations(payment);
+      setSelVoucher((p) => p && p.id === payment.id ? updatedPayment : p);
       toast(t.pi_voucherCancelled,"err");
     } catch(e) { toast(e.message,"err"); }
   };
@@ -4766,28 +4830,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     if (newChequeStatus==="bounced") {
       if (!window.confirm(t.pi_confirmBounce)) return;
       try {
-        const payRef = doc(db,"purchasePayments",payment.id);
-        await runTransaction(db, async tx=>{
-          const paySnap = await tx.get(payRef);
-          if (!paySnap.exists()) throw new Error(lang==="bn"?"ভাউচার খুঁজে পাওয়া যায়নি":"Voucher not found");
-          const payData = paySnap.data();
-          if (payData.status==="cancelled") throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
-          const updates = [];
-          for (const alloc of (payData.allocations||[])) {
-            const invRef = doc(db,"purchaseInvoices",alloc.invoiceId);
-            const snap = await tx.get(invRef);
-            if (!snap.exists()) continue;
-            const cur = snap.data();
-            const grand = piN2(cur.grandTotal);
-            const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(alloc.amount))));
-            const newBalance    = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
-            const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
-            updates.push({ invRef, newAmountPaid, newBalance, newStatus });
-          }
-          updates.forEach(u=>tx.update(u.invRef, { amountPaid:u.newAmountPaid, balanceDue:u.newBalance, status:u.newStatus, updatedAt:serverTimestamp() }));
-          tx.update(payRef, { chequeStatus:"bounced", status:"cancelled", cancelledAt:serverTimestamp(), cancelledBy:user.uid, cancelReason:"cheque_bounced" });
+        if (payment.status === "cancelled") {
+          throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
+        }
+        const updatedPayment = await piReversePaymentAllocations(payment, {
+          cancelReason: "cheque_bounced",
+          chequeStatus: "bounced",
         });
-        setSelVoucher(p=>p&&p.id===payment.id?{...p,chequeStatus:"bounced",status:"cancelled"}:p);
+        setSelVoucher((p) => p && p.id === payment.id ? updatedPayment : p);
         toast(t.pi_chequeBounced,"err");
       } catch(e) { toast(e.message,"err"); }
     } else {

@@ -167,7 +167,7 @@ export async function updateShopMemberPermissions(
   const localUser = await resolveLocalUserForMember(memberId, localUserId);
   const docId = localUser?.firebaseUid || memberId;
 
-  if (localUser && permissions) {
+  if (localUser && permissions !== undefined && permissions !== null) {
     await updateLocalUserProfile(localUser.id, { permissions });
   }
 

@@ -69,11 +69,12 @@ export async function createOfflineSession({
 
   const id = createId();
   const now = nowIso();
+  const resolvedExpiresAt = expiresAt ?? session.expiresAt ?? null;
   const sessionJson = JSON.stringify({
     loginMethod: "local",
     ...session,
     createdAt: session.createdAt || now,
-    expiresAt,
+    expiresAt: resolvedExpiresAt,
   });
 
   executeSql(
@@ -95,7 +96,7 @@ export async function createOfflineSession({
       role,
       permissions ? JSON.stringify(permissions) : null,
       sessionJson,
-      expiresAt,
+      resolvedExpiresAt,
       now,
       now,
     ]

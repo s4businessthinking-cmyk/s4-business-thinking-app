@@ -171,8 +171,17 @@ function initSchema() {
   `);
 }
 
+const MAX_SYNC_RETRIES = 5;
+
 export async function bootOfflineSqlite() {
-  if (bootPromise) return bootPromise;
+  if (bootPromise) {
+    try {
+      return await bootPromise;
+    } catch (error) {
+      bootPromise = null;
+      throw error;
+    }
+  }
 
   bootPromise = (async () => {
     SQL = await initSqlJs({
@@ -204,7 +213,10 @@ export async function bootOfflineSqlite() {
       database: DB_NAME,
       schemaVersion: migration.schemaVersion,
     };
-  })();
+  })().catch((error) => {
+    bootPromise = null;
+    throw error;
+  });
 
   return bootPromise;
 }
@@ -374,13 +386,24 @@ export async function getPendingSyncQueue() {
     `SELECT *
      FROM sync_queue
      WHERE status = 'PENDING'
-     ORDER BY created_at ASC`
+        OR (status = 'FAILED' AND retry_count < ?)
+     ORDER BY created_at ASC`,
+    [MAX_SYNC_RETRIES]
   );
 
-  return rows.map((row) => ({
-    ...row,
-    payload: JSON.parse(row.payload_json || "{}"),
-  }));
+  return rows.map((row) => {
+    let payload = {};
+    try {
+      payload = JSON.parse(row.payload_json || "{}");
+    } catch {
+      payload = {};
+    }
+
+    return {
+      ...row,
+      payload,
+    };
+  });
 }
 
 export async function markSyncDone(queueId) {
@@ -444,7 +467,9 @@ export async function getOfflineStatus() {
   const pending = query(
     `SELECT COUNT(*) AS count
      FROM sync_queue
-     WHERE status = 'PENDING'`
+     WHERE status = 'PENDING'
+        OR (status = 'FAILED' AND retry_count < ?)`,
+    [MAX_SYNC_RETRIES]
   );
 
   const local = query(
