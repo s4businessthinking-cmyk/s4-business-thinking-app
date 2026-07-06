@@ -56,7 +56,19 @@ function filterRecordsForShop(collectionName, shopId, rows = []) {
   if (collectionName === "shops") {
     return rows.filter((row) => String(row.document_id) === String(shopId));
   }
-  return rows.filter((row) => String(row.data?.shopId || "") === String(shopId));
+
+  return rows
+    .filter((row) => {
+      const recordShopId = String(row.data?.shopId || "").trim();
+      return !recordShopId || recordShopId === String(shopId);
+    })
+    .map((row) => ({
+      ...row,
+      data: {
+        ...(row.data || {}),
+        shopId: row.data?.shopId || shopId,
+      },
+    }));
 }
 
 function cloudPullMetaKey(shopId) {

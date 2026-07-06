@@ -8606,12 +8606,23 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     setCloudUploadBusy(true);
     try {
-      if (products.length) {
+      const stageCollection = async (collectionName, rows) => {
+        if (!rows?.length) return;
         await offlineCacheCloudRecords(
-          "products",
-          products.map((row) => ({ ...row, shopId, id: row.id }))
+          collectionName,
+          rows.map((row) => ({
+            ...row,
+            shopId: row.shopId || shopId,
+            id: row.id || row.uid,
+          }))
         );
-      }
+      };
+
+      await stageCollection("products", products);
+      await stageCollection("companies", cos);
+      await stageCollection("customers", customers);
+      await stageCollection("vendors", vendors);
+      await stageCollection("orders", orders);
 
       const result = await uploadPendingShopChanges(shopId);
       if (result?.reason === "OFFLINE" || result?.skipped) {
@@ -8624,9 +8635,20 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
 
       const productCount = result.productsUploaded || 0;
+      const uploaded = result.totalUploaded || result.done || 0;
+      if (uploaded === 0 && (syncDashboard?.localRecords || 0) > 0) {
+        toast(
+          lang === "bn"
+            ? "⚠️ Cloud-এ upload হয়নি। Logout → email/password দিয়ে login → v1.0.12+ install করুন"
+            : "⚠️ Nothing uploaded. Logout, sign in with email/password, and use v1.0.12+",
+          "err"
+        );
+        return;
+      }
+
       const msg = lang==="bn"
-        ? `${t.syncUploadOk} (${result.done || 0} records, products: ${productCount})`
-        : `${t.syncUploadOk} (${result.done || 0} records, products: ${productCount})`;
+        ? `${t.syncUploadOk} (${uploaded} records, products: ${productCount})`
+        : `${t.syncUploadOk} (${uploaded} records, products: ${productCount})`;
       toast(result.failed || result.totalFailed ? `${msg} ⚠️` : msg, result.failed || result.totalFailed ? "err" : "ok");
       await refreshSyncDashboard();
     } catch (error) {
