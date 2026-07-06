@@ -82,42 +82,46 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
-      - name: Prepare APK
-        if: success()
+      - name: Resolve release version
+        id: apkmeta
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION=$(node -p "require('./package.json').version")
+            echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           else
-            VERSION="${GITHUB_REF_NAME#v}"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           fi
 
-          APK_DIR="android/app/build/outputs/apk/release"
-          APK_SRC="${APK_DIR}/app-release.apk"
+      - name: List APK outputs
+        if: success()
+        shell: cmd
+        run: |
+          dir /s /b android\app\build\outputs\apk\release\*.apk
 
-          if [ ! -f "$APK_SRC" ]; then
-            APK_SRC="${APK_DIR}/app-release-unsigned.apk"
-          fi
+      - name: Prepare APK
+        if: success()
+        shell: cmd
+        env:
+          VERSION: ${{ steps.apkmeta.outputs.version }}
+        run: |
+          set APK_SRC=android\app\build\outputs\apk\release\app-release.apk
+          if not exist "%APK_SRC%" (
+            echo Signed release APK not found: %APK_SRC%
+            dir android\app\build\outputs\apk\release
+            exit /b 1
+          )
 
-          if [ ! -f "$APK_SRC" ]; then
-            echo "APK not found in ${APK_DIR}"
-            ls -la "$APK_DIR" || true
-            exit 1
-          fi
-
-          cp "$APK_SRC" "S4-Business-Thinking-${VERSION}.apk"
-          ls -la "S4-Business-Thinking-${VERSION}.apk"
+          copy /Y "%APK_SRC%" "S4-Business-Thinking-%VERSION%.apk"
+          dir "S4-Business-Thinking-%VERSION%.apk"
 
       - name: Verify APK signature
         if: success()
-        shell: bash
+        shell: cmd
+        env:
+          VERSION: ${{ steps.apkmeta.outputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION=$(node -p "require('./package.json').version")
-          else
-            VERSION="${GITHUB_REF_NAME#v}"
-          fi
-          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --print-certs "S4-Business-Thinking-${VERSION}.apk"
+          call "%ANDROID_SDK_ROOT%\build-tools\36.0.0\apksigner.bat" verify --print-certs "S4-Business-Thinking-%VERSION%.apk"
+          if errorlevel 1 exit /b 1
 
       - name: Upload Android artifact
         if: success()
