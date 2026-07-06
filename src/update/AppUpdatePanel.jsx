@@ -19,40 +19,38 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
       ? {
           title: "🔄 অ্যাপ আপডেট",
           current: "বর্তমান ভার্সন",
-          latest: "GitHub latest",
+          latest: "সর্বশেষ ভার্সন",
           check: "আপডেট চেক করুন",
           checking: "চেক হচ্ছে...",
           available: "নতুন আপডেট পাওয়া গেছে",
           upToDate: "আপনার অ্যাপ আপ-টু-ডেট",
-          download: "GitHub থেকে ডাউনলোড",
-          openRelease: "Release page খুলুন",
+          download: "আপডেট ডাউনলোড",
           desktopHint:
-            "Windows app GitHub release থেকে auto-update নেবে। App restart করলে update install হবে।",
+            "Windows app স্বয়ংক্রিয়ভাবে আপডেট check করবে। Restart করলে install হবে।",
           mobileHint:
-            "Mobile-এ নতুন APK download করে install করুন। Settings → অ্যাপ আপডেট থেকে চেক করুন।",
+            "নতুন version পেলে Download চাপুন → install করুন। পুরনো app uninstall করে নিলে ভালো হয়।",
           noApkHint:
-            "GitHub release-এ এখনো APK আপলোড হয়নি। Release page খুলে manually APK নিন, অথবা developer-কে জানান।",
+            "এই version-এর mobile update file এখনো ready নয়। কিছুক্ষণ পর আবার চেষ্টা করুন।",
           needInternet: "Internet সংযোগ লাগবে",
-          later: "পরে",
+          checkFailed: "আপডেট check করা যায়নি। Internet চালু আছে কিনা দেখুন।",
         }
       : {
           title: "🔄 App Update",
           current: "Current version",
-          latest: "GitHub latest",
+          latest: "Latest version",
           check: "Check for updates",
           checking: "Checking...",
           available: "A new update is available",
           upToDate: "Your app is up to date",
-          download: "Download from GitHub",
-          openRelease: "Open release page",
+          download: "Download update",
           desktopHint:
-            "The Windows app checks GitHub automatically. Restart after download to install.",
+            "The Windows app checks for updates automatically. Restart to install.",
           mobileHint:
-            "On mobile, download the new APK and install it from Settings → App Update.",
+            "When an update is available, tap Download and install it. Uninstalling the old app first is recommended.",
           noApkHint:
-            "No APK is attached to the GitHub release yet. Open the release page or ask the developer to upload the APK.",
+            "The mobile update file is not ready yet. Please try again later.",
           needInternet: "Internet connection required",
-          later: "Later",
+          checkFailed: "Could not check for updates. Please verify your internet connection.",
         };
 
   const runCheck = async ({ silent = false } = {}) => {
@@ -72,7 +70,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
       }
       return update;
     } catch (checkError) {
-      const message = checkError?.message || String(checkError);
+      const message = txt.checkFailed;
       setError(message);
       if (!silent) toast(message, "err");
       return null;
@@ -154,12 +152,6 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
             {txt.download}
           </button>
         )}
-
-        {result?.releaseUrl && (
-          <button style={s.addCoBtn} onClick={() => openUpdateDownload(result.releaseUrl)}>
-            {txt.openRelease}
-          </button>
-        )}
       </div>
 
       <div style={{ fontSize: 11, color: th.txtMuted, lineHeight: 1.6 }}>
@@ -178,14 +170,14 @@ export async function runStartupUpdatePrompt({ lang, toast }) {
 
     const message =
       lang === "bn"
-        ? `নতুন ভার্সন ${update.latestVersion} GitHub-এ আছে। ডাউনলোড করবেন?`
-        : `Version ${update.latestVersion} is available on GitHub. Download now?`;
+        ? `নতুন version ${update.latestVersion} পাওয়া গেছে। এখন download করবেন?`
+        : `Version ${update.latestVersion} is available. Download now?`;
 
     if (update.platform === "desktop") {
       toast(
         lang === "bn"
-          ? `🔄 নতুন আপডেট ${update.latestVersion} ডাউনলোড হচ্ছে (Windows auto-update)`
-          : `🔄 Update ${update.latestVersion} will download automatically on Windows`,
+          ? `🔄 নতুন আপডেট ${update.latestVersion} download হচ্ছে`
+          : `🔄 Update ${update.latestVersion} is downloading`,
         "ok"
       );
       dismissAutoUpdatePrompt(update.latestVersion);
@@ -193,9 +185,8 @@ export async function runStartupUpdatePrompt({ lang, toast }) {
     }
 
     const ok = window.confirm(message);
-    const targetUrl = update.downloadUrl || update.releaseUrl;
-    if (ok && targetUrl) {
-      openUpdateDownload(targetUrl);
+    if (ok && update.downloadUrl) {
+      openUpdateDownload(update.downloadUrl);
     } else if (!ok) {
       dismissAutoUpdatePrompt(update.latestVersion);
     }

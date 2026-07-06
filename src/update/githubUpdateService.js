@@ -120,14 +120,14 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
   );
 
   if (!response.ok) {
-    throw new Error(`GitHub release check failed (${response.status})`);
+    throw new Error("UPDATE_CHECK_FAILED");
   }
 
   const releases = await response.json();
   const picked = pickLatestRelease(releases);
 
   if (!picked?.release) {
-    throw new Error("No published GitHub release found");
+    throw new Error("UPDATE_NOT_FOUND");
   }
 
   const { release, latestVersion } = picked;
