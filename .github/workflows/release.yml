@@ -42,7 +42,6 @@ jobs:
 
   build-android:
     runs-on: windows-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
@@ -109,6 +108,17 @@ jobs:
           cp "$APK_SRC" "S4-Business-Thinking-${VERSION}.apk"
           ls -la "S4-Business-Thinking-${VERSION}.apk"
 
+      - name: Verify APK signature
+        if: success()
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION=$(node -p "require('./package.json').version")
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          "$ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner" verify --print-certs "S4-Business-Thinking-${VERSION}.apk"
+
       - name: Upload Android artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -118,7 +128,7 @@ jobs:
 
   publish:
     needs: [build-windows, build-android]
-    if: ${{ !cancelled() && needs.build-windows.result == 'success' }}
+    if: ${{ !cancelled() && needs.build-windows.result == 'success' && needs.build-android.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -132,7 +142,6 @@ jobs:
           path: release-files
 
       - name: Download Android artifacts
-        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: android-release
