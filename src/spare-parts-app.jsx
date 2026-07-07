@@ -84,6 +84,27 @@ import s4LogoUrl from "./assets/s4-logo.png";
 const LOGO_URL = s4LogoUrl;
 const APP_NAME = "S4 Business Thinking";
 
+const SUPPORT_CONTACTS = {
+  whatsapp: "8801860531723",
+  whatsappDisplay: "+8801860531723",
+  facebook: "https://www.facebook.com/share/18rxnEiW3b/",
+  email: "s4businessthinking@gmail.com",
+  website: "https://s4businessthinking.com",
+  websiteDisplay: "s4businessthinking.com",
+};
+
+function openExternalLink(url) {
+  if (typeof window === "undefined" || !url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function buildSupportWhatsappUrl(lang) {
+  const text = lang === "bn"
+    ? "S4 Business Thinking - সাহায্য/complaint: "
+    : "S4 Business Thinking - Help/complaint: ";
+  return `https://wa.me/${SUPPORT_CONTACTS.whatsapp}?text=${encodeURIComponent(text)}`;
+}
+
 // ─── PRESET POSITIONS ────────────────────────────────────────
 const PRESET_POSITIONS = {
   bn: ["সিনিয়র সেলসম্যান", "জুনিয়র সেলসম্যান", "ম্যানেজার", "ক্যাশিয়ার", "স্টোরকিপার", "ডেলিভারি ম্যান", "অ্যাকাউন্ট্যান্ট", "সুপারভাইজার"],
@@ -201,6 +222,13 @@ const TR = {
     syncFirebaseOk:"✅ Connected",
     syncFirebaseNo:"❌ Email login needed",
     syncAutoPullOk:"☁️ Cloud data auto-download হয়েছে",
+    helpTitle:"❓ সাহায্য ও সাপোর্ট",
+    helpIntro:"Software-এ যে সমস্যা, bug বা error দেখছেন—complaint জানান। নতুন feature বা option দরকার হলে idea পাঠান।",
+    helpWhatsappNote:"শুধু WhatsApp message বা voice note — call করবেন না",
+    helpWhatsappBtn:"💬 WhatsApp Message",
+    helpFacebookBtn:"📘 Facebook Page",
+    helpEmailBtn:"✉️ Email",
+    helpWebsiteBtn:"🌐 Website",
     connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
     confirmLogout:"লগআউট করতে চান?",
@@ -715,6 +743,13 @@ const TR = {
     syncFirebaseOk:"✅ Connected",
     syncFirebaseNo:"❌ Email login needed",
     syncAutoPullOk:"☁️ Cloud data auto-downloaded",
+    helpTitle:"❓ Help & Support",
+    helpIntro:"Report software problems, bugs, or errors. Send new feature ideas if you need extra options.",
+    helpWhatsappNote:"WhatsApp message or voice note only — please do not call",
+    helpWhatsappBtn:"💬 WhatsApp Message",
+    helpFacebookBtn:"📘 Facebook Page",
+    helpEmailBtn:"✉️ Email",
+    helpWebsiteBtn:"🌐 Website",
     connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
     confirmLogout:"Do you want to logout?",
@@ -8412,6 +8447,67 @@ function ProfilePasswordSettings({ t, lang, profile, toast, th, s }) {
   );
 }
 
+// ─── HELP SETTINGS ─────────────────────────────────────────────
+function HelpSettingsPanel({ t, lang, th, s }) {
+  const contactBtn = {
+    ...s.stBtn,
+    width:"100%",
+    textAlign:"left",
+    display:"flex",
+    alignItems:"center",
+    gap:10,
+    padding:"12px 14px",
+    marginBottom:8,
+  };
+
+  return (
+    <div style={{ ...s.card, marginTop:16, border:"1px solid rgba(249,115,22,0.25)" }}>
+      <div style={s.settingsLbl}>{t.helpTitle}</div>
+      <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.6, marginBottom:14 }}>
+        {t.helpIntro}
+      </div>
+
+      <button
+        type="button"
+        style={{ ...contactBtn, background:"rgba(34,197,94,0.12)", borderColor:"#22c55e", color:"#22c55e" }}
+        onClick={() => openExternalLink(buildSupportWhatsappUrl(lang))}
+      >
+        <span>{t.helpWhatsappBtn}</span>
+        <span style={{ marginLeft:"auto", fontSize:11, opacity:0.9 }}>{SUPPORT_CONTACTS.whatsappDisplay}</span>
+      </button>
+      <div style={{ fontSize:10, color:"#f59e0b", margin:"-4px 0 10px", lineHeight:1.4 }}>
+        {t.helpWhatsappNote}
+      </div>
+
+      <button
+        type="button"
+        style={{ ...contactBtn, background:"rgba(37,99,235,0.1)", borderColor:"#2563eb", color:"#60a5fa" }}
+        onClick={() => openExternalLink(SUPPORT_CONTACTS.facebook)}
+      >
+        <span>{t.helpFacebookBtn}</span>
+      </button>
+
+      <button
+        type="button"
+        style={contactBtn}
+        onClick={() => openExternalLink(`mailto:${SUPPORT_CONTACTS.email}?subject=${encodeURIComponent("S4 Business Thinking - Support")}`)}
+      >
+        <span>{t.helpEmailBtn}</span>
+        <span style={{ marginLeft:"auto", fontSize:11, opacity:0.85 }}>{SUPPORT_CONTACTS.email}</span>
+      </button>
+
+      <button
+        type="button"
+        style={contactBtn}
+        onClick={() => openExternalLink(SUPPORT_CONTACTS.website)}
+      >
+        <span>{t.helpWebsiteBtn}</span>
+        <span style={{ marginLeft:"auto", fontSize:11, opacity:0.85 }}>{SUPPORT_CONTACTS.websiteDisplay}</span>
+      </button>
+    </div>
+  );
+}
+
 // ─── SYNC SETTINGS ───────────────────────────────────────────
 function SyncSettingsPanel({
   t,
@@ -11394,6 +11490,8 @@ const startEditOrder = (order) => {
                 </div>
                 <span style={s.settingsArrow}>›</span>
               </button>
+
+              <HelpSettingsPanel t={t} lang={lang} th={th} s={s} />
 
               {/* Logout */}
               <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
