@@ -229,6 +229,7 @@ const TR = {
     helpFacebookBtn:"📘 Facebook Page",
     helpEmailBtn:"✉️ Email",
     helpWebsiteBtn:"🌐 Website",
+    helpMenuSub:"WhatsApp, Facebook, Email, Website",
     connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
     confirmLogout:"লগআউট করতে চান?",
@@ -750,6 +751,7 @@ const TR = {
     helpFacebookBtn:"📘 Facebook Page",
     helpEmailBtn:"✉️ Email",
     helpWebsiteBtn:"🌐 Website",
+    helpMenuSub:"WhatsApp, Facebook, Email, Website",
     connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
     confirmLogout:"Do you want to logout?",
@@ -8461,7 +8463,7 @@ function HelpSettingsPanel({ t, lang, th, s }) {
   };
 
   return (
-    <div style={{ ...s.card, marginTop:16, border:"1px solid rgba(249,115,22,0.25)" }}>
+    <div style={{ ...s.card, border:"1px solid rgba(249,115,22,0.25)" }}>
       <div style={s.settingsLbl}>{t.helpTitle}</div>
       <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.6, marginBottom:14 }}>
         {t.helpIntro}
@@ -11491,7 +11493,15 @@ const startEditOrder = (order) => {
                 <span style={s.settingsArrow}>›</span>
               </button>
 
-              <HelpSettingsPanel t={t} lang={lang} th={th} s={s} />
+              {/* Help & support */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("help")}>
+                <span style={s.settingsRowIcon}>❓</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{t.helpTitle}</div>
+                  <div style={s.settingsRowSub}>{t.helpMenuSub}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
 
               {/* Logout */}
               <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
@@ -11542,6 +11552,10 @@ const startEditOrder = (order) => {
 
           {settingsPage==="update"&&(
             <AppUpdatePanel lang={lang} th={th} s={s} toast={toast} />
+          )}
+
+          {settingsPage==="help"&&(
+            <HelpSettingsPanel t={t} lang={lang} th={th} s={s} />
           )}
 
           {settingsPage==="invite"&&isOwner&&(
