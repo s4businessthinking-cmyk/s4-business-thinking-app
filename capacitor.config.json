@@ -1,5 +1,19 @@
 {
   "appId": "com.s4businessthinking.app",
   "appName": "S4 Business Thinking",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": [
+      "github.com",
+      "*.github.com",
+      "*.githubusercontent.com"
+    ]
+  },
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "resetWhenUpdate": false
+    }
+  }
 }

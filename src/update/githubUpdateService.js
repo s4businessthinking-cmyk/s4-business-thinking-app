@@ -23,14 +23,27 @@ export function compareVersions(left, right) {
   return 0;
 }
 
+function pickAndroidBundleUrl(assets) {
+  const list = Array.isArray(assets) ? assets : [];
+
+  return (
+    list.find((asset) => /-bundle\.zip$/i.test(asset?.name || ""))?.browser_download_url ||
+    list.find((asset) => /bundle\.zip$/i.test(asset?.name || ""))?.browser_download_url ||
+    null
+  );
+}
+
+function pickAndroidApkUrl(assets) {
+  const list = Array.isArray(assets) ? assets : [];
+
+  return list.find((asset) => /\.apk$/i.test(asset?.name || ""))?.browser_download_url || null;
+}
+
 function pickAssetUrl(assets, platform) {
   const list = Array.isArray(assets) ? assets : [];
 
   if (platform === "android") {
-    return (
-      list.find((asset) => /\.apk$/i.test(asset?.name || ""))?.browser_download_url ||
-      null
-    );
+    return pickAndroidBundleUrl(list) || pickAndroidApkUrl(list);
   }
 
   if (platform === "desktop") {
@@ -132,6 +145,8 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
 
   const { release, latestVersion } = picked;
   const platform = getReleasePlatform();
+  const bundleUrl = platform === "android" ? pickAndroidBundleUrl(release.assets) : null;
+  const apkUrl = platform === "android" ? pickAndroidApkUrl(release.assets) : null;
   const downloadUrl = pickAssetUrl(release.assets, platform);
 
   return {
@@ -141,10 +156,12 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
     hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
     platform,
     downloadUrl,
+    bundleUrl,
+    apkUrl,
     releaseUrl: release.html_url || "",
     releaseNotes: release.body || "",
     publishedAt: release.published_at || "",
-    missingAsset: platform === "android" && !downloadUrl,
+    missingAsset: platform === "android" && !bundleUrl && !apkUrl,
   };
 }
 

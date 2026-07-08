@@ -64,7 +64,7 @@ export async function startOfflineEngine() {
     const status = await getOfflineStatus();
 
     const autoSync = startAutoFirebaseSync({
-      intervalMs: 30000,
+      intervalMs: 10000,
     });
 
     window.S4Offline = {

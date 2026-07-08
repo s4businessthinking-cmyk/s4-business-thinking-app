@@ -2,12 +2,18 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./spare-parts-app.jsx";
 import { startOfflineEngine } from "./offline/offlineBoot";
+import { notifyMobileAppReady, runMobileAutoUpdate } from "./update/mobileOtaService.js";
+import { APP_VERSION, checkGitHubUpdate } from "./update/githubUpdateService.js";
 
-async function clearStaleNativeWebCache() {
+async function clearStaleShellWebCache() {
   const isNative =
     typeof window !== "undefined" &&
     window.Capacitor?.isNativePlatform?.() === true;
-  if (!isNative) return;
+  const isElectron =
+    typeof window !== "undefined" &&
+    typeof window.process?.versions?.electron === "string";
+
+  if (!isNative && !isElectron) return;
 
   try {
     if ("serviceWorker" in navigator) {
@@ -19,13 +25,52 @@ async function clearStaleNativeWebCache() {
       await Promise.all(keys.map((key) => caches.delete(key)));
     }
   } catch (error) {
-    console.warn("[S4] Native cache cleanup failed", error);
+    console.warn("[S4] Shell cache cleanup failed", error);
   }
 }
 
-clearStaleNativeWebCache().finally(() => {
-  startOfflineEngine();
-});
+async function setupWebPwaAutoReload() {
+  const isNative = window.Capacitor?.isNativePlatform?.() === true;
+  const isElectron = typeof window.process?.versions?.electron === "string";
+  if (isNative || isElectron) return;
+
+  try {
+    const { registerSW } = await import("virtual:pwa-register");
+    registerSW({
+      immediate: true,
+      onRegisteredSW(_swUrl, registration) {
+        if (registration) {
+          setInterval(() => {
+            registration.update().catch(() => {});
+          }, 60 * 60 * 1000);
+        }
+      },
+      onNeedRefresh() {
+        window.location.reload();
+      },
+    });
+  } catch {
+    // PWA disabled in this build.
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      window.location.reload();
+    });
+  }
+}
+
+clearStaleShellWebCache()
+  .then(() => setupWebPwaAutoReload())
+  .finally(async () => {
+    startOfflineEngine();
+    await notifyMobileAppReady();
+    runMobileAutoUpdate({
+      checkGitHubUpdate,
+      APP_VERSION,
+      silent: true,
+    }).catch(() => {});
+  });
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

@@ -4,6 +4,7 @@ import {
   signOut,
   sendEmailVerification,
   sendPasswordResetEmail,
+  onAuthStateChanged,
 } from "firebase/auth";
 import {
   collection,
@@ -8847,6 +8848,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     const handleConnectivity = () => {
       refreshSyncDashboard();
+      if (typeof navigator !== "undefined" && navigator.onLine && !getCloudSyncBlockReason()) {
+        window.S4Offline?.syncNow?.().catch((err) =>
+          console.warn("[S4 Sync] auto upload on reconnect failed", err)
+        );
+      }
     };
 
     window.addEventListener("online", handleConnectivity);
@@ -8855,6 +8861,37 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       window.removeEventListener("online", handleConnectivity);
       window.removeEventListener("offline", handleConnectivity);
     };
+  }, [shopId]);
+
+  useEffect(() => {
+    if (!shopId) return;
+
+    const runAutoUpload = () => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) return;
+      if (getCloudSyncBlockReason()) return;
+      window.S4Offline?.syncNow?.().catch((err) =>
+        console.warn("[S4 Sync] periodic auto upload failed", err)
+      );
+    };
+
+    runAutoUpload();
+    const timer = window.setInterval(runAutoUpload, 15000);
+
+    return () => window.clearInterval(timer);
+  }, [shopId, user?.uid]);
+
+  useEffect(() => {
+    if (!auth || !shopId) return;
+
+    return onAuthStateChanged(auth, (fbUser) => {
+      if (!fbUser) return;
+      setSyncRefreshKey((value) => value + 1);
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch((err) =>
+          console.warn("[S4 Sync] auth restore upload failed", err)
+        );
+      }
+    });
   }, [shopId]);
 
   useEffect(() => {
@@ -9193,58 +9230,77 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     );
   },[shopId, isOwner]);
 
-  // ── Products — one-time fetch (not real-time, too heavy for 3000+ items) ──
+  // ── Products — realtime listener with offline cache fallback ──
   const [productsLoading,setProductsLoading]=useState(false);
+
   const fetchProducts = async () => {
+    setSyncRefreshKey((value) => value + 1);
+  };
+
+  useEffect(() => {
     if (!shopId) return;
 
     setProductsLoading(true);
 
+    const sortProducts = (rows = []) =>
+      [...rows].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
     const loadLocalProducts = async () => {
-      const local = await offlineList("products");
-      return local.records
-        .map(r => ({ id: r.document_id, ...(r.data || {}) }))
-        .filter(p => p.shopId === shopId)
-        .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
+      try {
+        const local = await offlineList("products");
+        const docs = sortProducts(
+          local.records
+            .map((r) => ({ id: r.document_id, ...(r.data || {}) }))
+            .filter((p) => p.shopId === shopId)
+        );
+        if (docs.length) setProducts(docs);
+        setSyncState(typeof navigator !== "undefined" && navigator.onLine ? "connected" : "offline");
+      } catch (err) {
+        console.error("products offline fallback:", err);
+      } finally {
+        setProductsLoading(false);
+      }
     };
 
-    try {
-      const localDocs = await loadLocalProducts();
-      if (localDocs.length) {
-        setProducts(localDocs);
-      }
-
-      if (!navigator.onLine || getCloudSyncBlockReason() === "FIREBASE_AUTH_REQUIRED") {
-        setSyncState(navigator.onLine ? "connected" : "offline");
+    const applyDocs = (snap) => {
+      if (snap.metadata?.fromCache && snap.empty) {
+        loadLocalProducts();
         return;
       }
 
-      const snap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId)));
-      const cloudDocs = snap.docs.map(d=>({...d.data(),id:d.id}))
-        .sort((a,b)=>(a.name||"").localeCompare(b.name||""));
-
-      if (cloudDocs.length) {
-        await offlineCacheCloudRecords("products", cloudDocs);
-      }
-
-      const docs = cloudDocs.length >= localDocs.length ? cloudDocs : localDocs;
+      const docs = sortProducts(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
       setProducts(docs);
+      offlineCacheCloudRecords("products", docs).catch((err) =>
+        console.warn("[S4 Offline] product cache failed", err)
+      );
       setSyncState("connected");
-    } catch(e) {
-      console.error(e);
-      try {
-        const localDocs = await loadLocalProducts();
-        if (localDocs.length) setProducts(localDocs);
-      } catch(localErr) {
-        console.error("products offline fallback:", localErr);
-      }
-      setSyncState("offline");
-    } finally {
       setProductsLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => { fetchProducts(); },[shopId, syncRefreshKey]);
+    let unsub2 = null;
+
+    const unsub1 = onSnapshot(
+      query(collection(db, "products"), where("shopId", "==", shopId), orderBy("name")),
+      applyDocs,
+      () => {
+        unsub2 = onSnapshot(
+          query(collection(db, "products"), where("shopId", "==", shopId)),
+          applyDocs,
+          (err) => {
+            console.error("products listener:", err);
+            loadLocalProducts();
+          }
+        );
+      }
+    );
+
+    loadLocalProducts();
+
+    return () => {
+      unsub1();
+      unsub2 && unsub2();
+    };
+  }, [shopId, syncRefreshKey]);
 
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
 

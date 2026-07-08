@@ -17,6 +17,11 @@ export default defineConfig({
     VitePWA({
       disable: disablePwa,
       registerType: "autoUpdate",
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: "S4 Business Thinking",
         short_name: "S4 Business",

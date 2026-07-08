@@ -39,11 +39,17 @@ fs.writeFileSync(
           "*.githubusercontent.com",
         ],
       },
+      plugins: {
+        CapacitorUpdater: {
+          autoUpdate: false,
+          resetWhenUpdate: false,
+        },
+      },
     },
     null,
     2
   )
 );
 
-fs.writeFileSync(path.join(assetsDir, "capacitor.plugins.json"), "{}\n");
+require("./sync-capacitor-updater-android.cjs");
 console.log("[S4 Android] Synced dist -> android/app/src/main/assets/public");

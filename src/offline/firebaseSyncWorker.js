@@ -204,6 +204,16 @@ export function startAutoFirebaseSync(options = {}) {
 
   window.addEventListener("online", run);
 
+  const onVisible = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "visible" && isOnline()) {
+      run();
+    }
+  };
+
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisible);
+  }
+
   const timer = window.setInterval(() => {
     if (isOnline()) run();
   }, intervalMs);
@@ -217,6 +227,9 @@ export function startAutoFirebaseSync(options = {}) {
     intervalMs,
     stop: () => {
       window.removeEventListener("online", run);
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisible);
+      }
       window.clearInterval(timer);
     },
   };
