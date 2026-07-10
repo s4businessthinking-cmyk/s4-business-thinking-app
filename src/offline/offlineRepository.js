@@ -8,6 +8,8 @@ import {
 
   cacheCloudRecord,
   cacheCloudRecords,
+  clearLocalCollection,
+  purgeLocalRecord,
 } from "./sqliteDb";
 
 function nowIso() {
@@ -171,4 +173,12 @@ export async function offlineCacheCloudRecord(collectionName, documentId, data =
 
 export async function offlineCacheCloudRecords(collectionName, records = []) {
   return cacheCloudRecords(collectionName, records);
+}
+
+export async function offlineClearCollection(collectionName) {
+  return clearLocalCollection(collectionName);
+}
+
+export async function offlinePurgeLocal(collectionName, documentId) {
+  return purgeLocalRecord(collectionName, documentId);
 }

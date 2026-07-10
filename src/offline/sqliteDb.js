@@ -336,6 +336,45 @@ export async function deleteLocalRecord(collectionName, documentId) {
   return { ok: true, id, collectionName, documentId };
 }
 
+export async function clearLocalCollection(collectionName) {
+  await bootOfflineSqlite();
+
+  const now = new Date().toISOString();
+
+  db.run(`DELETE FROM local_records WHERE collection_name = ?`, [collectionName]);
+  db.run(`DELETE FROM sync_queue WHERE collection_name = ?`, [collectionName]);
+
+  db.run(
+    `INSERT OR REPLACE INTO app_meta (key, value, updated_at)
+     VALUES (?, ?, ?)`,
+    [`collection_cleared:${collectionName}`, now, now]
+  );
+
+  await persist();
+
+  return { ok: true, collectionName, clearedAt: now };
+}
+
+export async function purgeLocalRecord(collectionName, documentId) {
+  await bootOfflineSqlite();
+
+  db.run(
+    `DELETE FROM local_records
+     WHERE collection_name = ? AND document_id = ?`,
+    [collectionName, documentId]
+  );
+
+  db.run(
+    `DELETE FROM sync_queue
+     WHERE collection_name = ? AND document_id = ?`,
+    [collectionName, documentId]
+  );
+
+  await persist();
+
+  return { ok: true, collectionName, documentId };
+}
+
 export async function getLocalRecords(collectionName) {
   await bootOfflineSqlite();
 

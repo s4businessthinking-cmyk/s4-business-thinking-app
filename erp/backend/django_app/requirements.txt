@@ -1,0 +1,22 @@
+# Django
+Django>=5.0,<5.2
+djangorestframework>=3.15,<3.16
+django-cors-headers>=4.3,<5
+django-environ>=0.11,<1
+
+# Database
+psycopg[binary]>=3.1,<4
+
+# Cache / Queue
+redis>=5.0,<6
+celery>=5.3,<6
+
+# Server
+gunicorn>=22.0,<24
+whitenoise>=6.6,<7
+
+# Utils
+# Auth / Security
+PyJWT>=2.8,<3
+cryptography>=42,<46
+argon2-cffi>=23.1,<24

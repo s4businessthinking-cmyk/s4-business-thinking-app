@@ -7,6 +7,14 @@ const disablePwa = process.env.DISABLE_PWA === "1";
 
 export default defineConfig({
   base: "./",
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+    },
+  },
   define: {
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(pkg.version),
     "import.meta.env.VITE_GITHUB_OWNER": JSON.stringify("s4businessthinking-cmyk"),
@@ -21,6 +29,16 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+            handler: "NetworkOnly",
+          },
+          {
+            urlPattern: /^https:\/\/www\.googleapis\.com\/.*/i,
+            handler: "NetworkOnly",
+          },
+        ],
       },
       manifest: {
         name: "S4 Business Thinking",
