@@ -1,7 +1,7 @@
 {
   "name": "s4-business-thinking",
   "private": true,
-  "version": "1.0.18",
+  "version": "1.0.19",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -18,7 +18,17 @@
     "desktop:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "desktop:build": "npm run build:desktop-web && electron-builder --publish never",
     "desktop:publish": "npm run build:desktop-web && electron-builder --publish always",
-    "release:github": "publish-github-release.bat"
+    "release:sync": "node scripts/sync-release-outputs.cjs",
+    "release:build": "node scripts/build-all-release.cjs",
+    "release:publish": "node scripts/publish-all-release.cjs",
+    "release:github": "publish-github-release.bat",
+    "erp:env": "node scripts/erp-prepare-env.cjs",
+    "erp:up": "npm run erp:env && docker compose -f erp/infrastructure/docker/docker-compose.yml --env-file erp/infrastructure/docker/.env up -d --build",
+    "erp:reset": "docker compose -f erp/infrastructure/docker/docker-compose.yml --env-file erp/infrastructure/docker/.env down -v && npm run erp:up",
+    "erp:down": "docker compose -f erp/infrastructure/docker/docker-compose.yml --env-file erp/infrastructure/docker/.env down",
+    "erp:logs": "docker compose -f erp/infrastructure/docker/docker-compose.yml --env-file erp/infrastructure/docker/.env logs -f",
+    "erp:migrate": "docker compose -f erp/infrastructure/docker/docker-compose.yml --env-file erp/infrastructure/docker/.env exec django python manage.py migrate",
+    "erp:dev": "concurrently \"npm run dev\" \"npm run erp:up\""
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

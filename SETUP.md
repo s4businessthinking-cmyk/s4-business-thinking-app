@@ -35,61 +35,21 @@
 
 ## ধাপ ৪: Firestore Security Rules সেট করুন
 
-1. Firestore Database এর **"Rules"** tab এ যান
-2. পুরো content মুছে এই rules paste করুন:
+**গুরুত্বপূর্ণ:** পুরনো rules-এ `products`, `vendors`, `customers` ইত্যাদি collection-এর **delete permission** ছিল না।  
+এতে Owner login থাকলেও product delete / "সব মুছুন" এ `Missing or insufficient permissions` error আসে।
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Users can read/write their own profile
-    match /users/{userId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update, delete: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Shops: anyone authenticated can read (for invite code lookup);
-    // only owner can write
-    match /shops/{shopId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
-    }
-
-    // Orders: only members of the shop can read/write
-    match /orders/{orderId} {
-      allow read: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.shopId == resource.data.shopId;
-      allow create: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.shopId == request.resource.data.shopId;
-      allow update, delete: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.shopId == resource.data.shopId;
-    }
-
-    // Companies: same shop members only
-    match /companies/{coId} {
-      allow read: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.shopId == resource.data.shopId;
-      allow create: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.shopId == request.resource.data.shopId;
-      allow update, delete: if request.auth != null
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.shopId == resource.data.shopId;
-    }
-  }
-}
-```
-
+1. Firestore Database এর **"Rules"** tab এ যান  
+   https://console.firebase.google.com/project/s4-business-thinking-31213/firestore/rules
+2. পুরো content মুছে project root এর **`firestore.rules`** file এর সম্পূর্ণ content paste করুন
 3. **Publish** button এ click করুন
 
-✅ এখন এক shop এর data অন্য shop এর কেউ দেখতে পাবে না — security guaranteed।
+**CLI দিয়ে deploy (optional):**
+```bash
+firebase login
+firebase deploy --only firestore:rules --project s4-business-thinking-31213
+```
+
+✅ এক shop এর member শুধু নিজ shop এর data read/create/update/**delete** করতে পারবে — অন্য shop access করতে পারবে না।
 
 ---
 
@@ -106,6 +66,15 @@ Orders আর Companies এর queries জন্য composite indexes দরক�
 
 **Index 2:** Collection: `companies`
 - `shopId` (Ascending) + `name` (Ascending) → Create
+
+**Index 3:** Collection: `products`
+- `shopId` (Ascending) + `name` (Ascending) → Create
+
+**Index 4:** Collection: `vendors`
+- `shopId` (Ascending) + `vendorName` (Ascending) → Create
+
+**Index 5:** Collection: `customers`
+- `shopId` (Ascending) + `customerName` (Ascending) → Create
 
 Index তৈরি হতে ১-৫ মিনিট লাগে।
 
@@ -214,8 +183,10 @@ npm run dev
 - Spam/Junk folder check করুন
 - Firebase console → Authentication → Templates → "Email address verification" → Sender support email check করুন
 
-**"Permission denied" error?**
-- Firestore Rules ঠিকমতো paste করেছেন কিনা check করুন
+**"Permission denied" / "Missing or insufficient permissions" error?**
+- Firebase Console → Firestore → **Rules** → `firestore.rules` file paste করে **Publish** করুন
+- `users/{your-firebase-uid}` document-এ `shopId` আছে কিনা check করুন
+- Product delete / Clear All এর জন্য rules-এ `allow delete` থাকতে হবে (`products` collection)
 - Indexes তৈরি হয়েছে কিনা দেখুন (Firestore → Indexes)
 
 **"failed-precondition" বা index error?**

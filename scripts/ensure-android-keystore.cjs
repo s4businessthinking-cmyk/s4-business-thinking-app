@@ -32,8 +32,7 @@ const keytoolCandidates = [
 let keytool = null;
 for (const candidate of keytoolCandidates) {
   if (candidate === "keytool") {
-    keytool = candidate;
-    break;
+    continue;
   }
   if (fs.existsSync(candidate)) {
     keytool = candidate;

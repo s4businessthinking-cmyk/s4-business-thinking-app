@@ -7,6 +7,7 @@ import {
   offlineList,
   offlineSearch,
   offlineEngineStatus,
+  offlineClearCollection,
 } from "./offlineRepository";
 import {
   syncPendingQueueToFirebase,
@@ -78,6 +79,7 @@ export async function startOfflineEngine() {
       remove: offlineRemove,
       list: offlineList,
       search: offlineSearch,
+      clearCollection: offlineClearCollection,
       syncNow: syncPendingQueueToFirebase,
       test: async () => {
         const created = await offlineCreate("offline_test", {

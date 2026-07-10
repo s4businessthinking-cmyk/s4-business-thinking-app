@@ -1,0 +1,26 @@
+---
+description: Locked ERP build order — follow ARCHITECTURE_LOCK.md strictly
+alwaysApply: true
+---
+
+# ERP Architecture Lock — Active Build
+
+Read `ARCHITECTURE_LOCK.md` before any ERP work.
+
+## Hard Rules
+
+1. **Current STAGE only** — do not start STAGE N+1 until STAGE N checklist is complete
+2. **No sideways work** — no random features, UI polish, or unrelated refactors
+3. **No demo/placeholder code** — every change must run and be verifiable in browser dashboard
+4. **Do not break** existing `spare-parts-app.jsx` user flows
+5. **Update** `ARCHITECTURE_LOCK.md` and `erp/build-state.json` when completing checklist items
+6. **Browser visibility** — backend changes must surface on `/?erp-dashboard=1`
+
+## Stack (Locked)
+
+- Django + DRF + PostgreSQL + Redis + Celery + Docker
+- See `ERP_ARCHITECTURE.md` for full spec
+
+## If Unsure
+
+Stop and ask user. Do not guess or skip stages.

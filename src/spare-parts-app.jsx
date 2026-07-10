@@ -38,6 +38,8 @@ import {
   offlineRemove,
   offlineList,
   offlineCacheCloudRecords,
+  offlineClearCollection,
+  offlinePurgeLocal,
 } from "./offline/offlineRepository";
 import {
   loadCachedShop,
@@ -69,6 +71,7 @@ import {
 } from "./auth/localAuthBootstrap";
 import { updateLocalUserPassword } from "./auth/localAuthService";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
+import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
 import { APP_VERSION } from "./update/githubUpdateService";
 import {
   createShopStaffUser,
@@ -81,6 +84,11 @@ import {
 } from "./auth/userManagementService";
 
 import s4LogoUrl from "./assets/s4-logo.png";
+
+function isActiveProduct(product) {
+  if (!product) return false;
+  return product.isDeleted !== true && product.deleted !== true;
+}
 
 const LOGO_URL = s4LogoUrl;
 const APP_NAME = "S4 Business Thinking";
@@ -4503,7 +4511,6 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [piForm,setPiForm]           = useState(piEmptyForm());
   const [piLines,setPiLines]         = useState([]);
   const [piCurrent,setPiCurrent]     = useState(piEmptyCurrent());
-  const [pickerTarget,setPickerTarget] = useState(false);
   const [piSaving,setPiSaving]       = useState(false);
   const piNameRef = useRef(null);
 
@@ -4943,7 +4950,6 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   const piSelectProduct=(prod)=>{
     setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.salesVat||prod.purchaseVat||p.taxPerc||"5" }));
-    setPickerTarget(false);
     setTimeout(()=>piNameRef.current?.focus(), 100);
   };
 
@@ -5231,8 +5237,6 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ══════ FORM VIEW ══════
   return (
     <div style={panel}>
-      {pickerTarget&&<PiProductPicker products={products} t={t} th={th} onSelect={p=>piSelectProduct(p)} onClose={()=>setPickerTarget(false)} />}
-
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
         <button onClick={()=>setPiView("list")} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.pi_backToList}</button>
         <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{editInvoiceId?t.pi_edit:t.pi_new}</div>
@@ -5334,24 +5338,36 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
         {/* ── Entry Row (staging area) ── */}
         <div style={{ background:th.bgInp, borderRadius:12, padding:12, marginBottom:10, border:`1px dashed ${th.borderMid}` }}>
-          {/* Product name + picker */}
-          <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
-            <input
-              ref={piNameRef}
-              style={{ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, fontSize:14, fontWeight:600, outline:"none", flex:1, boxSizing:"border-box", fontFamily:"inherit" }}
-              placeholder={t.pi_itemName}
+          {/* Product name */}
+          <div style={{ marginBottom:8 }}>
+            <ProductTypeaheadInput
+              products={products}
               value={piCurrent.name}
-              onChange={e=>setPiCurrent(p=>({...p,name:e.target.value}))}
-              onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()}
+              onChange={(value)=>setPiCurrent((p)=>({ ...p, name:value }))}
+              onSelectProduct={piSelectProduct}
+              field="name"
+              inputRef={piNameRef}
+              placeholder={t.pi_itemName}
+              th={th}
+              lang={lang}
+              onKeyDown={(e)=>e.key==="Enter"&&piAddCurrentItem()}
+              style={{ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgCard, color:th.txtPrimary, fontSize:14, fontWeight:600, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" }}
             />
-            <button onClick={()=>setPickerTarget(true)} title={t.pi_fromMaster}
-              style={{ padding:"10px 14px", borderRadius:8, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:14, fontWeight:700, flexShrink:0 }}>
-              📦
-            </button>
           </div>
           {/* Code + Brand */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
-            <input style={inp()} placeholder={t.pi_code} value={piCurrent.code} onChange={e=>setPiCurrent(p=>({...p,code:e.target.value}))} />
+            <ProductTypeaheadInput
+              products={products}
+              value={piCurrent.code}
+              onChange={(value)=>setPiCurrent((p)=>({ ...p, code:value }))}
+              onSelectProduct={piSelectProduct}
+              field="code"
+              placeholder={t.pi_code}
+              th={th}
+              lang={lang}
+              onKeyDown={(e)=>e.key==="Enter"&&piAddCurrentItem()}
+              style={{ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" }}
+            />
             <input style={inp()} placeholder={t.pi_brand} value={piCurrent.brand} onChange={e=>setPiCurrent(p=>({...p,brand:e.target.value}))} />
           </div>
 
@@ -5944,9 +5960,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const [siInvoiceNo,setSiInvoiceNo]= useState("");
   const [siForm,setSiForm]         = useState(siEmptyForm());
   const [siLines,setSiLines]       = useState([]);
-  const [pickerTarget,setPickerTarget]= useState(null);
   const [showCustPicker,setShowCustPicker]= useState(false);
-  const [showQuickPicker,setShowQuickPicker] = useState(false);
   const siEmptyCurrent = () => ({ productId:null, name:"", code:"", brand:"", qty:"1", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" });
   const [siCurrent,setSiCurrent]   = useState(siEmptyCurrent);
   const siNameRef = useRef(null);
@@ -6110,7 +6124,6 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       unitPrice: prod.vatExclusive||prod.landingCost||prod.mrp||p.unitPrice,
       vatPerc:   prod.salesVat||"5",
     }));
-    setPickerTarget(null);
     setTimeout(()=>siNameRef.current?.focus(), 100);
   };
 
@@ -6309,7 +6322,6 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   // ══ LIST ══
   if (siView==="list") return (
     <div style={panel}>
-      {pickerTarget!==null&&<PiProductPicker products={products} t={{ ...t, pi_fromMaster:t.si_fromMaster, pi_pmSearchPh:t.si_pmSearchPh, pi_noResults:t.si_noResults }} th={th} onSelect={p=>{ setSiCurrent(prev=>({ ...prev, productId:p.id, name:p.name, code:p.code||p.barcode||"", brand:p.brand||"", unit:p.unit||"Pcs", unitPrice:p.vatExclusive||p.landingCost||p.mrp||prev.unitPrice, vatPerc:p.salesVat||"5" })); setPickerTarget(null); }} onClose={()=>setPickerTarget(null)} />}
       {showCustPicker&&<SiCustomerPicker customers={customers} t={t} th={th} onSelect={siSelectCustomer} onClose={()=>setShowCustPicker(false)} />}
 
       {/* ── Print Modal after Confirm ── */}
@@ -6465,9 +6477,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   // ══ FORM ══
   return (
     <div style={panel}>
-      {pickerTarget!==null&&<PiProductPicker products={products} t={{ ...t, pi_fromMaster:t.si_fromMaster, pi_pmSearchPh:t.si_pmSearchPh, pi_noResults:t.si_noResults }} th={th} onSelect={p=>siSelectProduct(p)} onClose={()=>setPickerTarget(null)} />}
       {showCustPicker&&<SiCustomerPicker customers={customers} t={t} th={th} onSelect={siSelectCustomer} onClose={()=>setShowCustPicker(false)} />}
-      {showQuickPicker&&<SiQuickAddPicker products={products} t={t} th={th} lang={lang} onAddLine={siAddProductLine} onClose={()=>setShowQuickPicker(false)} />}
 
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
         <button onClick={()=>setSiView("list")} style={{ background:"transparent", border:"none", color:"#22c55e", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.si_backToList}</button>
@@ -6528,24 +6538,36 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
         {/* ── Entry Row ── */}
         <div style={{ background:th.bgInp, borderRadius:12, padding:12, marginBottom:10, border:`1px dashed ${th.borderMid}` }}>
-          {/* Product name + picker */}
-          <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
-            <input
-              ref={siNameRef}
-              style={{ ...inp(), flex:1, fontSize:14, fontWeight:600 }}
-              placeholder={t.si_itemName}
+          {/* Product name */}
+          <div style={{ marginBottom:8 }}>
+            <ProductTypeaheadInput
+              products={products}
               value={siCurrent.name}
-              onChange={e=>setSiCurrent(p=>({...p,name:e.target.value}))}
-              onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()}
+              onChange={(value)=>setSiCurrent((p)=>({ ...p, name:value }))}
+              onSelectProduct={siSelectProduct}
+              field="name"
+              inputRef={siNameRef}
+              placeholder={t.si_itemName}
+              th={th}
+              lang={lang}
+              onKeyDown={(e)=>e.key==="Enter"&&siAddCurrentItem()}
+              style={{ ...inp(), fontSize:14, fontWeight:600 }}
             />
-            <button onClick={()=>setPickerTarget("current")} title={t.si_fromMaster}
-              style={{ padding:"10px 14px", borderRadius:8, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:14, fontWeight:700, flexShrink:0 }}>
-              📦
-            </button>
           </div>
           {/* Code + Brand */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 }}>
-            <input style={inp()} placeholder={t.si_code} value={siCurrent.code} onChange={e=>setSiCurrent(p=>({...p,code:e.target.value}))} />
+            <ProductTypeaheadInput
+              products={products}
+              value={siCurrent.code}
+              onChange={(value)=>setSiCurrent((p)=>({ ...p, code:value }))}
+              onSelectProduct={siSelectProduct}
+              field="code"
+              placeholder={t.si_code}
+              th={th}
+              lang={lang}
+              onKeyDown={(e)=>e.key==="Enter"&&siAddCurrentItem()}
+              style={inp()}
+            />
             <input style={inp()} placeholder={t.si_brand} value={siCurrent.brand} onChange={e=>setSiCurrent(p=>({...p,brand:e.target.value}))} />
           </div>
           {/* Qty + Unit + Price + Disc + VAT + ADD — responsive layout */}
@@ -8653,6 +8675,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const isDesktop = windowWidth >= 768;
   const [licenseAccess, setLicenseAccess] = useState(null);
   const [syncRefreshKey, setSyncRefreshKey] = useState(0);
+  const [clearingProducts, setClearingProducts] = useState(false);
+  const productBulkDeleteRef = useRef(false);
   const [licenseAccessLoading, setLicenseAccessLoading] = useState(true);
   const [syncDashboard, setSyncDashboard] = useState(null);
   const [cloudPullBusy, setCloudPullBusy] = useState(false);
@@ -9251,7 +9275,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         const docs = sortProducts(
           local.records
             .map((r) => ({ id: r.document_id, ...(r.data || {}) }))
-            .filter((p) => p.shopId === shopId)
+            .filter((p) => p.shopId === shopId && isActiveProduct(p))
         );
         if (docs.length) setProducts(docs);
         setSyncState(typeof navigator !== "undefined" && navigator.onLine ? "connected" : "offline");
@@ -9263,12 +9287,18 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     };
 
     const applyDocs = (snap) => {
+      if (productBulkDeleteRef.current) return;
+
       if (snap.metadata?.fromCache && snap.empty) {
         loadLocalProducts();
         return;
       }
 
-      const docs = sortProducts(snap.docs.map((d) => ({ ...d.data(), id: d.id })));
+      const docs = sortProducts(
+        snap.docs
+          .map((d) => ({ ...d.data(), id: d.id }))
+          .filter(isActiveProduct)
+      );
       setProducts(docs);
       offlineCacheCloudRecords("products", docs).catch((err) =>
         console.warn("[S4 Offline] product cache failed", err)
@@ -9338,9 +9368,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [pmEditId,setPmEditId]=useState(null);
   const [pmForm,setPmForm]=useState(emptyPmForm);
   const [pmDetailId,setPmDetailId]=useState(null); // full detail modal
-  const [showProductPicker,setShowProductPicker]=useState(false);
-  const [productPickerQ,setProductPickerQ]=useState("");
-
   const pmReset = () => setPmForm(emptyPmForm);
   const pmDetail = products.find(p=>p.id===pmDetailId)||null;
 
@@ -9478,8 +9505,23 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const deleteProduct = async (id) => {
     if (!window.confirm(lang==="bn"?"এই পণ্যটি মুছে ফেলবেন?":"Delete this product?")) return;
 
+    const now = new Date().toISOString();
+    const tombstone = { isDeleted: true, deletedAt: now, updatedAt: now };
+
     try {
-      await offlineRemove("products", id);
+      if (navigator.onLine && db) {
+        try {
+          await deleteDoc(doc(db, "products", id));
+          await offlinePurgeLocal("products", id);
+        } catch (cloudErr) {
+          const denied = String(cloudErr?.code || cloudErr?.message || "").includes("permission");
+          if (!denied) throw cloudErr;
+          await setDoc(doc(db, "products", id), tombstone, { merge: true });
+          await offlineUpdate("products", id, tombstone);
+        }
+      } else {
+        await offlineRemove("products", id);
+      }
 
       setProducts(p=>p.filter(x=>x.id!==id));
       setPmDetailId(null);
@@ -9493,9 +9535,120 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     }
   };
 
+  const clearAllShopProducts = async () => {
+    if (clearingProducts) return;
+
+    const initialCount = products.length;
+    if (!initialCount && (!navigator.onLine || !db || !shopId)) return;
+
+    if (!window.confirm(
+      lang==="bn"
+        ? `সব পণ্য মুছে ফেলবেন? (${initialCount || "cloud"}টি) পরে নতুন import করতে পারবেন।`
+        : `Delete all products? (${initialCount || "cloud"}) You can import fresh data after.`
+    )) return;
+
+    setClearingProducts(true);
+    productBulkDeleteRef.current = true;
+    setProducts([]);
+    setPmDetailId(null);
+    setPmEditId(null);
+
+    const now = new Date().toISOString();
+    const tombstone = { isDeleted: true, deletedAt: now, updatedAt: now };
+    let done = 0;
+    let usedSoftDelete = false;
+    const chunkSize = 200;
+
+    const reportProgress = (total) => {
+      toast(lang==="bn"?`🗑️ ${done}/${total}...`:`🗑️ ${done}/${total}...`);
+    };
+
+    const commitBatchWithRetry = async (buildBatch, retries = 4) => {
+      let lastErr;
+      for (let attempt = 1; attempt <= retries; attempt += 1) {
+        try {
+          const batch = writeBatch(db);
+          buildBatch(batch);
+          await batch.commit();
+          return;
+        } catch (err) {
+          lastErr = err;
+          const message = String(err?.message || err?.code || "").toLowerCase();
+          const retryable = message.includes("fetch")
+            || message.includes("network")
+            || message.includes("unavailable")
+            || message.includes("deadline");
+          if (!retryable || attempt === retries) throw err;
+          await new Promise((resolve) => setTimeout(resolve, 700 * attempt));
+        }
+      }
+      throw lastErr;
+    };
+
+    const softDeleteChunk = async (chunk) => {
+      usedSoftDelete = true;
+      await commitBatchWithRetry((batch) => {
+        chunk.forEach((p) => {
+          batch.set(doc(db, "products", p.id), tombstone, { merge: true });
+        });
+      });
+    };
+
+    try {
+      await offlineClearCollection("products");
+
+      let rows = [...products];
+      if (navigator.onLine && db && shopId) {
+        const snap = await getDocs(query(collection(db, "products"), where("shopId", "==", shopId)));
+        if (snap.docs.length) {
+          rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        }
+      }
+
+      if (!rows.length) {
+        toast(lang==="bn"?"কোনো পণ্য নেই":"No products to delete", "err");
+        return;
+      }
+
+      toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
+      reportProgress(rows.length);
+
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        try {
+          await commitBatchWithRetry((batch) => {
+            chunk.forEach((p) => batch.delete(doc(db, "products", p.id)));
+          });
+        } catch (cloudErr) {
+          const denied = String(cloudErr?.code || cloudErr?.message || "").includes("permission");
+          if (!denied) throw cloudErr;
+          await softDeleteChunk(chunk);
+        }
+        done += chunk.length;
+        reportProgress(rows.length);
+      }
+
+      if (usedSoftDelete) {
+        toast(
+          lang==="bn"
+            ? "✅ পণ্য লুকানো হয়েছে। Import করতে পারবেন।"
+            : "✅ Products hidden. You can import now.",
+          "err"
+        );
+      } else {
+        toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
+      }
+    } catch (e) {
+      hErr(e);
+    } finally {
+      productBulkDeleteRef.current = false;
+      setClearingProducts(false);
+      setSyncRefreshKey((value) => value + 1);
+    }
+  };
+
   const selectProductToOrder = (prod) => {
     setCurrentItem(p=>({...p, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs"}));
-    setShowProductPicker(false); setProductPickerQ("");
   };
 
   // ── INVOICE ITEM FUNCTIONS ──
@@ -10349,49 +10502,33 @@ const startEditOrder = (order) => {
 
               {/* ── ITEM ENTRY FORM ── */}
               <div style={{ ...s.card, border:"1px solid #3f3f46" }}>
-                {/* Product picker trigger */}
-                {products.length>0&&(
-                  <div style={{ marginBottom:8 }}>
-                    <button style={{ ...s.addInvoiceBtn, background:"rgba(99,102,241,0.08)", borderColor:"#6366f1", color:"#818cf8", padding:"9px" }}
-                      onClick={()=>{ setShowProductPicker(!showProductPicker); setProductPickerQ(""); }}>
-                      📦 {t.pmFromMaster}
-                    </button>
-                    {showProductPicker&&(
-                      <div style={{ background:th.bgInp, border:"1px solid #3f3f46", borderRadius:10, marginTop:6, overflow:"hidden" }}>
-                        <input autoFocus style={{ ...s.inp, borderRadius:0, borderLeft:"none", borderRight:"none", borderTop:"none", borderColor:"#27272a" }}
-                          placeholder={t.pmSearch} value={productPickerQ}
-                          onChange={e=>setProductPickerQ(e.target.value)} />
-                        <div style={{ maxHeight:200, overflowY:"auto" }}>
-                          {products
-                          .filter(p=> nsmatch([p.name,p.code||'',p.brand||'',p.category||'',p.barcode||'',...(p.moreBarcodes||[])].filter(Boolean).join(' '), productPickerQ))
-                            .map(p=>(
-                              <button key={p.id} onClick={()=>selectProductToOrder(p)}
-                                style={{ width:"100%", textAlign:"left", padding:"10px 14px", background:"transparent", border:"none", borderTop:`1px solid ${th.border}`, color:th.txtSecondary, cursor:"pointer", fontFamily:"inherit" }}>
-                                <div style={{ fontSize:13, fontWeight:700 }}>{p.name}</div>
-                                <div style={{ fontSize:11, color:"#71717a" }}>
-                                  {[p.code,p.brand,p.category].filter(Boolean).join(" · ")}
-                                  {p.price&&<span style={{ color:"#22c55e", marginLeft:6 }}>{t.cur}{p.price}</span>}
-                                </div>
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-                <input
-                  ref={nameRef}
-                  style={{ ...s.inp, marginBottom:8, fontSize:15, fontWeight:600 }}
-                  placeholder={t.itemName}
-                  value={currentItem.name}
-                  onChange={e=>updCurrentItem("name",e.target.value)}
-                  onKeyDown={handleEnterAdd}
-                />
-                <div style={{ display:"flex", gap:7, marginBottom:8 }}>
-                  <input style={{ ...s.inp, flex:1 }} placeholder={t.code}
-                    value={currentItem.code}
-                    onChange={e=>updCurrentItem("code",e.target.value)}
+                <div style={{ marginBottom:8 }}>
+                  <ProductTypeaheadInput
+                    products={products}
+                    value={currentItem.name}
+                    onChange={(value)=>updCurrentItem("name", value)}
+                    onSelectProduct={selectProductToOrder}
+                    field="name"
+                    inputRef={nameRef}
+                    placeholder={t.itemName}
+                    th={th}
+                    lang={lang}
                     onKeyDown={handleEnterAdd}
+                    style={{ ...s.inp, fontSize:15, fontWeight:600 }}
+                  />
+                </div>
+                <div style={{ display:"flex", gap:7, marginBottom:8 }}>
+                  <ProductTypeaheadInput
+                    products={products}
+                    value={currentItem.code}
+                    onChange={(value)=>updCurrentItem("code", value)}
+                    onSelectProduct={selectProductToOrder}
+                    field="code"
+                    placeholder={t.code}
+                    th={th}
+                    lang={lang}
+                    onKeyDown={handleEnterAdd}
+                    style={{ ...s.inp, flex:1 }}
                   />
                   <input style={{ ...s.inp, flex:1 }} placeholder={t.brand}
                     value={currentItem.brand}
@@ -10648,22 +10785,11 @@ const startEditOrder = (order) => {
           <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
             <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }} onClick={fetchProducts} disabled={productsLoading}>{productsLoading?"⏳":"🔄"}</button>
-              {isOwner&&products.length>0&&(
+              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }} onClick={fetchProducts} disabled={productsLoading||clearingProducts}>{productsLoading||clearingProducts?"⏳":"🔄"}</button>
+              {isOwner&&(products.length>0||clearingProducts)&&(
                 <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
-                  onClick={async()=>{
-                    if (!window.confirm(lang==="bn"?`সব ${products.length}টি পণ্য মুছে ফেলবেন?`:`Delete all ${products.length} products?`)) return;
-                    toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
-                    try {
-                      for (let i=0;i<products.length;i+=500) {
-                        const batch=writeBatch(db);
-                        products.slice(i,i+500).forEach(p=>batch.delete(doc(db,"products",p.id)));
-                        await batch.commit();
-                      }
-                      setProducts([]);
-                      toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
-                    } catch(e){ hErr(e); }
-                  }}>🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}</button>
+                  onClick={clearAllShopProducts}
+                  disabled={clearingProducts}>🗑️ {clearingProducts?(lang==="bn"?"মুছছে...":"Deleting..."):(lang==="bn"?"সব মুছুন":"Clear All")}</button>
               )}
               {isOwner&&(<>
               <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>

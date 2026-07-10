@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./spare-parts-app.jsx";
+import ErpBuildDashboard from "./erp-build/ErpBuildDashboard.jsx";
+import { isErpDashboardRoute } from "./erp-build/buildStages.js";
 import { startOfflineEngine } from "./offline/offlineBoot";
 import { notifyMobileAppReady, runMobileAutoUpdate } from "./update/mobileOtaService.js";
 import { APP_VERSION, checkGitHubUpdate } from "./update/githubUpdateService.js";
@@ -72,8 +74,10 @@ clearStaleShellWebCache()
     }).catch(() => {});
   });
 
+const RootApp = isErpDashboardRoute() ? ErpBuildDashboard : App;
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <RootApp />
   </React.StrictMode>
 );

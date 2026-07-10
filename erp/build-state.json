@@ -1,0 +1,41 @@
+{
+  "locked_at": "2026-07-09",
+  "architecture_version": "v2",
+  "architecture_doc": "ERP_ARCHITECTURE.md",
+  "roadmap_doc": "S4 Business Thinking Erp Complete Build Roadmap.pdf",
+  "current_stage": 10,
+  "current_stage_name": "REPORTS + ANALYTICS",
+  "dashboard_url": "/?erp-dashboard=1",
+  "stages": [
+    { "id": 0, "code": "STAGE_0", "name": "Planning + Architecture", "name_bn": "প্ল্যানিং + আর্কিটেকচার", "status": "completed", "progress_pct": 100 },
+    { "id": 1, "code": "STAGE_1", "name": "Foundation", "name_bn": "ফাউন্ডেশন", "status": "completed", "progress_pct": 100 },
+    { "id": 2, "code": "STAGE_2", "name": "Auth + Security", "name_bn": "অথ + সিকিউরিটি", "status": "completed", "progress_pct": 100 },
+    { "id": 3, "code": "STAGE_3", "name": "SaaS + Tenants + License", "name_bn": "SaaS + টেন্যান্ট + লাইসেন্স", "status": "completed", "progress_pct": 100 },
+    { "id": 4, "code": "STAGE_4", "name": "Database + Offline + Sync", "name_bn": "ডাটাবেস + অফলাইন + সিঙ্ক", "status": "completed", "progress_pct": 100 },
+    { "id": 5, "code": "STAGE_5", "name": "Inventory Core", "name_bn": "ইনভেন্টরি", "status": "completed", "progress_pct": 100 },
+    { "id": 6, "code": "STAGE_6", "name": "Purchase", "name_bn": "ক্রয়", "status": "completed", "progress_pct": 100 },
+    { "id": 7, "code": "STAGE_7", "name": "Sales + POS", "name_bn": "বিক্রয় + POS", "status": "completed", "progress_pct": 100 },
+    { "id": 8, "code": "STAGE_8", "name": "Accounting", "name_bn": "অ্যাকাউন্টিং", "status": "completed", "progress_pct": 100 },
+    { "id": 9, "code": "STAGE_9", "name": "HRM + CRM", "name_bn": "HRM + CRM", "status": "completed", "progress_pct": 100 },
+    {
+      "id": 10,
+      "code": "STAGE_10",
+      "name": "Reports + Analytics",
+      "name_bn": "রিপোর্ট + অ্যানালিটিক্স",
+      "status": "completed",
+      "progress_pct": 100,
+      "items": [
+        { "id": "10.1", "label": "Report catalog + run history", "label_bn": "Catalog", "status": "completed" },
+        { "id": "10.2", "label": "Executive KPI dashboard", "label_bn": "KPIs", "status": "completed" },
+        { "id": "10.3", "label": "Inventory/Sales/Purchase summaries", "label_bn": "Ops reports", "status": "completed" },
+        { "id": "10.4", "label": "Finance trial balance report", "label_bn": "Finance", "status": "completed" },
+        { "id": "10.5", "label": "CRM pipeline + HRM headcount", "label_bn": "CRM/HRM", "status": "completed" },
+        { "id": "10.6", "label": "Report run engine (sync)", "label_bn": "Engine", "status": "completed" },
+        { "id": "10.7", "label": "Reports APIs + RBAC", "label_bn": "APIs", "status": "completed" },
+        { "id": "10.8", "label": "Seed report definitions", "label_bn": "Seed", "status": "completed" },
+        { "id": "10.9", "label": "Browser reports test panel", "label_bn": "Browser panel", "status": "completed" }
+      ]
+    },
+    { "id": 11, "code": "STAGE_11", "name": "Offline + Realtime", "name_bn": "অফলাইন + রিয়েলটাইম", "status": "pending", "progress_pct": 0 }
+  ]
+}

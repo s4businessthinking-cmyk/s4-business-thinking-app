@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: s4-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-s4_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-s4_erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+    volumes:
+      - s4_erp_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-s4_erp} -d ${POSTGRES_DB:-s4_erp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: s4-erp-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - s4_erp_redis:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  django:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.django
+    container_name: s4-erp-django
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      ERP_BUILD_STATE_PATH: /app/erp/build-state.json
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/live/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  celery-worker:
+    build:
+      context: ../../
+      dockerfile: infrastructure/docker/Dockerfile.django
+    container_name: s4-erp-celery
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      ERP_BUILD_STATE_PATH: /app/erp/build-state.json
+    command: celery -A config worker --loglevel=info --concurrency=2
+    working_dir: /app/backend/django_app
+    depends_on:
+      django:
+        condition: service_healthy
+
+volumes:
+  s4_erp_pgdata:
+  s4_erp_redis:
