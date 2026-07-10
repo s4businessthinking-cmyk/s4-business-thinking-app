@@ -10652,16 +10652,52 @@ const startEditOrder = (order) => {
               {isOwner&&products.length>0&&(
                 <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
                   onClick={async()=>{
-                    if (!window.confirm(lang==="bn"?`সব ${products.length}টি পণ্য মুছে ফেলবেন?`:`Delete all ${products.length} products?`)) return;
+                    const totalCount = products.length;
+                    if (!window.confirm(lang==="bn"?`সব ${totalCount}টি পণ্য মুছে ফেলবেন?`:`Delete all ${totalCount} products?`)) return;
                     toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
                     try {
-                      for (let i=0;i<products.length;i+=500) {
-                        const batch=writeBatch(db);
-                        products.slice(i,i+500).forEach(p=>batch.delete(doc(db,"products",p.id)));
-                        await batch.commit();
+                      // ১. Firestore থেকে সরাসরি সর্বশেষ ও সম্পূর্ণ লিস্ট আনা হচ্ছে —
+                      // UI-এর local state stale/duplicate থাকলেও কোনো ডকুমেন্ট বাদ যাবে না।
+                      const freshSnap = await getDocs(query(collection(db,"products"), where("shopId","==",shopId)));
+                      const allIds = freshSnap.docs.map(d=>d.id);
+
+                      if (!allIds.length) {
+                        setProducts([]);
+                        toast(lang==="bn"?"✅ কোনো পণ্য নেই":"✅ No products found");
+                        return;
                       }
+
+                      let deletedCount = 0;
+                      const failedIds = [];
+
+                      for (let i=0;i<allIds.length;i+=450) {
+                        const chunk = allIds.slice(i,i+450);
+                        try {
+                          const batch=writeBatch(db);
+                          chunk.forEach(id=>batch.delete(doc(db,"products",id)));
+                          await batch.commit();
+                          deletedCount += chunk.length;
+                        } catch(chunkErr) {
+                          console.error("Clear All batch failed:", chunkErr);
+                          failedIds.push(...chunk);
+                        }
+                        toast(lang==="bn"?`🗑️ মুছা হচ্ছে... ${deletedCount}/${allIds.length}`:`🗑️ Deleting... ${deletedCount}/${allIds.length}`);
+                      }
+
+                      // ২. Local offline cache থেকেও পুরনো পণ্যগুলো মুছে ফেলা হচ্ছে —
+                      // নাহলে reload/network hiccup হলে cache থেকে পুরনো পণ্য আবার ফিরে আসতে পারে,
+                      // যেটাই "delete করার পরও পুরনো product থেকে যাচ্ছে" সমস্যার আসল কারণ।
+                      for (const id of allIds) {
+                        try { await offlineRemove("products", id); } catch(offErr) { console.warn("offline cache clear failed:", id, offErr); }
+                      }
+
                       setProducts([]);
-                      toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
+
+                      if (failedIds.length) {
+                        toast(lang==="bn"?`⚠️ ${deletedCount}টি মুছা হয়েছে, ${failedIds.length}টি ব্যর্থ — আবার "সব মুছুন" চাপুন`:`⚠️ ${deletedCount} deleted, ${failedIds.length} failed — press Clear All again`,"err");
+                      } else {
+                        toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
+                      }
                     } catch(e){ hErr(e); }
                   }}>🗑️ {lang==="bn"?"সব মুছুন":"Clear All"}</button>
               )}
