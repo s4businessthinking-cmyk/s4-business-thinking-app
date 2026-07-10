@@ -69,6 +69,12 @@ function setupAutoUpdater() {
   setTimeout(checkForUpdates, 5000);
   setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS);
 
+  setInterval(() => {
+    if (updateReady) {
+      promptRestartForUpdate();
+    }
+  }, 30 * 60 * 1000);
+
   app.on("browser-window-created", () => {
     if (updateReady) {
       setTimeout(promptRestartForUpdate, 1500);

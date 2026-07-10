@@ -52,7 +52,18 @@ export async function applyMobileOtaUpdate({ version, bundleUrl }) {
     url: bundleUrl,
   });
 
-  await updater.set(downloaded);
+  if (!downloaded?.id) {
+    throw new Error("MOBILE_OTA_DOWNLOAD_INVALID");
+  }
+
+  await updater.set({ id: downloaded.id });
+
+  try {
+    await updater.reload();
+  } catch (reloadError) {
+    console.warn("[S4 OTA] reload after set failed", reloadError);
+  }
+
   return downloaded;
 }
 
@@ -92,6 +103,15 @@ export async function runMobileAutoUpdate({
       version: update.latestVersion,
       bundleUrl: update.bundleUrl,
     });
+
+    if (!silent && toast) {
+      toast(
+        lang === "bn"
+          ? `✅ Version ${update.latestVersion} apply হয়েছে। App reload হচ্ছে...`
+          : `✅ Version ${update.latestVersion} applied. Reloading app...`,
+        "ok"
+      );
+    }
 
     return { ok: true, applied: true, update };
   } catch (error) {

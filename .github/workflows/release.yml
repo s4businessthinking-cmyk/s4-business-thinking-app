@@ -123,6 +123,22 @@ jobs:
           call "%ANDROID_SDK_ROOT%\build-tools\36.0.0\apksigner.bat" verify --print-certs "S4-Business-Thinking-%VERSION%.apk"
           if errorlevel 1 exit /b 1
 
+      - name: Prepare OTA bundle
+        if: success()
+        shell: cmd
+        env:
+          VERSION: ${{ steps.apkmeta.outputs.version }}
+        run: |
+          set BUNDLE_SRC=release\S4-Business-Thinking-%VERSION%-bundle.zip
+          if not exist "%BUNDLE_SRC%" (
+            echo OTA bundle not found: %BUNDLE_SRC%
+            dir release
+            exit /b 1
+          )
+
+          copy /Y "%BUNDLE_SRC%" "S4-Business-Thinking-%VERSION%-bundle.zip"
+          dir "S4-Business-Thinking-%VERSION%-bundle.zip"
+
       - name: Upload Android artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -166,6 +182,14 @@ jobs:
 
           echo "Files to publish:"
           find release-files -type f | sort
+
+      - name: Verify OTA bundle is present
+        shell: bash
+        run: |
+          if ! find release-files -type f -name '*-bundle.zip' | grep -q .; then
+            echo "ERROR: OTA bundle.zip is missing. Mobile auto-update will not work."
+            exit 1
+          fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
