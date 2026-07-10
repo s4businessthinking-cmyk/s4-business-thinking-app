@@ -1,6 +1,15 @@
 import { offlineUpsert } from "../offline/offlineRepository";
 import {
+  assertFirebaseReady,
+  buildLocalAuthEmail,
+  createFirebaseAccount,
+  deleteStaffLoginIndex,
+  writeCloudUserProfile,
+  writeStaffLoginIndex,
+} from "./firebaseAuthBridge";
+import {
   createLocalUser,
+  deleteLocalUser,
   getLocalUserById,
   getLocalUserByFirebaseUid,
   listLocalUsers,
@@ -15,6 +24,14 @@ function triggerBackgroundSync() {
       console.warn("[S4 Users] background sync failed", error);
     });
   }
+}
+
+export function isActiveTeamMember(member) {
+  if (!member) return false;
+  if (member.role === "owner") return true;
+
+  const status = String(member.status || "active").toLowerCase();
+  return status !== "disabled" && status !== "closed" && member.isDeleted !== true;
 }
 
 export function localUserToTeamMember(localUser, extras = {}) {
@@ -35,6 +52,7 @@ export function localUserToTeamMember(localUser, extras = {}) {
     country: extras.country || "BD",
     countryName: extras.countryName || "",
     shopId: localUser.shopId,
+    status: "active",
     isLocalAuth: true,
   };
 }
@@ -68,7 +86,9 @@ export function mergeTeamMembers(cloudTeam = [], localTeam = []) {
         permissions: member.permissions ?? existing.permissions,
         personName: member.personName || existing.personName,
         username: member.username || existing.username,
+        email: member.email || existing.email,
         localUserId: member.localUserId || existing.localUserId,
+        status: member.status || existing.status || "active",
       });
     } else {
       map.set(uid, member);
@@ -80,6 +100,77 @@ export function mergeTeamMembers(cloudTeam = [], localTeam = []) {
     if (b.role === "owner") return 1;
     return String(a.personName || "").localeCompare(String(b.personName || ""));
   });
+}
+
+export function buildLegacyMembersFromInvites(usedInvites = [], existingIds = new Set()) {
+  const members = [];
+
+  for (const invite of usedInvites) {
+    if (!invite?.used) continue;
+
+    const uid = invite.usedBy || invite.usedByUid || "";
+    if (!uid || existingIds.has(uid)) continue;
+
+    members.push({
+      id: uid,
+      uid,
+      role: "salesman",
+      personName: invite.usedByName || invite.personName || "Staff",
+      email: invite.usedByEmail || invite.email || "",
+      username: invite.usedByUsername || invite.username || "",
+      position: "Salesman",
+      shopId: invite.shopId || "",
+      status: "active",
+      legacyInvite: true,
+    });
+    existingIds.add(uid);
+  }
+
+  return members;
+}
+
+export function assembleShopTeam({
+  cloudUsers = [],
+  localTeam = [],
+  usedInvites = [],
+} = {}) {
+  const merged = mergeTeamMembers(cloudUsers, localTeam);
+  const existingIds = new Set(merged.map((member) => member.uid || member.id).filter(Boolean));
+  const legacy = buildLegacyMembersFromInvites(usedInvites, existingIds);
+
+  return mergeTeamMembers(merged, legacy).filter(isActiveTeamMember);
+}
+
+export async function backfillLegacyTeamMembers({
+  cloudUsers = [],
+  usedInvites = [],
+  shopId = "",
+} = {}) {
+  if (!shopId || !usedInvites.length) return;
+
+  const cloudIds = new Set(
+    cloudUsers.map((member) => member.uid || member.id).filter(Boolean)
+  );
+
+  for (const invite of usedInvites) {
+    if (!invite?.used || !invite.usedBy || cloudIds.has(invite.usedBy)) continue;
+
+    try {
+      await writeCloudUserProfile(invite.usedBy, {
+        role: "salesman",
+        shopId,
+        personName: invite.usedByName || "Staff",
+        email: invite.usedByEmail || invite.email || "",
+        username: invite.usedByUsername || invite.username || "",
+        position: "Salesman",
+        status: "active",
+        legacyBackfill: true,
+      });
+      cloudIds.add(invite.usedBy);
+    } catch (error) {
+      console.warn("[S4 Team] legacy backfill failed", invite.usedBy, error);
+    }
+  }
 }
 
 async function syncTeamMemberToCloud(localUser, extras = {}) {
@@ -100,6 +191,7 @@ async function syncTeamMemberToCloud(localUser, extras = {}) {
     position: extras.position || (localUser.role === "owner" ? "মালিক" : "Salesman"),
     permissions: localUser.permissions,
     localUserId: localUser.id,
+    status: "active",
     updatedAt: new Date().toISOString(),
   });
 
@@ -119,12 +211,20 @@ export async function createShopStaffUser({
   country = "BD",
   countryName = "",
 } = {}) {
+  assertFirebaseReady(true);
+
+  const authEmail = buildLocalAuthEmail(username, shopId, email);
+  const fbUser = await createFirebaseAccount(authEmail.email, password, {
+    useProvisioner: true,
+  });
+
   const localUser = await createLocalUser({
     username,
     password,
     role: "salesman",
     personName,
-    email,
+    email: authEmail.email,
+    firebaseUid: fbUser.uid,
     shopId,
     permissions,
     mustChangePassword: false,
@@ -139,13 +239,26 @@ export async function createShopStaffUser({
     countryName,
   });
 
-  return localUserToTeamMember(localUser, {
+  await writeStaffLoginIndex({
+    username,
+    shopId,
+    authEmail: authEmail.email,
+    firebaseUid: fbUser.uid,
+    personName,
+  });
+
+  const member = localUserToTeamMember(localUser, {
     position,
     mobile,
     area,
     country,
     countryName,
   });
+
+  return {
+    ...member,
+    authEmail: authEmail.email,
+  };
 }
 
 async function resolveLocalUserForMember(memberId, localUserId = "") {
@@ -186,6 +299,42 @@ export async function updateShopMemberPermissions(
 
 export async function updateShopMemberPosition(memberId, position, localUserId = "") {
   return updateShopMemberPermissions(memberId, { position, localUserId });
+}
+
+export async function removeShopTeamMember(member, { ownerUid = "" } = {}) {
+  const memberId = member?.uid || member?.id;
+  if (!memberId) throw new Error("Member id is required.");
+  if (member?.role === "owner") throw new Error("Owner cannot be removed.");
+
+  const localUser = await resolveLocalUserForMember(memberId, member?.localUserId);
+  const docId = localUser?.firebaseUid || memberId;
+  const shopId = member?.shopId || localUser?.shopId || "";
+
+  await offlineUpsert("users", docId, {
+    uid: docId,
+    id: docId,
+    shopId,
+    role: member?.role || localUser?.role || "salesman",
+    personName: member?.personName || localUser?.personName || "",
+    username: member?.username || localUser?.username || "",
+    email: member?.email || localUser?.email || "",
+    status: "disabled",
+    disabledAt: new Date().toISOString(),
+    disabledBy: ownerUid || "",
+    updatedAt: new Date().toISOString(),
+  });
+
+  const username = member?.username || localUser?.username;
+  if (username) {
+    await deleteStaffLoginIndex(username);
+  }
+
+  if (localUser?.id) {
+    await deleteLocalUser(localUser.id);
+  }
+
+  triggerBackgroundSync();
+  return { ok: true, memberId: docId };
 }
 
 export async function resetShopMemberPassword(localUserId, newPassword) {

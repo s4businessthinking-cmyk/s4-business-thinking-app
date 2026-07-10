@@ -3,6 +3,19 @@ import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { bootOfflineSqlite } from "../offline/sqliteDb";
 import { auth, db, generateInviteCode } from "../firebase-config";
 import {
+  assertFirebaseReady,
+  buildLocalAuthEmail,
+  createFirebaseAccount,
+  isRealAuthEmail,
+  lookupStaffLoginIndex,
+  resolveLocalUserAuthEmail,
+  sendVerificationEmailIfNeeded,
+  writeCloudInviteCode,
+  writeCloudShop,
+  writeCloudUserProfile,
+  writeStaffLoginIndex,
+} from "./firebaseAuthBridge";
+import {
   countLocalUsers,
   createLocalUser,
   getLocalUserById,
@@ -204,18 +217,85 @@ function isOnline() {
 }
 
 async function ensureFirebaseSignedInAfterLocalLogin(localUser, password) {
-  if (!isOnline() || !auth || !db || auth.currentUser) return;
+  if (!isOnline() || !auth || !db) return localUser;
 
-  const email = String(localUser?.email || "").trim();
-  if (!email || !email.includes("@")) return;
+  let currentUser = localUser;
+  const authEmail = resolveLocalUserAuthEmail(currentUser);
+  if (!authEmail) return currentUser;
+
+  if (auth.currentUser?.uid === currentUser.firebaseUid) {
+    return currentUser;
+  }
 
   try {
-    await signInWithEmailAndPassword(auth, email, password);
+    await signInWithEmailAndPassword(auth, authEmail, password);
+    return currentUser;
   } catch (error) {
+    const code = error?.code || "";
+    const canProvision =
+      !currentUser.firebaseUid &&
+      currentUser.shopId &&
+      (code === "auth/user-not-found" ||
+        code === "auth/invalid-credential" ||
+        code === "auth/invalid-login-credentials");
+
+    if (!canProvision) {
+      console.warn(
+        "[S4 Auth] Firebase session was not established after local login:",
+        error?.message || error
+      );
+      return currentUser;
+    }
+  }
+
+  try {
+    const fbUser = await createFirebaseAccount(authEmail, password);
+    await updateLocalUserProfile(currentUser.id, {
+      firebaseUid: fbUser.uid,
+      email: authEmail,
+    });
+
+    await writeCloudUserProfile(fbUser.uid, {
+      role: currentUser.role,
+      shopId: currentUser.shopId,
+      personName: currentUser.personName,
+      username: currentUser.username,
+      email: authEmail,
+      position: currentUser.role === "owner" ? "মালিক" : "Salesman",
+      permissions: currentUser.permissions,
+      localUserId: currentUser.id,
+    });
+
+    if (currentUser.role === "owner" && currentUser.shopId) {
+      const cachedShop = readLegacyCachedShop(currentUser.shopId);
+      if (cachedShop) {
+        await writeCloudShop(currentUser.shopId, {
+          ...cachedShop,
+          ownerUid: fbUser.uid,
+        });
+      }
+    }
+
+    currentUser = await getLocalUserById(currentUser.id);
+    return currentUser;
+  } catch (provisionError) {
     console.warn(
-      "[S4 Auth] Firebase session was not established after local login:",
-      error?.message || error
+      "[S4 Auth] Could not provision Firebase account for local user:",
+      provisionError?.message || provisionError
     );
+    return localUser;
+  }
+}
+
+async function seedCloudInviteCodesForShop(shopId, codes = []) {
+  if (!db || !shopId || !codes.length) return;
+
+  for (const code of codes) {
+    try {
+      await writeCloudInviteCode(code, shopId);
+    } catch (error) {
+      console.warn("[S4 Auth] Could not write cloud invite code", code, error);
+    }
   }
 }
 
@@ -234,7 +314,7 @@ async function loginWithFirebaseEmail(email, password) {
 
   const fbUser = cred.user;
 
-  if (!fbUser.emailVerified) {
+  if (!fbUser.emailVerified && isRealAuthEmail(fbUser.email)) {
     try { await signOut(auth); } catch {}
     return {
       ok: false,
@@ -250,6 +330,12 @@ async function loginWithFirebaseEmail(email, password) {
   }
 
   const profData = profSnap.data();
+
+  if (profData.status === "disabled" || profData.status === "closed" || profData.isDeleted === true) {
+    try { await signOut(auth); } catch {}
+    return { ok: false, reason: "ACCOUNT_DISABLED" };
+  }
+
   let shop = null;
 
   if (profData.shopId) {
@@ -281,10 +367,10 @@ async function loginWithFirebaseEmail(email, password) {
     localUser = await getLocalUserById(localUser.id);
   } else {
     localUser = await createLocalUser({
-      username: normalizedEmail,
+      username: profData.username || normalizedEmail.split("@")[0],
       password,
       role: profData.role === "salesman" ? "salesman" : "owner",
-      personName: profData.personName || normalizedEmail.split("@")[0],
+      personName: profData.personName || profData.username || normalizedEmail.split("@")[0],
       email: fbUser.email || normalizedEmail,
       firebaseUid: fbUser.uid,
       shopId: profData.shopId || "",
@@ -329,6 +415,37 @@ export async function loginWithLocalCredentials(username, password) {
   return loginWithCredentials(username, password);
 }
 
+async function loginWithRemoteStaffUsername(username, password) {
+  if (!isOnline() || !auth || !db) {
+    return { ok: false, reason: "OFFLINE_STAFF_LOGIN" };
+  }
+
+  const index = await lookupStaffLoginIndex(username);
+  if (!index?.authEmail) {
+    return { ok: false, reason: "USER_NOT_FOUND" };
+  }
+
+  try {
+    return await loginWithFirebaseEmail(index.authEmail, password);
+  } catch (error) {
+    const code = error?.code || "";
+    if (
+      code === "auth/wrong-password" ||
+      code === "auth/invalid-credential" ||
+      code === "auth/invalid-login-credentials"
+    ) {
+      return { ok: false, reason: "INVALID_PASSWORD" };
+    }
+
+    return {
+      ok: false,
+      reason: "FIREBASE_ERROR",
+      code,
+      message: error?.message || String(error),
+    };
+  }
+}
+
 export async function loginWithCredentials(identifier, password) {
   await ensureLocalAuthBootstrap();
 
@@ -351,12 +468,12 @@ export async function loginWithCredentials(identifier, password) {
   }
 
   if (localResult.ok) {
-    await ensureFirebaseSignedInAfterLocalLogin(localResult.user, password);
-    const shopId = localResult.user?.shopId;
+    const linkedUser = await ensureFirebaseSignedInAfterLocalLogin(localResult.user, password);
+    const shopId = linkedUser?.shopId || localResult.user?.shopId;
     return {
       ok: true,
-      user: buildAppUserFromLocal(localResult.user),
-      profile: buildProfileFromLocal(localResult.user),
+      user: buildAppUserFromLocal(linkedUser || localResult.user),
+      profile: buildProfileFromLocal(linkedUser || localResult.user),
       shop: shopId ? readLegacyCachedShop(shopId) : null,
     };
   }
@@ -394,6 +511,24 @@ export async function loginWithCredentials(identifier, password) {
         code: error?.code || "",
         message: error?.message || String(error),
       };
+    }
+  }
+
+  if (
+    !localResult.ok &&
+    localResult.reason === "USER_NOT_FOUND" &&
+    !looksLikeEmail(trimmed)
+  ) {
+    if (!isOnline()) {
+      return { ok: false, reason: "OFFLINE_STAFF_LOGIN" };
+    }
+
+    const remoteResult = await loginWithRemoteStaffUsername(trimmed, password);
+    if (remoteResult.ok || remoteResult.reason === "EMAIL_NOT_VERIFIED") {
+      return remoteResult;
+    }
+    if (remoteResult.reason === "INVALID_PASSWORD") {
+      return remoteResult;
     }
   }
 
@@ -538,14 +673,20 @@ export async function registerLocalOwnerAccount({
   email = "",
 } = {}) {
   await bootOfflineSqlite();
+  assertFirebaseReady(true);
 
   const shopId = createId();
+  const authEmail = buildLocalAuthEmail(username, shopId, email);
+  const fbUser = await createFirebaseAccount(authEmail.email, password);
+  const verificationSent = await sendVerificationEmailIfNeeded(fbUser);
+
   const localUser = await createLocalUser({
     username,
     password,
     role: "owner",
     personName,
-    email,
+    email: authEmail.email,
+    firebaseUid: fbUser.uid,
     shopId,
     mustChangePassword: false,
     isEmergencyBootstrap: false,
@@ -555,7 +696,7 @@ export async function registerLocalOwnerAccount({
     id: shopId,
     companyName: String(companyName || "").trim(),
     ownerName: personName,
-    ownerUid: localUser.id,
+    ownerUid: fbUser.uid,
     country,
     countryName,
     area: String(area || "").trim(),
@@ -566,7 +707,8 @@ export async function registerLocalOwnerAccount({
     createdAt: new Date().toISOString(),
   };
 
-  createLocalInviteCodesForShop(shopId, 3);
+  const inviteCodes = createLocalInviteCodesForShop(shopId, 3);
+  await seedCloudInviteCodesForShop(shopId, inviteCodes);
 
   const profileExtras = {
     mobile: shop.mobile,
@@ -576,8 +718,24 @@ export async function registerLocalOwnerAccount({
     companyName: shop.companyName,
   };
 
+  await writeCloudShop(shopId, shop);
+  await writeCloudUserProfile(fbUser.uid, {
+    role: "owner",
+    shopId,
+    personName,
+    username,
+    email: authEmail.email,
+    mobile: shop.mobile,
+    country,
+    countryName,
+    area: shop.area,
+    companyName: shop.companyName,
+    position: "মালিক",
+    localUserId: localUser.id,
+  });
+
   await saveShopRecord(shopId, shop, {
-    ownerUid: localUser.id,
+    ownerUid: fbUser.uid,
     profile: buildProfileFromLocal(localUser, profileExtras),
     user: buildAppUserFromLocal(localUser),
   });
@@ -590,9 +748,25 @@ export async function registerLocalOwnerAccount({
     return login;
   }
 
+  const appUser = buildAppUserFromLocal(localUser);
+  appUser.email = authEmail.isRealEmail ? authEmail.email : email || "";
+  appUser.emailVerified = !authEmail.isRealEmail || fbUser.emailVerified;
+
+  if (authEmail.isRealEmail && !fbUser.emailVerified) {
+    return {
+      ok: true,
+      needsEmailVerification: true,
+      verificationSent,
+      rawFirebaseUser: fbUser,
+      user: appUser,
+      profile: buildProfileFromLocal(localUser, profileExtras),
+      shop,
+    };
+  }
+
   return {
     ok: true,
-    user: buildAppUserFromLocal(localUser),
+    user: appUser,
     profile: buildProfileFromLocal(localUser, profileExtras),
     shop,
   };
@@ -611,26 +785,65 @@ export async function registerLocalSalesmanAccount({
   permissions = null,
 } = {}) {
   await bootOfflineSqlite();
+  assertFirebaseReady(true);
 
   const inviteInfo = await resolveInviteCode(inviteCode);
+  const authEmail = buildLocalAuthEmail(username, inviteInfo.shopId, email);
+  const fbUser = await createFirebaseAccount(authEmail.email, password);
+  const verificationSent = await sendVerificationEmailIfNeeded(fbUser);
+
   const localUser = await createLocalUser({
     username,
     password,
     role: "salesman",
     personName,
-    email,
+    email: authEmail.email,
+    firebaseUid: fbUser.uid,
     shopId: inviteInfo.shopId,
     permissions,
     mustChangePassword: false,
     isEmergencyBootstrap: false,
   });
 
-  await markInviteCodeUsed(inviteInfo, localUser.id, personName);
+  await markInviteCodeUsed(inviteInfo, fbUser.uid, personName);
 
   const shop = {
     id: inviteInfo.shopId,
     ...inviteInfo.shopData,
   };
+
+  const profileExtras = {
+    mobile: String(mobile || "").trim(),
+    country,
+    countryName,
+    area: String(area || "").trim(),
+    joinedShopName: shop.companyName || "",
+    permissions,
+  };
+
+  await writeCloudUserProfile(fbUser.uid, {
+    role: "salesman",
+    shopId: inviteInfo.shopId,
+    personName,
+    username,
+    email: authEmail.email,
+    mobile: profileExtras.mobile,
+    country,
+    countryName,
+    area: profileExtras.area,
+    joinedShopName: profileExtras.joinedShopName,
+    position: "Salesman",
+    permissions,
+    localUserId: localUser.id,
+  });
+
+  await writeStaffLoginIndex({
+    username,
+    shopId: inviteInfo.shopId,
+    authEmail: authEmail.email,
+    firebaseUid: fbUser.uid,
+    personName,
+  });
 
   await saveShopRecord(inviteInfo.shopId, shop);
 
@@ -642,18 +855,25 @@ export async function registerLocalSalesmanAccount({
     return login;
   }
 
-  const profileExtras = {
-    mobile: String(mobile || "").trim(),
-    country,
-    countryName,
-    area: String(area || "").trim(),
-    joinedShopName: shop.companyName || "",
-    permissions,
-  };
+  const appUser = buildAppUserFromLocal(localUser);
+  appUser.email = authEmail.isRealEmail ? authEmail.email : email || "";
+  appUser.emailVerified = !authEmail.isRealEmail || fbUser.emailVerified;
+
+  if (authEmail.isRealEmail && !fbUser.emailVerified) {
+    return {
+      ok: true,
+      needsEmailVerification: true,
+      verificationSent,
+      rawFirebaseUser: fbUser,
+      user: appUser,
+      profile: buildProfileFromLocal(localUser, profileExtras),
+      shop,
+    };
+  }
 
   return {
     ok: true,
-    user: buildAppUserFromLocal(localUser),
+    user: appUser,
     profile: buildProfileFromLocal(localUser, profileExtras),
     shop,
   };
@@ -678,6 +898,15 @@ export function friendlyLocalAuthError(result, lang = "bn") {
     FIREBASE_UNAVAILABLE: isBn
       ? "Firebase প্রস্তুত নয়"
       : "Firebase is not ready",
+    OFFLINE_REQUIRED: isBn
+      ? "অ্যাকাউন্ট তৈরি/যোগদানের জন্য ইন্টারনেট লাগবে"
+      : "Internet is required to create or join an account",
+    OFFLINE_STAFF_LOGIN: isBn
+      ? "নতুন device-এ প্রথম login-এর জন্য একবার internet লাগবে"
+      : "Internet is required once for first login on a new device",
+    ACCOUNT_DISABLED: isBn
+      ? "এই অ্যাকাউন্ট বন্ধ করা হয়েছে। মালিকের সাথে যোগাযোগ করুন"
+      : "This account has been closed. Contact the owner",
     VALIDATION: isBn
       ? "ইউজারনেম/ইমেইল ও পাসওয়ার্ড দিন"
       : "Username/email and password required",

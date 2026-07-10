@@ -59,12 +59,21 @@ service cloud.firestore {
         request.auth.uid == userId ||
         (resource.data.shopId != null && getShopId(request.auth.uid) == resource.data.shopId)
       );
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow create: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (
+          request.resource.data.shopId != null &&
+          isOwnerOfShop(request.resource.data.shopId)
+        )
+      );
       allow update: if isAuthenticated() && (
         request.auth.uid == userId ||
         (resource.data.shopId != null && isOwnerOfShop(resource.data.shopId))
       );
-      allow delete: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAuthenticated() && (
+        request.auth.uid == userId ||
+        (resource.data.shopId != null && isOwnerOfShop(resource.data.shopId))
+      );
     }
 
     match /shops/{shopId} {
@@ -93,6 +102,16 @@ service cloud.firestore {
         && request.resource.data.shopId == resource.data.shopId
         && request.resource.data.used == true
         && request.resource.data.usedBy == request.auth.uid;
+      allow delete: if isAuthenticated() && isOwnerOfShop(resource.data.shopId);
+    }
+
+    // Lets a staff member log in on a new device with username + password (internet once).
+    match /staffLoginIndex/{username} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() && (
+        isOwnerOfShop(request.resource.data.shopId) ||
+        request.auth.uid == request.resource.data.firebaseUid
+      );
       allow delete: if isAuthenticated() && isOwnerOfShop(resource.data.shopId);
     }
 

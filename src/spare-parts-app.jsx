@@ -77,6 +77,9 @@ import {
   createShopStaffUser,
   listShopTeamMembers,
   mergeTeamMembers,
+  assembleShopTeam,
+  removeShopTeamMember,
+  backfillLegacyTeamMembers,
   updateShopMemberPermissions,
   updateShopMemberPosition,
   resetShopMemberPassword,
@@ -180,6 +183,9 @@ const TR = {
     addStaffTitle:"➕ নতুন কর্মী যোগ করুন",
     addStaffBtn:"কর্মী যোগ করুন",
     staffAddedOk:"✅ কর্মী যোগ হয়েছে",
+    removeMemberBtn:"🚫 বন্ধ করুন",
+    confirmRemoveMember:"এই কর্মীর অ্যাকাউন্ট বন্ধ করবেন? আর login করতে পারবে না।",
+    memberRemovedOk:"✅ কর্মীর অ্যাকাউন্ট বন্ধ করা হয়েছে",
     resetPwLbl:"নতুন পাসওয়ার্ড",
     resetPwBtn:"পাসওয়ার্ড রিসেট",
     resetPwOk:"✅ পাসওয়ার্ড আপডেট হয়েছে",
@@ -702,6 +708,9 @@ const TR = {
     addStaffTitle:"➕ Add New Staff",
     addStaffBtn:"Add staff member",
     staffAddedOk:"✅ Staff member added",
+    removeMemberBtn:"🚫 Close account",
+    confirmRemoveMember:"Close this staff account? They will not be able to login again.",
+    memberRemovedOk:"✅ Staff account closed",
     resetPwLbl:"New password",
     resetPwBtn:"Reset password",
     resetPwOk:"✅ Password updated",
@@ -1653,7 +1662,7 @@ function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:sp, the
 }
 
 // ─── SIGNUP FORM ─────────────────────────────────────────────
-function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme, onSignupSuccess }) {
+function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme, onSignupSuccess, onEmailVerificationRequired }) {
   const _s = sp||_globalS;
   const [companyName,setCompanyName]=useState("");
   const [personName,setPersonName]=useState("");
@@ -1715,6 +1724,12 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
         return;
       }
 
+      if (result.needsEmailVerification && result.rawFirebaseUser && onEmailVerificationRequired) {
+        toast(t.n11);
+        onEmailVerificationRequired(result.rawFirebaseUser);
+        return;
+      }
+
       toast(t.n9);
       onSignupSuccess(result);
     } catch(err) {
@@ -1722,6 +1737,10 @@ function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:
         toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
       } else if (err.code === "invite/not-found") {
         toast(lang==="bn"?"❌ Invite Code সঠিক নয়":"❌ Invalid invite code","err");
+      } else if (err.code === "OFFLINE_REQUIRED") {
+        toast(friendlyLocalAuthError({ reason: "OFFLINE_REQUIRED" }, lang), "err");
+      } else if (err.code === "auth/email-already-in-use") {
+        toast(friendlyAuthError(err, lang), "err");
       } else {
         toast(err?.message || friendlyAuthError(err,lang),"err");
       }
@@ -9212,34 +9231,56 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     return () => { unsub1(); unsub2 && unsub2(); };
   }, [shopId]);
 
+  const cloudTeamRef = useRef([]);
+  const inviteCodesRef = useRef([]);
+
+  const rebuildTeam = async () => {
+    if (!shopId) return;
+    try {
+      if (isOwner && inviteCodesRef.current.length) {
+        await backfillLegacyTeamMembers({
+          cloudUsers: cloudTeamRef.current,
+          usedInvites: inviteCodesRef.current,
+          shopId,
+        });
+      }
+
+      const localTeam = await listShopTeamMembers(shopId);
+      setTeam(
+        assembleShopTeam({
+          cloudUsers: cloudTeamRef.current,
+          localTeam,
+          usedInvites: inviteCodesRef.current,
+        })
+      );
+    } catch (err) {
+      console.error("[S4 Team] rebuild failed", err);
+    }
+  };
+
+  useEffect(() => {
+    inviteCodesRef.current = inviteCodes;
+    rebuildTeam();
+  }, [inviteCodes, shopId]);
+
   useEffect(() => {
     if (!shopId) return;
 
-    const refreshLocalTeam = async () => {
-      try {
-        const localTeam = await listShopTeamMembers(shopId);
-        setTeam((prev) => mergeTeamMembers(prev, localTeam));
-      } catch (err) {
-        console.error("[S4 Team] local load failed", err);
-      }
-    };
-
-    refreshLocalTeam();
+    rebuildTeam();
 
     return onSnapshot(
       query(collection(db,"users"), where("shopId","==",shopId)),
-      async (snap) => {
-        const cloudTeam = snap.docs.map((d) => ({
+      (snap) => {
+        cloudTeamRef.current = snap.docs.map((d) => ({
           ...d.data(),
           id: d.id,
           uid: d.data().uid || d.id,
         }));
-        const localTeam = await listShopTeamMembers(shopId);
-        setTeam(mergeTeamMembers(cloudTeam, localTeam));
+        rebuildTeam();
       },
       (err) => {
         console.error(err);
-        refreshLocalTeam();
+        rebuildTeam();
       }
     );
   },[shopId]);
@@ -10083,8 +10124,22 @@ const startEditOrder = (order) => {
       });
       setTeam((prev) => mergeTeamMembers(prev, [member]));
       setStaffForm({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
-      toast(t.staffAddedOk);
-    } catch(e) { hErr(e); }
+      toast(
+        member.authEmail
+          ? (lang==="bn"
+            ? `✅ কর্মী যোগ হয়েছে। অন্য device-এ username "${member.username}" + password দিয়ে login করুন (প্রথমবার internet লাগবে)`
+            : `✅ Staff added. On another device login with username "${member.username}" + password (internet needed once)`)
+          : t.staffAddedOk
+      );
+    } catch(e) {
+      if (e?.code === "OFFLINE_REQUIRED") {
+        toast(friendlyLocalAuthError({ reason: "OFFLINE_REQUIRED" }, lang), "err");
+      } else if (e?.code === "auth/email-already-in-use") {
+        toast(friendlyAuthError(e, lang), "err");
+      } else {
+        hErr(e);
+      }
+    }
     finally { setStaffSaving(false); }
   };
 
@@ -10101,6 +10156,19 @@ const startEditOrder = (order) => {
       setStaffPwReset((prev) => ({ ...prev, [member.localUserId]: "" }));
       toast(t.resetPwOk);
     } catch(e) { hErr(e); }
+  };
+
+  const closeTeamMember = async (member) => {
+    const memberId = member.uid || member.id;
+    if (!window.confirm(t.confirmRemoveMember)) return;
+
+    try {
+      await removeShopTeamMember(member, { ownerUid: user?.uid || profile?.uid || "" });
+      setTeam((prev) => prev.filter((m) => (m.uid || m.id) !== memberId));
+      toast(t.memberRemovedOk);
+    } catch (e) {
+      hErr(e);
+    }
   };
 
   const shortId  = (id) => id.slice(-6).toUpperCase();
@@ -11842,6 +11910,7 @@ const startEditOrder = (order) => {
                       <div style={{ fontSize:11, color:"#71717a" }}>
                         {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)}
                         {m.username&&<span> · @{m.username}</span>}
+                        {m.email&&<span> · ✉️ {m.email}</span>}
                         {m.mobile&&<span> · 📱 {m.mobile}</span>}
                         {m.area&&<span> · {m.area}</span>}
                       </div>
@@ -11881,6 +11950,11 @@ const startEditOrder = (order) => {
                           </div>
                         </>
                       )}
+                      <div style={{ height:1, background:th.bgCard, margin:"10px 0 8px" }} />
+                      <button
+                        style={{ ...s.addCoBtn, width:"100%", borderColor:"#450a0a", color:"#ef4444", marginTop:4 }}
+                        onClick={()=>closeTeamMember(m)}
+                      >{t.removeMemberBtn}</button>
                     </div>
                   )}
                 </div>
@@ -12298,6 +12372,7 @@ export default function App() {
           theme={theme}
           setTheme={setTheme}
           onSignupSuccess={applyAuthResult}
+          onEmailVerificationRequired={handleEmailVerificationRequired}
         />
       );
     } else {

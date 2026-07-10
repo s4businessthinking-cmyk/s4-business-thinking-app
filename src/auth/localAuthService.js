@@ -364,6 +364,14 @@ export async function verifyLocalUserPassword(
   };
 }
 
+export async function deleteLocalUser(userId) {
+  if (!userId) return;
+
+  await bootOfflineSqlite();
+  executeSql(`DELETE FROM local_users WHERE id = ?`, [userId]);
+  await persistOfflineDb();
+}
+
 export async function updateLocalUserProfile(userId, updates = {}) {
   if (!userId) throw new Error("userId is required.");
 
