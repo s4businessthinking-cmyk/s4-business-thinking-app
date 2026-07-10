@@ -39,7 +39,12 @@ function findWindowsInstaller(releaseDir, version) {
   return installers[0] || null;
 }
 
-function resolveAndroidApk(root) {
+function resolveAndroidApk(root, version) {
+  const releaseApk = path.join(root, "release", RELEASE_CONFIG.fileNames.apk(version));
+  if (fs.existsSync(releaseApk) && fs.statSync(releaseApk).size > 10 * 1024 * 1024) {
+    return releaseApk;
+  }
+
   const candidates = [
     path.join(root, "android", "app", "build", "outputs", "apk", "release", "app-release.apk"),
     path.join(
@@ -137,7 +142,7 @@ function syncReleaseOutputs({ requireAll = false } = {}) {
   ensureDir(projectReleaseDir);
   ensureDir(usbDeliveryDir);
 
-  const apkSource = resolveAndroidApk(root);
+  const apkSource = resolveAndroidApk(root, version);
   const bundleSource = resolveBundleZip(root, version);
   const exeSource = findWindowsInstaller(projectReleaseDir, version);
 
