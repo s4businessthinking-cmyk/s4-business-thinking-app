@@ -82,6 +82,7 @@ import {
   assembleShopTeam,
   removeShopTeamMember,
   backfillLegacyTeamMembers,
+  backfillShopStaffCloudRecords,
   updateShopMemberPermissions,
   updateShopMemberPosition,
   resetShopMemberPassword,
@@ -9113,6 +9114,28 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   }, [settingsPage]);
 
   useEffect(() => {
+    if (settingsPage !== "team" || !isOwner || !shopId || !team.length) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const result = await backfillShopStaffCloudRecords(shopId, team);
+        if (!cancelled && result?.updated > 0) {
+          rebuildTeam();
+        }
+      } catch (error) {
+        console.warn("[S4 Team] staff cloud backfill on team page failed", error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsPage, isOwner, shopId]);
+
+  useEffect(() => {
     if (!shopId) return;
     let cancelled = false;
 
@@ -9403,6 +9426,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const cloudTeamRef = useRef([]);
   const inviteCodesRef = useRef([]);
+  const teamPermissionOverridesRef = useRef({});
 
   const rebuildTeam = async () => {
     if (!shopId) return;
@@ -9416,13 +9440,29 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
 
       const localTeam = await listShopTeamMembers(shopId);
-      setTeam(
-        assembleShopTeam({
-          cloudUsers: cloudTeamRef.current,
-          localTeam,
-          usedInvites: inviteCodesRef.current,
-        })
-      );
+      let nextTeam = assembleShopTeam({
+        cloudUsers: cloudTeamRef.current,
+        localTeam,
+        usedInvites: inviteCodesRef.current,
+      });
+
+      const overrides = teamPermissionOverridesRef.current;
+      nextTeam = nextTeam.map((member) => {
+        const memberId = member.uid || member.id;
+        const override = overrides[memberId];
+        if (!override) return member;
+
+        const mergedCloud = { ...DEFAULT_PERMISSIONS, ...(member.permissions || {}) };
+        const mergedOverride = { ...DEFAULT_PERMISSIONS, ...override };
+        if (JSON.stringify(mergedCloud) === JSON.stringify(mergedOverride)) {
+          delete overrides[memberId];
+          return member;
+        }
+
+        return { ...member, permissions: override };
+      });
+
+      setTeam(nextTeam);
     } catch (err) {
       console.error("[S4 Team] rebuild failed", err);
     }
@@ -10254,15 +10294,21 @@ const startEditOrder = (order) => {
 
   const savePermissions = async (member, newPerms) => {
     const memberId = member.uid || member.id;
+    teamPermissionOverridesRef.current[memberId] = newPerms;
+    setTeam((prev) => prev.map((m) => ((m.uid || m.id) === memberId ? { ...m, permissions: newPerms } : m)));
     try {
       await updateShopMemberPermissions(memberId, {
         permissions: newPerms,
         position: member.position,
         localUserId: member.localUserId,
+        memberRecord: { ...member, permissions: newPerms, shopId },
       });
-      setTeam((prev) => prev.map((m) => ((m.uid || m.id) === memberId ? { ...m, permissions: newPerms } : m)));
       toast(t.permSaved);
-    } catch(e) { hErr(e); }
+    } catch(e) {
+      delete teamPermissionOverridesRef.current[memberId];
+      rebuildTeam();
+      hErr(e);
+    }
   };
 
   const saveMemberPosition = async (member, position) => {

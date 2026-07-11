@@ -4,6 +4,7 @@ import {
   buildLocalAuthEmail,
   createFirebaseAccount,
   deleteStaffLoginIndex,
+  isOnline,
   writeCloudUserProfile,
   writeStaffLoginIndex,
 } from "./firebaseAuthBridge";
@@ -83,7 +84,10 @@ export function mergeTeamMembers(cloudTeam = [], localTeam = []) {
       map.set(uid, {
         ...existing,
         ...member,
-        permissions: member.permissions ?? existing.permissions,
+        permissions: {
+          ...(existing.permissions || {}),
+          ...(member.permissions || {}),
+        },
         personName: member.personName || existing.personName,
         username: member.username || existing.username,
         email: member.email || existing.email,
@@ -173,6 +177,74 @@ export async function backfillLegacyTeamMembers({
   }
 }
 
+function resolveStaffAuthEmail(member, shopId, localUser = null) {
+  const stored = String(localUser?.email || member?.email || "").trim().toLowerCase();
+  if (stored && stored.includes("@")) return stored;
+  if (member?.username && shopId) {
+    return buildLocalAuthEmail(member.username, shopId).email;
+  }
+  return "";
+}
+
+export async function ensureStaffCloudLoginRecords(member, shopId) {
+  if (!member || member.role === "owner" || !shopId) return { ok: false };
+
+  const uid = member.uid || member.id;
+  const username = String(member.username || "").trim();
+  if (!uid || !username) return { ok: false };
+
+  const localUser = member.localUserId
+    ? await getLocalUserById(member.localUserId)
+    : await getLocalUserByFirebaseUid(uid);
+  const authEmail = resolveStaffAuthEmail(member, shopId, localUser);
+  if (!authEmail) return { ok: false };
+
+  assertFirebaseReady(isOnline());
+
+  await writeCloudUserProfile(uid, {
+    role: "salesman",
+    shopId,
+    personName: member.personName || localUser?.personName || username,
+    username: localUser?.username || username,
+    email: authEmail,
+    position: member.position || "Salesman",
+    permissions: member.permissions ?? localUser?.permissions ?? null,
+    mobile: member.mobile || "",
+    area: member.area || "",
+    country: member.country || "BD",
+    countryName: member.countryName || "",
+    localUserId: member.localUserId || localUser?.id || "",
+    status: member.status || "active",
+  });
+
+  await writeStaffLoginIndex({
+    username: localUser?.username || username,
+    shopId,
+    authEmail,
+    firebaseUid: uid,
+    personName: member.personName || localUser?.personName || username,
+  });
+
+  return { ok: true, uid, authEmail };
+}
+
+export async function backfillShopStaffCloudRecords(shopId, members = []) {
+  if (!shopId || !isOnline()) return { ok: false, updated: 0 };
+
+  let updated = 0;
+  for (const member of members) {
+    if (!member || member.role === "owner") continue;
+    try {
+      const result = await ensureStaffCloudLoginRecords(member, shopId);
+      if (result.ok) updated += 1;
+    } catch (error) {
+      console.warn("[S4 Team] staff cloud backfill failed", member.uid || member.id, error);
+    }
+  }
+
+  return { ok: true, updated };
+}
+
 async function syncTeamMemberToCloud(localUser, extras = {}) {
   const docId = localUser.firebaseUid || localUser.id;
 
@@ -239,6 +311,22 @@ export async function createShopStaffUser({
     countryName,
   });
 
+  await writeCloudUserProfile(fbUser.uid, {
+    role: "salesman",
+    shopId,
+    personName,
+    username: localUser.username,
+    email: authEmail.email,
+    position,
+    permissions: localUser.permissions,
+    mobile,
+    area,
+    country,
+    countryName,
+    localUserId: localUser.id,
+    status: "active",
+  });
+
   await writeStaffLoginIndex({
     username,
     shopId,
@@ -275,10 +363,11 @@ async function resolveLocalUserForMember(memberId, localUserId = "") {
 
 export async function updateShopMemberPermissions(
   memberId,
-  { permissions, position, localUserId } = {}
+  { permissions, position, localUserId, memberRecord = null } = {}
 ) {
   const localUser = await resolveLocalUserForMember(memberId, localUserId);
   const docId = localUser?.firebaseUid || memberId;
+  const shopId = localUser?.shopId || memberRecord?.shopId || "";
 
   if (localUser && permissions !== undefined && permissions !== null) {
     await updateLocalUserProfile(localUser.id, { permissions });
@@ -287,11 +376,33 @@ export async function updateShopMemberPermissions(
   await offlineUpsert("users", docId, {
     uid: docId,
     id: docId,
-    shopId: localUser?.shopId || "",
+    shopId,
+    role: localUser?.role || memberRecord?.role || "salesman",
+    personName: localUser?.personName || memberRecord?.personName || "",
+    username: localUser?.username || memberRecord?.username || "",
+    email: localUser?.email || memberRecord?.email || "",
     permissions,
     ...(position ? { position } : {}),
     updatedAt: new Date().toISOString(),
   });
+
+  if (isOnline() && shopId && docId) {
+    const mergedMember = {
+      ...(memberRecord || {}),
+      uid: docId,
+      id: docId,
+      shopId,
+      permissions,
+      position: position || memberRecord?.position || "Salesman",
+      username: localUser?.username || memberRecord?.username || "",
+      personName: localUser?.personName || memberRecord?.personName || "",
+      email: localUser?.email || memberRecord?.email || "",
+      mobile: memberRecord?.mobile || "",
+      localUserId: localUser?.id || memberRecord?.localUserId || "",
+      status: memberRecord?.status || "active",
+    };
+    await ensureStaffCloudLoginRecords(mergedMember, shopId);
+  }
 
   triggerBackgroundSync();
   return { ok: true, docId };
