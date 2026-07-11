@@ -69,6 +69,7 @@ import {
   registerLocalOwnerAccount,
   registerLocalSalesmanAccount,
   addLocalInviteCode,
+  repairStaffProfileIfNeeded,
 } from "./auth/localAuthBootstrap";
 import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAuthService";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
@@ -9050,7 +9051,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   }, []);
 
   useEffect(() => {
-    if (!shopId) return;
+    if (!shopId) {
+      setSyncState("offline");
+      return;
+    }
+
     setLastCloudPullAt(getShopCloudPulledAt(shopId));
     refreshSyncDashboard();
 
@@ -12498,6 +12503,44 @@ export default function App() {
     setShop(null);
     setProfileError(null);
   };
+
+  useEffect(() => {
+    if (!profile?.localUserId || profile.role === "owner" || profile.shopId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      for (let attempt = 0; attempt < 12 && !cancelled; attempt++) {
+        if (auth?.currentUser || (typeof navigator !== "undefined" && !navigator.onLine)) break;
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+
+      const repaired = await repairStaffProfileIfNeeded(profile.localUserId);
+      if (cancelled || !repaired?.ok || !repaired.profile?.shopId) {
+        if (repaired?.reason === "ACCOUNT_DISABLED") {
+          toast(
+            lang === "bn"
+              ? "অ্যাকাউন্ট বন্ধ করা হয়েছে। মালিকের সাথে যোগাযোগ করুন।"
+              : "This account has been disabled. Contact the owner.",
+            "err"
+          );
+          handleLogout();
+        }
+        return;
+      }
+
+      setProfile(repaired.profile);
+      saveCachedProfile(repaired.profile.uid, repaired.profile);
+      if (repaired.shop?.id) {
+        setShop(repaired.shop);
+        saveCachedShop(repaired.shop.id, repaired.shop);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.localUserId, profile?.shopId, profile?.role, lang]);
 
   useEffect(() => {
     let cancelled = false;

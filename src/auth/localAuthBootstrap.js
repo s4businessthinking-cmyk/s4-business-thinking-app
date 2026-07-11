@@ -29,7 +29,7 @@ import {
   getActiveOfflineSession,
   clearOfflineSessions,
 } from "./authSession";
-import { saveShopRecord } from "../offline/shopService";
+import { loadShopRecord, saveShopRecord } from "../offline/shopService";
 import { offlineGetById } from "../offline/offlineRepository";
 
 function isDisabledMember(data = {}) {
@@ -37,29 +37,76 @@ function isDisabledMember(data = {}) {
   return status === "disabled" || status === "closed" || data.isDeleted === true;
 }
 
+async function resolveShopForLogin(shopId) {
+  if (!shopId) return null;
+
+  const cached = readLegacyCachedShop(shopId);
+  if (cached) return cached;
+
+  try {
+    const localShop = await loadShopRecord(shopId);
+    if (localShop) return localShop;
+  } catch (error) {
+    console.warn("[S4 Auth] local shop load failed", error);
+  }
+
+  if (isOnline() && db) {
+    try {
+      const shopSnap = await getDoc(doc(db, "shops", shopId));
+      if (shopSnap.exists()) {
+        return { id: shopSnap.id, ...shopSnap.data() };
+      }
+    } catch (error) {
+      console.warn("[S4 Auth] cloud shop load failed", error);
+    }
+  }
+
+  return null;
+}
+
 async function finalizeStaffLocalLogin(localUser) {
   if (!localUser || localUser.role === "owner") {
     return { ok: true, localUser, profileExtras: {} };
   }
 
-  const uid = localUser.firebaseUid || localUser.id;
+  const cloudUid =
+    auth?.currentUser?.uid ||
+    localUser.firebaseUid ||
+    "";
+  const offlineLookupId = cloudUid || localUser.id;
   let memberData = null;
 
   try {
-    const row = await offlineGetById("users", uid);
+    const row = await offlineGetById("users", offlineLookupId);
     memberData = row?.data || null;
   } catch (error) {
     console.warn("[S4 Auth] offline member profile read failed", error);
   }
 
-  if (isOnline() && db && auth?.currentUser?.uid === uid) {
+  if (isOnline() && db && cloudUid) {
     try {
-      const snap = await getDoc(doc(db, "users", uid));
+      const snap = await getDoc(doc(db, "users", cloudUid));
       if (snap.exists()) {
         memberData = { ...(memberData || {}), ...snap.data() };
       }
     } catch (error) {
       console.warn("[S4 Auth] cloud member profile refresh failed", error);
+    }
+  }
+
+  const localShopId = String(localUser.shopId || "").trim();
+  const memberShopId = String(memberData?.shopId || "").trim();
+  if (!localShopId && !memberShopId && isOnline()) {
+    try {
+      const index = await lookupStaffLoginIndex(localUser.username);
+      if (index?.shopId) {
+        memberData = { ...(memberData || {}), shopId: index.shopId };
+      }
+      if (index?.firebaseUid && !cloudUid) {
+        memberData = { ...(memberData || {}), uid: index.firebaseUid };
+      }
+    } catch (error) {
+      console.warn("[S4 Auth] staff login index lookup failed", error);
     }
   }
 
@@ -70,6 +117,25 @@ async function finalizeStaffLocalLogin(localUser) {
   const profileExtras = {};
   const updates = {};
   let nextUser = localUser;
+
+  const resolvedFirebaseUid =
+    auth?.currentUser?.uid ||
+    localUser.firebaseUid ||
+    memberData?.uid ||
+    memberData?.id ||
+    "";
+
+  if (resolvedFirebaseUid && resolvedFirebaseUid !== localUser.firebaseUid) {
+    updates.firebaseUid = resolvedFirebaseUid;
+  }
+
+  const resolvedShopId =
+    localShopId ||
+    String(memberData?.shopId || "").trim();
+
+  if (!localShopId && resolvedShopId) {
+    updates.shopId = resolvedShopId;
+  }
 
   if (memberData?.permissions !== undefined && memberData?.permissions !== null) {
     updates.permissions = memberData.permissions;
@@ -263,12 +329,14 @@ export async function restoreLocalAuthSession() {
   }
 
   const finalUser = access.localUser || localUser;
+  const shopId = finalUser?.shopId || "";
 
   return {
     session,
     localUser: finalUser,
     user: buildAppUserFromLocal(finalUser),
     profile: buildProfileFromLocal(finalUser, access.profileExtras || {}),
+    shop: shopId ? await resolveShopForLogin(shopId) : null,
   };
 }
 
@@ -293,6 +361,13 @@ async function ensureFirebaseSignedInAfterLocalLogin(localUser, password) {
 
   try {
     await signInWithEmailAndPassword(auth, authEmail, password);
+    if (auth.currentUser?.uid && auth.currentUser.uid !== currentUser.firebaseUid) {
+      await updateLocalUserProfile(currentUser.id, {
+        firebaseUid: auth.currentUser.uid,
+        email: auth.currentUser.email || authEmail,
+      });
+      currentUser = await getLocalUserById(currentUser.id);
+    }
     return currentUser;
   } catch (error) {
     const code = error?.code || "";
@@ -546,7 +621,7 @@ export async function loginWithCredentials(identifier, password) {
       ok: true,
       user: buildAppUserFromLocal(finalUser),
       profile: buildProfileFromLocal(finalUser, access.profileExtras || {}),
-      shop: shopId ? readLegacyCachedShop(shopId) : null,
+      shop: shopId ? await resolveShopForLogin(shopId) : null,
     };
   }
 
@@ -948,6 +1023,32 @@ export async function registerLocalSalesmanAccount({
     user: appUser,
     profile: buildProfileFromLocal(localUser, profileExtras),
     shop,
+  };
+}
+
+export async function repairStaffProfileIfNeeded(localUserId) {
+  if (!localUserId) return null;
+
+  await ensureLocalAuthBootstrap();
+  const localUser = await getLocalUserById(localUserId);
+  if (!localUser || localUser.role === "owner" || String(localUser.shopId || "").trim()) {
+    return null;
+  }
+
+  const access = await finalizeStaffLocalLogin(localUser);
+  if (!access.ok) {
+    return { ok: false, reason: access.reason };
+  }
+
+  const finalUser = access.localUser || localUser;
+  const shopId = String(finalUser.shopId || "").trim();
+  if (!shopId) return null;
+
+  return {
+    ok: true,
+    localUser: finalUser,
+    profile: buildProfileFromLocal(finalUser, access.profileExtras || {}),
+    shop: await resolveShopForLogin(shopId),
   };
 }
 
