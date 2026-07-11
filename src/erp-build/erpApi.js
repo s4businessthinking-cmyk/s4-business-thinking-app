@@ -548,3 +548,55 @@ export async function publishRealtimeTest(accessToken, tenantId, message = "") {
     body: JSON.stringify({ group: "tenant", event_type: "realtime.test.ping", message }),
   });
 }
+
+// -- STAGE 12 — Desktop Devices (provisioning / registry) ------------------
+
+export async function fetchDeviceStatus(accessToken, tenantId) {
+  return fetchJson("/devices/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchDevices(accessToken, tenantId) {
+  return fetchJson("/devices/list/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchDeviceActivations(accessToken, tenantId) {
+  return fetchJson("/devices/activations/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function createDeviceActivation(accessToken, tenantId, payload = {}) {
+  return fetchJson("/devices/activations/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function redeemDeviceActivation(tenantId, payload) {
+  return fetchJson("/devices/redeem/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Tenant-Id": tenantId },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deviceHeartbeat(tenantId, payload) {
+  return fetchJson("/devices/heartbeat/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Tenant-Id": tenantId },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function deviceAction(accessToken, tenantId, payload) {
+  return fetchJson("/devices/action/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}

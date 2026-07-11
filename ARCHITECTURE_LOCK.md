@@ -27,7 +27,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Current STAGE** | 11 — OFFLINE + REALTIME ✅ COMPLETE → next STAGE 12 |
+| **Current STAGE** | 12 — ELECTRON DESKTOP 🔄 (backend device provisioning ✅; native client pending) |
 | **Started** | 2026-07-09 |
 | **Browser dashboard** | `http://localhost:5173/?erp-dashboard=1` |
 
@@ -62,7 +62,7 @@ STAGE 8  ✅ Accounting (CoA, JE, GL, trial balance, auto-JE)
 STAGE 9  ✅ HRM + CRM (employee, attendance, leave, lead, opportunity)
 STAGE 10 ✅ Reports + Analytics (KPI dashboard, standard reports, run engine)
 STAGE 11 ✅ Offline + Realtime (Channels/Daphne WS, tickets, presence, replay, outbox relay)
-STAGE 12 🔄 Electron Desktop (migrate) (NEXT)
+STAGE 12 🔄 Electron Desktop — backend device provisioning + registry ✅ (activation codes, device keys, heartbeat, version pin/channel, RBAC, dashboard panel). Native client (SQLCipher, peripherals, POS multi-window) = hardware-only follow-up. Production electron/main.cjs untouched.
 STAGE 13 ⏳ Enterprise Extras
 STAGE 14 ⏳ Security + Backup
 STAGE 15 ⏳ Deployment + Scaling

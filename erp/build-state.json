@@ -3,8 +3,8 @@
   "architecture_version": "v2",
   "architecture_doc": "ERP_ARCHITECTURE.md",
   "roadmap_doc": "S4 Business Thinking Erp Complete Build Roadmap.pdf",
-  "current_stage": 11,
-  "current_stage_name": "OFFLINE + REALTIME",
+  "current_stage": 12,
+  "current_stage_name": "ELECTRON DESKTOP (DEVICE PROVISIONING)",
   "dashboard_url": "/?erp-dashboard=1",
   "stages": [
     { "id": 0, "code": "STAGE_0", "name": "Planning + Architecture", "name_bn": "প্ল্যানিং + আর্কিটেকচার", "status": "completed", "progress_pct": 100 },
@@ -55,6 +55,25 @@
         { "id": "11.9", "label": "Browser realtime live test panel", "label_bn": "Browser panel", "status": "completed" }
       ]
     },
-    { "id": 12, "code": "STAGE_12", "name": "Electron Desktop (migrate)", "name_bn": "ইলেকট্রন ডেস্কটপ", "status": "pending", "progress_pct": 0 }
+    {
+      "id": 12,
+      "code": "STAGE_12",
+      "name": "Electron Desktop (migrate)",
+      "name_bn": "ইলেকট্রন ডেস্কটপ",
+      "status": "in_progress",
+      "progress_pct": 60,
+      "note": "Backend desktop device provisioning + registry (dashboard-verifiable). Native Electron client (SQLCipher, peripherals, POS windows) is separate hardware-only follow-up.",
+      "items": [
+        { "id": "12.1", "label": "Devices app: DesktopDevice/DeviceActivation/DeviceEvent models + migration", "label_bn": "Models", "status": "completed" },
+        { "id": "12.2", "label": "Device keys (hash once) + activation codes", "label_bn": "Keys", "status": "completed" },
+        { "id": "12.3", "label": "First-run provisioning (create/redeem activation) §20.10", "label_bn": "Provisioning", "status": "completed" },
+        { "id": "12.4", "label": "Heartbeat + update-target resolver (channel/pin) §20.7", "label_bn": "Heartbeat/Update", "status": "completed" },
+        { "id": "12.5", "label": "Registry manage (pin version / channel / disable)", "label_bn": "Registry", "status": "completed" },
+        { "id": "12.6", "label": "APIs + RBAC devices.read/provision/manage + seed", "label_bn": "APIs/RBAC", "status": "completed" },
+        { "id": "12.7", "label": "Browser devices test panel", "label_bn": "Browser panel", "status": "completed" },
+        { "id": "12.8", "label": "Native Electron client: SQLCipher local DB", "label_bn": "SQLCipher", "status": "pending" },
+        { "id": "12.9", "label": "Native Electron client: peripherals + POS multi-window", "label_bn": "Peripherals/POS", "status": "pending" }
+      ]
+    }
   ]
 }

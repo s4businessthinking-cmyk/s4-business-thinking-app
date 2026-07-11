@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "apps.crm",
     "apps.reports",
     "apps.realtime",
+    "apps.devices",
 ]
 
 MIDDLEWARE = [
