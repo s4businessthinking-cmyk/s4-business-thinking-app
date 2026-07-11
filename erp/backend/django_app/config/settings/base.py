@@ -26,12 +26,14 @@ DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "channels",
     "corsheaders",
     "rest_framework",
     "apps.core",
@@ -48,6 +50,7 @@ INSTALLED_APPS = [
     "apps.hrm",
     "apps.crm",
     "apps.reports",
+    "apps.realtime",
 ]
 
 MIDDLEWARE = [
@@ -84,6 +87,19 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
+
+REDIS_URL = env("REDIS_URL", default="redis://127.0.0.1:6379/0")
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+            "capacity": 1500,
+            "expiry": 30,
+        },
+    }
+}
 
 DATABASES = {
     "default": {
@@ -184,7 +200,13 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 300
 
-ERP_APP_VERSION = env("ERP_APP_VERSION", default="0.7.0-stage7")
+ERP_APP_VERSION = env("ERP_APP_VERSION", default="0.11.0-stage11")
+
+# Realtime (STAGE 11) — WebSocket tickets + replay ring buffer
+REALTIME_WS_TICKET_TTL_SECONDS = env.int("REALTIME_WS_TICKET_TTL_SECONDS", default=30)
+REALTIME_RING_BUFFER_SIZE = env.int("REALTIME_RING_BUFFER_SIZE", default=200)
+REALTIME_RING_BUFFER_TTL_SECONDS = env.int("REALTIME_RING_BUFFER_TTL_SECONDS", default=600)
+REALTIME_PRESENCE_TTL_SECONDS = env.int("REALTIME_PRESENCE_TTL_SECONDS", default=60)
 
 LICENSE_PUBLIC_KEY_JWK = {
     "kty": "EC",

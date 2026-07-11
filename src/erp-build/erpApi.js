@@ -506,3 +506,45 @@ export async function runReport(accessToken, tenantId, reportCode, parameters = 
     body: JSON.stringify({ report_code: reportCode, parameters }),
   });
 }
+
+// -- STAGE 11 — Realtime (WebSocket) ---------------------------------------
+
+export function getErpWsUrl(path = "/ws/realtime/") {
+  const explicit = import.meta.env.VITE_ERP_WS_BASE;
+  if (explicit && String(explicit).trim()) {
+    return `${String(explicit).replace(/\/$/, "")}${path}`;
+  }
+  if (typeof window === "undefined") return path;
+  const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+  return `${proto}//${window.location.host}${path}`;
+}
+
+export async function requestWsTicket(accessToken, tenantId, deviceId = "") {
+  return fetchJson("/realtime/ws-ticket/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ device_id: deviceId }),
+  });
+}
+
+export async function fetchRealtimeStatus(accessToken, tenantId) {
+  return fetchJson("/realtime/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function relayOutbox(accessToken, tenantId, batchSize = 200) {
+  return fetchJson("/realtime/relay-outbox/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ batch_size: batchSize }),
+  });
+}
+
+export async function publishRealtimeTest(accessToken, tenantId, message = "") {
+  return fetchJson("/realtime/publish-test/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ group: "tenant", event_type: "realtime.test.ping", message }),
+  });
+}

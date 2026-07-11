@@ -15,4 +15,5 @@ urlpatterns = [
     path("api/v1/", include("apps.hrm.urls")),
     path("api/v1/", include("apps.crm.urls")),
     path("api/v1/", include("apps.reports.urls")),
+    path("api/v1/", include("apps.realtime.urls")),
 ]

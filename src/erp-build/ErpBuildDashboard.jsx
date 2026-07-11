@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import AccountingTestPanel from "./AccountingTestPanel.jsx";
 import HrmCrmTestPanel from "./HrmCrmTestPanel.jsx";
 import ReportsTestPanel from "./ReportsTestPanel.jsx";
+import RealtimeTestPanel from "./RealtimeTestPanel.jsx";
 import AuthTestPanel from "./AuthTestPanel.jsx";
 import InventoryTestPanel from "./InventoryTestPanel.jsx";
 import PurchaseTestPanel from "./PurchaseTestPanel.jsx";
@@ -247,6 +248,7 @@ export default function ErpBuildDashboard() {
         <AccountingTestPanel />
         <HrmCrmTestPanel />
         <ReportsTestPanel />
+        <RealtimeTestPanel />
 
         <section>
           <h2 style={{ fontSize: 16, marginBottom: 12 }}>Build Stages (Locked Order)</h2>

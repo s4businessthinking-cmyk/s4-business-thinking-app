@@ -3,8 +3,8 @@
   "architecture_version": "v2",
   "architecture_doc": "ERP_ARCHITECTURE.md",
   "roadmap_doc": "S4 Business Thinking Erp Complete Build Roadmap.pdf",
-  "current_stage": 10,
-  "current_stage_name": "REPORTS + ANALYTICS",
+  "current_stage": 11,
+  "current_stage_name": "OFFLINE + REALTIME",
   "dashboard_url": "/?erp-dashboard=1",
   "stages": [
     { "id": 0, "code": "STAGE_0", "name": "Planning + Architecture", "name_bn": "প্ল্যানিং + আর্কিটেকচার", "status": "completed", "progress_pct": 100 },
@@ -36,6 +36,25 @@
         { "id": "10.9", "label": "Browser reports test panel", "label_bn": "Browser panel", "status": "completed" }
       ]
     },
-    { "id": 11, "code": "STAGE_11", "name": "Offline + Realtime", "name_bn": "অফলাইন + রিয়েলটাইম", "status": "pending", "progress_pct": 0 }
+    {
+      "id": 11,
+      "code": "STAGE_11",
+      "name": "Offline + Realtime",
+      "name_bn": "অফলাইন + রিয়েলটাইম",
+      "status": "completed",
+      "progress_pct": 100,
+      "items": [
+        { "id": "11.1", "label": "Channels/Daphne deps + channel layer", "label_bn": "Channels setup", "status": "completed" },
+        { "id": "11.2", "label": "ASGI ProtocolTypeRouter + ws routing", "label_bn": "ASGI router", "status": "completed" },
+        { "id": "11.3", "label": "Single-use WebSocket tickets (Redis)", "label_bn": "WS ticket", "status": "completed" },
+        { "id": "11.4", "label": "RealtimeConsumer auth + groups + heartbeat", "label_bn": "Consumer", "status": "completed" },
+        { "id": "11.5", "label": "Message envelope + publisher (group_send)", "label_bn": "Publisher", "status": "completed" },
+        { "id": "11.6", "label": "Replay ring buffer + SSE fallback", "label_bn": "Replay/SSE", "status": "completed" },
+        { "id": "11.7", "label": "Outbox to realtime relay (Celery + REST)", "label_bn": "Outbox relay", "status": "completed" },
+        { "id": "11.8", "label": "Presence + RBAC realtime permissions + seed", "label_bn": "Presence/RBAC", "status": "completed" },
+        { "id": "11.9", "label": "Browser realtime live test panel", "label_bn": "Browser panel", "status": "completed" }
+      ]
+    },
+    { "id": 12, "code": "STAGE_12", "name": "Electron Desktop (migrate)", "name_bn": "ইলেকট্রন ডেস্কটপ", "status": "pending", "progress_pct": 0 }
   ]
 }

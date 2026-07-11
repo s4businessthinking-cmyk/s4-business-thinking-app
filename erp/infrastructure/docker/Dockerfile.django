@@ -20,4 +20,4 @@ COPY build-state.json /app/erp/build-state.json
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_erp_auth && python manage.py seed_erp_tenancy && python manage.py seed_erp_sync && python manage.py seed_erp_inventory && python manage.py seed_erp_purchase && python manage.py seed_erp_sales && python manage.py seed_erp_accounting && python manage.py seed_erp_hrm_crm && python manage.py seed_erp_reports && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_erp_auth && python manage.py seed_erp_tenancy && python manage.py seed_erp_sync && python manage.py seed_erp_inventory && python manage.py seed_erp_purchase && python manage.py seed_erp_sales && python manage.py seed_erp_accounting && python manage.py seed_erp_hrm_crm && python manage.py seed_erp_reports && python manage.py seed_erp_realtime && daphne -b 0.0.0.0 -p 8000 config.asgi:application"]
