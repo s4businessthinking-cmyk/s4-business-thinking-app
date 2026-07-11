@@ -49,3 +49,45 @@ def _compute_hash(entry: AuditLogEntry, prev_hash: str) -> str:
     }
     raw = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
+
+
+def verify_chain(limit: int | None = None) -> dict:
+    """Tamper-evidence check (ERP_ARCHITECTURE §8.5).
+
+    Walks the audit log in write order, recomputing each entry's hash and
+    confirming both the stored ``entry_hash`` and the ``prev_hash`` linkage.
+    Returns the first break (if any) so an investigator can pinpoint tampering.
+    """
+    qs = AuditLogEntry.objects.order_by("created_at")
+    if limit:
+        # Verify only the most recent `limit` entries (still order-correct).
+        ids = list(
+            AuditLogEntry.objects.order_by("-created_at").values_list("id", flat=True)[:limit]
+        )
+        qs = AuditLogEntry.objects.filter(id__in=ids).order_by("created_at")
+
+    checked = 0
+    prev_hash = ""
+    first_break = None
+    for entry in qs.iterator():
+        expected = _compute_hash(entry, prev_hash)
+        link_ok = entry.prev_hash == prev_hash
+        hash_ok = entry.entry_hash == expected
+        if not (link_ok and hash_ok) and first_break is None:
+            first_break = {
+                "entry_id": str(entry.id),
+                "created_at": entry.created_at.isoformat() if entry.created_at else "",
+                "action": entry.action,
+                "link_ok": link_ok,
+                "hash_ok": hash_ok,
+                "expected_hash": expected,
+                "stored_hash": entry.entry_hash,
+            }
+        prev_hash = entry.entry_hash
+        checked += 1
+
+    return {
+        "ok": first_break is None,
+        "checked": checked,
+        "first_break": first_break,
+    }

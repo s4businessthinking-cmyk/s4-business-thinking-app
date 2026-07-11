@@ -27,7 +27,7 @@
 
 | Field | Value |
 |-------|-------|
-| **Current STAGE** | 12 — ELECTRON DESKTOP 🔄 (backend device provisioning ✅; native client pending) |
+| **Current STAGE** | 16 — FINAL HARDENING ✅ COMPLETE → all core stages done 🎉 |
 | **Started** | 2026-07-09 |
 | **Browser dashboard** | `http://localhost:5173/?erp-dashboard=1` |
 
@@ -63,10 +63,12 @@ STAGE 9  ✅ HRM + CRM (employee, attendance, leave, lead, opportunity)
 STAGE 10 ✅ Reports + Analytics (KPI dashboard, standard reports, run engine)
 STAGE 11 ✅ Offline + Realtime (Channels/Daphne WS, tickets, presence, replay, outbox relay)
 STAGE 12 🔄 Electron Desktop — backend device provisioning + registry ✅ (activation codes, device keys, heartbeat, version pin/channel, RBAC, dashboard panel). Native client (SQLCipher, peripherals, POS multi-window) = hardware-only follow-up. Production electron/main.cjs untouched.
-STAGE 13 ⏳ Enterprise Extras
-STAGE 14 ⏳ Security + Backup
-STAGE 15 ⏳ Deployment + Scaling
-STAGE 16 ⏳ Final Hardening
+STAGE 13 ✅ Enterprise Extras — Notifications & Alerts (real low-stock rules + realtime push), Approval workflows (multi-step, RBAC), Document attachments (§24 storage abstraction + checksum), Custom fields + Number sequences (atomic, period reset). Dashboard panels for all.
+STAGE 14 ✅ Security + Backup — real pg_dump/dumpdata backups (SHA-256 checksum + 35-day retention + Celery beat), audit hash-chain tamper verify (§8.5), per-tenant API keys (hashed), security policy, security headers middleware (§17.7). Dashboard panel for all. MFA/TOTP deferred.
+STAGE 15 ✅ Deployment + Scaling — observability (dependency-free Prometheus /metrics + request middleware + ops status API/panel) + single-VPS production stack (§16.5: multi-stage non-root prod image, gunicorn web + daphne ws + celery worker/beat, nginx reverse proxy http+WS, postgres/redis/minio). Full k8s cluster manifests (§16.1) deferred — needs a real cluster to verify.
+STAGE 16 ✅ Final Hardening — DRF rate limiting (anon/user + tight login IP+email + self-test scope), edge idempotency middleware (Idempotency-Key → cached, replay-safe writes), upload hardening (dangerous-extension blocklist + optional content-type allowlist), uniform error envelope (verified). Dashboard proves live 429 + idempotent replay. Chaos/load/DR drills = ops runbooks (deferred).
+
+ALL CORE STAGES (0–16) COMPLETE. Remaining deferred (environment/hardware-dependent): STAGE 12.8/12.9 native Electron client (SQLCipher, peripherals, POS windows), STAGE 14.10 MFA/TOTP, STAGE 15.9 full k8s cluster manifests, STAGE 16.7 chaos/load/DR drills.
 ```
 
 ---

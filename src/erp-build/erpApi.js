@@ -600,3 +600,298 @@ export async function deviceAction(accessToken, tenantId, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+// -- STAGE 13 — Notifications & Alerts -------------------------------------
+
+export async function fetchNotificationStatus(accessToken, tenantId) {
+  return fetchJson("/notifications/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchNotifications(accessToken, tenantId, unreadOnly = false) {
+  const qs = unreadOnly ? "?unread=1" : "";
+  return fetchJson(`/notifications/${qs}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function markNotificationRead(accessToken, tenantId, notificationId) {
+  return fetchJson("/notifications/mark-read/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ notification_id: notificationId }),
+  });
+}
+
+export async function markAllNotificationsRead(accessToken, tenantId) {
+  return fetchJson("/notifications/mark-all-read/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchNotificationRules(accessToken, tenantId) {
+  return fetchJson("/notifications/rules/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function createNotificationRule(accessToken, tenantId, payload) {
+  return fetchJson("/notifications/rules/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function notificationRuleAction(accessToken, tenantId, payload) {
+  return fetchJson("/notifications/rules/action/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+// -- STAGE 13.6 — Approvals ------------------------------------------------
+
+export async function fetchApprovalStatus(accessToken, tenantId) {
+  return fetchJson("/approvals/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchApprovalWorkflows(accessToken, tenantId) {
+  return fetchJson("/approvals/workflows/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function createApprovalWorkflow(accessToken, tenantId, payload) {
+  return fetchJson("/approvals/workflows/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchApprovalRequests(accessToken, tenantId) {
+  return fetchJson("/approvals/requests/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function submitApprovalRequest(accessToken, tenantId, payload) {
+  return fetchJson("/approvals/requests/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function actApprovalRequest(accessToken, tenantId, payload) {
+  return fetchJson("/approvals/requests/action/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+// -- STAGE 13.7 — Documents / Attachments ----------------------------------
+
+export async function fetchDocumentsStatus(accessToken, tenantId) {
+  return fetchJson("/documents/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchAttachments(accessToken, tenantId, entityType = "", entityId = "") {
+  const params = new URLSearchParams();
+  if (entityType) params.set("entity_type", entityType);
+  if (entityId) params.set("entity_id", entityId);
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return fetchJson(`/documents/attachments/${qs}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function uploadAttachment(accessToken, tenantId, payload) {
+  return fetchJson("/documents/attachments/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function downloadAttachment(accessToken, tenantId, attachmentId) {
+  return fetchJson(`/documents/attachments/${attachmentId}/download/`, {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+// -- STAGE 13.8 — Customization (custom fields + number sequences) ----------
+
+export async function fetchCustomizationStatus(accessToken, tenantId) {
+  return fetchJson("/customization/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchCustomFields(accessToken, tenantId, entityType = "") {
+  const qs = entityType ? `?entity_type=${encodeURIComponent(entityType)}` : "";
+  return fetchJson(`/customization/fields/${qs}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function createCustomField(accessToken, tenantId, payload) {
+  return fetchJson("/customization/fields/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchNumberSequences(accessToken, tenantId) {
+  return fetchJson("/customization/sequences/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function createNumberSequence(accessToken, tenantId, payload) {
+  return fetchJson("/customization/sequences/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function generateNextNumber(accessToken, tenantId, code) {
+  return fetchJson("/customization/sequences/next/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ code }),
+  });
+}
+
+// -- STAGE 14 — Backup & DR ------------------------------------------------
+
+export async function fetchBackupStatus(accessToken, tenantId) {
+  return fetchJson("/backup/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchBackupJobs(accessToken, tenantId) {
+  return fetchJson("/backup/jobs/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function runBackup(accessToken, tenantId, payload = {}) {
+  return fetchJson("/backup/run/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function verifyBackup(accessToken, tenantId, jobId) {
+  return fetchJson("/backup/action/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ job_id: jobId, action: "verify" }),
+  });
+}
+
+// -- STAGE 14 — Security (policy, API keys, audit verify) -------------------
+
+export async function fetchSecurityStatus(accessToken, tenantId) {
+  return fetchJson("/security/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchSecurityPolicy(accessToken, tenantId) {
+  return fetchJson("/security/policy/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function updateSecurityPolicy(accessToken, tenantId, payload) {
+  return fetchJson("/security/policy/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function fetchApiKeys(accessToken, tenantId) {
+  return fetchJson("/security/api-keys/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function createApiKey(accessToken, tenantId, payload) {
+  return fetchJson("/security/api-keys/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function revokeApiKey(accessToken, tenantId, keyId) {
+  return fetchJson("/security/api-keys/action/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify({ key_id: keyId, action: "revoke" }),
+  });
+}
+
+export async function verifyAuditChain(accessToken, tenantId, limit) {
+  return fetchJson("/security/audit/verify/", {
+    method: "POST",
+    headers: authHeaders(accessToken, tenantId),
+    body: JSON.stringify(limit ? { limit } : {}),
+  });
+}
+
+// -- STAGE 15 — Ops / Observability ----------------------------------------
+
+export async function fetchOpsStatus(accessToken, tenantId) {
+  return fetchJson("/ops/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function fetchMetricsText() {
+  const res = await fetchJson("/metrics/");
+  const text = res.data?.raw ?? (typeof res.data === "string" ? res.data : "");
+  return { ok: res.ok, status: res.status, text };
+}
+
+// -- STAGE 16 — Final Hardening --------------------------------------------
+
+export async function fetchHardeningStatus(accessToken, tenantId) {
+  return fetchJson("/hardening/status/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function hardeningRateLimitPing(accessToken, tenantId) {
+  return fetchJson("/hardening/selftest/rate-limit/", {
+    headers: { Authorization: `Bearer ${accessToken}`, "X-Tenant-Id": tenantId },
+  });
+}
+
+export async function hardeningIdempotencyDemo(accessToken, tenantId, idempotencyKey) {
+  return fetchJson("/hardening/selftest/idempotency/", {
+    method: "POST",
+    headers: {
+      ...authHeaders(accessToken, tenantId),
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+    },
+    body: JSON.stringify({}),
+  });
+}

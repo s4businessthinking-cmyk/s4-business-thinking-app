@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from apps.auth_service.models import UserSession
 from apps.auth_service.serializers import LoginSerializer, LogoutSerializer, RefreshSerializer, RevokeSessionSerializer
 from apps.auth_service.services.auth import AuthError, login_user, logout_session, refresh_session
+from apps.hardening.throttling import LoginRateThrottle
 from apps.rbac.services.permissions import get_user_permissions
 
 
@@ -19,6 +20,7 @@ def _client_ip(request):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)

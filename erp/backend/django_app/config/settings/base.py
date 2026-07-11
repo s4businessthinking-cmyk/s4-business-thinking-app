@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ERP_ROOT = BASE_DIR.parent.parent
@@ -52,6 +53,14 @@ INSTALLED_APPS = [
     "apps.reports",
     "apps.realtime",
     "apps.devices",
+    "apps.notifications",
+    "apps.approvals",
+    "apps.documents",
+    "apps.customization",
+    "apps.backup",
+    "apps.security",
+    "apps.ops",
+    "apps.hardening",
 ]
 
 MIDDLEWARE = [
@@ -64,8 +73,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "apps.security.middleware.SecurityHeadersMiddleware",
+    "apps.ops.middleware.RequestMetricsMiddleware",
     "apps.core.middleware.correlation.CorrelationIdMiddleware",
     "apps.tenancy.middleware.TenantMiddleware",
+    "apps.hardening.idempotency.IdempotencyMiddleware",
     "apps.core.middleware.request_log.RequestLogMiddleware",
 ]
 
@@ -143,6 +155,12 @@ STORAGES = {
     },
 }
 
+# Documents / attachments (STAGE 13.7 — §24 File / Document Storage)
+MEDIA_ROOT = env("ERP_MEDIA_ROOT", default=str(BASE_DIR / "media"))
+DOCUMENTS_MAX_UPLOAD_BYTES = env.int("DOCUMENTS_MAX_UPLOAD_BYTES", default=10 * 1024 * 1024)
+# Allow base64-encoded attachment payloads (JSON) up to ~20MB request bodies.
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=20 * 1024 * 1024)
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "identity.User"
@@ -184,6 +202,21 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "EXCEPTION_HANDLER": "apps.core.exceptions.handlers.custom_exception_handler",
     "UNAUTHENTICATED_USER": None,
+    # Rate limiting (STAGE 16 §5/§17.2). Generous defaults so normal ERP usage
+    # is never throttled; login + self-test scopes are intentionally tight.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON", default="120/min"),
+        "user": env("THROTTLE_USER", default="2000/min"),
+        "login": env("THROTTLE_LOGIN", default="20/min"),
+        "hardening_test": env("THROTTLE_HARDENING_TEST", default="5/min"),
+    },
+    # Behind a reverse proxy (nginx), set NUM_PROXIES so throttle identity uses
+    # the real client IP from X-Forwarded-For instead of the proxy IP.
+    "NUM_PROXIES": env.int("NUM_PROXIES", default=0) or None,
 }
 
 CORS_ALLOWED_ORIGINS = env.list(
@@ -201,7 +234,38 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 300
 
+# Backup & DR (STAGE 14 — ERP_ARCHITECTURE §22): scheduled full backup + retention purge.
+CELERY_BEAT_SCHEDULE = {
+    "backup-nightly-full": {
+        "task": "backup.run_scheduled_full",
+        "schedule": crontab(hour=2, minute=30),
+    },
+    "backup-cleanup-expired": {
+        "task": "backup.cleanup_expired",
+        "schedule": crontab(hour=3, minute=30),
+    },
+}
+
 ERP_APP_VERSION = env("ERP_APP_VERSION", default="0.11.0-stage11")
+
+# Backup & DR (STAGE 14 — §22)
+BACKUP_ROOT = env("ERP_BACKUP_ROOT", default=str(BASE_DIR / "backups"))
+BACKUP_RETENTION_DAYS = env.int("BACKUP_RETENTION_DAYS", default=35)
+
+# Observability (STAGE 15 — §16.4/§26): Prometheus scrape endpoint.
+METRICS_ENABLED = env.bool("METRICS_ENABLED", default=True)
+METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
+# Final hardening (STAGE 16 — §8/§17.8/§28.3): idempotent writes + upload safety.
+IDEMPOTENCY_TTL_SECONDS = env.int("IDEMPOTENCY_TTL_SECONDS", default=86400)
+UPLOAD_ALLOWED_CONTENT_TYPES = env.list("UPLOAD_ALLOWED_CONTENT_TYPES", default=[])
+
+# Security headers (STAGE 14 — §17.7). CSP off by default so DRF/admin keep working.
+SECURITY_CONTENT_SECURITY_POLICY = env("SECURITY_CONTENT_SECURITY_POLICY", default="")
+SECURITY_HSTS_HEADER = env("SECURITY_HSTS_HEADER", default="max-age=31536000; includeSubDomains")
+SECURITY_PERMISSIONS_POLICY = env(
+    "SECURITY_PERMISSIONS_POLICY", default="geolocation=(), microphone=(), camera=()"
+)
 
 # Realtime (STAGE 11) — WebSocket tickets + replay ring buffer
 REALTIME_WS_TICKET_TTL_SECONDS = env.int("REALTIME_WS_TICKET_TTL_SECONDS", default=30)

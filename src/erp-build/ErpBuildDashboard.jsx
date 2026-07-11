@@ -4,6 +4,11 @@ import HrmCrmTestPanel from "./HrmCrmTestPanel.jsx";
 import ReportsTestPanel from "./ReportsTestPanel.jsx";
 import RealtimeTestPanel from "./RealtimeTestPanel.jsx";
 import DevicesTestPanel from "./DevicesTestPanel.jsx";
+import NotificationsTestPanel from "./NotificationsTestPanel.jsx";
+import EnterpriseExtrasPanel from "./EnterpriseExtrasPanel.jsx";
+import SecurityBackupPanel from "./SecurityBackupPanel.jsx";
+import OpsPanel from "./OpsPanel.jsx";
+import HardeningPanel from "./HardeningPanel.jsx";
 import AuthTestPanel from "./AuthTestPanel.jsx";
 import InventoryTestPanel from "./InventoryTestPanel.jsx";
 import PurchaseTestPanel from "./PurchaseTestPanel.jsx";
@@ -251,6 +256,11 @@ export default function ErpBuildDashboard() {
         <ReportsTestPanel />
         <RealtimeTestPanel />
         <DevicesTestPanel />
+        <NotificationsTestPanel />
+        <EnterpriseExtrasPanel />
+        <SecurityBackupPanel />
+        <OpsPanel />
+        <HardeningPanel />
 
         <section>
           <h2 style={{ fontSize: 16, marginBottom: 12 }}>Build Stages (Locked Order)</h2>

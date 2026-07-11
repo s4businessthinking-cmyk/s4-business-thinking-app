@@ -3,8 +3,9 @@
   "architecture_version": "v2",
   "architecture_doc": "ERP_ARCHITECTURE.md",
   "roadmap_doc": "S4 Business Thinking Erp Complete Build Roadmap.pdf",
-  "current_stage": 12,
-  "current_stage_name": "ELECTRON DESKTOP (DEVICE PROVISIONING)",
+  "current_stage": 16,
+  "current_stage_name": "FINAL HARDENING",
+  "build_complete": true,
   "dashboard_url": "/?erp-dashboard=1",
   "stages": [
     { "id": 0, "code": "STAGE_0", "name": "Planning + Architecture", "name_bn": "প্ল্যানিং + আর্কিটেকচার", "status": "completed", "progress_pct": 100 },
@@ -73,6 +74,85 @@
         { "id": "12.7", "label": "Browser devices test panel", "label_bn": "Browser panel", "status": "completed" },
         { "id": "12.8", "label": "Native Electron client: SQLCipher local DB", "label_bn": "SQLCipher", "status": "pending" },
         { "id": "12.9", "label": "Native Electron client: peripherals + POS multi-window", "label_bn": "Peripherals/POS", "status": "pending" }
+      ]
+    },
+    {
+      "id": 13,
+      "code": "STAGE_13",
+      "name": "Enterprise Extras",
+      "name_bn": "এন্টারপ্রাইজ এক্সট্রা",
+      "status": "completed",
+      "progress_pct": 100,
+      "note": "Enterprise Extras: Notifications, Approval workflows, Document attachments, Custom fields + Number sequences. All dashboard-verifiable, production flow untouched.",
+      "items": [
+        { "id": "13.1", "label": "Notifications app: Notification + NotificationRule models + migration", "label_bn": "Models", "status": "completed" },
+        { "id": "13.2", "label": "Dispatch service (create + STAGE 11 realtime push, mark read)", "label_bn": "Dispatch", "status": "completed" },
+        { "id": "13.3", "label": "Rule engine: real low-stock trigger (warehouse balances)", "label_bn": "Rule engine", "status": "completed" },
+        { "id": "13.4", "label": "APIs + RBAC notifications.read/manage + seed", "label_bn": "APIs/RBAC", "status": "completed" },
+        { "id": "13.5", "label": "Browser notifications test panel", "label_bn": "Browser panel", "status": "completed" },
+        { "id": "13.6", "label": "Approval workflows (PO/SO/JE/Leave/generic) — engine, steps, act, RBAC", "label_bn": "Approvals", "status": "completed" },
+        { "id": "13.7", "label": "Document / file attachments (§24) — storage abstraction, checksum, RBAC", "label_bn": "Attachments", "status": "completed" },
+        { "id": "13.8", "label": "Custom fields + number sequences (atomic, period reset)", "label_bn": "Custom fields", "status": "completed" },
+        { "id": "13.9", "label": "Enterprise Extras dashboard test panel", "label_bn": "Browser panel", "status": "completed" }
+      ]
+    },
+    {
+      "id": 14,
+      "code": "STAGE_14",
+      "name": "Security + Backup",
+      "name_bn": "সিকিউরিটি + ব্যাকআপ",
+      "status": "completed",
+      "progress_pct": 100,
+      "note": "Security + Backup: real pg_dump/dumpdata backups (checksum + retention + Celery beat), audit hash-chain tamper verify, per-tenant API keys (hashed), security policy, security headers middleware. Dashboard-verifiable. MFA/TOTP deferred to a later sub-stage.",
+      "items": [
+        { "id": "14.1", "label": "Backup app: BackupJob model + migration", "label_bn": "Backup models", "status": "completed" },
+        { "id": "14.2", "label": "Backup runner: real pg_dump (dumpdata fallback) + SHA-256 checksum + retention cleanup", "label_bn": "Runner", "status": "completed" },
+        { "id": "14.3", "label": "Celery beat: nightly backup + expired purge tasks", "label_bn": "Scheduled", "status": "completed" },
+        { "id": "14.4", "label": "Backup APIs (run/list/status/verify) + RBAC backup.read/manage + seed", "label_bn": "Backup APIs", "status": "completed" },
+        { "id": "14.5", "label": "Audit hash-chain integrity verify_chain() + endpoint + RBAC audit.verify", "label_bn": "Audit verify", "status": "completed" },
+        { "id": "14.6", "label": "Security app: per-tenant API keys (hashed) + SecurityPolicy + migration", "label_bn": "Security models", "status": "completed" },
+        { "id": "14.7", "label": "SecurityHeaders middleware (§17.7) + policy/apikey APIs + RBAC seed", "label_bn": "Headers/APIs", "status": "completed" },
+        { "id": "14.8", "label": "postgresql-client-16 in Dockerfile + seeds wired (compose/entrypoint)", "label_bn": "Infra", "status": "completed" },
+        { "id": "14.9", "label": "Security & Backup dashboard test panel", "label_bn": "Browser panel", "status": "completed" },
+        { "id": "14.10", "label": "MFA / TOTP enrollment (deferred to later sub-stage)", "label_bn": "MFA", "status": "pending" }
+      ]
+    },
+    {
+      "id": 15,
+      "code": "STAGE_15",
+      "name": "Deployment + Scaling",
+      "name_bn": "ডিপ্লয়মেন্ট + স্কেলিং",
+      "status": "completed",
+      "progress_pct": 100,
+      "note": "Deployment + Scaling: observability (dependency-free Prometheus /metrics + request middleware + ops status API/panel) and single-VPS production stack (§16.5) — multi-stage non-root prod image, gunicorn web + daphne ws + celery worker/beat, nginx reverse proxy (http+WS), postgres/redis/minio. Health/readiness (DB+Redis+Celery) already from earlier stages. Full k8s cluster manifests (§16.1 HPA/KEDA/Patroni) deferred — not verifiable without a cluster.",
+      "items": [
+        { "id": "15.1", "label": "Ops app: dependency-free Prometheus metrics registry + render (text exposition)", "label_bn": "Metrics", "status": "completed" },
+        { "id": "15.2", "label": "Request metrics middleware (counter + latency histogram + in-flight)", "label_bn": "Middleware", "status": "completed" },
+        { "id": "15.3", "label": "/metrics scrape endpoint (optional token) + ops/status API + RBAC ops.read + seed", "label_bn": "APIs/RBAC", "status": "completed" },
+        { "id": "15.4", "label": "Ops dashboard panel (readiness + metrics summary + live scrape)", "label_bn": "Browser panel", "status": "completed" },
+        { "id": "15.5", "label": "Production image: multi-stage non-root Dockerfile.django.prod + gunicorn.conf + entrypoint.prod", "label_bn": "Prod image", "status": "completed" },
+        { "id": "15.6", "label": "docker-compose.prod.yml (§16.5): nginx + gunicorn web + daphne ws + worker + beat + postgres + redis + minio", "label_bn": "Prod compose", "status": "completed" },
+        { "id": "15.7", "label": "nginx reverse proxy (http + WS upgrade + static) + proxy SSL header trust", "label_bn": "Nginx", "status": "completed" },
+        { "id": "15.8", "label": "Health/readiness probes (DB+Redis+Celery) — already present from earlier stages", "label_bn": "Probes", "status": "completed" },
+        { "id": "15.9", "label": "Kubernetes cluster manifests (HPA/KEDA/Patroni/observability namespace) — deferred, needs cluster", "label_bn": "K8s", "status": "pending" }
+      ]
+    },
+    {
+      "id": 16,
+      "code": "STAGE_16",
+      "name": "Final Hardening",
+      "name_bn": "ফাইনাল হার্ডেনিং",
+      "status": "completed",
+      "progress_pct": 100,
+      "note": "Final Hardening: DRF rate limiting (anon/user + tight login IP+email + self-test scope), edge idempotency middleware (Idempotency-Key -> cached response, replay-safe writes), file upload hardening (dangerous extension blocklist + optional content-type allowlist), uniform error envelope (already present, verified). Dashboard panel proves 429 + idempotent replay live. Chaos/load/DR drills are ops runbooks (deferred).",
+      "items": [
+        { "id": "16.1", "label": "DRF throttling: anon/user rates + LoginRateThrottle (IP+email) + hardening_test scope", "label_bn": "Rate limit", "status": "completed" },
+        { "id": "16.2", "label": "Idempotency middleware (cache-based, mutating requests, replay-safe)", "label_bn": "Idempotency", "status": "completed" },
+        { "id": "16.3", "label": "Upload hardening validator (blocklist + allowlist) wired into documents", "label_bn": "Upload safety", "status": "completed" },
+        { "id": "16.4", "label": "Uniform error envelope (custom_exception_handler) — verified", "label_bn": "Uniform errors", "status": "completed" },
+        { "id": "16.5", "label": "Hardening status + self-test APIs (rate-limit, idempotency) + RBAC hardening.read + seed", "label_bn": "APIs/RBAC", "status": "completed" },
+        { "id": "16.6", "label": "Final Hardening dashboard panel (live 429 + idempotent replay proof)", "label_bn": "Browser panel", "status": "completed" },
+        { "id": "16.7", "label": "Chaos / load / DR drills (ops runbooks — deferred, environment-dependent)", "label_bn": "Drills", "status": "pending" }
       ]
     }
   ]

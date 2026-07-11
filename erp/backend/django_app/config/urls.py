@@ -17,4 +17,12 @@ urlpatterns = [
     path("api/v1/", include("apps.reports.urls")),
     path("api/v1/", include("apps.realtime.urls")),
     path("api/v1/", include("apps.devices.urls")),
+    path("api/v1/", include("apps.notifications.urls")),
+    path("api/v1/", include("apps.approvals.urls")),
+    path("api/v1/", include("apps.documents.urls")),
+    path("api/v1/", include("apps.customization.urls")),
+    path("api/v1/", include("apps.backup.urls")),
+    path("api/v1/", include("apps.security.urls")),
+    path("api/v1/", include("apps.ops.urls")),
+    path("api/v1/", include("apps.hardening.urls")),
 ]

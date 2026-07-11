@@ -6,10 +6,21 @@ ENV PIP_NO_CACHE_DIR=1
 
 WORKDIR /app/backend/django_app
 
+# postgresql-client-16 (from PGDG) is required so `pg_dump` matches the
+# postgres:16 server used for real backups (STAGE 14 §22).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    ca-certificates \
+    gnupg \
     libpq-dev \
     gcc \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/django_app/requirements.txt /app/backend/django_app/requirements.txt
@@ -20,4 +31,4 @@ COPY build-state.json /app/erp/build-state.json
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_erp_auth && python manage.py seed_erp_tenancy && python manage.py seed_erp_sync && python manage.py seed_erp_inventory && python manage.py seed_erp_purchase && python manage.py seed_erp_sales && python manage.py seed_erp_accounting && python manage.py seed_erp_hrm_crm && python manage.py seed_erp_reports && python manage.py seed_erp_realtime && python manage.py seed_erp_devices && daphne -b 0.0.0.0 -p 8000 config.asgi:application"]
+CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py seed_erp_auth && python manage.py seed_erp_tenancy && python manage.py seed_erp_sync && python manage.py seed_erp_inventory && python manage.py seed_erp_purchase && python manage.py seed_erp_sales && python manage.py seed_erp_accounting && python manage.py seed_erp_hrm_crm && python manage.py seed_erp_reports && python manage.py seed_erp_realtime && python manage.py seed_erp_devices && python manage.py seed_erp_notifications && python manage.py seed_erp_approvals && python manage.py seed_erp_documents && python manage.py seed_erp_customization && python manage.py seed_erp_backup && python manage.py seed_erp_security && python manage.py seed_erp_ops && python manage.py seed_erp_hardening && daphne -b 0.0.0.0 -p 8000 config.asgi:application"]
