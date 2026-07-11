@@ -39,3 +39,4 @@ erp/backend/django_app/**/__pycache__/
 erp/backend/django_app/.venv/
 erp/backend/django_app/staticfiles/
 erp/backend/django_app/*.pyc
+.vercel

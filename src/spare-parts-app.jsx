@@ -37,6 +37,7 @@ import {
   offlineUpdate,
   offlineRemove,
   offlineList,
+  offlineGetById,
   offlineCacheCloudRecords,
   offlineClearCollection,
   offlinePurgeLocal,
@@ -69,7 +70,7 @@ import {
   registerLocalSalesmanAccount,
   addLocalInviteCode,
 } from "./auth/localAuthBootstrap";
-import { updateLocalUserPassword } from "./auth/localAuthService";
+import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAuthService";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
 import { APP_VERSION } from "./update/githubUpdateService";
@@ -132,6 +133,8 @@ const PERMISSIONS_LIST = [
   { key: "markDelivery",     bn: "ডেলিভারি মার্ক করা",         en: "Mark as Delivered" },
   { key: "deleteOrder",      bn: "অর্ডার ডিলিট করা",           en: "Delete Orders" },
   { key: "viewProducts",     bn: "পণ্য তালিকা দেখা",           en: "View Product List" },
+  { key: "manageSales",      bn: "বিক্রয় ইনভয়েস ম্যানেজ করা", en: "Manage Sales Invoices" },
+  { key: "manageCustomers",  bn: "কাস্টমার যোগ / বেছে নেওয়া", en: "Add / Pick Customers" },
 
   // Owner-controlled purchase/supplier/payment access for staff.
   // OFF by default. Salesman can see/use these options only after owner turns them ON from Settings → Team.
@@ -149,6 +152,8 @@ const DEFAULT_PERMISSIONS = {
   markDelivery: false,
   deleteOrder: false,
   viewProducts: false,
+  manageSales: true,
+  manageCustomers: true,
 
   viewVendors: false,
   viewSupplierLedger: false,
@@ -4498,7 +4503,7 @@ function printPaymentVoucher(voucher, shop, lang) {
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
 function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
   const isOwner = profile?.role==="owner";
-  const perms = profile?.permissions || DEFAULT_PERMISSIONS;
+  const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
   const can = (key) => isOwner || perms[key] === true;
 
   const canManagePurchase = can("managePurchase");
@@ -5765,10 +5770,25 @@ function SiStatusBadge({ status, lang }) {
 }
 
 // ── SI Customer Picker ──
-function SiCustomerPicker({ customers, onSelect, onClose, t, th }) {
+function SiCustomerPicker({ customers, onSelect, onClose, onQuickAdd, canQuickAdd=false, t, th, lang }) {
   const [q,setQ]=useState("");
+  const [newName,setNewName]=useState("");
+  const [adding,setAdding]=useState(false);
   const filtered=customers.filter(c=>{ if (!q) return true; return nsmatch([c.customerName,c.customerCode,c.mobileNumber].filter(Boolean).join(" "),q); });
   const inp={ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
+
+  const handleQuickAdd = async () => {
+    const name = newName.trim();
+    if (!name || !onQuickAdd || adding) return;
+    setAdding(true);
+    try {
+      await onQuickAdd(name);
+      setNewName("");
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:10000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}>
       <div style={{ width:"100%", maxWidth:600, background:th.bgCard, borderRadius:"16px 16px 0 0", maxHeight:"70vh", display:"flex", flexDirection:"column", border:`1px solid ${th.border}` }}>
@@ -5779,6 +5799,24 @@ function SiCustomerPicker({ customers, onSelect, onClose, t, th }) {
         <div style={{ padding:"10px 14px", borderBottom:`1px solid ${th.border}` }}>
           <input autoFocus style={inp} placeholder={t.si_customerSearch} value={q} onChange={e=>setQ(e.target.value)} />
         </div>
+        {canQuickAdd&&(
+          <div style={{ display:"flex", gap:8, padding:"10px 14px", borderBottom:`1px solid ${th.border}` }}>
+            <input
+              style={{ ...inp, flex:1 }}
+              placeholder={lang==="bn"?"নতুন কাস্টমারের নাম":"New customer name"}
+              value={newName}
+              onChange={e=>setNewName(e.target.value)}
+              onKeyDown={e=>{ if (e.key==="Enter") handleQuickAdd(); }}
+            />
+            <button
+              onClick={handleQuickAdd}
+              disabled={adding || !newName.trim()}
+              style={{ padding:"10px 14px", borderRadius:8, border:"none", background:adding?"#14532d":"#22c55e", color:"#fff", fontWeight:700, cursor:adding?"not-allowed":"pointer", whiteSpace:"nowrap" }}
+            >
+              {adding ? "..." : (lang==="bn"?"+ যোগ":"+ Add")}
+            </button>
+          </div>
+        )}
         <div style={{ overflowY:"auto", flex:1 }}>
           {filtered.length===0&&<div style={{ textAlign:"center", padding:"30px", color:th.txtFaint }}>{t.si_noResults}</div>}
           {filtered.map(c=>(
@@ -5967,7 +6005,7 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated }) {
   const isOwner = profile?.role==="owner";
 
   const [invoices,setInvoices]     = useState([]);
@@ -6162,6 +6200,47 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     setShowCustPicker(false);
   };
 
+  const siQuickAddCustomer = async (customerName) => {
+    if (!canManageCustomers) {
+      toast(lang==="bn"?"কাস্টমার যোগ করার permission নেই":"No permission to add customers","err");
+      return;
+    }
+    const name = String(customerName || "").trim();
+    if (!name) return;
+
+    try {
+      const now = new Date().toISOString();
+      const result = await offlineCreate("customers", {
+        shopId,
+        customerName: name,
+        mobileNumber: "",
+        createdBy: user.uid,
+        createdAt: now,
+      });
+      const created = { ...result.data, id: result.documentId, customerName: name };
+      onCustomerCreated?.(created);
+      siSelectCustomer(created);
+      toast(lang==="bn"?"✅ কাস্টমার যোগ হয়েছে":"✅ Customer added");
+
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] customer quick-add sync failed", err));
+      }
+    } catch (error) {
+      toast(error?.message || String(error), "err");
+    }
+  };
+
+  const customerPickerProps = {
+    customers,
+    t,
+    th,
+    lang,
+    onSelect: siSelectCustomer,
+    onClose: () => setShowCustPicker(false),
+    canQuickAdd: canManageCustomers,
+    onQuickAdd: siQuickAddCustomer,
+  };
+
   const siBuild=(status, invoiceNoOverride)=>{
     const valid=siLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.si_errItems,"err"); return null; }
@@ -6341,7 +6420,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   // ══ LIST ══
   if (siView==="list") return (
     <div style={panel}>
-      {showCustPicker&&<SiCustomerPicker customers={customers} t={t} th={th} onSelect={siSelectCustomer} onClose={()=>setShowCustPicker(false)} />}
+      {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
 
       {/* ── Print Modal after Confirm ── */}
       {siPrintModal&&(
@@ -6496,7 +6575,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   // ══ FORM ══
   return (
     <div style={panel}>
-      {showCustPicker&&<SiCustomerPicker customers={customers} t={t} th={th} onSelect={siSelectCustomer} onClose={()=>setShowCustPicker(false)} />}
+      {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
 
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
         <button onClick={()=>setSiView("list")} style={{ background:"transparent", border:"none", color:"#22c55e", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.si_backToList}</button>
@@ -6792,7 +6871,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 }
 
 // ─── SHOP INFO SETTINGS ──────────────────────────────────────
-function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast, onShopUpdated }) {
+function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast, onShopUpdated, readOnly=false }) {
   const [shopEdit, setShopEdit] = useState({
     companyName: localShop.companyName||"",
     trnNumber:   localShop.trnNumber||"",
@@ -6815,6 +6894,9 @@ function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast
   }, [localShop]);
 
   const saveShop = async () => {
+    if (readOnly) {
+      return toast(lang==="bn"?"শুধু মালিক দোকানের তথ্য বদলাতে পারবেন":"Only the owner can edit shop info","err");
+    }
     if (!shopEdit.companyName.trim()) {
       return toast(lang==="bn"?"দোকানের নাম দিন":"Shop name is required","err");
     }
@@ -6845,42 +6927,50 @@ function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast
 
   const sinp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
   const slbl = { fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
+  const fieldProps = readOnly ? { readOnly:true, disabled:true } : {};
 
   return (
     <div style={s.card}>
       <div style={s.settingsLbl}>{lang==="bn"?"🏢 দোকানের তথ্য":"🏢 Shop Info"}</div>
+      {readOnly&&(
+        <div style={{ fontSize:12, color:th.txtMuted, marginBottom:12 }}>
+          {lang==="bn"?"শুধু দেখার জন্য — সম্পাদনা শুধু মালিক করতে পারবেন":"View only — only the owner can edit shop info"}
+        </div>
+      )}
       <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
         <div>
           <span style={slbl}>{lang==="bn"?"দোকানের নাম":"Shop Name"}</span>
-          <input style={sinp} value={shopEdit.companyName} onChange={e=>setShopEdit(p=>({...p,companyName:e.target.value}))} />
+          <input style={sinp} {...fieldProps} value={shopEdit.companyName} onChange={e=>setShopEdit(p=>({...p,companyName:e.target.value}))} />
         </div>
         <div>
           <span style={slbl}>{lang==="bn"?"TRN নম্বর (Tax Registration)":"TRN Number (Tax Registration)"}</span>
-          <input style={{ ...sinp, borderColor:shopEdit.trnNumber?"#f59e0b":th.borderMid, fontFamily:"monospace" }} placeholder="100XXXXXXXXX" value={shopEdit.trnNumber} onChange={e=>setShopEdit(p=>({...p,trnNumber:e.target.value}))} />
+          <input style={{ ...sinp, borderColor:shopEdit.trnNumber?"#f59e0b":th.borderMid, fontFamily:"monospace" }} placeholder="100XXXXXXXXX" {...fieldProps} value={shopEdit.trnNumber} onChange={e=>setShopEdit(p=>({...p,trnNumber:e.target.value}))} />
           {shopEdit.trnNumber&&<div style={{ fontSize:10, color:"#f59e0b", marginTop:4, fontWeight:700 }}>✅ {lang==="bn"?"Tax Invoice এ দেখাবে":"Shows in Tax Invoice"}</div>}
         </div>
         <div>
           <span style={slbl}>{lang==="bn"?"VAT নম্বর":"VAT Number"}</span>
-          <input style={{ ...sinp, fontFamily:"monospace" }} placeholder="VAT Number" value={shopEdit.vatNumber} onChange={e=>setShopEdit(p=>({...p,vatNumber:e.target.value}))} />
+          <input style={{ ...sinp, fontFamily:"monospace" }} placeholder="VAT Number" {...fieldProps} value={shopEdit.vatNumber} onChange={e=>setShopEdit(p=>({...p,vatNumber:e.target.value}))} />
         </div>
         <div>
           <span style={slbl}>{lang==="bn"?"মোবাইল":"Mobile"}</span>
-          <input style={sinp} inputMode="tel" value={shopEdit.mobile} onChange={e=>setShopEdit(p=>({...p,mobile:e.target.value}))} />
+          <input style={sinp} inputMode="tel" {...fieldProps} value={shopEdit.mobile} onChange={e=>setShopEdit(p=>({...p,mobile:e.target.value}))} />
         </div>
         <div>
           <span style={slbl}>{lang==="bn"?"ইমেইল":"Email"}</span>
-          <input style={sinp} inputMode="email" value={shopEdit.email} onChange={e=>setShopEdit(p=>({...p,email:e.target.value}))} />
+          <input style={sinp} inputMode="email" {...fieldProps} value={shopEdit.email} onChange={e=>setShopEdit(p=>({...p,email:e.target.value}))} />
         </div>
         <div>
           <span style={slbl}>{lang==="bn"?"এলাকা / শহর":"Area / City"}</span>
-          <input style={sinp} value={shopEdit.area} onChange={e=>setShopEdit(p=>({...p,area:e.target.value}))} />
+          <input style={sinp} {...fieldProps} value={shopEdit.area} onChange={e=>setShopEdit(p=>({...p,area:e.target.value}))} />
         </div>
         <div style={{ paddingTop:8, borderTop:`1px solid ${th.border}`, fontSize:12, color:th.txtMuted }}>
           👤 {lang==="bn"?"মালিক":"Owner"}: {localShop.ownerName}
         </div>
-        <button onClick={saveShop} disabled={shopSaving} style={{ padding:"12px", borderRadius:10, border:"none", background:shopSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:shopSaving?"not-allowed":"pointer" }}>
-          {shopSaving?"...":(lang==="bn"?"✅ সেভ করুন":"✅ Save")}
-        </button>
+        {!readOnly&&(
+          <button onClick={saveShop} disabled={shopSaving} style={{ padding:"12px", borderRadius:10, border:"none", background:shopSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:shopSaving?"not-allowed":"pointer" }}>
+            {shopSaving?"...":(lang==="bn"?"✅ সেভ করুন":"✅ Save")}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -8141,8 +8231,8 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   );
 }
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread }) {
-  const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===profile.uid);
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys }) {
+  const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
   const delivered  = myOrders.filter(o=>o.overall==="delivered").length;
@@ -8209,8 +8299,8 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
 
   const salesNavItems = [
     { key:"shop",     icon:"📋", label:lang==="bn"?"অর্ডার":"New Order",      badge:unread },
-    { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:null },
-    { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
+    ...(staffQuickNavKeys.includes("products") ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
     { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
@@ -8221,11 +8311,15 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
   const miniTopItems = [
     { key:"dashboard", icon:"🏠", label:lang==="bn"?"ড্যাশবোর্ড":"Dashboard" },
     { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
-    { key:"purchase", icon:"🛍️", label:lang==="bn"?"ক্রয়":"Purchase" },
-    { key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" },
-    { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products" },
+    ...(isOwner || staffQuickNavKeys.includes("sales")
+      ? [{ key:isOwner?"purchase":"shop", icon:"＋", label:lang==="bn"?(isOwner?"ক্রয়":"অর্ডার"):(isOwner?"Purchase":"Order") }]
+      : [{ key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয়":"Purchase" }]),
+    ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
+    ...(isOwner || staffQuickNavKeys.includes("products")
+      ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products" }]
+      : []),
     { key:"settings", icon:"•••", label:lang==="bn"?"আরও":"More" },
-  ].filter(x => isOwner || !["vendors"].includes(x.key));
+  ];
 
   const statusCards = [
     { label:t.dashPending,    value:pending,    icon:"⏳", color:"#f59e0b", glow:"rgba(245,158,11,0.26)" },
@@ -8411,10 +8505,15 @@ function DashboardTab({ t, lang, th, s, profile, localShop, orders, cos, product
           {[
             { key:"dashboard", icon:"🏠", label:lang==="bn"?"হোম":"Home" },
             { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
-            { key:"purchase", icon:"＋", label:lang==="bn"?"নতুন":"New", main:true },
-            { key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" },
+            {
+              key: isOwner ? "purchase" : "shop",
+              icon:"＋",
+              label: isOwner ? (lang==="bn"?"নতুন":"New") : (lang==="bn"?"অর্ডার":"Order"),
+              main:true,
+            },
+            ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
             { key:"settings", icon:"⚙️", label:lang==="bn"?"আরও":"More" },
-          ].filter(x=>isOwner || x.key!=="vendors").map(item=>(
+          ].map(item=>(
             <button key={item.key} onClick={()=>setTab(item.key)}
               style={{ border:0, background:"transparent", color:item.main?"#fff":th.txtSecondary, fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:3, fontSize:10, fontWeight:800 }}>
               <span style={{ width:item.main?50:30, height:item.main?50:30, marginTop:item.main?-24:0, borderRadius:999, background:item.main?"linear-gradient(135deg,#2563eb,#60a5fa)":"transparent", boxShadow:item.main?"0 12px 28px rgba(59,130,246,0.46)":"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:item.main?34:22 }}>
@@ -8645,11 +8744,11 @@ function SyncSettingsPanel({
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────
-function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme, onLogout }) {
+function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme, onLogout, onProfileUpdate }) {
   const isOwner = profile.role==="owner";
   const isSalesman = !isOwner;
   const shopId  = profile.shopId;
-  const perms   = profile.permissions||DEFAULT_PERMISSIONS;
+  const perms   = { ...DEFAULT_PERMISSIONS, ...(profile.permissions || {}) };
   const can     = (key) => isOwner||perms[key]===true;
   const isOrderManager = !isOwner&&(can("setStatus")||can("setPrices")||can("markDelivery")||can("deleteOrder"));
 
@@ -8705,6 +8804,72 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [staffForm, setStaffForm] = useState({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
   const [staffSaving, setStaffSaving] = useState(false);
   const [staffPwReset, setStaffPwReset] = useState({});
+
+  const profileSyncRef = useRef(profile);
+  profileSyncRef.current = profile;
+
+  useEffect(() => {
+    if (!user?.uid || isOwner || !db) return;
+
+    let cancelled = false;
+
+    const applyMemberRecord = async (data) => {
+      if (!data || cancelled) return;
+
+      const status = String(data.status || "active").toLowerCase();
+      if (status === "disabled" || status === "closed" || data.isDeleted === true) {
+        toast(
+          lang === "bn"
+            ? "অ্যাকাউন্ট বন্ধ করা হয়েছে। মালিকের সাথে যোগাযোগ করুন।"
+            : "This account has been disabled. Contact the owner.",
+          "err"
+        );
+        onLogout?.();
+        return;
+      }
+
+      const currentProfile = profileSyncRef.current || {};
+      const nextPermissions = data.permissions ?? currentProfile.permissions;
+      const nextPosition = data.position || currentProfile.position;
+      const permissionsChanged =
+        JSON.stringify(nextPermissions || null) !== JSON.stringify(currentProfile.permissions || null);
+      const positionChanged = nextPosition !== currentProfile.position;
+
+      if (!permissionsChanged && !positionChanged) return;
+
+      if (currentProfile.localUserId && permissionsChanged) {
+        try {
+          await updateLocalUserProfile(currentProfile.localUserId, {
+            permissions: nextPermissions,
+          });
+        } catch (error) {
+          console.warn("[S4 Team] local permission sync failed", error);
+        }
+      }
+
+      onProfileUpdate?.({
+        permissions: nextPermissions,
+        position: nextPosition,
+      });
+    };
+
+    offlineGetById("users", user.uid)
+      .then((row) => applyMemberRecord(row?.data))
+      .catch((error) => console.warn("[S4 Team] offline profile sync failed", error));
+
+    const unsub = onSnapshot(
+      doc(db, "users", user.uid),
+      (snap) => {
+        if (snap.exists()) applyMemberRecord(snap.data());
+      },
+      (error) => console.warn("[S4 Team] cloud profile sync failed", error)
+    );
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, [user?.uid, isOwner, profile.localUserId, lang]);
 
   const refreshSyncDashboard = async () => {
     try {
@@ -9069,7 +9234,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     loadLocalOrders();
 
     return () => unsub();
-  },[shopId,isOwner,isOrderManager]);
+  },[shopId,isOwner,isOrderManager,user?.uid]);
 
   // ── Companies real-time listener with offline fallback ──
   useEffect(() => {
@@ -10121,6 +10286,7 @@ const startEditOrder = (order) => {
         shopId,
         position: staffForm.position || "Salesman",
         mobile: staffForm.mobile.trim(),
+        permissions: { ...DEFAULT_PERMISSIONS },
       });
       setTeam((prev) => mergeTeamMembers(prev, [member]));
       setStaffForm({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
@@ -10252,6 +10418,16 @@ const startEditOrder = (order) => {
   };
 
   const canStaffSupplierArea = can("viewVendors") || can("viewSupplierLedger") || can("vendorPayments") || can("managePurchase");
+  const staffQuickNavKeys = isOwner
+    ? []
+    : [
+        "shop",
+        ...(can("viewProducts") ? ["products"] : []),
+        ...(can("manageSales") ? ["sales"] : []),
+        "purchase",
+        "cheque",
+        "settings",
+      ];
 
   const visibleTabs = isOwner
     ? [["dashboard",t.tabDashboard],["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["settings",t.tabSettings]]
@@ -10260,7 +10436,7 @@ const startEditOrder = (order) => {
         ["shop",t.tabShop],
         ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
-        ["sales", t.tabSales],
+        ...(can("manageSales")?[["sales", t.tabSales]]:[]),
         ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
         ...(can("viewVendors")?[["vendors",t.tabVendor]]:[]),
         ["cheque",t.tabCheque],
@@ -10555,11 +10731,12 @@ const startEditOrder = (order) => {
       {tab==="dashboard"&&(
         <DashboardTab
           t={t} lang={lang} th={th} s={s}
-          profile={profile} localShop={localShop}
+          profile={profile} userUid={user.uid} localShop={localShop}
           orders={orders} cos={cos} products={products}
           team={team} vendors={vendors} customers={customers}
           isOwner={isOwner} isDesktop={isDesktop}
           setTab={setTab} unread={unread}
+          staffQuickNavKeys={staffQuickNavKeys}
         />
       )}
       {!isOwner&&tab==="shop"&&(
@@ -11598,13 +11775,15 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {tab==="sales"&&(
+      {(isOwner || can("manageSales")) && tab==="sales"&&(
         <SalesInvoiceTab
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
           customers={customers} products={products}
           shop={localShop} toast={toast} isDesktop={isDesktop}
           siShowCode={siShowCode} siColorPrint={siColorPrint}
+          canManageCustomers={can("manageCustomers")}
+          onCustomerCreated={(created) => setCustomers((prev) => [...prev, created].sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||"")))}
         />
       )}
 
@@ -11640,7 +11819,10 @@ const startEditOrder = (order) => {
                   <span style={s.settingsRowIcon}>🏢</span>
                   <div style={{ flex:1 }}>
                     <div style={s.settingsRowLabel}>{t.shopInfoTitle}</div>
-                    <div style={s.settingsRowSub}>{localShop.companyName}</div>
+                    <div style={s.settingsRowSub}>
+                      {localShop.companyName}
+                      {!isOwner && (lang==="bn" ? " · শুধু দেখা" : " · View only")}
+                    </div>
                   </div>
                   <span style={s.settingsArrow}>›</span>
                 </button>
@@ -11788,6 +11970,7 @@ const startEditOrder = (order) => {
               profile={profile} user={user}
               onShopUpdated={setLocalShop}
               th={th} s={s} lang={lang} toast={toast}
+              readOnly={!isOwner}
             />
           )}
 
@@ -11930,7 +12113,7 @@ const startEditOrder = (order) => {
                       <div style={{ height:1, background:th.bgCard, marginBottom:8 }} />
                       <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>{t.permissionsTitle}</div>
                       {PERMISSIONS_LIST.map((perm,pi)=>{
-                        const mPerms = m.permissions||DEFAULT_PERMISSIONS;
+                        const mPerms = { ...DEFAULT_PERMISSIONS, ...(m.permissions || {}) };
                         const isOn   = mPerms[perm.key]===true;
                         return (
                           <div key={perm.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 0", borderTop:pi>0?`1px solid ${th.border}`:"none" }}>
@@ -12243,6 +12426,15 @@ export default function App() {
     toastTimer.current = setTimeout(()=>setNotif(null),3500);
   };
 
+  const handleProfileUpdate = (patch) => {
+    setProfile((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      if (user?.uid) saveCachedProfile(user.uid, next);
+      return next;
+    });
+  };
+
   const applyAuthResult = (result) => {
     if (!result?.user || !result?.profile) return;
     setUser(result.user);
@@ -12451,7 +12643,7 @@ export default function App() {
     );
   }
 
-  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} onLogout={handleLogout} /></>;
+  return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} onLogout={handleLogout} onProfileUpdate={handleProfileUpdate} /></>;
 }
 
 // ─── STYLES FUNCTION ─────────────────────────────────────────

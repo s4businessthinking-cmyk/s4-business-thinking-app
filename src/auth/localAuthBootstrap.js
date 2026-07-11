@@ -30,6 +30,62 @@ import {
   clearOfflineSessions,
 } from "./authSession";
 import { saveShopRecord } from "../offline/shopService";
+import { offlineGetById } from "../offline/offlineRepository";
+
+function isDisabledMember(data = {}) {
+  const status = String(data.status || "active").toLowerCase();
+  return status === "disabled" || status === "closed" || data.isDeleted === true;
+}
+
+async function finalizeStaffLocalLogin(localUser) {
+  if (!localUser || localUser.role === "owner") {
+    return { ok: true, localUser, profileExtras: {} };
+  }
+
+  const uid = localUser.firebaseUid || localUser.id;
+  let memberData = null;
+
+  try {
+    const row = await offlineGetById("users", uid);
+    memberData = row?.data || null;
+  } catch (error) {
+    console.warn("[S4 Auth] offline member profile read failed", error);
+  }
+
+  if (isOnline() && db && auth?.currentUser?.uid === uid) {
+    try {
+      const snap = await getDoc(doc(db, "users", uid));
+      if (snap.exists()) {
+        memberData = { ...(memberData || {}), ...snap.data() };
+      }
+    } catch (error) {
+      console.warn("[S4 Auth] cloud member profile refresh failed", error);
+    }
+  }
+
+  if (memberData && isDisabledMember(memberData)) {
+    return { ok: false, reason: "ACCOUNT_DISABLED" };
+  }
+
+  const profileExtras = {};
+  const updates = {};
+  let nextUser = localUser;
+
+  if (memberData?.permissions !== undefined && memberData?.permissions !== null) {
+    updates.permissions = memberData.permissions;
+    profileExtras.permissions = memberData.permissions;
+  }
+  if (memberData?.position) {
+    profileExtras.position = memberData.position;
+  }
+
+  if (Object.keys(updates).length) {
+    await updateLocalUserProfile(localUser.id, updates);
+    nextUser = await getLocalUserById(localUser.id);
+  }
+
+  return { ok: true, localUser: nextUser, profileExtras };
+}
 
 function createId() {
   if (typeof globalThis.crypto?.randomUUID === "function") {
@@ -200,11 +256,19 @@ export async function restoreLocalAuthSession() {
     return null;
   }
 
+  const access = await finalizeStaffLocalLogin(localUser);
+  if (!access.ok) {
+    await clearOfflineSessions();
+    return null;
+  }
+
+  const finalUser = access.localUser || localUser;
+
   return {
     session,
-    localUser,
-    user: buildAppUserFromLocal(localUser),
-    profile: buildProfileFromLocal(localUser),
+    localUser: finalUser,
+    user: buildAppUserFromLocal(finalUser),
+    profile: buildProfileFromLocal(finalUser, access.profileExtras || {}),
   };
 }
 
@@ -469,11 +533,19 @@ export async function loginWithCredentials(identifier, password) {
 
   if (localResult.ok) {
     const linkedUser = await ensureFirebaseSignedInAfterLocalLogin(localResult.user, password);
-    const shopId = linkedUser?.shopId || localResult.user?.shopId;
+    const access = await finalizeStaffLocalLogin(linkedUser || localResult.user);
+    if (!access.ok) {
+      await clearOfflineSessions();
+      try { await signOut(auth); } catch {}
+      return access;
+    }
+
+    const finalUser = access.localUser || linkedUser || localResult.user;
+    const shopId = finalUser?.shopId || localResult.user?.shopId;
     return {
       ok: true,
-      user: buildAppUserFromLocal(linkedUser || localResult.user),
-      profile: buildProfileFromLocal(linkedUser || localResult.user),
+      user: buildAppUserFromLocal(finalUser),
+      profile: buildProfileFromLocal(finalUser, access.profileExtras || {}),
       shop: shopId ? readLegacyCachedShop(shopId) : null,
     };
   }
