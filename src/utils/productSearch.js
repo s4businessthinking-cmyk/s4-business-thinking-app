@@ -75,7 +75,11 @@ export function findExactProductMatch(products = [], { name = "", code = "" } = 
 
   const nameKey = nsq(name);
   if (nameKey) {
-    return products.find((p) => nsq(p.name) === nameKey) || null;
+    const matches = products.filter((p) => {
+      const status = String(p.status || "active").toLowerCase();
+      return status === "active" && nsq(p.name) === nameKey;
+    });
+    return matches.length === 1 ? matches[0] : null;
   }
 
   return null;

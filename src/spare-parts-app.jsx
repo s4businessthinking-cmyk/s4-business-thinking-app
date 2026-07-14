@@ -4539,6 +4539,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [piCurrent,setPiCurrent]     = useState(piEmptyCurrent());
   const [piSaving,setPiSaving]       = useState(false);
   const piNameRef = useRef(null);
+  const piQtyRef = useRef(null);
 
   // ── Vendor search state (for purchase invoice form) ──
   const [vendorSearchQ,setVendorSearchQ]     = useState("");
@@ -4976,7 +4977,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   const piSelectProduct=(prod)=>{
     setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.salesVat||prod.purchaseVat||p.taxPerc||"5" }));
-    setTimeout(()=>piNameRef.current?.focus(), 100);
+    setTimeout(()=>piQtyRef.current?.focus(), 100);
   };
 
   const piHandleVendor=(e)=>{
@@ -5403,6 +5404,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
               <div style={{ flex:"0 0 64px" }}>
                 <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_qty}</div>
                 <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="0" value={piCurrent.qty}
+                  ref={piQtyRef}
                   onChange={e=>setPiCurrent(p=>({...p,qty:e.target.value}))}
                   onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
               </div>
@@ -5444,6 +5446,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
                 <div>
                   <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_qty}</div>
                   <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="0" value={piCurrent.qty}
+                    ref={piQtyRef}
                     onChange={e=>setPiCurrent(p=>({...p,qty:e.target.value}))}
                     onKeyDown={e=>e.key==="Enter"&&piAddCurrentItem()} />
                 </div>
@@ -6023,6 +6026,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siEmptyCurrent = () => ({ productId:null, name:"", code:"", brand:"", qty:"1", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" });
   const [siCurrent,setSiCurrent]   = useState(siEmptyCurrent);
   const siNameRef = useRef(null);
+  const siQtyRef = useRef(null);
 
   const [siSaving,setSiSaving]     = useState(false);
   const [siSearch,setSiSearch]     = useState("");
@@ -6183,7 +6187,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       unitPrice: prod.vatExclusive||prod.landingCost||prod.mrp||p.unitPrice,
       vatPerc:   prod.salesVat||"5",
     }));
-    setTimeout(()=>siNameRef.current?.focus(), 100);
+    setTimeout(()=>siQtyRef.current?.focus(), 100);
   };
 
   const siAddCurrentItem = () => {
@@ -6677,6 +6681,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               <div style={{ flex:"0 0 70px" }}>
                 <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_qty}</div>
                 <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="1" value={siCurrent.qty}
+                  ref={siQtyRef}
                   onChange={e=>setSiCurrent(p=>({...p,qty:e.target.value}))}
                   onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
               </div>
@@ -6713,6 +6718,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                 <div>
                   <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_qty}</div>
                   <input style={{ ...inp(), textAlign:"center" }} inputMode="decimal" placeholder="1" value={siCurrent.qty}
+                    ref={siQtyRef}
                     onChange={e=>setSiCurrent(p=>({...p,qty:e.target.value}))}
                     onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
                 </div>

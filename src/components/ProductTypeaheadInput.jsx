@@ -18,6 +18,7 @@ export function ProductTypeaheadInput({
 }) {
   const listId = useId();
   const wrapRef = useRef(null);
+  const suppressFocusOpenRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -37,6 +38,7 @@ export function ProductTypeaheadInput({
 
   const pickProduct = (product) => {
     if (!product) return;
+    suppressFocusOpenRef.current = true;
     onSelectProduct?.(product);
     setOpen(false);
   };
@@ -93,10 +95,16 @@ export function ProductTypeaheadInput({
         placeholder={placeholder}
         value={value}
         onChange={(event) => {
+          suppressFocusOpenRef.current = false;
           onChange?.(event.target.value);
           setOpen(true);
         }}
         onFocus={() => {
+          if (suppressFocusOpenRef.current) {
+            suppressFocusOpenRef.current = false;
+            setOpen(false);
+            return;
+          }
           if (String(value || "").trim()) setOpen(true);
         }}
         onBlur={handleBlur}
