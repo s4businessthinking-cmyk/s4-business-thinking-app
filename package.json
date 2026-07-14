@@ -78,7 +78,8 @@
         "repo": "s4-business-thinking-app",
         "releaseType": "release"
       }
-    ]
+    ],
+    "artifactName": "S4-Business-Thinking-Setup-${version}.${ext}"
   },
   "repository": {
     "type": "git",

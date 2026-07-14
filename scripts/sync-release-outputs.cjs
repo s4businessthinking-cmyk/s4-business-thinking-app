@@ -21,6 +21,7 @@ function findWindowsInstaller(releaseDir, version) {
   if (!fs.existsSync(releaseDir)) return null;
 
   const candidates = [
+    `S4-Business-Thinking-Setup-${version}.exe`,
     `S4.Business.Thinking.Setup.${version}.exe`,
     `S4 Business Thinking Setup ${version}.exe`,
   ];
@@ -116,7 +117,7 @@ function writeInstallReadme(targetDir, version) {
     `GitHub: ${getGithubReleaseUrl(version)}`,
     "",
     "Windows PC:",
-    `  Install: S4 Business Thinking Setup ${version}.exe`,
+    `  Install: S4-Business-Thinking-Setup-${version}.exe`,
     "  Uninstall not required for updates. Restart app after auto-update.",
     "",
     "Android Mobile:",
