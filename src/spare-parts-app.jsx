@@ -74,6 +74,13 @@ import {
 import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAuthService";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
+import {
+  BranchTransferSettingsPanel,
+  BranchTransferWorkspace,
+  branchTransferMenuLabel,
+  branchTransferSettingsCopy,
+  useBranchTransferAccess,
+} from "./branch-transfer/BranchTransferNative.jsx";
 import { APP_VERSION } from "./update/githubUpdateService";
 import {
   createShopStaffUser,
@@ -144,6 +151,7 @@ const PERMISSIONS_LIST = [
   { key: "viewSupplierLedger", bn: "সাপ্লায়ার লেজার দেখা",    en: "View Supplier Ledger" },
   { key: "vendorPayments",   bn: "সাপ্লায়ার পেমেন্ট করা",     en: "Make Supplier Payments" },
   { key: "managePurchase",   bn: "ক্রয় ইনভয়েস ম্যানেজ করা",  en: "Manage Purchase Invoices" },
+  { key: "sendBranchTransfer", bn: "Branch-এ পণ্য পাঠানো",      en: "Send Branch Products" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -161,6 +169,7 @@ const DEFAULT_PERMISSIONS = {
   viewSupplierLedger: false,
   vendorPayments: false,
   managePurchase: false,
+  sendBranchTransfer: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -4592,12 +4601,27 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       new Date(b.createdAt||b.invoiceDate||0) - new Date(a.createdAt||a.invoiceDate||0)
     );
 
-    const loadOfflinePiInvoices = async () => {
+    const loadOfflinePiInvoices = async ({ cloudRows = null } = {}) => {
       const res = await offlineList("purchaseInvoices");
-      const rawRows = Array.isArray(res) ? res : (res.records || []).map(r => r.data || r);
-      const rows = rawRows.filter(inv => inv.shopId === shopId);
-      if (rows.length) setInvoices(sortPiInvoices(rows));
-      return rows.length;
+      const records = Array.isArray(res) ? res : (res.records || []);
+      const localRows = records
+        .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
+        .filter(inv => inv.shopId === shopId);
+
+      if (Array.isArray(cloudRows)) {
+        const merged = new Map(cloudRows.map(inv => [String(inv.id), inv]));
+        records
+          .filter(r => Number(r?.dirty || 0) === 1)
+          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
+          .filter(inv => inv.shopId === shopId)
+          .forEach(inv => merged.set(String(inv.id), inv));
+        const rows = sortPiInvoices([...merged.values()]);
+        setInvoices(rows);
+        return rows.length;
+      }
+
+      if (localRows.length) setInvoices(sortPiInvoices(localRows));
+      return localRows.length;
     };
 
     loadOfflinePiInvoices().catch(err => console.warn("[S4 Offline] purchaseInvoices offline load failed", err));
@@ -4605,18 +4629,18 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
     const unsub1=onSnapshot(q,snap=>{
       const rows = snap.docs.map(normalizePiInvoice);
-      setInvoices(rows);
-      offlineCacheCloudRecords("purchaseInvoices", rows).catch(err => console.warn("[S4 Offline] purchaseInvoices cache failed", err));
-      setPiLoading(false);
+      offlineCacheCloudRecords("purchaseInvoices", rows)
+        .catch(err => console.warn("[S4 Offline] purchaseInvoices cache failed", err))
+        .finally(()=>loadOfflinePiInvoices({ cloudRows:rows }).finally(()=>setPiLoading(false)));
     },()=>{
       // Index নেই — orderBy ছাড়া fallback query, client-side sort
       const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
       unsub2=onSnapshot(q2,snap=>{
         const docs=snap.docs.map(normalizePiInvoice);
         const rows=sortPiInvoices(docs);
-        setInvoices(rows);
-        offlineCacheCloudRecords("purchaseInvoices", rows).catch(err => console.warn("[S4 Offline] purchaseInvoices fallback cache failed", err));
-        setPiLoading(false);
+        offlineCacheCloudRecords("purchaseInvoices", rows)
+          .catch(err => console.warn("[S4 Offline] purchaseInvoices fallback cache failed", err))
+          .finally(()=>loadOfflinePiInvoices({ cloudRows:rows }).finally(()=>setPiLoading(false)));
       },err2=>{
         console.error(err2);
         loadOfflinePiInvoices().finally(()=>setPiLoading(false));
@@ -8809,6 +8833,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [cloudUploadBusy, setCloudUploadBusy] = useState(false);
   const [lastCloudPullAt, setLastCloudPullAt] = useState(null);
   const [settingsPage,setSettingsPage]=useState(null);
+  const branchTransferAccess = useBranchTransferAccess({
+    shopId, user, profile, isOwner,
+  });
+  const branchTransferSettings = branchTransferAccess.settings;
+  const setBranchTransferSettings = branchTransferAccess.setSettings;
+  const canUseBranchTransfer = branchTransferAccess.canUse;
   const [staffForm, setStaffForm] = useState({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
   const [staffSaving, setStaffSaving] = useState(false);
   const [staffPwReset, setStaffPwReset] = useState({});
@@ -10487,7 +10517,7 @@ const startEditOrder = (order) => {
       ];
 
   const visibleTabs = isOwner
-    ? [["dashboard",t.tabDashboard],["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ["shop",t.tabShop],
@@ -10497,6 +10527,7 @@ const startEditOrder = (order) => {
         ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
         ...(can("viewVendors")?[["vendors",t.tabVendor]]:[]),
         ["cheque",t.tabCheque],
+        ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),
         ["settings",t.tabSettings],
       ];
 
@@ -11853,6 +11884,18 @@ const startEditOrder = (order) => {
         />
       )}
 
+      {tab==="branchTransfer"&&canUseBranchTransfer&&(
+        <div style={isDesktop?s.desktopPanel:s.panel}>
+          <BranchTransferWorkspace
+            lang={lang} th={th} s={s}
+            shopId={shopId} user={user} profile={profile}
+            team={team} products={products} vendors={vendors} shop={localShop}
+            settings={branchTransferSettings} toast={toast}
+            isDesktop={isDesktop}
+          />
+        </div>
+      )}
+
       {tab==="settings"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           {/* ── SETTINGS MENU ── */}
@@ -11930,6 +11973,21 @@ const startEditOrder = (order) => {
                 </div>
                 <span style={s.settingsArrow}>›</span>
               </button>
+
+              {/* Branch Stock Transfer - native optional module */}
+              {isOwner&&(()=>{
+                const copy = branchTransferSettingsCopy(lang, branchTransferSettings.enabled);
+                return (
+                  <button style={s.settingsRow} onClick={()=>setSettingsPage("branchTransfer")}>
+                    <span style={s.settingsRowIcon}>🚚</span>
+                    <div style={{ flex:1 }}>
+                      <div style={s.settingsRowLabel}>{copy.title}</div>
+                      <div style={s.settingsRowSub}>{copy.subtitle}</div>
+                    </div>
+                    <span style={s.settingsArrow}>›</span>
+                  </button>
+                );
+              })()}
 
               {/* WA style - owner only */}
               {isOwner&&(
@@ -12202,6 +12260,16 @@ const startEditOrder = (order) => {
                 })}
               </div>
             </>
+          )}
+
+          {settingsPage==="branchTransfer"&&isOwner&&(
+            <BranchTransferSettingsPanel
+              lang={lang} th={th} s={s}
+              shopId={shopId} user={user} profile={profile}
+              team={team} settings={branchTransferSettings}
+              onSettingsChanged={setBranchTransferSettings}
+              toast={toast}
+            />
           )}
 
           {settingsPage==="invoice"&&(

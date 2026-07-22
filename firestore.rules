@@ -42,6 +42,16 @@ service cloud.firestore {
         );
     }
 
+    function hasShopPermission(shopId, permission) {
+      return isShopMember(shopId)
+        && getUser(request.auth.uid).permissions != null
+        && getUser(request.auth.uid).permissions[permission] == true;
+    }
+
+    function canSendBranchTransfer(shopId) {
+      return isOwnerOfShop(shopId) || hasShopPermission(shopId, 'sendBranchTransfer');
+    }
+
     function sameShopByResource() {
       return isAuthenticated()
         && userExists(request.auth.uid)
@@ -292,6 +302,94 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Optional Branch Stock Transfer module
+    match /branchTransferSettings/{settingsId} {
+      allow read: if sameShopByResource();
+      allow create: if sameShopByRequest() && isOwnerOfShop(request.resource.data.shopId);
+      allow update: if sameShopByResource() && isOwnerOfShop(resource.data.shopId);
+      allow delete: if false;
+    }
+
+    match /branches/{branchId} {
+      allow read: if sameShopByResource();
+      allow create: if sameShopByRequest() && isOwnerOfShop(request.resource.data.shopId);
+      allow update, delete: if sameShopByResource() && isOwnerOfShop(resource.data.shopId);
+    }
+
+    match /branchTransfers/{transferId} {
+      allow read: if sameShopByResource();
+      allow create: if sameShopByRequest() && canSendBranchTransfer(request.resource.data.shopId);
+
+      allow update: if sameShopByResource() && (
+        canSendBranchTransfer(resource.data.shopId) ||
+        (
+          resource.data.receiverUserId == request.auth.uid &&
+          request.resource.data.shopId == resource.data.shopId &&
+          request.resource.data.branchId == resource.data.branchId &&
+          request.resource.data.diff(resource.data).changedKeys().hasOnly([
+            "status",
+            "receipts",
+            "purchaseInvoiceIds",
+            "invoiceStatus",
+            "receiptSummary",
+            "receivedAt",
+            "receivedBy",
+            "receivedByName",
+            "updatedAt",
+            "updatedBy",
+            "updatedByName",
+            "_offline_updated_at",
+            "_cloud_collection",
+            "_cloud_document_id",
+            "_cloud_synced_at",
+            "_cloud_sync_status"
+          ])
+        )
+      );
+
+      allow delete: if sameShopByResource()
+        && isOwnerOfShop(resource.data.shopId)
+        && resource.data.status in ["draft", "cancelled"];
+    }
+
+    match /branchTransferReceipts/{receiptId} {
+      allow read: if sameShopByResource();
+      allow create: if sameShopByRequest() && (
+        isOwnerOfShop(request.resource.data.shopId) ||
+        request.resource.data.createdBy == request.auth.uid
+      );
+      allow update: if sameShopByResource() && (
+        isOwnerOfShop(resource.data.shopId) ||
+        resource.data.createdBy == request.auth.uid
+      );
+      allow delete: if false;
+    }
+
+    match /branchStockBalances/{balanceId} {
+      allow read: if sameShopByResource();
+      allow create: if sameShopByRequest() && (
+        isOwnerOfShop(request.resource.data.shopId) ||
+        request.resource.data.receiverUserId == request.auth.uid
+      );
+      allow update: if sameShopByResource() && (
+        isOwnerOfShop(resource.data.shopId) ||
+        request.resource.data.receiverUserId == request.auth.uid
+      );
+      allow delete: if sameShopByResource() && isOwnerOfShop(resource.data.shopId);
+    }
+
+    match /branchStockMovements/{movementId} {
+      allow read: if sameShopByResource();
+      allow create: if sameShopByRequest() && (
+        isOwnerOfShop(request.resource.data.shopId) ||
+        request.resource.data.createdBy == request.auth.uid
+      );
+      allow update: if sameShopByResource() && (
+        isOwnerOfShop(resource.data.shopId) ||
+        resource.data.createdBy == request.auth.uid
+      );
+      allow delete: if false;
+    }
     match /purchaseOrders/{poId} {
       allow read: if sameShopByResource();
       allow create: if sameShopByRequest() && request.resource.data.createdBy == request.auth.uid;
