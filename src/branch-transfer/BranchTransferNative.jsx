@@ -1083,11 +1083,11 @@ function ReceiveModal({ lang, s, th, transfer, busy, onClose, onConfirm, isDeskt
   );
 }
 
-function TransferCard({ lang, s, th, transfer, isOwner, busy, onStatus, onReceive, isDesktop }) {
+function TransferCard({ lang, s, th, transfer, isOwner, canManageTransferStatus = false, actor, busy, onStatus, onReceive, isDesktop }) {
   const t = bt(lang);
   const [expanded, setExpanded] = useState(false);
   const remaining = TransferRemaining(transfer);
-  const canReceive = !isOwner && remaining > 0 && ["dispatched", "in_transit", "partially_received", "discrepancy"].includes(transfer.status);
+  const canReceive = !isOwner && transferAssignedToActor(transfer, actor) && remaining > 0 && ["dispatched", "in_transit", "partially_received", "discrepancy"].includes(transfer.status);
   const sentDate = transferSentDate(transfer);
 
   return (
@@ -1174,11 +1174,11 @@ function TransferCard({ lang, s, th, transfer, isOwner, busy, onStatus, onReceiv
         </div>
       )}
       <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginTop: 10 }}>
-        {isOwner && transfer.status === "draft" && <NativeButton s={s} disabled={busy} onClick={() => onStatus(transfer, "packed")}>{t.packed}</NativeButton>}
-        {isOwner && ["draft", "packed"].includes(transfer.status) && <NativeButton s={s} tone="primary" disabled={busy} onClick={() => onStatus(transfer, "dispatched")}>{t.dispatch}</NativeButton>}
-        {isOwner && transfer.status === "dispatched" && <NativeButton s={s} disabled={busy} onClick={() => onStatus(transfer, "in_transit")}>{t.inTransit}</NativeButton>}
-        {isOwner && transfer.status === "discrepancy" && remaining === 0 && <NativeButton s={s} tone="primary" disabled={busy} onClick={() => onStatus(transfer, "received")}>{t.completed}</NativeButton>}
-        {isOwner && !["received", "cancelled"].includes(transfer.status) && <NativeButton s={s} tone="danger" disabled={busy} onClick={() => onStatus(transfer, "cancelled")}>{t.cancel}</NativeButton>}
+        {canManageTransferStatus && transfer.status === "draft" && <NativeButton s={s} disabled={busy} onClick={() => onStatus(transfer, "packed")}>{t.packed}</NativeButton>}
+        {canManageTransferStatus && ["draft", "packed"].includes(transfer.status) && <NativeButton s={s} tone="primary" disabled={busy} onClick={() => onStatus(transfer, "dispatched")}>{t.dispatch}</NativeButton>}
+        {canManageTransferStatus && transfer.status === "dispatched" && <NativeButton s={s} disabled={busy} onClick={() => onStatus(transfer, "in_transit")}>{t.inTransit}</NativeButton>}
+        {canManageTransferStatus && transfer.status === "discrepancy" && remaining === 0 && <NativeButton s={s} tone="primary" disabled={busy} onClick={() => onStatus(transfer, "received")}>{t.completed}</NativeButton>}
+        {canManageTransferStatus && !["received", "cancelled"].includes(transfer.status) && <NativeButton s={s} tone="danger" disabled={busy} onClick={() => onStatus(transfer, "cancelled")}>{t.cancel}</NativeButton>}
         {canReceive && <NativeButton s={s} tone="primary" disabled={busy} onClick={() => onReceive(transfer)}>{t.receive}</NativeButton>}
       </div>
     </div>
@@ -1221,9 +1221,13 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
 
   useEffect(() => setTab(canSendTransfer ? "overview" : "incoming"), [canSendTransfer]);
 
+  const assignedTransfers = useMemo(
+    () => transfers.filter((transfer) => transferAssignedToActor(transfer, actor)),
+    [transfers, actor]
+  );
   const visibleTransfers = useMemo(
-    () => (canSendTransfer ? transfers : transfers.filter((transfer) => transferAssignedToActor(transfer, actor))),
-    [transfers, canSendTransfer, actor]
+    () => (canSendTransfer ? transfers : assignedTransfers),
+    [transfers, assignedTransfers, canSendTransfer]
   );
 
   const filteredTransfers = useMemo(() => {
@@ -1243,11 +1247,11 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
         (branch) =>
           branch.active !== false &&
           (
-            canSendTransfer ||
-            visibleTransfers.some((transfer) => transfer.branchId === branch.id)
+            isOwner ||
+            assignedTransfers.some((transfer) => transfer.branchId === branch.id)
           )
       ),
-    [branches, canSendTransfer, visibleTransfers]
+    [branches, isOwner, assignedTransfers]
   );
   const assignedIds = useMemo(
     () => [...new Set(assignedBranches.map((branch) => branch.id))],
@@ -1255,6 +1259,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   );
   const incoming = filteredTransfers.filter(
     (transfer) =>
+      (isOwner || transferAssignedToActor(transfer, actor)) &&
       TransferRemaining(transfer) > 0 &&
       ["dispatched", "in_transit", "partially_received", "discrepancy"].includes(transfer.status)
   );
@@ -1291,7 +1296,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   };
 
   const tabs = canSendTransfer
-    ? [["overview", t.overview], ["new", t.newTransfer], ["transfers", t.transfers]]
+    ? [["overview", t.overview], ["new", t.newTransfer], ...(!isOwner ? [["incoming", t.incoming], ["stock", t.stock]] : []), ["transfers", t.transfers]]
     : [["incoming", t.incoming], ["transfers", t.transfers], ["stock", t.stock]];
   const waiting = filteredTransfers.filter((transfer) => TransferRemaining(transfer) > 0 && !["draft", "packed", "cancelled"].includes(transfer.status)).length;
   const completed = filteredTransfers.filter((transfer) => transfer.status === "received").length;
@@ -1341,7 +1346,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
             <Metric s={s} th={th} label={t.completed} value={completed} color="#22c55e" />
             <Metric s={s} th={th} label={t.discrepancy} value={discrepancies} color="#ef4444" />
           </div>
-          <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers.slice(0, 5)} isOwner={canSendTransfer} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />
+          <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers.slice(0, 5)} isOwner={isOwner} canManageTransferStatus={canSendTransfer} actor={actor} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />
         </div>
       )}
 
@@ -1349,11 +1354,11 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
 
       {tab === "incoming" && !isOwner && (
         assignedBranches.length
-          ? <TransferList lang={lang} s={s} th={th} transfers={incoming} isOwner={false} busy={busy} isDesktop={isDesktop} emptyText={t.noIncoming} onStatus={() => {}} onReceive={setReceiving} />
+          ? <TransferList lang={lang} s={s} th={th} transfers={incoming} isOwner={isOwner} canManageTransferStatus={false} actor={actor} busy={busy} isDesktop={isDesktop} emptyText={t.noIncoming} onStatus={() => {}} onReceive={setReceiving} />
           : <div style={{ ...s.card, color: th.txtMuted, textAlign: "center", padding: 35 }}>{t.notAssigned}</div>
       )}
 
-      {tab === "transfers" && <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers} isOwner={canSendTransfer} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />}
+      {tab === "transfers" && <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers} isOwner={isOwner} canManageTransferStatus={canSendTransfer} actor={actor} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />}
       {tab === "stock" && !isOwner && <StockList lang={lang} s={s} th={th} stockRows={stockRows} branchIds={assignedIds} />}
 
       {receiving && (
