@@ -8263,7 +8263,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   );
 }
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys }) {
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
@@ -8326,6 +8326,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     { key:"vendors",  icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors",        badge:vendors.length },
     { key:"customers",icon:"👥", label:lang==="bn"?"কাস্টমার":"Customers",    badge:customers.length },
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
+    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
 
@@ -8335,6 +8336,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
     { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
+    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
 
@@ -8347,6 +8349,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
       ? [{ key:isOwner?"purchase":"shop", icon:"＋", label:lang==="bn"?(isOwner?"ক্রয়":"অর্ডার"):(isOwner?"Purchase":"Order") }]
       : [{ key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয়":"Purchase" }]),
     ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
+    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch":"Branch" }] : []),
     ...(isOwner || staffQuickNavKeys.includes("products")
       ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products" }]
       : []),
@@ -10825,6 +10828,7 @@ const startEditOrder = (order) => {
           isOwner={isOwner} isDesktop={isDesktop}
           setTab={setTab} unread={unread}
           staffQuickNavKeys={staffQuickNavKeys}
+          canUseBranchTransfer={canUseBranchTransfer}
         />
       )}
       {!isOwner&&tab==="shop"&&(
