@@ -677,7 +677,7 @@ function Metric({ s, th, label, value, color = "#f97316" }) {
   );
 }
 
-function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shopId, shop, actor, busy, onCreated, toast }) {
+function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shopId, shop, actor, busy, onCreated, toast, isDesktop }) {
   const t = bt(lang);
   const branchRef = useRef(null);
   const salesmanRef = useRef(null);
@@ -884,7 +884,7 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
   return (
     <div style={s.card}>
       <div style={s.settingsLbl}>🚚 {t.newTransfer}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8, marginBottom: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fit,minmax(220px,1fr))" : "minmax(0,1fr)", gap: 8, marginBottom: 10 }}>
         <select
           ref={branchRef}
           style={s.sel}
@@ -920,7 +920,7 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
       </div>
 
       <div style={{ color: th.txtMuted, fontSize: 11, marginBottom: 7 }}>{t.vendorHelp}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8, marginBottom: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fit,minmax(220px,1fr))" : "minmax(0,1fr)", gap: 8, marginBottom: 10 }}>
         <div>
           <input
             list={vendorListId}
@@ -967,7 +967,7 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
           style={{ ...s.inp, marginBottom: 8, fontWeight: 700 }}
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(190px,1fr))", gap: 8, marginBottom: 8 }}>
+        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fit,minmax(190px,1fr))" : "minmax(0,1fr)", gap: 8, marginBottom: 8 }}>
           <ProductTypeaheadInput
             products={activeProducts}
             value={current.code}
@@ -989,7 +989,7 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
           />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(90px,0.8fr) minmax(90px,0.7fr) minmax(150px,1.4fr) auto", gap: 8, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "minmax(90px,0.8fr) minmax(90px,0.7fr) minmax(150px,1.4fr) auto" : "minmax(0,1fr)", gap: 8, alignItems: "end" }}>
           <input
             ref={qtyRef}
             style={s.inp}
@@ -1013,14 +1013,14 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
             placeholder={t.unitCost}
             inputMode="decimal"
           />
-          <NativeButton s={s} tone="primary" onClick={addItem}>{t.addItem} →</NativeButton>
+          <NativeButton s={s} tone="primary" onClick={addItem} style={isDesktop ? {} : { width: "100%" }}>{t.addItem} →</NativeButton>
         </div>
       </div>
 
       {items.length > 0 && (
         <div style={{ marginTop: 10, border: `1px solid ${th.border}`, borderRadius: 10, overflow: "hidden" }}>
           {items.map((item, index) => (
-            <div key={item.lineId} style={{ display: "grid", gridTemplateColumns: "24px minmax(0,1fr) auto auto", gap: 8, alignItems: "center", padding: 9, borderTop: index ? `1px solid ${th.border}` : "none", background: th.bgInp }}>
+            <div key={item.lineId} style={{ display: "grid", gridTemplateColumns: isDesktop ? "24px minmax(0,1fr) auto auto" : "22px minmax(0,1fr) auto", gap: 8, alignItems: "center", padding: 9, borderTop: index ? `1px solid ${th.border}` : "none", background: th.bgInp }}>
               <span style={{ color: th.txtMuted }}>{index + 1}</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: th.txtPrimary, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.name}</div>
@@ -1028,14 +1028,14 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
                   {[item.code, item.brand].filter(Boolean).join(" · ") || "—"}
                 </div>
               </div>
-              <span style={{ color: th.txtMuted, fontSize: 11, whiteSpace: "nowrap" }}>{item.quantity} {item.unit} · {item.unitCost}</span>
+              <span style={{ color: th.txtMuted, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", gridColumn: isDesktop ? "auto" : "2 / 3" }}>{item.quantity} {item.unit} · {item.unitCost}</span>
               <button type="button" style={s.dlBtn} onClick={() => setItems((prev) => prev.filter((row) => row.lineId !== item.lineId))}>✕</button>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 8, marginTop: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(auto-fit,minmax(220px,1fr))" : "minmax(0,1fr)", gap: 8, marginTop: 10 }}>
         <input type="date" style={s.inp} value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
         <input style={s.inp} value={note} onChange={(e) => setNote(e.target.value)} placeholder={t.note} />
       </div>
@@ -1047,7 +1047,7 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
   );
 }
 
-function ReceiveModal({ lang, s, th, transfer, busy, onClose, onConfirm }) {
+function ReceiveModal({ lang, s, th, transfer, busy, onClose, onConfirm, isDesktop }) {
   const t = bt(lang);
   const [lines, setLines] = useState(() => (transfer.items || []).map((item) => ({
     lineId: item.lineId,
@@ -1069,7 +1069,7 @@ function ReceiveModal({ lang, s, th, transfer, busy, onClose, onConfirm }) {
           return (
             <div key={item.lineId} style={{ ...s.card, marginBottom: 8 }}>
               <div style={{ color: th.txtPrimary, fontWeight: 800, marginBottom: 8 }}>{item.name} · {t.remaining}: {remainingQuantityForLine(transfer, item)}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "1fr 1fr" : "minmax(0,1fr)", gap: 8 }}>
                 <input style={s.inp} value={line.receivedQty} onChange={(e) => update(item.lineId, "receivedQty", e.target.value)} placeholder={t.received} inputMode="decimal" />
                 <input style={s.inp} value={line.damagedQty} onChange={(e) => update(item.lineId, "damagedQty", e.target.value)} placeholder={t.damaged} inputMode="decimal" />
               </div>
@@ -1083,7 +1083,7 @@ function ReceiveModal({ lang, s, th, transfer, busy, onClose, onConfirm }) {
   );
 }
 
-function TransferCard({ lang, s, th, transfer, isOwner, busy, onStatus, onReceive }) {
+function TransferCard({ lang, s, th, transfer, isOwner, busy, onStatus, onReceive, isDesktop }) {
   const t = bt(lang);
   const [expanded, setExpanded] = useState(false);
   const remaining = TransferRemaining(transfer);
@@ -1141,7 +1141,7 @@ function TransferCard({ lang, s, th, transfer, isOwner, busy, onStatus, onReceiv
                     {t.unitCost}: {numberValue(item.unitCost).toFixed(2)}
                   </div>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,minmax(60px,1fr))", gap: 5, marginTop: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(4,minmax(60px,1fr))" : "repeat(2,minmax(0,1fr))", gap: 5, marginTop: 8 }}>
                   {[
                     [t.sent, item.quantity],
                     [t.received, accepted],
@@ -1305,7 +1305,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
       </div>
 
       <div style={{ ...s.card, marginBottom: 12 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) repeat(2,minmax(145px,1fr)) auto", gap: 8, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "minmax(220px,2fr) repeat(2,minmax(145px,1fr)) auto" : "minmax(0,1fr)", gap: 8, alignItems: "end" }}>
           <input
             style={s.inp}
             value={searchText}
@@ -1320,7 +1320,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
             {t.toDate}
             <input type="date" style={{ ...s.inp, marginTop: 4 }} value={toDate} onChange={(event) => setToDate(event.target.value)} />
           </label>
-          <NativeButton s={s} onClick={clearFilters}>{t.clearFilter}</NativeButton>
+          <NativeButton s={s} onClick={clearFilters} style={isDesktop ? {} : { width: "100%" }}>{t.clearFilter}</NativeButton>
         </div>
         <div style={{ color: th.txtMuted, fontSize: 10, marginTop: 7 }}>
           {filteredTransfers.length} {t.filterResult}
@@ -1341,23 +1341,23 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
             <Metric s={s} th={th} label={t.completed} value={completed} color="#22c55e" />
             <Metric s={s} th={th} label={t.discrepancy} value={discrepancies} color="#ef4444" />
           </div>
-          <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers.slice(0, 5)} isOwner={canSendTransfer} busy={busy} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />
+          <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers.slice(0, 5)} isOwner={canSendTransfer} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />
         </div>
       )}
 
-      {tab === "new" && canSendTransfer && <NewTransfer lang={lang} s={s} th={th} branches={branches} team={team} products={products} vendors={vendors} shopId={shopId} shop={shop} actor={actor} busy={busy} toast={toast} onCreated={(payload) => run(async () => { const created = await createBranchTransfer(payload); setTab("transfers"); return created; }, t.transferSaved)} />}
+      {tab === "new" && canSendTransfer && <NewTransfer lang={lang} s={s} th={th} branches={branches} team={team} products={products} vendors={vendors} shopId={shopId} shop={shop} actor={actor} busy={busy} toast={toast} isDesktop={isDesktop} onCreated={(payload) => run(async () => { const created = await createBranchTransfer(payload); setTab("transfers"); return created; }, t.transferSaved)} />}
 
       {tab === "incoming" && !isOwner && (
         assignedBranches.length
-          ? <TransferList lang={lang} s={s} th={th} transfers={incoming} isOwner={false} busy={busy} emptyText={t.noIncoming} onStatus={() => {}} onReceive={setReceiving} />
+          ? <TransferList lang={lang} s={s} th={th} transfers={incoming} isOwner={false} busy={busy} isDesktop={isDesktop} emptyText={t.noIncoming} onStatus={() => {}} onReceive={setReceiving} />
           : <div style={{ ...s.card, color: th.txtMuted, textAlign: "center", padding: 35 }}>{t.notAssigned}</div>
       )}
 
-      {tab === "transfers" && <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers} isOwner={canSendTransfer} busy={busy} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />}
+      {tab === "transfers" && <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers} isOwner={canSendTransfer} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />}
       {tab === "stock" && !isOwner && <StockList lang={lang} s={s} th={th} stockRows={stockRows} branchIds={assignedIds} />}
 
       {receiving && (
-        <ReceiveModal lang={lang} s={s} th={th} transfer={receiving} busy={busy} onClose={() => setReceiving(null)} onConfirm={(inputLines) => run(async () => {
+        <ReceiveModal lang={lang} s={s} th={th} transfer={receiving} busy={busy} isDesktop={isDesktop} onClose={() => setReceiving(null)} onConfirm={(inputLines) => run(async () => {
           const result = await receiveBranchTransfer({ transfer: receiving, inputLines, settings, shop, actor });
           setReceiving(null);
           return result;
