@@ -288,6 +288,10 @@ function transferAssignedToActor(transfer, actor) {
   return transferReceiverIds(transfer).some((value) => actorIds.has(value));
 }
 
+function canReceiveBranchTransferActor(actor) {
+  return String(actor?.role || "").trim().toLowerCase() === "owner" || actor?.permissions?.receiveBranchTransfer === true;
+}
+
 function dateOnly(value) {
   if (!value) return "";
   const raw = value?.toDate?.() || value;
@@ -328,6 +332,7 @@ function normalizeError(error, lang) {
     TRANSFER_PRODUCT_REQUIRED: ["Product নির্বাচন করুন", "Select a product"],
     TRANSFER_QUANTITY_INVALID: ["সঠিক quantity দিন", "Enter a valid quantity"],
     RECEIVER_NOT_ASSIGNED: ["এই Branch-এর receiver আপনি নন", "You are not assigned to this branch"],
+    RECEIVE_PERMISSION_REQUIRED: ["Owner এই Salesman-কে Receive permission দেয়নি", "Owner has not allowed this salesman to receive"],
     TRANSFER_NOT_RECEIVABLE: ["এই status-এ Receive করা যাবে না", "This transfer cannot be received now"],
     RECEIPT_QUANTITY_REQUIRED: ["Receive quantity দিন", "Enter received quantity"],
     RECEIPT_QUANTITY_INVALID: ["Received/Damaged quantity সঠিক নয়", "Received/damaged quantity is invalid"],
@@ -1087,7 +1092,7 @@ function TransferCard({ lang, s, th, transfer, isOwner, canManageTransferStatus 
   const t = bt(lang);
   const [expanded, setExpanded] = useState(false);
   const remaining = TransferRemaining(transfer);
-  const canReceive = !isOwner && transferAssignedToActor(transfer, actor) && remaining > 0 && ["dispatched", "in_transit", "partially_received", "discrepancy"].includes(transfer.status);
+  const canReceive = !isOwner && canReceiveBranchTransferActor(actor) && transferAssignedToActor(transfer, actor) && remaining > 0 && ["dispatched", "in_transit", "partially_received", "discrepancy"].includes(transfer.status);
   const sentDate = transferSentDate(transfer);
 
   return (
@@ -1209,6 +1214,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   const actor = useMemo(() => actorFrom(user, profile), [user, profile]);
   const isOwner = profile?.role === "owner";
   const canSendTransfer = isOwner || profile?.permissions?.sendBranchTransfer === true;
+  const canReceiveTransfer = canReceiveBranchTransferActor(actor);
   const [branches, setBranches] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, shopId);
   const [transfers, setTransfers] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.TRANSFERS, shopId);
   const [stockRows] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.STOCK_BALANCES, shopId);
@@ -1222,8 +1228,8 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   useEffect(() => setTab(canSendTransfer ? "overview" : "incoming"), [canSendTransfer]);
 
   const assignedTransfers = useMemo(
-    () => transfers.filter((transfer) => transferAssignedToActor(transfer, actor)),
-    [transfers, actor]
+    () => canReceiveTransfer ? transfers.filter((transfer) => transferAssignedToActor(transfer, actor)) : [],
+    [transfers, actor, canReceiveTransfer]
   );
   const visibleTransfers = useMemo(
     () => (canSendTransfer ? transfers : assignedTransfers),
@@ -1259,7 +1265,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   );
   const incoming = filteredTransfers.filter(
     (transfer) =>
-      (isOwner || transferAssignedToActor(transfer, actor)) &&
+      (isOwner || (canReceiveTransfer && transferAssignedToActor(transfer, actor))) &&
       TransferRemaining(transfer) > 0 &&
       ["dispatched", "in_transit", "partially_received", "discrepancy"].includes(transfer.status)
   );

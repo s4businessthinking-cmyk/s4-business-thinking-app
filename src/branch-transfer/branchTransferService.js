@@ -70,6 +70,10 @@ function canSendBranchTransferActor(actor) {
   return isOwnerActor(actor) || actor?.permissions?.sendBranchTransfer === true;
 }
 
+function canReceiveBranchTransferActor(actor) {
+  return isOwnerActor(actor) || actor?.permissions?.receiveBranchTransfer === true;
+}
+
 function identitySet(source = {}) {
   return new Set(
     [source?.uid, source?.firebaseUid, source?.id, source?.localUserId, source?.username, source?.email]
@@ -645,6 +649,7 @@ export async function receiveBranchTransfer({
   actor,
 }) {
   if (!transfer?.id) throw new Error("TRANSFER_REQUIRED");
+  if (!canReceiveBranchTransferActor(actor)) throw new Error("RECEIVE_PERMISSION_REQUIRED");
   if (!matchesAssignedReceiver(transfer, actor)) throw new Error("RECEIVER_NOT_ASSIGNED");
   if (!RECEIVABLE_STATUSES.has(transfer.status)) throw new Error("TRANSFER_NOT_RECEIVABLE");
 
@@ -767,6 +772,7 @@ export async function createPurchaseInvoiceFromReceipt({
   actor,
 }) {
   if (!transfer?.id || !receiptId) throw new Error("RECEIPT_REQUIRED");
+  if (!canReceiveBranchTransferActor(actor)) throw new Error("RECEIVE_PERMISSION_REQUIRED");
   if (!matchesAssignedReceiver(transfer, actor)) throw new Error("RECEIVER_NOT_ASSIGNED");
 
   const receipt = (transfer.receipts || []).find((entry) => entry.id === receiptId);

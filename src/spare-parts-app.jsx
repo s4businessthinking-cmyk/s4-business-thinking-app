@@ -152,6 +152,7 @@ const PERMISSIONS_LIST = [
   { key: "vendorPayments",   bn: "সাপ্লায়ার পেমেন্ট করা",     en: "Make Supplier Payments" },
   { key: "managePurchase",   bn: "ক্রয় ইনভয়েস ম্যানেজ করা",  en: "Manage Purchase Invoices" },
   { key: "sendBranchTransfer", bn: "Branch-এ পণ্য পাঠানো",      en: "Send Branch Products" },
+  { key: "receiveBranchTransfer", bn: "Branch Transfer Receive", en: "Receive Branch Products" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -170,6 +171,7 @@ const DEFAULT_PERMISSIONS = {
   vendorPayments: false,
   managePurchase: false,
   sendBranchTransfer: false,
+  receiveBranchTransfer: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
