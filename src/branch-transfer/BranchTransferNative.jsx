@@ -364,6 +364,7 @@ export function useBranchTransferAccess({ shopId, user, profile, isOwner }) {
   const [settings, setSettings] = useState({ ...DEFAULT_BRANCH_TRANSFER_SETTINGS });
   const [assigned, setAssigned] = useState(Boolean(isOwner));
   const canSend = profile?.permissions?.sendBranchTransfer === true;
+  const canReceive = profile?.permissions?.receiveBranchTransfer === true;
 
   useEffect(() => {
     let cancelled = false;
@@ -445,8 +446,9 @@ export function useBranchTransferAccess({ shopId, user, profile, isOwner }) {
     settings,
     setSettings,
     assigned,
-    canUse: settings.enabled === true && (Boolean(isOwner) || canSend || assigned),
+    canUse: settings.enabled === true && (Boolean(isOwner) || canSend || canReceive || assigned),
     canSend,
+    canReceive,
   };
 }
 
