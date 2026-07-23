@@ -52,6 +52,34 @@ service cloud.firestore {
       return isOwnerOfShop(shopId) || hasShopPermission(shopId, 'sendBranchTransfer');
     }
 
+    function canReceiveBranchTransfer(shopId) {
+      return isOwnerOfShop(shopId) || hasShopPermission(shopId, 'receiveBranchTransfer');
+    }
+
+    function isBranchTransferReceiverByResource() {
+      return isAuthenticated()
+        && userExists(request.auth.uid)
+        && (
+          resource.data.receiverUserId == request.auth.uid ||
+          resource.data.receiverFirebaseUid == request.auth.uid ||
+          resource.data.receiverLocalUserId == getUser(request.auth.uid).localUserId ||
+          resource.data.receiverUsername == getUser(request.auth.uid).username ||
+          resource.data.receiverEmail == getUser(request.auth.uid).email
+        );
+    }
+
+    function isBranchTransferReceiverByRequest() {
+      return isAuthenticated()
+        && userExists(request.auth.uid)
+        && (
+          request.resource.data.receiverUserId == request.auth.uid ||
+          request.resource.data.receiverFirebaseUid == request.auth.uid ||
+          request.resource.data.receiverLocalUserId == getUser(request.auth.uid).localUserId ||
+          request.resource.data.receiverUsername == getUser(request.auth.uid).username ||
+          request.resource.data.receiverEmail == getUser(request.auth.uid).email
+        );
+    }
+
     function sameShopByResource() {
       return isAuthenticated()
         && userExists(request.auth.uid)
@@ -323,7 +351,8 @@ service cloud.firestore {
       allow update: if sameShopByResource() && (
         canSendBranchTransfer(resource.data.shopId) ||
         (
-          resource.data.receiverUserId == request.auth.uid &&
+          canReceiveBranchTransfer(resource.data.shopId) &&
+          isBranchTransferReceiverByResource() &&
           request.resource.data.shopId == resource.data.shopId &&
           request.resource.data.branchId == resource.data.branchId &&
           request.resource.data.diff(resource.data).changedKeys().hasOnly([
@@ -369,11 +398,17 @@ service cloud.firestore {
       allow read: if sameShopByResource();
       allow create: if sameShopByRequest() && (
         isOwnerOfShop(request.resource.data.shopId) ||
-        request.resource.data.receiverUserId == request.auth.uid
+        (
+          canReceiveBranchTransfer(request.resource.data.shopId) &&
+          isBranchTransferReceiverByRequest()
+        )
       );
       allow update: if sameShopByResource() && (
         isOwnerOfShop(resource.data.shopId) ||
-        request.resource.data.receiverUserId == request.auth.uid
+        (
+          canReceiveBranchTransfer(resource.data.shopId) &&
+          isBranchTransferReceiverByRequest()
+        )
       );
       allow delete: if sameShopByResource() && isOwnerOfShop(resource.data.shopId);
     }
