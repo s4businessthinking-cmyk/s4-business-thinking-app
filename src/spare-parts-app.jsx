@@ -10682,6 +10682,10 @@ const startEditOrder = (order) => {
       const itemMatch = o.items?.some(it =>
         nsmatch([it.name,it.brand,it.code].filter(Boolean).join(" "), q)
       );
+      const supplierMatch = o.items?.some(it => {
+        const supplier = findOrderSupplier(it.co);
+        return nsmatch([supplier?.name, supplier?.phone, it.supplierPhone].filter(Boolean).join(" "), q);
+      });
       const d = o.createdAt instanceof Date ? o.createdAt : new Date(o.createdAt);
       // Match against several date formats so user can type e.g. "9 may", "09/05", "2026"
       const dateFormats = [
@@ -10692,7 +10696,7 @@ const startEditOrder = (order) => {
         String(d.getFullYear()),
       ];
       const dateMatch = dateFormats.some(f => f.toLowerCase().includes(q));
-      return noMatch || itemMatch || dateMatch;
+      return noMatch || itemMatch || supplierMatch || dateMatch;
     });
   };
 
@@ -11270,7 +11274,7 @@ const startEditOrder = (order) => {
               <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
               <input
                 style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
-                placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+              placeholder={lang==="bn"?"অর্ডার, পণ্য, কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন...":"Search order, item, company/vendor name or number..."}
                 value={searchQ}
                 onChange={e=>setSearchQ(e.target.value)}
               />
@@ -11337,7 +11341,7 @@ const startEditOrder = (order) => {
                 <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
                 <input
                   style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
-                  placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+                  placeholder={lang==="bn"?"অর্ডার, পণ্য, কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন...":"Search order, item, company/vendor name or number..."}
                   value={searchQ}
                   onChange={e=>setSearchQ(e.target.value)}
                 />
