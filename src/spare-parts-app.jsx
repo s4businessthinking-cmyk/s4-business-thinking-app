@@ -8265,7 +8265,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   );
 }
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer }) {
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, orderModuleEnabled }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
@@ -8320,8 +8320,8 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
   };
 
   const ownerNavItems = [
-    { key:"owner",    icon:"📋", label:lang==="bn"?"অর্ডার":"Orders",         badge:unread },
-    { key:"companies",icon:"🏢", label:lang==="bn"?"কোম্পানি":"Companies",    badge:cos.length },
+    ...(orderModuleEnabled ? [{ key:"owner", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders", badge:unread }] : []),
+    ...(orderModuleEnabled ? [{ key:"companies", icon:"🏢", label:lang==="bn"?"কোম্পানি":"Companies", badge:cos.length }] : []),
     { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:products.length },
     { key:"purchase", icon:"🧾", label:lang==="bn"?"ক্রয়":"Purchase",         badge:null },
     { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
@@ -8333,7 +8333,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
   ];
 
   const salesNavItems = [
-    { key:"shop",     icon:"📋", label:lang==="bn"?"অর্ডার":"New Order",      badge:unread },
+    ...(orderModuleEnabled ? [{ key:"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"New Order", badge:unread }] : []),
     ...(staffQuickNavKeys.includes("products") ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products", badge:null }] : []),
     ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
     { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
@@ -8346,8 +8346,8 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
 
   const miniTopItems = [
     { key:"dashboard", icon:"🏠", label:lang==="bn"?"ড্যাশবোর্ড":"Dashboard" },
-    { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
-    ...(isOwner || staffQuickNavKeys.includes("sales")
+    ...(orderModuleEnabled ? [{ key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" }] : []),
+    ...(isOwner || (orderModuleEnabled && staffQuickNavKeys.includes("sales"))
       ? [{ key:isOwner?"purchase":"shop", icon:"＋", label:lang==="bn"?(isOwner?"ক্রয়":"অর্ডার"):(isOwner?"Purchase":"Order") }]
       : [{ key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয়":"Purchase" }]),
     ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
@@ -8367,7 +8367,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
 
   const shopCards = [
     { label:t.dashProducts,  value:products.length,  icon:"📦", color:"#a855f7" },
-    { label:t.dashCompanies, value:cos.length,       icon:"🏢", color:"#f97316" },
+    ...(orderModuleEnabled ? [{ label:t.dashCompanies, value:cos.length, icon:"🏢", color:"#f97316" }] : []),
     { label:t.dashTeam,      value:team.length,      icon:"👥", color:"#3b82f6" },
     { label:t.dashCustomers, value:customers.length, icon:"👥", color:"#22c55e" },
     { label:t.dashVendors,   value:vendors.length,   icon:"🏭", color:"#06b6d4" },
@@ -8506,22 +8506,26 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
             {!isOwner && profile.position && <span style={{ color:"#60a5fa", fontWeight:800 }}> · {profile.position}</span>}
           </div>
         </div>
-        {!isDesktop && (
+        {!isDesktop && orderModuleEnabled && (
           <button onClick={()=>setTab(isOwner?"owner":"shop")} style={{ width:46, height:46, borderRadius:23, border:"1px solid rgba(96,165,250,0.30)", background:"rgba(59,130,246,0.16)", color:"#60a5fa", fontSize:24, fontWeight:900, flexShrink:0 }}>
             ›
           </button>
         )}
       </div>
 
-      <div style={sectionTitle}>
-        <span>{isOwner ? (lang==="bn"?"আজকের অর্ডার":"Today Overview") : t.dashMyOrders}</span>
-        <button onClick={()=>setTab(isOwner?"owner":"shop")} style={{ background:"transparent", border:0, color:"#60a5fa", fontWeight:800, fontSize:12, cursor:"pointer" }}>
-          {lang==="bn"?"সব দেখুন":"View all"}
-        </button>
-      </div>
-      <div style={dashRow}>
-        {statusCards.map(c=>statCard(c))}
-      </div>
+      {orderModuleEnabled && (
+        <>
+          <div style={sectionTitle}>
+            <span>{isOwner ? (lang==="bn"?"আজকের অর্ডার":"Today Overview") : t.dashMyOrders}</span>
+            <button onClick={()=>setTab(isOwner?"owner":"shop")} style={{ background:"transparent", border:0, color:"#60a5fa", fontWeight:800, fontSize:12, cursor:"pointer" }}>
+              {lang==="bn"?"সব দেখুন":"View all"}
+            </button>
+          </div>
+          <div style={dashRow}>
+            {statusCards.map(c=>statCard(c))}
+          </div>
+        </>
+      )}
 
       {isOwner && (
         <>
@@ -8809,6 +8813,10 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const nameRef = useRef(null);
 
   const [selOrder,setSelOrder]=useState(null);
+  const [ownerOrderView,setOwnerOrderView]=useState("menu");
+  const [orderStatusPage,setOrderStatusPage]=useState("pending");
+  const [supplierSearch,setSupplierSearch]=useState({});
+  const [supplierPickerOpen,setSupplierPickerOpen]=useState({});
 
   const [editId,setEditId]=useState(null);
   const [editNm,setEditNm]=useState(""); const [editPh,setEditPh]=useState("");
@@ -8838,18 +8846,72 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [cloudUploadBusy, setCloudUploadBusy] = useState(false);
   const [lastCloudPullAt, setLastCloudPullAt] = useState(null);
   const [settingsPage,setSettingsPage]=useState(null);
+  const [orderSettingsSaving,setOrderSettingsSaving]=useState(false);
+  const orderModuleEnabled = localShop?.orderModuleEnabled === true;
   const branchTransferAccess = useBranchTransferAccess({
     shopId, user, profile, isOwner,
   });
   const branchTransferSettings = branchTransferAccess.settings;
   const setBranchTransferSettings = branchTransferAccess.setSettings;
   const canUseBranchTransfer = branchTransferAccess.canUse;
+
+  useEffect(() => {
+    if (tab !== "owner") setOwnerOrderView("menu");
+  }, [tab]);
+
+  const saveOrderModuleEnabled = async (enabled) => {
+    if (!isOwner || !shopId || !localShop) return;
+    setOrderSettingsSaving(true);
+    try {
+      const updated = await saveShopRecord(
+        shopId,
+        { ...localShop, orderModuleEnabled: enabled },
+        { ownerUid: user?.uid, profile, user }
+      );
+      setLocalShop(updated);
+      if (!enabled && (tab === "owner" || tab === "shop")) setTab("dashboard");
+      toast(enabled ? (lang==="bn"?"✅ Order option চালু হয়েছে":"✅ Order option enabled") : (lang==="bn"?"Order option বন্ধ হয়েছে":"Order option disabled"));
+    } catch (error) {
+      hErr(error);
+    } finally {
+      setOrderSettingsSaving(false);
+    }
+  };
+
   const [staffForm, setStaffForm] = useState({ username:"", password:"", personName:"", mobile:"", position:"Salesman" });
   const [staffSaving, setStaffSaving] = useState(false);
   const [staffPwReset, setStaffPwReset] = useState({});
 
   const profileSyncRef = useRef(profile);
   profileSyncRef.current = profile;
+
+  const mergeShopRecord = (previous, next) => {
+    if (!next) return previous;
+    const merged = { ...(previous || {}), ...next };
+    const previousHasOrderSetting = Object.prototype.hasOwnProperty.call(previous || {}, "orderModuleEnabled");
+    const nextHasOrderSetting = Object.prototype.hasOwnProperty.call(next, "orderModuleEnabled");
+    const previousUpdatedAt = Date.parse(previous?.updatedAt || "") || 0;
+    const nextUpdatedAt = Date.parse(next?.updatedAt || "") || 0;
+    if (previous?.orderModuleEnabled === true && !nextHasOrderSetting) {
+      merged.orderModuleEnabled = true;
+    }
+    if (previousHasOrderSetting && nextHasOrderSetting && previousUpdatedAt > nextUpdatedAt) {
+      merged.orderModuleEnabled = previous.orderModuleEnabled;
+    }
+    return merged;
+  };
+
+  const applyShopRecord = (next, { cache = false } = {}) => {
+    if (!next) return;
+    const mergedForCache = mergeShopRecord(localShop, next);
+    setLocalShop(prev => mergeShopRecord(prev, next));
+    if (cache && shopId && mergedForCache) {
+      saveCachedShop(shopId, mergedForCache);
+      offlineCacheCloudRecords("shops", [mergedForCache]).catch((err) =>
+        console.warn("[S4 Offline] shop cache failed", err)
+      );
+    }
+  };
 
   useEffect(() => {
     if (!user?.uid || isOwner || !db) return;
@@ -8932,7 +8994,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     if (sorted.vendors.length) setVendors(sorted.vendors);
     if (sorted.orders.length) setOrders(sorted.orders);
     if (sorted.team.length) setTeam(sorted.team);
-    if (sorted.shop) setLocalShop(sorted.shop);
+    if (sorted.shop) applyShopRecord(sorted.shop, { cache: true });
     if (sorted.inviteCodes.length) {
       setInviteCodes(sorted.inviteCodes.map((c) => ({ ...c, code: c.code || c.id })));
     }
@@ -9200,7 +9262,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [showAddPos,setShowAddPos]=useState(false);
 
   useEffect(() => {
-    if (shopProp) setLocalShop(shopProp);
+    if (shopProp) applyShopRecord(shopProp);
   }, [shopProp]);
 
   useEffect(() => {
@@ -9210,7 +9272,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     (async () => {
       try {
         const local = await loadShopRecord(shopId);
-        if (!cancelled && local) setLocalShop(local);
+        if (!cancelled && local) applyShopRecord(local);
       } catch (err) {
         console.warn("[S4 Shop] local load failed", err);
       }
@@ -9221,11 +9283,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       (snap) => {
         if (!snap.exists()) return;
         const data = { id: snap.id, ...snap.data() };
-        setLocalShop(data);
-        saveCachedShop(shopId, data);
-        offlineCacheCloudRecords("shops", [data]).catch((err) =>
-          console.warn("[S4 Offline] shop cache failed", err)
-        );
+        applyShopRecord(data, { cache: true });
       },
       (err) => console.warn("[S4 Shop] online listener failed", err)
     );
@@ -10083,6 +10141,93 @@ const startEditOrder = (order) => {
     return updated;
   };
 
+  const ensureOrderPurchaseInvoices = async (order) => {
+    if (!order || order.purchaseInvoiceCreated === true) return;
+    const deliverableItems = (order.items || []).filter(it => it.status === "delivered");
+    if (!deliverableItems.length) return;
+
+    const existingRows = await offlineList("purchaseInvoices");
+    const existing = existingRows.records
+      .map(r => ({ id:r.document_id, ...(r.data || {}) }))
+      .filter(inv => inv.shopId === shopId && inv.sourceOrderId === order.id);
+    if (existing.length) {
+      await patchOrderOffline(order.id, { purchaseInvoiceCreated:true, purchaseInvoiceIds:existing.map(inv => inv.id) });
+      return;
+    }
+
+    const groups = {};
+    deliverableItems.forEach((item) => {
+      const supplier = findOrderSupplier(item.co);
+      const key = item.co || "manual";
+      if (!groups[key]) groups[key] = { supplier, items:[] };
+      groups[key].items.push(item);
+    });
+
+    const nowIso = new Date().toISOString();
+    const orderNo = getOrderDisplayNo(order);
+    const createdInvoiceIds = [];
+    let seq = 1;
+    for (const [supplierKey, group] of Object.entries(groups)) {
+      const builtItems = group.items.map((item) => {
+        const qty = Number(item.qty || 0) || 0;
+        const unitCost = Number(item.price || 0) || 0;
+        const lineTotal = Number((qty * unitCost).toFixed(2));
+        return {
+          productId:null,
+          name:String(item.name || "").trim(),
+          code:String(item.code || "").trim(),
+          brand:String(item.brand || "").trim(),
+          qty,
+          unit:item.unit || "Pcs",
+          unitCost,
+          discountPerc:0,
+          discountAmt:0,
+          taxPerc:0,
+          taxAmt:0,
+          lineTotal,
+          salePrice:null,
+        };
+      });
+      const grandTotal = Number(builtItems.reduce((sum, item) => sum + (Number(item.lineTotal) || 0), 0).toFixed(2));
+      const supplier = group.supplier || {};
+      const invoicePayload = {
+        shopId,
+        invoiceNo:`PI-${orderNo}-${String(seq).padStart(2,"0")}`,
+        supplierInvoiceNo:`ORDER-${orderNo}`,
+        invoiceDate:nowIso.slice(0, 10),
+        vendorId:String(supplierKey).startsWith("vendor:") ? String(supplierKey).slice(7) : null,
+        vendorName:supplier.name || order.createdByName || "Order Supplier",
+        vendorMobile:supplier.phone || "",
+        items:builtItems,
+        subtotal:grandTotal,
+        totalDiscount:0,
+        totalTax:0,
+        grandTotal,
+        paymentMethod:"credit",
+        amountPaid:0,
+        balanceDue:grandTotal,
+        status:grandTotal > 0 ? "confirmed" : "paid",
+        note:`Auto from delivered order ${orderNo}`,
+        source:"salesmanOrder",
+        sourceOrderId:order.id,
+        sourceOrderNo:orderNo,
+        sourceSupplierKey:supplierKey,
+        createdBy:user.uid,
+        createdByName:profile.personName,
+        createdAt:nowIso,
+        updatedAt:nowIso,
+      };
+      const result = await offlineCreate("purchaseInvoices", invoicePayload);
+      createdInvoiceIds.push(result.documentId || result.id);
+      seq += 1;
+    }
+
+    await patchOrderOffline(order.id, { purchaseInvoiceCreated:true, purchaseInvoiceIds:createdInvoiceIds });
+    if (navigator.onLine) {
+      window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] order purchase invoice sync failed", err));
+    }
+  };
+
   const savePrice = async (oId, iIdx, directVal) => {
     if (!isOwner&&!can("setPrices")) return;
     const order = orders.find(o=>o.id===oId); if (!order) return;
@@ -10118,7 +10263,10 @@ const startEditOrder = (order) => {
     const activeItems = upd.filter(it=>it.status!=="cancelled" && it.status!=="out_of_stock");
     const allDelivered = activeItems.length>0 && activeItems.every(it=>it.status==="delivered");
     const overall = allDelivered ? "delivered" : order.overall;
-    try { await patchOrderOffline(oId, {overall,items:upd}, t.n3); } catch(e) { hErr(e); }
+    try {
+      const updated = await patchOrderOffline(oId, {overall,items:upd}, t.n3);
+      if (overall === "delivered") await ensureOrderPurchaseInvoices(updated);
+    } catch(e) { hErr(e); }
   };
 
   const delOrder = async (oId) => {
@@ -10154,7 +10302,23 @@ const startEditOrder = (order) => {
     const current = order.items[iIdx];
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
     if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
-    const upd = order.items.map((it,x)=>x===iIdx?{...it,co:coId||null}:it);
+    const selectedSupplier = findOrderSupplier(coId);
+    const upd = order.items.map((it,x)=>x===iIdx?{
+      ...it,
+      co:coId||null,
+      supplierPhone: selectedSupplier?.phone ? "" : (coId ? (it.supplierPhone || "") : ""),
+    }:it);
+    try { await patchOrderOffline(oId, {items:upd}); } catch(e) { hErr(e); }
+  };
+
+  const saveSupplierPhone = async (oId,iIdx,phone) => {
+    if (!isOwner&&!can("manageCompanies")) return;
+    const order = orders.find(o=>o.id===oId); if (!order) return;
+    const current = order.items[iIdx];
+    if (!current || current.status==="delivered" || current.status==="cancelled") return;
+    if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
+    const cleanPhone = String(phone || "").replace(/[^0-9]/g, "");
+    const upd = order.items.map((it,x)=>x===iIdx?{...it,supplierPhone:cleanPhone}:it);
     try { await patchOrderOffline(oId, {items:upd}); } catch(e) { hErr(e); }
   };
 
@@ -10457,6 +10621,41 @@ const startEditOrder = (order) => {
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
+  const supplierPhone = (row = {}) => String(
+    row.whatsappNumber || row.mobileNumber || row.phoneNumber || row.phone || row.supplierPhone || ""
+  ).replace(/[^0-9]/g, "");
+
+  const orderSupplierOptions = [
+    ...vendors
+      .filter(v => v?.isDeleted !== true && v?.status !== "disabled")
+      .map(v => ({
+        id: `vendor:${v.id}`,
+        name: v.vendorName || "",
+        phone: supplierPhone(v),
+        source: lang === "bn" ? "ভেন্ডর" : "Vendor",
+      })),
+    ...cos.map(c => ({
+      id: c.id,
+      name: c.name || "",
+      phone: supplierPhone(c),
+      source: lang === "bn" ? "কোম্পানি" : "Company",
+    })),
+  ].filter(row => row.name.trim());
+
+  const findOrderSupplier = (value) => {
+    if (!value) return null;
+    return orderSupplierOptions.find(row => row.id === value) || null;
+  };
+
+  const normalizeSupplierSearch = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9\u0980-\u09ff]+/g, "");
+  const searchOrderSuppliers = (query) => {
+    const clean = normalizeSupplierSearch(query);
+    if (!clean) return orderSupplierOptions.slice(0, 12);
+    return orderSupplierOptions
+      .filter(row => normalizeSupplierSearch(`${row.name} ${row.phone} ${row.source}`).includes(clean))
+      .slice(0, 12);
+  };
+
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
     try {
@@ -10509,11 +10708,41 @@ const startEditOrder = (order) => {
     return Object.entries(groups); // [ [dateStr, [orders]], ... ]
   };
 
+  const orderPageTabs = [
+    { key:"pending", label:lang==="bn"?"Pending":"Pending", icon:"⏳" },
+    { key:"delivered", label:lang==="bn"?"Delivered":"Delivered", icon:"✅" },
+    { key:"cancelled", label:lang==="bn"?"Cancelled":"Cancelled", icon:"🚫" },
+  ];
+  const orderPageCounts = {
+    pending: orders.filter(o => !["delivered","cancelled"].includes(o.overall)).length,
+    delivered: orders.filter(o => o.overall === "delivered").length,
+    cancelled: orders.filter(o => o.overall === "cancelled").length,
+  };
+  const filterOrdersByStatusPage = (list) => list.filter((order) => {
+    if (orderStatusPage === "delivered") return order.overall === "delivered";
+    if (orderStatusPage === "cancelled") return order.overall === "cancelled";
+    return !["delivered","cancelled"].includes(order.overall);
+  });
+  const renderOrderPageTabs = () => (
+    <div style={{ display:"grid", gridTemplateColumns:"repeat(3,minmax(0,1fr))", gap:7, marginBottom:12 }}>
+      {orderPageTabs.map(page => (
+        <button
+          key={page.key}
+          type="button"
+          onClick={()=>setOrderStatusPage(page.key)}
+          style={{ padding:"10px 8px", borderRadius:12, border:`1px solid ${orderStatusPage===page.key?"#f97316":th.borderMid}`, background:orderStatusPage===page.key?th.accentDim:th.bgCard, color:orderStatusPage===page.key?"#f97316":th.txtSecondary, fontSize:12, fontWeight:850, cursor:"pointer", fontFamily:"inherit" }}>
+          {page.icon} {page.label}
+          <span style={{ display:"block", fontSize:10, color:th.txtMuted, marginTop:2 }}>{orderPageCounts[page.key] || 0}</span>
+        </button>
+      ))}
+    </div>
+  );
+
   const canStaffSupplierArea = can("viewVendors") || can("viewSupplierLedger") || can("vendorPayments") || can("managePurchase");
   const staffQuickNavKeys = isOwner
     ? []
     : [
-        "shop",
+        ...(orderModuleEnabled ? ["shop"] : []),
         ...(can("viewProducts") ? ["products"] : []),
         ...(can("manageSales") ? ["sales"] : []),
         "purchase",
@@ -10522,11 +10751,10 @@ const startEditOrder = (order) => {
       ];
 
   const visibleTabs = isOwner
-    ? [["dashboard",t.tabDashboard],["owner",t.tabOwner],["companies",t.tabCompany],["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
-        ["shop",t.tabShop],
-        ...(can("manageCompanies")?[["companies",t.tabCompany]]:[]),
+        ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
         ...(can("manageSales")?[["sales", t.tabSales]]:[]),
         ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
@@ -10535,11 +10763,14 @@ const startEditOrder = (order) => {
         ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),
         ["settings",t.tabSettings],
       ];
+  const validTabs = isOwner
+    ? [...visibleTabs, ...(orderModuleEnabled?[["companies",t.tabCompany]]:[])]
+    : visibleTabs;
 
   // Safety: if any old/invalid tab is active after new menu changes, always return to Dashboard.
   useEffect(() => {
-    if (!visibleTabs.some(([k]) => k === tab)) setTab("dashboard");
-  }, [tab, visibleTabs]);
+    if (!validTabs.some(([k]) => k === tab)) setTab("dashboard");
+  }, [tab, validTabs]);
 
   // ── ORDER STATUS FLOW (overall) ──
   const setOrderStatus = async (oId, newStatus) => {
@@ -10586,7 +10817,12 @@ const startEditOrder = (order) => {
     return (
       <>
         {order.items.map((it,iIdx)=>{
-          const selectedCo = cos.find(c=>c.id===it.co);
+          const selectedSupplier = findOrderSupplier(it.co);
+          const supplierPhoneForItem = selectedSupplier?.phone || supplierPhone(it);
+          const supplierKey = `${order.id}:${iIdx}`;
+          const supplierQuery = supplierSearch[supplierKey] ?? selectedSupplier?.name ?? "";
+          const supplierResults = searchOrderSuppliers(supplierQuery);
+          const pickerOpen = supplierPickerOpen[supplierKey] === true;
           const itemLocked = it.status==="delivered" || it.status==="cancelled";
           const canEditProc = !itemLocked && ["pending","order_confirmed","out_of_stock"].includes(it.status);
           return (
@@ -10598,15 +10834,73 @@ const startEditOrder = (order) => {
                 <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
               </div>
               {(isOwner||can("manageCompanies"))&&(
-                <div style={s.row}>
-                  <select
-                    style={s.sel}
-                    value={it.co||""}
-                    disabled={!canEditProc}
-                    onChange={e=>setCo(order.id,iIdx,e.target.value)}>
-                    <option value="">{t.selectCo}</option>
-                    {cos.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                <div style={{ marginTop:8 }}>
+                  <div style={{ position:"relative" }}>
+                    <input
+                      style={{ ...s.inp, paddingLeft:34 }}
+                      value={supplierQuery}
+                      disabled={!canEditProc}
+                      placeholder={lang==="bn"?"কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন":"Search company/vendor by name or number"}
+                      onFocus={()=>setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}))}
+                      onChange={e=>{
+                        setSupplierSearch(prev=>({...prev,[supplierKey]:e.target.value}));
+                        setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}));
+                      }}
+                    />
+                    <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
+                    {(it.co||supplierQuery)&&canEditProc&&(
+                      <button
+                        type="button"
+                        onClick={()=>{
+                          setSupplierSearch(prev=>({...prev,[supplierKey]:""}));
+                          setSupplierPickerOpen(prev=>({...prev,[supplierKey]:false}));
+                          setCo(order.id,iIdx,"");
+                        }}
+                        style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  {pickerOpen&&canEditProc&&(
+                    <div style={{ marginTop:6, border:`1px solid ${th.borderMid}`, borderRadius:10, overflow:"hidden", background:th.bgCard }}>
+                      {supplierResults.length===0&&(
+                        <div style={{ padding:"9px 10px", fontSize:12, color:th.txtMuted }}>
+                          {lang==="bn"?"কোনো কোম্পানি/ভেন্ডর পাওয়া যায়নি":"No company/vendor found"}
+                        </div>
+                      )}
+                      {supplierResults.map(supplier=>(
+                        <button
+                          key={supplier.id}
+                          type="button"
+                          onClick={()=>{
+                            setSupplierSearch(prev=>({...prev,[supplierKey]:supplier.name}));
+                            setSupplierPickerOpen(prev=>({...prev,[supplierKey]:false}));
+                            setCo(order.id,iIdx,supplier.id);
+                          }}
+                          style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"9px 10px", border:"none", borderTop:`1px solid ${th.border}`, background:supplier.id===it.co?th.accentDim:"transparent", color:th.txtPrimary, cursor:"pointer", textAlign:"left" }}>
+                          <span style={{ minWidth:0 }}>
+                            <span style={{ fontSize:13, fontWeight:800 }}>{supplier.name}</span>
+                            <span style={{ fontSize:10, color:"#f97316", marginLeft:6 }}>{supplier.source}</span>
+                          </span>
+                          <span style={{ fontSize:11, color:th.txtMuted, whiteSpace:"nowrap" }}>{supplier.phone?`+${supplier.phone}`:(lang==="bn"?"নম্বর নেই":"No number")}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {supplierPhoneForItem&&(
+                    <div style={{ fontSize:11, color:"#22c55e", marginTop:4 }}>
+                      WhatsApp: +{supplierPhoneForItem}
+                    </div>
+                  )}
+                  {selectedSupplier&&!selectedSupplier.phone&&canEditProc&&(
+                    <input
+                      style={{ ...s.inp, marginTop:6 }}
+                      inputMode="tel"
+                      defaultValue={it.supplierPhone || ""}
+                      placeholder={lang==="bn"?"WhatsApp নম্বর দিন":"Enter WhatsApp number"}
+                      onBlur={e=>saveSupplierPhone(order.id,iIdx,e.target.value)}
+                    />
+                  )}
                 </div>
               )}
               {(isOwner||can("setPrices"))&&(
@@ -10653,9 +10947,12 @@ const startEditOrder = (order) => {
           const groups = {};
           order.items.forEach(it => {
             if (!it.co || it.status==="cancelled") return;
-            const co = cos.find(c=>c.id===it.co);
-            if (!co?.phone) return;
+            const co = findOrderSupplier(it.co);
+            const phone = co?.phone || supplierPhone(it);
+            if (!co || !phone) return;
+            const supplierForMessage = { ...co, phone };
             if (!groups[it.co]) groups[it.co] = { co, items:[] };
+            groups[it.co].co = supplierForMessage;
             groups[it.co].items.push(it);
           });
           const entries = Object.values(groups);
@@ -10741,10 +11038,10 @@ const startEditOrder = (order) => {
   const OrderCard = ({ order, showSenderName }) => {
     const isMyOrder = order.createdBy === user.uid;
     const isCancelled = order.overall === "cancelled";
-    const canCancel = isMyOrder && !isCancelled && order.overall === "pending";
+    const canCancel = (isOwner || isMyOrder) && !isCancelled && order.overall === "pending";
     const orderAge = Date.now() - (order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt)).getTime();
     const canEditOrder = isSalesman && isMyOrder && order.overall === "pending" && orderAge < 60 * 60 * 1000;
-    const canExpandThis = !isCancelled && canExpand;
+    const canExpandThis = canExpand;
     return (
       <div style={{ ...s.card, cursor:canExpandThis?"pointer":"default", opacity:isCancelled?0.6:1 }}
         onClick={() => { if (!canExpandThis) return; markRead(order.id); setSelOrder(selOrder===order.id?null:order.id); }}>
@@ -10831,9 +11128,10 @@ const startEditOrder = (order) => {
           setTab={setTab} unread={unread}
           staffQuickNavKeys={staffQuickNavKeys}
           canUseBranchTransfer={canUseBranchTransfer}
+          orderModuleEnabled={orderModuleEnabled}
         />
       )}
-      {!isOwner&&tab==="shop"&&(
+      {!isOwner&&orderModuleEnabled&&tab==="shop"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
           {can("sendOrder")&&(
             <>
@@ -10965,6 +11263,7 @@ const startEditOrder = (order) => {
           {orders.length>0&&(<>
             <div style={{ ...s.secTitle, marginTop:20 }}>{t.sentOrders}</div>
           </>)}
+          {orders.length>0&&renderOrderPageTabs()}
           {/* Search box - always visible */}
           {orders.length>0&&(
             <div style={{ position:"relative", marginBottom:12 }}>
@@ -10980,8 +11279,7 @@ const startEditOrder = (order) => {
           )}
           {/* Daily grouped orders */}
           {(() => {
-              const filtered = filterOrders(orders);
-              if (!filtered.length && !searchQ) return null;
+              const filtered = filterOrdersByStatusPage(filterOrders(orders));
               if (!filtered.length) return (
                 <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
               );
@@ -11003,40 +11301,70 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {isOwner&&tab==="owner"&&(
+      {isOwner&&orderModuleEnabled&&tab==="owner"&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
-          {/* Search box */}
-          <div style={{ position:"relative", marginBottom:12 }}>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-            <input
-              style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
-              placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
-              value={searchQ}
-              onChange={e=>setSearchQ(e.target.value)}
-            />
-            {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+          <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(2,minmax(0,1fr))":"minmax(0,1fr)", gap:10, marginBottom:14 }}>
+            <button
+              type="button"
+              onClick={()=>setTab("companies")}
+              style={{ ...s.card, textAlign:"left", cursor:"pointer", border:`1px solid ${th.borderMid}`, display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:44, height:44, borderRadius:14, background:th.accentDim, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>🏢</div>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize:15, fontWeight:900, color:th.txtPrimary }}>{lang==="bn"?"Companies":"Companies"}</div>
+                <div style={{ fontSize:11, color:th.txtMuted, marginTop:3 }}>{lang==="bn"?"কোম্পানি/ভেন্ডর লিস্ট ম্যানেজ করুন":"Manage company/vendor list"}</div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={()=>setOwnerOrderView("orders")}
+              style={{ ...s.card, textAlign:"left", cursor:"pointer", border:`1px solid ${ownerOrderView==="orders"?"#f97316":th.borderMid}`, display:"flex", alignItems:"center", gap:12 }}>
+              <div style={{ width:44, height:44, borderRadius:14, background:th.accentDim, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📋</div>
+              <div style={{ minWidth:0 }}>
+                <div style={{ fontSize:15, fontWeight:900, color:th.txtPrimary }}>{lang==="bn"?"Order to Salesman":"Order to Salesman"}</div>
+                <div style={{ fontSize:11, color:th.txtMuted, marginTop:3 }}>{lang==="bn"?"সেলসম্যানের অর্ডার দেখুন ও কোম্পানি/ভেন্ডর সিলেক্ট করুন":"Open salesman orders and select company/vendor"}</div>
+              </div>
+            </button>
           </div>
-          {/* Daily grouped orders */}
-          {orders.length===0
-            ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
-            : (() => {
-                const filtered = filterOrders(orders);
-                if (!filtered.length) return (
-                  <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
-                );
-                const groups = groupByDay(filtered);
-                return groups.map(([dateStr, dayOrders]) => (
-                  <div key={dateStr}>
-                    <div style={s.dayHeader}>
-                      <span style={s.dayDot} />
-                      <span style={s.dayLabel}>📅 {dateStr}</span>
-                      <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
-                    </div>
-                    {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
-                  </div>
-                ));
-              })()
-          }
+
+          {ownerOrderView==="orders"&&(
+            <>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, marginBottom:10 }}>
+                <div style={s.secTitle}>{lang==="bn"?"📋 সেলসম্যান অর্ডার":"📋 Order to Salesman"}</div>
+                <button type="button" style={{ ...s.stBtn, padding:"8px 12px" }} onClick={()=>setOwnerOrderView("menu")}>{lang==="bn"?"← অপশন":"← Options"}</button>
+              </div>
+              {orders.length>0&&renderOrderPageTabs()}
+              <div style={{ position:"relative", marginBottom:12 }}>
+                <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+                <input
+                  style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
+                  placeholder={lang==="bn"?"অর্ডার নম্বর, পণ্যের নাম বা ব্র্যান্ড দিয়ে খুঁজুন...":"Search by order no, item name or brand..."}
+                  value={searchQ}
+                  onChange={e=>setSearchQ(e.target.value)}
+                />
+                {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
+              </div>
+              {orders.length===0
+                ? <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+                : (() => {
+                    const filtered = filterOrdersByStatusPage(filterOrders(orders));
+                    if (!filtered.length) return (
+                      <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+                    );
+                    const groups = groupByDay(filtered);
+                    return groups.map(([dateStr, dayOrders]) => (
+                      <div key={dateStr}>
+                        <div style={s.dayHeader}>
+                          <span style={s.dayDot} />
+                          <span style={s.dayLabel}>📅 {dateStr}</span>
+                          <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                        </div>
+                        {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={true} />)}
+                      </div>
+                    ));
+                  })()
+              }
+            </>
+          )}
         </div>
       )}
 
@@ -11295,8 +11623,18 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {(isOwner||can("manageCompanies"))&&tab==="companies"&&(
+      {orderModuleEnabled&&(isOwner||can("manageCompanies"))&&tab==="companies"&&(
   <div style={isDesktop?s.desktopPanel:s.panel}>
+
+    {isOwner&&(
+      <button
+        type="button"
+        style={{ ...s.stBtn, marginBottom:12, padding:"8px 12px" }}
+        onClick={()=>{ setOwnerOrderView("menu"); setTab("owner"); }}
+      >
+        {lang==="bn"?"← অপশন":"← Options"}
+      </button>
+    )}
 
     <div style={{
       display:"flex",
@@ -11316,13 +11654,6 @@ const startEditOrder = (order) => {
         gap:10,
         flexWrap:"wrap"
       }}>
-
-        <button
-          style={s.addCoBtn}
-          onClick={() => setShowVendorModal(true)}
-        >
-          + Vendor
-        </button>
 
         <button
           style={s.addCoBtn}
@@ -11397,7 +11728,7 @@ const startEditOrder = (order) => {
 
     {/* ───────── VENDORS LIST ───────── */}
 
-{vendors.length > 0 && (
+{false && vendors.length > 0 && (
 
   <div style={{ marginTop:20 }}>
 
@@ -11547,7 +11878,7 @@ const startEditOrder = (order) => {
 
       {/* ───────── VENDOR MODAL ───────── */}
 
-{showVendorModal && (
+{false && showVendorModal && (
 
   <div style={s.modalOverlay}>
 
@@ -11980,6 +12311,18 @@ const startEditOrder = (order) => {
                 <span style={s.settingsArrow}>›</span>
               </button>
 
+              {/* Order module - optional for single-shop users */}
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("orderModule")}>
+                  <span style={s.settingsRowIcon}>📋</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{lang==="bn"?"Order Option":"Order Option"}</div>
+                    <div style={s.settingsRowSub}>{orderModuleEnabled?(lang==="bn"?"চালু আছে":"Enabled"):(lang==="bn"?"বন্ধ আছে":"Disabled")}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
               {/* Branch Stock Transfer - native optional module */}
               {isOwner&&(()=>{
                 const copy = branchTransferSettingsCopy(lang, branchTransferSettings.enabled);
@@ -12276,6 +12619,29 @@ const startEditOrder = (order) => {
               onSettingsChanged={setBranchTransferSettings}
               toast={toast}
             />
+          )}
+
+          {settingsPage==="orderModule"&&isOwner&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{lang==="bn"?"📋 Order Option":"📋 Order Option"}</div>
+              <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.6, marginBottom:14 }}>
+                {lang==="bn"
+                  ? "Single shop হলে এই option বন্ধ রাখতে পারেন। চালু করলে Orders/New Order, Companies এবং Order to Salesman option দেখা যাবে।"
+                  : "For a single shop, you can keep this off. Enable it to show Orders/New Order, Companies, and Order to Salesman."}
+              </div>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, padding:"14px 0", borderTop:`1px solid ${th.border}`, borderBottom:`1px solid ${th.border}` }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontSize:14, fontWeight:800, color:th.txtPrimary }}>{lang==="bn"?"Order system":"Order system"}</div>
+                  <div style={{ fontSize:12, color:th.txtMuted, marginTop:4 }}>
+                    {orderModuleEnabled ? (lang==="bn"?"চালু আছে":"Enabled") : (lang==="bn"?"বন্ধ আছে (Default)":"Disabled (Default)")}
+                  </div>
+                </div>
+                <PermToggle isOn={orderModuleEnabled} onToggle={()=>saveOrderModuleEnabled(!orderModuleEnabled)} />
+              </div>
+              {orderSettingsSaving&&(
+                <div style={{ fontSize:12, color:"#f97316", marginTop:10 }}>{lang==="bn"?"সেভ হচ্ছে...":"Saving..."}</div>
+              )}
+            </div>
           )}
 
           {settingsPage==="invoice"&&(
