@@ -8321,7 +8321,6 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
 
   const ownerNavItems = [
     ...(orderModuleEnabled ? [{ key:"owner", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders", badge:unread }] : []),
-    ...(orderModuleEnabled ? [{ key:"companies", icon:"🏢", label:lang==="bn"?"কোম্পানি":"Companies", badge:cos.length }] : []),
     { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:products.length },
     { key:"purchase", icon:"🧾", label:lang==="bn"?"ক্রয়":"Purchase",         badge:null },
     { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
@@ -8367,7 +8366,6 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
 
   const shopCards = [
     { label:t.dashProducts,  value:products.length,  icon:"📦", color:"#a855f7" },
-    ...(orderModuleEnabled ? [{ label:t.dashCompanies, value:cos.length, icon:"🏢", color:"#f97316" }] : []),
     { label:t.dashTeam,      value:team.length,      icon:"👥", color:"#3b82f6" },
     { label:t.dashCustomers, value:customers.length, icon:"👥", color:"#22c55e" },
     { label:t.dashVendors,   value:vendors.length,   icon:"🏭", color:"#06b6d4" },
@@ -8913,6 +8911,33 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     }
   };
 
+  const orderRecordStamp = (order) => {
+    const raw = order?.updatedAt || order?.createdAt || order?.createdAtIso || 0;
+    const value = raw?.toDate?.() || raw;
+    return new Date(value).getTime() || 0;
+  };
+
+  const sortOrderRecords = (list) =>
+    [...list].sort((a,b) => orderRecordStamp(b) - orderRecordStamp(a));
+
+  const isVisibleOrderRecord = (order) => {
+    if (!order || order.shopId !== shopId) return false;
+    return isOwner || isOrderManager || order.createdBy === user?.uid;
+  };
+
+  const mergeVisibleOrders = (incoming) => {
+    const visibleIncoming = (incoming || []).filter(isVisibleOrderRecord);
+    setOrders((prev) => {
+      const merged = new Map();
+      prev.filter(isVisibleOrderRecord).forEach((order) => merged.set(order.id, order));
+      visibleIncoming.forEach((order) => {
+        const current = merged.get(order.id);
+        if (!current || orderRecordStamp(order) >= orderRecordStamp(current)) merged.set(order.id, order);
+      });
+      return sortOrderRecords([...merged.values()]);
+    });
+  };
+
   useEffect(() => {
     if (!user?.uid || isOwner || !db) return;
 
@@ -8992,7 +9017,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     if (sorted.companies.length) setCos(sorted.companies);
     if (sorted.customers.length) setCustomers(sorted.customers);
     if (sorted.vendors.length) setVendors(sorted.vendors);
-    if (sorted.orders.length) setOrders(sorted.orders);
+    if (sorted.orders.length) mergeVisibleOrders(sorted.orders);
     if (sorted.team.length) setTeam(sorted.team);
     if (sorted.shop) applyShopRecord(sorted.shop, { cache: true });
     if (sorted.inviteCodes.length) {
@@ -9298,12 +9323,9 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   useEffect(() => {
     if (!shopId) return;
 
-    const sortOrders = (list) =>
-      [...list].sort((a,b) => {
-        const av = a.createdAt?.toDate?.() || a.createdAt || a.createdAtIso || 0;
-        const bv = b.createdAt?.toDate?.() || b.createdAt || b.createdAtIso || 0;
-        return new Date(bv).getTime() - new Date(av).getTime();
-      });
+    const applyOrderRecords = (incoming) => {
+      mergeVisibleOrders(incoming);
+    };
 
     const loadLocalOrders = async () => {
       try {
@@ -9317,7 +9339,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           docs = docs.filter(o => o.createdBy === user.uid);
         }
 
-        setOrders(sortOrders(docs));
+        applyOrderRecords(docs);
         setSyncState("offline");
       } catch (err) {
         console.error("orders offline fallback:", err);
@@ -9340,7 +9362,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         };
       });
 
-      setOrders(sortOrders(docs));
+      applyOrderRecords(docs);
       offlineCacheCloudRecords("orders", docs).catch(err => console.warn("[S4 Offline] order cache failed", err));
       setSyncState("connected");
     };
@@ -10822,7 +10844,10 @@ const startEditOrder = (order) => {
           const selectedSupplier = findOrderSupplier(it.co);
           const supplierPhoneForItem = selectedSupplier?.phone || supplierPhone(it);
           const supplierKey = `${order.id}:${iIdx}`;
-          const supplierQuery = supplierSearch[supplierKey] ?? selectedSupplier?.name ?? "";
+          const supplierQuery = supplierSearch[supplierKey] ?? "";
+          const supplierDisplayValue = supplierPickerOpen[supplierKey] === true
+            ? supplierQuery
+            : (supplierQuery || selectedSupplier?.name || "");
           const supplierResults = searchOrderSuppliers(supplierQuery);
           const pickerOpen = supplierPickerOpen[supplierKey] === true;
           const itemLocked = it.status==="delivered" || it.status==="cancelled";
@@ -10840,7 +10865,7 @@ const startEditOrder = (order) => {
                   <div style={{ position:"relative" }}>
                     <input
                       style={{ ...s.inp, paddingLeft:34 }}
-                      value={supplierQuery}
+                      value={supplierDisplayValue}
                       disabled={!canEditProc}
                       autoComplete="off"
                       inputMode="search"
@@ -10849,7 +10874,10 @@ const startEditOrder = (order) => {
                       onMouseDown={e=>e.stopPropagation()}
                       onPointerDown={e=>e.stopPropagation()}
                       onTouchStart={e=>e.stopPropagation()}
-                      onFocus={()=>setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}))}
+                      onFocus={()=>{
+                        setSupplierSearch(prev=>({...prev,[supplierKey]:prev[supplierKey] ?? selectedSupplier?.name ?? ""}));
+                        setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}));
+                      }}
                       onChange={e=>{
                         setSupplierSearch(prev=>({...prev,[supplierKey]:e.target.value}));
                         setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}));
@@ -10858,9 +10886,10 @@ const startEditOrder = (order) => {
                         setSupplierSearch(prev=>({...prev,[supplierKey]:e.currentTarget.value}));
                         setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}));
                       }}
+                      onKeyDown={e=>e.stopPropagation()}
                     />
                     <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
-                    {(it.co||supplierQuery)&&canEditProc&&(
+                    {(it.co||supplierDisplayValue)&&canEditProc&&(
                       <button
                         type="button"
                         onClick={()=>{
@@ -10874,7 +10903,12 @@ const startEditOrder = (order) => {
                     )}
                   </div>
                   {pickerOpen&&canEditProc&&(
-                    <div style={{ marginTop:6, border:`1px solid ${th.borderMid}`, borderRadius:10, overflowY:"auto", overflowX:"hidden", maxHeight:260, WebkitOverflowScrolling:"touch", background:th.bgCard }}>
+                    <div
+                      onClick={e=>e.stopPropagation()}
+                      onMouseDown={e=>e.stopPropagation()}
+                      onPointerDown={e=>e.stopPropagation()}
+                      onTouchStart={e=>e.stopPropagation()}
+                      style={{ marginTop:6, border:`1px solid ${th.borderMid}`, borderRadius:10, overflowY:"auto", overflowX:"hidden", maxHeight:260, WebkitOverflowScrolling:"touch", background:th.bgCard }}>
                       {supplierResults.length===0&&(
                         <div style={{ padding:"9px 10px", fontSize:12, color:th.txtMuted }}>
                           {lang==="bn"?"কোনো কোম্পানি/ভেন্ডর পাওয়া যায়নি":"No company/vendor found"}
