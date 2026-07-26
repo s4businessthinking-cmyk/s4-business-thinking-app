@@ -8264,25 +8264,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
     </div>
   );
 }
-function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canEdit, placeholder, noResultsText, options, searchSuppliers, onClear, onSelect }) {
-  const [query, setQuery] = useState(selectedSupplier?.name || "");
-  const [open, setOpen] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (!open) setQuery(selectedSupplier?.name || "");
-  }, [selectedSupplier?.name, open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => {
-      inputRef.current?.focus?.();
-      inputRef.current?.select?.();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [open]);
-
-  const results = searchSuppliers(query);
+function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canEdit, placeholder, onClear, onOpen }) {
   const displayText = selectedSupplier?.name || "";
 
   return (
@@ -8301,7 +8283,7 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
           readOnly
           autoComplete="off"
           placeholder={placeholder}
-          onClick={e=>{ e.stopPropagation(); setQuery(selectedSupplier?.name || ""); setOpen(true); }}
+          onClick={e=>{ e.stopPropagation(); onOpen(); }}
           onFocus={e=>e.currentTarget.blur()}
           onKeyDown={e=>e.stopPropagation()}
         />
@@ -8311,8 +8293,6 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
             type="button"
             onClick={(event)=>{
               event.stopPropagation();
-              setQuery("");
-              setOpen(false);
               onClear();
             }}
             style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>
@@ -8320,65 +8300,6 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
           </button>
         )}
       </div>
-
-      {open&&canEdit&&(
-        <div
-          onClick={e=>e.stopPropagation()}
-          onMouseDown={e=>e.stopPropagation()}
-          onPointerDown={e=>e.stopPropagation()}
-          onTouchStart={e=>e.stopPropagation()}
-          style={{ position:"fixed", inset:0, zIndex:99999, background:"rgba(2,6,23,0.72)", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"72px 12px 18px" }}>
-          <div style={{ width:"min(560px,100%)", maxHeight:"calc(100vh - 96px)", display:"flex", flexDirection:"column", border:`1px solid ${th.borderMid}`, borderRadius:16, background:th.bgCard, boxShadow:"0 18px 60px rgba(0,0,0,0.35)", overflow:"hidden" }}>
-            <div style={{ padding:12, borderBottom:`1px solid ${th.border}` }}>
-              <div style={{ position:"relative" }}>
-                <input
-                  ref={inputRef}
-                  style={{ ...s.inp, paddingLeft:34, paddingRight:44 }}
-                  value={query}
-                  autoComplete="off"
-                  inputMode="search"
-                  placeholder={placeholder}
-                  onChange={e=>setQuery(e.target.value)}
-                  onInput={e=>setQuery(e.currentTarget.value)}
-                  onKeyDown={e=>e.stopPropagation()}
-                />
-                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
-                <button
-                  type="button"
-                  onClick={()=>setOpen(false)}
-                  style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:28, height:28, borderRadius:14, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtMuted, cursor:"pointer" }}>
-                  ✕
-                </button>
-              </div>
-            </div>
-            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
-              {results.length===0&&(
-                <div style={{ padding:"12px", fontSize:12, color:th.txtMuted }}>
-                  {noResultsText}
-                </div>
-              )}
-              {results.map(supplier=>(
-                <button
-                  key={supplier.id}
-                  type="button"
-                  onClick={(event)=>{
-                    event.stopPropagation();
-                    setQuery(supplier.name);
-                    setOpen(false);
-                    onSelect(supplier.id);
-                  }}
-                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"12px", border:"none", borderTop:`1px solid ${th.border}`, background:supplier.id===selectedSupplierId?th.accentDim:"transparent", color:th.txtPrimary, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
-                  <span style={{ minWidth:0 }}>
-                    <span style={{ fontSize:13, fontWeight:800 }}>{supplier.name}</span>
-                    <span style={{ fontSize:10, color:"#f97316", marginLeft:6 }}>{supplier.source}</span>
-                  </span>
-                  <span style={{ fontSize:11, color:th.txtMuted, whiteSpace:"nowrap" }}>{supplier.phone?`+${supplier.phone}`:"No number"}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -8932,6 +8853,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [selOrder,setSelOrder]=useState(null);
   const [ownerOrderView,setOwnerOrderView]=useState("menu");
   const [orderStatusPage,setOrderStatusPage]=useState("pending");
+  const [supplierPickerTarget,setSupplierPickerTarget]=useState(null);
+  const [supplierPickerQuery,setSupplierPickerQuery]=useState("");
+  const supplierPickerInputRef = useRef(null);
 
   const [editId,setEditId]=useState(null);
   const [editNm,setEditNm]=useState(""); const [editPh,setEditPh]=useState("");
@@ -10793,6 +10717,31 @@ const startEditOrder = (order) => {
       .slice(0, 80);
   };
 
+  useEffect(() => {
+    if (!supplierPickerTarget) return;
+    const timer = setTimeout(() => {
+      supplierPickerInputRef.current?.focus?.();
+      supplierPickerInputRef.current?.select?.();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [supplierPickerTarget]);
+
+  const openOrderSupplierPicker = (orderId, itemIndex, selectedSupplier) => {
+    setSupplierPickerTarget({ orderId, itemIndex });
+    setSupplierPickerQuery(selectedSupplier?.name || "");
+  };
+
+  const closeOrderSupplierPicker = () => {
+    setSupplierPickerTarget(null);
+    setSupplierPickerQuery("");
+  };
+
+  const selectOrderSupplierFromPicker = (supplierId) => {
+    if (!supplierPickerTarget) return;
+    setCo(supplierPickerTarget.orderId, supplierPickerTarget.itemIndex, supplierId);
+    closeOrderSupplierPicker();
+  };
+
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
     try {
@@ -10978,12 +10927,9 @@ const startEditOrder = (order) => {
                     selectedSupplier={selectedSupplier}
                     selectedSupplierId={it.co}
                     canEdit={canEditProc}
-                    options={orderSupplierOptions}
-                    searchSuppliers={searchOrderSuppliers}
                     placeholder={lang==="bn"?"কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন":"Search company/vendor by name or number"}
-                    noResultsText={lang==="bn"?"কোনো কোম্পানি/ভেন্ডর পাওয়া যায়নি":"No company/vendor found"}
                     onClear={()=>setCo(order.id,iIdx,"")}
-                    onSelect={(supplierId)=>setCo(order.id,iIdx,supplierId)}
+                    onOpen={()=>openOrderSupplierPicker(order.id,iIdx,selectedSupplier)}
                   />
                   {supplierPhoneForItem&&(
                     <div style={{ fontSize:11, color:"#22c55e", marginTop:4 }}>
@@ -12949,6 +12895,14 @@ const startEditOrder = (order) => {
     );
   }
 
+  const supplierPickerResults = supplierPickerTarget ? searchOrderSuppliers(supplierPickerQuery) : [];
+  const supplierPickerOrder = supplierPickerTarget
+    ? orders.find(order => order.id === supplierPickerTarget.orderId)
+    : null;
+  const supplierPickerSelectedId = supplierPickerTarget
+    ? supplierPickerOrder?.items?.[supplierPickerTarget.itemIndex]?.co
+    : null;
+
   return (
     <div style={s.root}>
       <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}>
@@ -12990,6 +12944,63 @@ const startEditOrder = (order) => {
           <div style={s.desktopContent}>{tabContent}</div>
         </div>
       ) : tabContent}
+
+      {supplierPickerTarget&&(
+        <div
+          onClick={e=>e.stopPropagation()}
+          onMouseDown={e=>e.stopPropagation()}
+          onPointerDown={e=>e.stopPropagation()}
+          onTouchStart={e=>e.stopPropagation()}
+          style={{ position:"fixed", inset:0, zIndex:99999, background:"rgba(2,6,23,0.72)", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"72px 12px 18px" }}>
+          <div style={{ width:"min(560px,100%)", maxHeight:"calc(100vh - 96px)", display:"flex", flexDirection:"column", border:`1px solid ${th.borderMid}`, borderRadius:16, background:th.bgCard, boxShadow:"0 18px 60px rgba(0,0,0,0.35)", overflow:"hidden" }}>
+            <div style={{ padding:12, borderBottom:`1px solid ${th.border}` }}>
+              <div style={{ position:"relative" }}>
+                <input
+                  ref={supplierPickerInputRef}
+                  style={{ ...s.inp, paddingLeft:34, paddingRight:44 }}
+                  value={supplierPickerQuery}
+                  autoComplete="off"
+                  inputMode="search"
+                  placeholder={lang==="bn"?"কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন":"Search company/vendor by name or number"}
+                  onChange={e=>setSupplierPickerQuery(e.target.value)}
+                  onInput={e=>setSupplierPickerQuery(e.currentTarget.value)}
+                  onKeyDown={e=>e.stopPropagation()}
+                />
+                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
+                <button
+                  type="button"
+                  onClick={closeOrderSupplierPicker}
+                  style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:28, height:28, borderRadius:14, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtMuted, cursor:"pointer" }}>
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+              {supplierPickerResults.length===0&&(
+                <div style={{ padding:"12px", fontSize:12, color:th.txtMuted }}>
+                  {lang==="bn"?"কোনো কোম্পানি/ভেন্ডর পাওয়া যায়নি":"No company/vendor found"}
+                </div>
+              )}
+              {supplierPickerResults.map(supplier=>(
+                <button
+                  key={supplier.id}
+                  type="button"
+                  onClick={(event)=>{
+                    event.stopPropagation();
+                    selectOrderSupplierFromPicker(supplier.id);
+                  }}
+                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"12px", border:"none", borderTop:`1px solid ${th.border}`, background:supplier.id===supplierPickerSelectedId?th.accentDim:"transparent", color:th.txtPrimary, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
+                  <span style={{ minWidth:0 }}>
+                    <span style={{ fontSize:13, fontWeight:800 }}>{supplier.name}</span>
+                    <span style={{ fontSize:10, color:"#f97316", marginLeft:6 }}>{supplier.source}</span>
+                  </span>
+                  <span style={{ fontSize:11, color:th.txtMuted, whiteSpace:"nowrap" }}>{supplier.phone?`+${supplier.phone}`:"No number"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
