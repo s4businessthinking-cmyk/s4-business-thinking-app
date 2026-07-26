@@ -10233,7 +10233,6 @@ const startEditOrder = (order) => {
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
-    if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
     const upd = order.items.map((it,x)=>x===iIdx?{...it,price:String(directVal??"")}:it);
     try { await patchOrderOffline(oId, {items:upd}, t.n2); } catch(e) { hErr(e); }
   };
@@ -10301,7 +10300,6 @@ const startEditOrder = (order) => {
     const order = orders.find(o=>o.id===oId); if (!order) return;
     const current = order.items[iIdx];
     if (!current || current.status==="delivered" || current.status==="cancelled") return;
-    if (!["pending","order_confirmed","out_of_stock"].includes(current.status)) return;
     const selectedSupplier = findOrderSupplier(coId);
     const upd = order.items.map((it,x)=>x===iIdx?{
       ...it,
@@ -10828,7 +10826,7 @@ const startEditOrder = (order) => {
           const supplierResults = searchOrderSuppliers(supplierQuery);
           const pickerOpen = supplierPickerOpen[supplierKey] === true;
           const itemLocked = it.status==="delivered" || it.status==="cancelled";
-          const canEditProc = !itemLocked && ["pending","order_confirmed","out_of_stock"].includes(it.status);
+          const canEditProc = !itemLocked;
           return (
             <div key={iIdx} style={s.oiCard}>
               <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:6 }}>
@@ -10844,10 +10842,20 @@ const startEditOrder = (order) => {
                       style={{ ...s.inp, paddingLeft:34 }}
                       value={supplierQuery}
                       disabled={!canEditProc}
+                      autoComplete="off"
+                      inputMode="search"
                       placeholder={lang==="bn"?"কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন":"Search company/vendor by name or number"}
+                      onClick={e=>e.stopPropagation()}
+                      onMouseDown={e=>e.stopPropagation()}
+                      onPointerDown={e=>e.stopPropagation()}
+                      onTouchStart={e=>e.stopPropagation()}
                       onFocus={()=>setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}))}
                       onChange={e=>{
                         setSupplierSearch(prev=>({...prev,[supplierKey]:e.target.value}));
+                        setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}));
+                      }}
+                      onInput={e=>{
+                        setSupplierSearch(prev=>({...prev,[supplierKey]:e.currentTarget.value}));
                         setSupplierPickerOpen(prev=>({...prev,[supplierKey]:true}));
                       }}
                     />
