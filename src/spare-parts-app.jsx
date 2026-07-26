@@ -1342,24 +1342,19 @@ function useWindowWidth() {
 }
 
 // ─── PRICE CELL ──────────────────────────────────────────────
-function PriceCell({ initialValue, disabled, placeholder, saveBtnLabel, onSave }) {
-  const [val, setVal] = useState(initialValue ?? "");
-  const prevRef = useRef(initialValue);
-  useEffect(() => {
-    if (prevRef.current !== initialValue) {
-      prevRef.current = initialValue;
-      setVal(initialValue ?? "");
-    }
-  }, [initialValue]);
+function PriceCell({ initialValue, disabled, placeholder, onOpen }) {
   const stop = (e) => e.stopPropagation();
+  const displayValue = String(initialValue ?? "").trim();
   return (
     <div style={{ display:"flex", gap:7, marginBottom:7, alignItems:"center" }}
       onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}>
-      <input style={_globalS.inp} placeholder={placeholder} inputMode="numeric"
-        disabled={disabled} value={val}
-        onClick={stop} onMouseDown={stop} onPointerDown={stop} onTouchStart={stop}
-        onChange={e => setVal(e.target.value)} />
-      {!disabled && <button style={_globalS.savBtn} onClick={() => onSave(val)}>{saveBtnLabel}</button>}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={(event)=>{ event.stopPropagation(); onOpen(); }}
+        style={{ ..._globalS.inp, textAlign:"left", cursor:disabled?"not-allowed":"pointer", opacity:disabled?0.65:1 }}>
+        {displayValue || placeholder}
+      </button>
     </div>
   );
 }
@@ -8856,6 +8851,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [supplierPickerTarget,setSupplierPickerTarget]=useState(null);
   const [supplierPickerQuery,setSupplierPickerQuery]=useState("");
   const supplierPickerInputRef = useRef(null);
+  const [priceEditorTarget,setPriceEditorTarget]=useState(null);
+  const [priceEditorValue,setPriceEditorValue]=useState("");
+  const priceEditorInputRef = useRef(null);
 
   const [editId,setEditId]=useState(null);
   const [editNm,setEditNm]=useState(""); const [editPh,setEditPh]=useState("");
@@ -10742,6 +10740,31 @@ const startEditOrder = (order) => {
     closeOrderSupplierPicker();
   };
 
+  useEffect(() => {
+    if (!priceEditorTarget) return;
+    const timer = setTimeout(() => {
+      priceEditorInputRef.current?.focus?.();
+      priceEditorInputRef.current?.select?.();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [priceEditorTarget]);
+
+  const openPriceEditor = (orderId, itemIndex, currentPrice) => {
+    setPriceEditorTarget({ orderId, itemIndex });
+    setPriceEditorValue(String(currentPrice ?? ""));
+  };
+
+  const closePriceEditor = () => {
+    setPriceEditorTarget(null);
+    setPriceEditorValue("");
+  };
+
+  const savePriceEditor = async () => {
+    if (!priceEditorTarget) return;
+    await savePrice(priceEditorTarget.orderId, priceEditorTarget.itemIndex, priceEditorValue);
+    closePriceEditor();
+  };
+
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
     try {
@@ -10952,8 +10975,7 @@ const startEditOrder = (order) => {
                   initialValue={it.price ?? ""}
                   disabled={!canEditProc}
                   placeholder={t.price}
-                  saveBtnLabel={t.save}
-                  onSave={(val) => savePrice(order.id, iIdx, val)}
+                  onOpen={() => openPriceEditor(order.id, iIdx, it.price ?? "")}
                 />
               )}
               {(isOwner||can("setStatus"))&&(
@@ -12997,6 +13019,40 @@ const startEditOrder = (order) => {
                   <span style={{ fontSize:11, color:th.txtMuted, whiteSpace:"nowrap" }}>{supplier.phone?`+${supplier.phone}`:"No number"}</span>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {priceEditorTarget&&(
+        <div
+          onClick={e=>e.stopPropagation()}
+          onMouseDown={e=>e.stopPropagation()}
+          onPointerDown={e=>e.stopPropagation()}
+          onTouchStart={e=>e.stopPropagation()}
+          style={{ position:"fixed", inset:0, zIndex:99999, background:"rgba(2,6,23,0.72)", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"88px 12px 18px" }}>
+          <div style={{ width:"min(420px,100%)", border:`1px solid ${th.borderMid}`, borderRadius:16, background:th.bgCard, boxShadow:"0 18px 60px rgba(0,0,0,0.35)", padding:14 }}>
+            <div style={{ fontSize:14, fontWeight:900, color:th.txtPrimary, marginBottom:10 }}>
+              {lang==="bn"?"Company price":"Company price"}
+            </div>
+            <input
+              ref={priceEditorInputRef}
+              style={{ ...s.inp, marginBottom:10 }}
+              value={priceEditorValue}
+              inputMode="decimal"
+              autoComplete="off"
+              placeholder={t.price}
+              onChange={e=>setPriceEditorValue(e.target.value)}
+              onInput={e=>setPriceEditorValue(e.currentTarget.value)}
+              onKeyDown={e=>{
+                e.stopPropagation();
+                if (e.key === "Enter") savePriceEditor();
+                if (e.key === "Escape") closePriceEditor();
+              }}
+            />
+            <div style={{ display:"flex", gap:8 }}>
+              <button type="button" style={{ ...s.stBtn, flex:1 }} onClick={closePriceEditor}>{lang==="bn"?"বন্ধ":"Cancel"}</button>
+              <button type="button" style={{ ...s.savBtn, flex:1 }} onClick={savePriceEditor}>{t.save}</button>
             </div>
           </div>
         </div>
