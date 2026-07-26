@@ -8267,19 +8267,34 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canEdit, placeholder, noResultsText, options, searchSuppliers, onClear, onSelect }) {
   const [query, setQuery] = useState(selectedSupplier?.name || "");
   const [open, setOpen] = useState(false);
+  const inputRef = useRef(null);
 
   useEffect(() => {
-    if (!open) setQuery(selectedSupplier?.name || "");
+    if (!open) {
+      const nextValue = selectedSupplier?.name || "";
+      setQuery(nextValue);
+      if (inputRef.current) inputRef.current.value = nextValue;
+    }
   }, [selectedSupplier?.name, open]);
 
   const results = searchSuppliers(query);
+  const keepFocus = () => {
+    setTimeout(() => inputRef.current?.focus?.(), 0);
+  };
 
   return (
-    <div style={{ marginTop:8 }} onClick={e=>e.stopPropagation()}>
+    <div
+      style={{ marginTop:8 }}
+      onClick={e=>e.stopPropagation()}
+      onMouseDown={e=>e.stopPropagation()}
+      onPointerDown={e=>e.stopPropagation()}
+      onTouchStart={e=>e.stopPropagation()}
+    >
       <div style={{ position:"relative" }}>
         <input
+          ref={inputRef}
           style={{ ...s.inp, paddingLeft:34 }}
-          value={query}
+          defaultValue={selectedSupplier?.name || ""}
           disabled={!canEdit}
           autoComplete="off"
           inputMode="search"
@@ -8289,8 +8304,8 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
             setOpen(true);
             event.currentTarget.select();
           }}
-          onChange={e=>{ setQuery(e.target.value); setOpen(true); }}
-          onInput={e=>{ setQuery(e.currentTarget.value); setOpen(true); }}
+          onChange={e=>{ setQuery(e.target.value); setOpen(true); keepFocus(); }}
+          onInput={e=>{ setQuery(e.currentTarget.value); setOpen(true); keepFocus(); }}
           onKeyDown={e=>e.stopPropagation()}
         />
         <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
@@ -8299,9 +8314,11 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
             type="button"
             onClick={(event)=>{
               event.stopPropagation();
+              if (inputRef.current) inputRef.current.value = "";
               setQuery("");
               setOpen(true);
               onClear();
+              keepFocus();
             }}
             style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>
             ✕
@@ -8325,6 +8342,7 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
               onMouseDown={event=>event.preventDefault()}
               onClick={(event)=>{
                 event.stopPropagation();
+                if (inputRef.current) inputRef.current.value = supplier.name;
                 setQuery(supplier.name);
                 setOpen(false);
                 onSelect(supplier.id);
