@@ -8270,17 +8270,20 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (!open) {
-      const nextValue = selectedSupplier?.name || "";
-      setQuery(nextValue);
-      if (inputRef.current) inputRef.current.value = nextValue;
-    }
+    if (!open) setQuery(selectedSupplier?.name || "");
   }, [selectedSupplier?.name, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      inputRef.current?.focus?.();
+      inputRef.current?.select?.();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [open]);
+
   const results = searchSuppliers(query);
-  const keepFocus = () => {
-    setTimeout(() => inputRef.current?.focus?.(), 0);
-  };
+  const displayText = selectedSupplier?.name || "";
 
   return (
     <div
@@ -8292,20 +8295,14 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
     >
       <div style={{ position:"relative" }}>
         <input
-          ref={inputRef}
           style={{ ...s.inp, paddingLeft:34 }}
-          defaultValue={selectedSupplier?.name || ""}
+          value={displayText}
           disabled={!canEdit}
+          readOnly
           autoComplete="off"
-          inputMode="search"
           placeholder={placeholder}
-          onClick={e=>{ e.stopPropagation(); setOpen(true); }}
-          onFocus={(event)=>{
-            setOpen(true);
-            event.currentTarget.select();
-          }}
-          onChange={e=>{ setQuery(e.target.value); setOpen(true); keepFocus(); }}
-          onInput={e=>{ setQuery(e.currentTarget.value); setOpen(true); keepFocus(); }}
+          onClick={e=>{ e.stopPropagation(); setQuery(selectedSupplier?.name || ""); setOpen(true); }}
+          onFocus={e=>e.currentTarget.blur()}
           onKeyDown={e=>e.stopPropagation()}
         />
         <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
@@ -8314,11 +8311,9 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
             type="button"
             onClick={(event)=>{
               event.stopPropagation();
-              if (inputRef.current) inputRef.current.value = "";
               setQuery("");
-              setOpen(true);
+              setOpen(false);
               onClear();
-              keepFocus();
             }}
             style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>
             ✕
@@ -8329,32 +8324,59 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
       {open&&canEdit&&(
         <div
           onClick={e=>e.stopPropagation()}
-          style={{ marginTop:6, border:`1px solid ${th.borderMid}`, borderRadius:10, overflowY:"auto", overflowX:"hidden", maxHeight:260, WebkitOverflowScrolling:"touch", background:th.bgCard }}>
-          {results.length===0&&(
-            <div style={{ padding:"9px 10px", fontSize:12, color:th.txtMuted }}>
-              {noResultsText}
+          onMouseDown={e=>e.stopPropagation()}
+          onPointerDown={e=>e.stopPropagation()}
+          onTouchStart={e=>e.stopPropagation()}
+          style={{ position:"fixed", inset:0, zIndex:99999, background:"rgba(2,6,23,0.72)", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"72px 12px 18px" }}>
+          <div style={{ width:"min(560px,100%)", maxHeight:"calc(100vh - 96px)", display:"flex", flexDirection:"column", border:`1px solid ${th.borderMid}`, borderRadius:16, background:th.bgCard, boxShadow:"0 18px 60px rgba(0,0,0,0.35)", overflow:"hidden" }}>
+            <div style={{ padding:12, borderBottom:`1px solid ${th.border}` }}>
+              <div style={{ position:"relative" }}>
+                <input
+                  ref={inputRef}
+                  style={{ ...s.inp, paddingLeft:34, paddingRight:44 }}
+                  value={query}
+                  autoComplete="off"
+                  inputMode="search"
+                  placeholder={placeholder}
+                  onChange={e=>setQuery(e.target.value)}
+                  onInput={e=>setQuery(e.currentTarget.value)}
+                  onKeyDown={e=>e.stopPropagation()}
+                />
+                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
+                <button
+                  type="button"
+                  onClick={()=>setOpen(false)}
+                  style={{ position:"absolute", right:8, top:"50%", transform:"translateY(-50%)", width:28, height:28, borderRadius:14, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtMuted, cursor:"pointer" }}>
+                  ✕
+                </button>
+              </div>
             </div>
-          )}
-          {results.map(supplier=>(
-            <button
-              key={supplier.id}
-              type="button"
-              onMouseDown={event=>event.preventDefault()}
-              onClick={(event)=>{
-                event.stopPropagation();
-                if (inputRef.current) inputRef.current.value = supplier.name;
-                setQuery(supplier.name);
-                setOpen(false);
-                onSelect(supplier.id);
-              }}
-              style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"9px 10px", border:"none", borderTop:`1px solid ${th.border}`, background:supplier.id===selectedSupplierId?th.accentDim:"transparent", color:th.txtPrimary, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
-              <span style={{ minWidth:0 }}>
-                <span style={{ fontSize:13, fontWeight:800 }}>{supplier.name}</span>
-                <span style={{ fontSize:10, color:"#f97316", marginLeft:6 }}>{supplier.source}</span>
-              </span>
-              <span style={{ fontSize:11, color:th.txtMuted, whiteSpace:"nowrap" }}>{supplier.phone?`+${supplier.phone}`:"No number"}</span>
-            </button>
-          ))}
+            <div style={{ overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
+              {results.length===0&&(
+                <div style={{ padding:"12px", fontSize:12, color:th.txtMuted }}>
+                  {noResultsText}
+                </div>
+              )}
+              {results.map(supplier=>(
+                <button
+                  key={supplier.id}
+                  type="button"
+                  onClick={(event)=>{
+                    event.stopPropagation();
+                    setQuery(supplier.name);
+                    setOpen(false);
+                    onSelect(supplier.id);
+                  }}
+                  style={{ width:"100%", display:"flex", alignItems:"center", justifyContent:"space-between", gap:10, padding:"12px", border:"none", borderTop:`1px solid ${th.border}`, background:supplier.id===selectedSupplierId?th.accentDim:"transparent", color:th.txtPrimary, cursor:"pointer", textAlign:"left", fontFamily:"inherit" }}>
+                  <span style={{ minWidth:0 }}>
+                    <span style={{ fontSize:13, fontWeight:800 }}>{supplier.name}</span>
+                    <span style={{ fontSize:10, color:"#f97316", marginLeft:6 }}>{supplier.source}</span>
+                  </span>
+                  <span style={{ fontSize:11, color:th.txtMuted, whiteSpace:"nowrap" }}>{supplier.phone?`+${supplier.phone}`:"No number"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
