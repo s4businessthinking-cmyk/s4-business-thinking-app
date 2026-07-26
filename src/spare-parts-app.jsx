@@ -10650,10 +10650,10 @@ const startEditOrder = (order) => {
   const normalizeSupplierSearch = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9\u0980-\u09ff]+/g, "");
   const searchOrderSuppliers = (query) => {
     const clean = normalizeSupplierSearch(query);
-    if (!clean) return orderSupplierOptions.slice(0, 12);
+    if (!clean) return orderSupplierOptions.slice(0, 80);
     return orderSupplierOptions
       .filter(row => normalizeSupplierSearch(`${row.name} ${row.phone} ${row.source}`).includes(clean))
-      .slice(0, 12);
+      .slice(0, 80);
   };
 
   const handleLogout = async () => {
@@ -10862,7 +10862,7 @@ const startEditOrder = (order) => {
                     )}
                   </div>
                   {pickerOpen&&canEditProc&&(
-                    <div style={{ marginTop:6, border:`1px solid ${th.borderMid}`, borderRadius:10, overflow:"hidden", background:th.bgCard }}>
+                    <div style={{ marginTop:6, border:`1px solid ${th.borderMid}`, borderRadius:10, overflowY:"auto", overflowX:"hidden", maxHeight:260, WebkitOverflowScrolling:"touch", background:th.bgCard }}>
                       {supplierResults.length===0&&(
                         <div style={{ padding:"9px 10px", fontSize:12, color:th.txtMuted }}>
                           {lang==="bn"?"কোনো কোম্পানি/ভেন্ডর পাওয়া যায়নি":"No company/vendor found"}
