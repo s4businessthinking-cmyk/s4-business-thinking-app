@@ -1839,11 +1839,11 @@ function VerifyGate({ t, lang, setLang, user, toast, onLogout, s:sp, theme, setT
 }
 
 // ─── PERMISSION TOGGLE ───────────────────────────────────────
-function PermToggle({ isOn, onToggle }) {
+function PermToggle({ isOn, onToggle, disabled = false }) {
   return (
-    <button onClick={onToggle} style={{
-      width:42, height:24, borderRadius:12, border:"none", cursor:"pointer",
-      background:isOn?"#f97316":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s",
+    <button disabled={disabled} onClick={onToggle} style={{
+      width:42, height:24, borderRadius:12, border:"none", cursor:disabled?"not-allowed":"pointer",
+      background:isOn?"#f97316":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s", opacity:disabled?0.65:1,
     }}>
       <span style={{
         position:"absolute", top:3, left:isOn?21:3,
@@ -8884,7 +8884,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [lastCloudPullAt, setLastCloudPullAt] = useState(null);
   const [settingsPage,setSettingsPage]=useState(null);
   const [orderSettingsSaving,setOrderSettingsSaving]=useState(false);
-  const orderModuleEnabled = localShop?.orderModuleEnabled === true;
+  const [orderModuleOverride,setOrderModuleOverride]=useState(null);
+  const hasOrderModuleSetting = Object.prototype.hasOwnProperty.call(localShop || {}, "orderModuleEnabled");
+  const staffHasOrderPermission = !isOwner && (can("sendOrder") || can("setStatus") || can("setPrices") || can("markDelivery") || can("manageCompanies"));
+  const resolvedOrderModuleEnabled = localShop?.orderModuleEnabled === true || (!isOwner && !hasOrderModuleSetting && staffHasOrderPermission);
+  const orderModuleEnabled = orderModuleOverride ?? resolvedOrderModuleEnabled;
   const branchTransferAccess = useBranchTransferAccess({
     shopId, user, profile, isOwner,
   });
@@ -8898,14 +8902,16 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const saveOrderModuleEnabled = async (enabled) => {
     if (!isOwner || !shopId || !localShop) return;
+    if (orderSettingsSaving) return;
     setOrderSettingsSaving(true);
+    setOrderModuleOverride(enabled);
     try {
       const updated = await saveShopRecord(
         shopId,
         { ...localShop, orderModuleEnabled: enabled },
         { ownerUid: user?.uid, profile, user }
       );
-      setLocalShop(updated);
+      setLocalShop(prev => mergeShopRecord(prev, updated));
       if (!enabled && (tab === "owner" || tab === "shop")) setTab("dashboard");
       toast(enabled ? (lang==="bn"?"✅ Order option চালু হয়েছে":"✅ Order option enabled") : (lang==="bn"?"Order option বন্ধ হয়েছে":"Order option disabled"));
     } catch (error) {
@@ -12702,7 +12708,7 @@ const startEditOrder = (order) => {
                     {orderModuleEnabled ? (lang==="bn"?"চালু আছে":"Enabled") : (lang==="bn"?"বন্ধ আছে (Default)":"Disabled (Default)")}
                   </div>
                 </div>
-                <PermToggle isOn={orderModuleEnabled} onToggle={()=>saveOrderModuleEnabled(!orderModuleEnabled)} />
+                <PermToggle isOn={orderModuleEnabled} disabled={orderSettingsSaving} onToggle={()=>saveOrderModuleEnabled(!orderModuleEnabled)} />
               </div>
               {orderSettingsSaving&&(
                 <div style={{ fontSize:12, color:"#f97316", marginTop:10 }}>{lang==="bn"?"সেভ হচ্ছে...":"Saving..."}</div>
