@@ -9632,7 +9632,26 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           .map((d) => ({ ...d.data(), id: d.id }))
           .filter(isActiveProduct)
       );
-      setProducts(docs);
+      setProducts((previous) => {
+        const prevById = new Map(previous.map((product) => [product.id, product]));
+        return sortProducts(docs.map((doc) => {
+          const local = prevById.get(doc.id);
+          if (!local) return doc;
+          const cloudEmpty = !String(doc.shopPartNumber || "").trim();
+          const localHas = String(local.shopPartNumber || "").trim();
+          if (cloudEmpty && localHas) {
+            return {
+              ...doc,
+              shopPartNumber: local.shopPartNumber,
+              shopPartSerial: local.shopPartSerial,
+              shopPartFormatKey: local.shopPartFormatKey || doc.shopPartFormatKey,
+              originalPartKey: local.originalPartKey || doc.originalPartKey,
+              shopPartGroupKey: local.shopPartGroupKey || doc.shopPartGroupKey,
+            };
+          }
+          return doc;
+        }));
+      });
       offlineCacheCloudRecords("products", docs).catch((err) =>
         console.warn("[S4 Offline] product cache failed", err)
       );
@@ -9789,7 +9808,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     shopPartSerialRef.current = Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1;
     const serial = shopPartSerialRef.current;
-    const candidate = formatShopPartNumber(serial, productLike.code, shopPartFormatRef.current);
+    const candidate = formatShopPartNumber(serial, productLike.code, shopPartFormatRef.current, {
+      brand: productLike.company || productLike.brand,
+      company: productLike.company || productLike.brand,
+      name: productLike.name,
+    });
     const shopPartNumber = uniqueShopPartNumber(
       candidate,
       new Set(shopPartNumberOwnersRef.current.keys()),
@@ -9899,7 +9922,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       nextSerial = Math.max(nextSerial, serial);
 
       const representative = groupProducts[0];
-      const candidate = formatShopPartNumber(serial, representative.code, normalizedFormat);
+      const candidate = formatShopPartNumber(serial, representative.code, normalizedFormat, {
+        brand: representative.company || representative.brand,
+        company: representative.company || representative.brand,
+        name: representative.name,
+      });
       const shopPartNumber = uniqueShopPartNumber(candidate, usedNumbers, normalizedFormat.collisionSeparator);
       usedNumbers.add(shopPartNumber.toLowerCase());
       const originalPartKey = normalizeOriginalPartNumber(representative.code);
@@ -9920,7 +9947,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     )));
   };
 
-  const saveShopPartFormat = async (format, { applyToExisting = true } = {}) => {
+  const saveShopPartFormat = async (format, { applyToExisting = false } = {}) => {
     if (shopPartSettingsSaving) return;
     setShopPartSettingsSaving(true);
     try {
@@ -9997,11 +10024,47 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     let cancelled = false;
     (async () => {
-      rebuildShopPartIndex(products);
+      const localRes = await offlineList("products").catch(() => ({ records: [] }));
+      if (cancelled) return;
+      const localById = new Map(
+        (localRes.records || [])
+          .map((row) => ({ id: row.document_id, ...(row.data || {}) }))
+          .filter((row) => row.id)
+          .map((row) => [row.id, row])
+      );
+
+      const restoredProducts = products.map((product) => {
+        if (String(product.shopPartNumber || "").trim()) return product;
+        const local = localById.get(product.id);
+        if (!String(local?.shopPartNumber || "").trim()) return product;
+        return {
+          ...product,
+          shopPartNumber: local.shopPartNumber,
+          shopPartSerial: local.shopPartSerial,
+          shopPartFormatKey: local.shopPartFormatKey || product.shopPartFormatKey,
+          originalPartKey: local.originalPartKey || product.originalPartKey,
+          shopPartGroupKey: local.shopPartGroupKey || product.shopPartGroupKey,
+        };
+      });
+
+      rebuildShopPartIndex(restoredProducts);
       const updates = [];
-      for (const product of products) {
+      for (const product of restoredProducts) {
         if (cancelled) return;
-        if (String(product.shopPartNumber || "").trim()) continue;
+        if (String(product.shopPartNumber || "").trim()) {
+          const local = localById.get(product.id);
+          if (!String(local?.shopPartNumber || "").trim() || local.shopPartNumber !== product.shopPartNumber) {
+            updates.push({
+              id: product.id,
+              shopPartNumber: product.shopPartNumber,
+              shopPartSerial: product.shopPartSerial,
+              shopPartFormatKey: product.shopPartFormatKey,
+              originalPartKey: product.originalPartKey,
+              shopPartGroupKey: product.shopPartGroupKey,
+            });
+          }
+          continue;
+        }
         const assigned = reserveShopPartNumber(product);
         if (!assigned.shopPartNumber) continue;
         updates.push({
@@ -10014,11 +10077,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         });
       }
       if (!updates.length) {
-        shopPartBackfillRef.current = signature;
+        setProducts(restoredProducts);
+        shopPartBackfillRef.current = `${shopId}:${restoredProducts.filter((p) => String(p.shopPartNumber || "").trim()).length}:0`;
         return;
       }
 
-      setProducts((previous) => previous.map((product) => {
+      setProducts(restoredProducts.map((product) => {
         const patch = updates.find((entry) => entry.id === product.id);
         return patch ? { ...product, ...patch } : product;
       }));
@@ -10205,10 +10269,18 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       toast(message, "err");
       return { created:0, skipped:records.length, errors:[{ row:"-", reason:message }] };
     }
-    if (productMaintenanceRef.current.active && !productReplacementActive) {
+    const maintenance = productMaintenanceRef.current || {};
+    const locker = String(maintenance.startedBy || "");
+    const thisDeviceReplacement = productReplacementActive
+      || !locker
+      || locker === user.uid;
+    if (maintenance.active && !thisDeviceReplacement) {
       const message = "Product Master is being replaced on another device. Import is temporarily locked.";
       toast(message, "err");
       return { created:0, skipped:records.length, errors:[{ row:"-", reason:message }] };
+    }
+    if (maintenance.active && thisDeviceReplacement && !productReplacementActive) {
+      setProductReplacementActive(true);
     }
     const summary = { created:0, skipped:0, errors:[] };
     rebuildShopPartIndex(products);
@@ -10235,7 +10307,9 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       const moreBarcodes = String(record.moreBarcodes || "")
         .split(/[;,|]/)
         .map(v=>v.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter((code, index, list) => list.findIndex((other) => other.toLowerCase() === code.toLowerCase()) === index)
+        .filter((code) => !existingCodes.has(code.toLowerCase()));
       const arrayFields = ["unitPrices", "customUnits", "unitDefinitions", "customerTypes"];
       const parsedArrays = {};
       let arrayError = "";
@@ -10258,14 +10332,18 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         summary.errors.push({ row:rowNo, reason:arrayError });
         continue;
       }
-      const unitPrices = parsedArrays.unitPrices;
-      const rowCodes = [record.barcode, record.ean, ...moreBarcodes, ...unitPrices.map(row=>row?.barcode)]
+      const unitPrices = parsedArrays.unitPrices.map((row) => {
+        const barcode = String(row?.barcode || "").trim();
+        if (barcode && existingCodes.has(barcode.toLowerCase())) return { ...row, barcode:"" };
+        return row;
+      });
+      let barcode = String(record.barcode || "").trim();
+      let ean = String(record.ean || "").trim();
+      if (barcode && existingCodes.has(barcode.toLowerCase())) barcode = "";
+      if (ean && existingCodes.has(ean.toLowerCase())) ean = "";
+      if (ean && barcode && ean.toLowerCase() === barcode.toLowerCase()) ean = "";
+      const rowCodes = [barcode, ean, ...moreBarcodes, ...unitPrices.map(row=>row?.barcode)]
         .map(v=>String(v||"").trim()).filter(Boolean);
-      const repeated = rowCodes.find((value,index)=>rowCodes.findIndex(other=>other.toLowerCase()===value.toLowerCase())!==index);
-      if (repeated) { summary.skipped += 1; summary.errors.push({ row:rowNo, reason:`The same Barcode/EAN is entered twice: ${repeated}` }); continue; }
-      const clash = rowCodes
-        .find(v=>v&&existingCodes.has(v.toLowerCase()));
-      if (clash) { summary.skipped += 1; summary.errors.push({ row:rowNo, reason:`Barcode/EAN already exists: ${clash}` }); continue; }
 
       const now = new Date().toISOString();
       try {
@@ -10285,6 +10363,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         const payload = {
           ...createEmptyPmForm(), ...record, shopId, name,
           id: draftId,
+          barcode,
+          ean,
           productCatalogEpoch: productMaintenanceRef.current.catalogEpoch || 0,
           code: String(record.code || "").trim(),
           shopPartNumber: assigned.shopPartNumber,
@@ -10417,7 +10497,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
             ? formatShopPartNumber(
                 Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1,
                 val,
-                shopPartFormatRef.current
+                shopPartFormatRef.current,
+                { brand: next.company || next.brand, company: next.company || next.brand, name: next.name }
               )
             : ""
         );

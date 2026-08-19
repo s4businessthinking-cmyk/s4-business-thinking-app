@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
-import { parseCsv } from "../csv";
+import { parseProductMasterFile } from "../importFile";
 
 const TARGET_FIELDS = [
   { value: "", label: "-- Ignore --" },
@@ -68,17 +68,17 @@ const MATCH_HINTS = {
   company: ["company", "brand"],
   category: ["category"],
   subcategory: ["subcategory", "subcat"],
-  commodityCode: ["commoditycode"],
+  commodityCode: ["commoditycode", "commcode"],
   unit: ["baseunit", "unit"],
   productType: ["producttype"],
   arabicName: ["arabicname", "arabic"],
-  salesVat: ["salesvat"],
+  salesVat: ["salesvat", "vatperc", "vatpercent", "vat%"],
   purchaseVat: ["purchasevat"],
   landingCost: ["landingcost", "landing", "cost"],
   marginPerc: ["marginpercent", "margin%", "margin"],
   marginAmount: ["marginamount"],
-  vatExclusive: ["vatexclusive", "exclusive"],
-  vatInclusive: ["vatinclusive", "inclusive"],
+  vatExclusive: ["vatexclusiverate", "vatexclusive", "exclusive"],
+  vatInclusive: ["vatinclusiverate", "vatinclusive", "inclusive"],
   vatOnMrp: ["vatonmrp"],
   averageCost: ["averagecost"],
   mrp: ["mrp"],
@@ -130,22 +130,6 @@ function autoMap(headers) {
   return mapping;
 }
 
-function matrixToRows(matrix) {
-  if (!Array.isArray(matrix) || matrix.length < 2) return { headers: [], rows: [] };
-  const seen = new Map();
-  const headers = matrix[0].map((raw, index) => {
-    const base = String(raw ?? "").trim() || `Column ${index + 1}`;
-    const key = base.toLowerCase();
-    const count = (seen.get(key) || 0) + 1;
-    seen.set(key, count);
-    return count === 1 ? base : `${base} (${count})`;
-  });
-  const rows = matrix.slice(1)
-    .filter((cells) => cells.some((cell) => String(cell ?? "").trim()))
-    .map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? ""])));
-  return { headers, rows };
-}
-
 export default function ImportModal({ onImport, onClose, notify, replacementMode = false }) {
   const [step, setStep] = useState("upload");
   const [headers, setHeaders] = useState([]);
@@ -173,38 +157,29 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
 
   const preview = useMemo(() => {
     const seenCodes = new Set();
-    const invalidRows = new Set();
     let missingName = 0;
     let duplicateCodes = 0;
     let invalidJson = 0;
-    mappedRecords.forEach((record, rowIndex) => {
-      if (!String(record.name || "").trim()) {
-        missingName += 1;
-        invalidRows.add(rowIndex);
-      }
+    mappedRecords.forEach((record) => {
+      if (!String(record.name || "").trim()) missingName += 1;
       const codes = [record.barcode, record.ean, ...String(record.moreBarcodes || "").split(/[;,|]/)]
         .map((value) => String(value || "").trim().toLowerCase())
         .filter(Boolean);
       if (codes.some((code) => seenCodes.has(code)) || new Set(codes).size !== codes.length) {
         duplicateCodes += 1;
-        invalidRows.add(rowIndex);
       }
       codes.forEach((code) => seenCodes.add(code));
       ["unitPrices", "customUnits", "unitDefinitions", "customerTypes"].forEach((field) => {
         if (!record[field]) return;
         try {
-          if (!Array.isArray(JSON.parse(record[field]))) {
-            invalidJson += 1;
-            invalidRows.add(rowIndex);
-          }
+          if (!Array.isArray(JSON.parse(record[field]))) invalidJson += 1;
         } catch {
           invalidJson += 1;
-          invalidRows.add(rowIndex);
         }
       });
     });
     return {
-      valid: mappedRecords.length - invalidRows.size,
+      valid: mappedRecords.filter((record) => String(record.name || "").trim()).length,
       missingName,
       duplicateCodes,
       invalidJson,
@@ -217,10 +192,7 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
     if (!file) return;
     setBusy(true);
     try {
-      const isExcel = /\.xlsx$/i.test(file.name);
-      const parsed = isExcel
-        ? matrixToRows(await (await import("read-excel-file/browser")).default(file))
-        : parseCsv(await file.text());
+      const parsed = await parseProductMasterFile(file);
       if (!parsed.headers.length || !parsed.rows.length) throw new Error("No data rows found in the file");
       setHeaders(parsed.headers);
       setRows(parsed.rows);
@@ -243,7 +215,7 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
     }
     setBusy(true);
     try {
-      setResult(await onImport(mappedRecords));
+      setResult(await onImport(mappedRecords.filter((record) => String(record.name || "").trim())));
       setStep("result");
     } catch (err) {
       notify(err.message || "Import failed", "err");
@@ -258,9 +230,9 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
         <>
           <p className="pm-hint">
             {replacementMode ? "The old Product Master is cleared and sync is locked. " : ""}
-            Choose an Excel (.xlsx), CSV, TSV, or semicolon-delimited text file.
+            Choose an Excel (.xls / .xlsx), CSV, TSV, or semicolon-delimited text file.
           </p>
-          <input type="file" accept=".xlsx,.csv,.tsv,.txt,text/csv,text/tab-separated-values" onChange={onFileSelected} style={{ fontSize: 12 }} />
+          <input type="file" accept=".xls,.xlsx,.csv,.tsv,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values" onChange={onFileSelected} style={{ fontSize: 12 }} />
           {busy && <p className="pm-hint">Reading file...</p>}
         </>
       )}

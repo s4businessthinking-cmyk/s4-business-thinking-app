@@ -44,14 +44,46 @@ export function shopPartFormatKey(value) {
   return `${normalized.pattern}|${normalized.caseStyle}|${normalized.collisionSeparator}`;
 }
 
-export function formatShopPartNumber(serial, originalPartNumber = "", settings = DEFAULT_SHOP_PART_FORMAT) {
+export function normalizeBrandToken(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+export function nameWordsToken(value, wordCount = 1) {
+  const words = String(value || "").toUpperCase().match(/[A-Z0-9]+/g) || [];
+  return words.slice(0, Math.max(1, Math.min(6, wordCount))).join("") || "ITEM";
+}
+
+export function formatShopPartNumber(serial, originalPartNumber = "", settings = DEFAULT_SHOP_PART_FORMAT, extras = {}) {
   const format = normalizeShopPartFormat(settings);
   const original = String(originalPartNumber || "").trim().replace(/[^A-Za-z0-9]/g, "");
+  const brand = normalizeBrandToken(extras.brand || extras.company);
+  const productName = String(extras.name || extras.productName || "").trim();
+  const nameCompact = normalizeBrandToken(productName);
   const safeSerial = Math.max(1, Number(serial) || 1);
   const output = format.pattern.replace(
-    /\{(ORIGINAL|FIRST|LAST|SERIAL)(\d{0,2})\}/gi,
+    /\{(ORIGINAL|FIRST|LAST|SERIAL|BRAND|COMPANY|NAMEWORD|NAME)(\d{0,2})\}/gi,
     (_, token, countText) => {
       const key = token.toUpperCase();
+      if (key === "BRAND" || key === "COMPANY") {
+        const source = brand || "GEN";
+        const count = countText
+          ? Math.max(1, Math.min(30, Number(countText) || source.length))
+          : source.length;
+        return source.slice(0, count);
+      }
+      if (key === "NAMEWORD") {
+        return nameWordsToken(productName, Number(countText) || 1);
+      }
+      if (key === "NAME") {
+        const source = nameCompact || "ITEM";
+        const count = countText
+          ? Math.max(1, Math.min(30, Number(countText) || source.length))
+          : Math.min(16, source.length);
+        return source.slice(0, count);
+      }
       const count = Math.max(1, Math.min(30, Number(countText) || (key === "SERIAL" ? SHOP_PART_DIGITS : original.length || 1)));
       if (key === "SERIAL") return String(safeSerial).padStart(count, "0");
       if (key === "FIRST") return original.slice(0, count);
@@ -78,8 +110,13 @@ export function uniqueShopPartNumber(candidate, usedNumbers, separator = "-") {
 }
 
 export function shopPartSerial(value) {
-  const match = String(value || "").trim().match(/^SP-(\d+)$/i);
-  return match ? Number(match[1]) || 0 : 0;
+  const text = String(value || "").trim();
+  const sp = text.match(/^SP-(\d+)$/i);
+  if (sp) return Number(sp[1]) || 0;
+  const groups = [...text.matchAll(/(\d+)/g)].map((match) => match[1]);
+  if (!groups.length) return 0;
+  const padded = groups.filter((group) => group.length >= 4).sort((a, b) => b.length - a.length)[0];
+  return Number(padded || groups[groups.length - 1]) || 0;
 }
 
 export function stableShopPartKey(value) {

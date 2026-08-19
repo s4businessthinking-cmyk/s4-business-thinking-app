@@ -9,14 +9,20 @@ import {
 export default function ShopPartFormatModal({ value, featureEnabled = true, onSave, onClose, notify }) {
   const [draft, setDraft] = useState(() => normalizeShopPartFormat(value));
   const [sampleOriginal, setSampleOriginal] = useState("ME013343");
+  const [sampleBrand, setSampleBrand] = useState("VOLVO");
+  const [sampleName, setSampleName] = useState("OIL FILTER");
   const [tokenLength, setTokenLength] = useState(4);
   const [sampleSerial, setSampleSerial] = useState(1233);
-  const [applyToExisting, setApplyToExisting] = useState(featureEnabled);
+  const [applyToExisting, setApplyToExisting] = useState(false);
   const patternRef = useRef(null);
 
   const preview = useMemo(
-    () => formatShopPartNumber(sampleSerial, sampleOriginal, draft),
-    [draft, sampleOriginal, sampleSerial]
+    () => formatShopPartNumber(sampleSerial, sampleOriginal, draft, {
+      brand: sampleBrand,
+      company: sampleBrand,
+      name: sampleName,
+    }),
+    [draft, sampleOriginal, sampleBrand, sampleName, sampleSerial]
   );
 
   const update = (field, nextValue) => setDraft((current) => ({ ...current, [field]: nextValue }));
@@ -64,6 +70,11 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
 
           <div className="pm-shop-part-format__tokens">
             <span>Insert at cursor:</span>
+            <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{NAMEWORD}")}>Name 1 word</button>
+            <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{NAMEWORD2}")}>Name 2 words</button>
+            <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{NAME}")}>Product Name</button>
+            <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{BRAND}")}>Brand</button>
+            <button type="button" className="pm-btn-secondary" onClick={() => insertToken(`{BRAND${tokenLength}}`)}>Brand {tokenLength}</button>
             <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{ORIGINAL}")}>Full Original</button>
             <button type="button" className="pm-btn-secondary" onClick={() => insertToken(`{FIRST${tokenLength}}`)}>First {tokenLength}</button>
             <button type="button" className="pm-btn-secondary" onClick={() => insertToken(`{LAST${tokenLength}}`)}>Last {tokenLength}</button>
@@ -105,6 +116,14 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
         <div className="pm-shop-part-format__preview">
           <strong>Live Preview</strong>
           <label className="pm-field">
+            <span className="pm-label">Sample Product Name</span>
+            <input className="pm-input" value={sampleName} onChange={(event) => setSampleName(event.target.value)} />
+          </label>
+          <label className="pm-field">
+            <span className="pm-label">Sample Brand / Company</span>
+            <input className="pm-input" value={sampleBrand} onChange={(event) => setSampleBrand(event.target.value)} />
+          </label>
+          <label className="pm-field">
             <span className="pm-label">Sample Original Part Number</span>
             <input className="pm-input" value={sampleOriginal} onChange={(event) => setSampleOriginal(event.target.value)} />
           </label>
@@ -120,6 +139,10 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
           </label>
           <div className="pm-shop-part-format__result">{preview}</div>
           <div className="pm-shop-part-format__examples">
+            <span><b>OIL-001233:</b> {"{NAMEWORD}-{SERIAL6}"}</span>
+            <span><b>OILFILTER-001233:</b> {"{NAMEWORD2}-{SERIAL6}"}</span>
+            <span><b>VOLVO-001233:</b> {"{BRAND}-{SERIAL6}"}</span>
+            <span><b>SCANIA-3343:</b> {"{BRAND}-{LAST4}"}</span>
             <span><b>UBP-3343:</b> UBP-{"{LAST4}"}</span>
             <span><b>13343-UBP:</b> {"{LAST5}"}-UBP</span>
             <span><b>ME-UBP-3343:</b> {"{FIRST2}"}-UBP-{"{LAST4}"}</span>
@@ -135,7 +158,7 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
             onChange={(event) => setApplyToExisting(event.target.checked)}
           />
           {featureEnabled
-            ? "Apply this new format to all existing products. Products sharing the same Original Part Number will still receive one identical Shop Part Number."
+            ? "Rewrite ALL existing Shop Part Numbers to this format. Leave unchecked to keep codes already generated; only new/empty products will use the new format."
             : "The feature is currently OFF. This format will be applied when Shop Part Number is enabled."}
         </label>
 
