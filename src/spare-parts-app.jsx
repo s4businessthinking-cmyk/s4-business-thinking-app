@@ -119,6 +119,38 @@ function isActiveProduct(product) {
   return product.isDeleted !== true && product.deleted !== true;
 }
 
+function mergeProductCatalog(cloudRows = [], localRows = []) {
+  const merged = new Map();
+  localRows.forEach((product) => {
+    const id = String(product?.id || "").trim();
+    if (id) merged.set(id, product);
+  });
+  cloudRows.forEach((product) => {
+    const id = String(product?.id || "").trim();
+    if (!id) return;
+    const local = merged.get(id);
+    if (!local) {
+      merged.set(id, product);
+      return;
+    }
+    if (product.isDeleted === true || product.deleted === true) {
+      merged.set(id, product);
+      return;
+    }
+    merged.set(id, {
+      ...product,
+      shopPartNumber: product.shopPartNumber || local.shopPartNumber,
+      shopPartSerial: product.shopPartSerial || local.shopPartSerial,
+      shopPartFormatKey: product.shopPartFormatKey || local.shopPartFormatKey,
+      originalPartKey: product.originalPartKey || local.originalPartKey,
+      shopPartGroupKey: product.shopPartGroupKey || local.shopPartGroupKey,
+    });
+  });
+  return [...merged.values()]
+    .filter(isActiveProduct)
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+}
+
 const LOGO_URL = s4LogoUrl;
 const APP_NAME = "S4 Business Thinking";
 
@@ -8953,7 +8985,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     if (!pullResult?.data) return;
     const sorted = sortPulledRecords(pullResult.data);
 
-    if (sorted.products.length) setProducts(sorted.products);
+    if (sorted.products.length) setProducts((previous) => mergeProductCatalog(sorted.products, previous));
     if (sorted.companies.length) setCos(sorted.companies);
     if (sorted.customers.length) setCustomers(sorted.customers);
     if (sorted.vendors.length) setVendors(sorted.vendors);
@@ -9632,26 +9664,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           .map((d) => ({ ...d.data(), id: d.id }))
           .filter(isActiveProduct)
       );
-      setProducts((previous) => {
-        const prevById = new Map(previous.map((product) => [product.id, product]));
-        return sortProducts(docs.map((doc) => {
-          const local = prevById.get(doc.id);
-          if (!local) return doc;
-          const cloudEmpty = !String(doc.shopPartNumber || "").trim();
-          const localHas = String(local.shopPartNumber || "").trim();
-          if (cloudEmpty && localHas) {
-            return {
-              ...doc,
-              shopPartNumber: local.shopPartNumber,
-              shopPartSerial: local.shopPartSerial,
-              shopPartFormatKey: local.shopPartFormatKey || doc.shopPartFormatKey,
-              originalPartKey: local.originalPartKey || doc.originalPartKey,
-              shopPartGroupKey: local.shopPartGroupKey || doc.shopPartGroupKey,
-            };
-          }
-          return doc;
-        }));
-      });
+      setProducts((previous) => mergeProductCatalog(docs, previous));
       offlineCacheCloudRecords("products", docs).catch((err) =>
         console.warn("[S4 Offline] product cache failed", err)
       );
