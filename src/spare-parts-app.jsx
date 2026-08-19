@@ -35,13 +35,25 @@ import {
 import {
   offlineCreate,
   offlineUpdate,
+  offlineUpsert,
   offlineRemove,
   offlineList,
   offlineGetById,
   offlineCacheCloudRecords,
-  offlineClearCollection,
+  offlineClearShopCollection,
   offlinePurgeLocal,
 } from "./offline/offlineRepository";
+import {
+  DEFAULT_SHOP_PART_FORMAT,
+  formatShopPartNumber,
+  nextLocalShopPartSerial,
+  normalizeOriginalPartNumber,
+  normalizeShopPartFormat,
+  productPartGroupKey,
+  shopPartFormatKey,
+  shopPartSerial,
+  uniqueShopPartNumber,
+} from "./product-master/shopPartNumbers";
 import {
   loadCachedShop,
   saveCachedShop,
@@ -95,6 +107,10 @@ import {
   resetShopMemberPassword,
   updateOwnPassword,
 } from "./auth/userManagementService";
+import ProductMasterScreen from "./product-master/ProductMasterScreen.jsx";
+import ShopPartFormatModal from "./product-master/modals/ShopPartFormatModal.jsx";
+import { PM_CSS } from "./product-master/pmStyles.js";
+import { code128SvgMarkup } from "./product-master/code128.js";
 
 import s4LogoUrl from "./assets/s4-logo.png";
 
@@ -1868,159 +1884,6 @@ function InviteCodeRow({ c, lang, t, onDelete, th }) {
         onClick={copy}>{copied?(lang==="bn"?"✅ কপি":"✅ Copied"):(lang==="bn"?"📋 কপি":"📋 Copy")}</button>
       <button style={{ padding:"6px 8px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12 }}
         onClick={()=>onDelete(c.code)}>🗑️</button>
-    </div>
-  );
-}
-
-// ─── PRODUCT FORM COMPONENT ──────────────────────────────────
-function PmForm({ pmForm, pmUpd, t, lang, th }) {
-  const _th  = th || {bgInp:"#09090b",bgCard:"#18181b",txtPrimary:"#f4f4f5",txtMuted:"#71717a",borderMid:"#3f3f46",border:"#27272a",accentDim:"#451a03"};
-  const inp  = { padding:"9px 11px", borderRadius:8, border:`1px solid ${_th.borderMid}`, background:_th.bgInp, color:_th.txtPrimary, fontSize:13, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
-  const calcInp = { ...inp, color:"#22c55e", fontWeight:700 };
-  const lbl  = { fontSize:10, color:_th.txtMuted, textTransform:"uppercase", letterSpacing:0, fontWeight:700, marginBottom:3, display:"block" };
-  const sec  = { fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, padding:"8px 0 6px", borderBottom:`1px solid ${_th.border}`, marginBottom:10 };
-  const g2   = { display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:8 };
-
-  // More barcodes state
-  const [newRef, setNewRef] = useState("");
-  const mbs = pmForm.moreBarcodes||[];
-
-  return (
-    <div>
-      {/* ── Basic Info ── */}
-      <div style={{ marginBottom:8 }}>
-        <label style={lbl}>{t.pmName} *</label>
-        <input style={inp} value={pmForm.name} onChange={e=>pmUpd("name",e.target.value)} />
-      </div>
-      <div style={g2}>
-        <div>
-          <label style={lbl}>{t.pmCode}</label>
-          <input style={inp} value={pmForm.code} onChange={e=>pmUpd("code",e.target.value)} />
-        </div>
-        <div>
-          <label style={lbl}>{t.pmBrand}</label>
-          <input style={inp} value={pmForm.brand} onChange={e=>pmUpd("brand",e.target.value)} />
-        </div>
-      </div>
-      <div style={g2}>
-        <div>
-          <label style={lbl}>{t.pmCategory}</label>
-          <input style={inp} value={pmForm.category} onChange={e=>pmUpd("category",e.target.value)} />
-        </div>
-        <div>
-          <label style={lbl}>{lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category"}</label>
-          <input style={inp} value={pmForm.subcategory||""} onChange={e=>pmUpd("subcategory",e.target.value)} />
-        </div>
-      </div>
-
-      {/* ── Barcode Section ── */}
-      <div style={sec}>🔢 Barcode / Reference</div>
-      <div style={g2}>
-        <div>
-          <label style={lbl}>Barcode</label>
-          <input style={inp} value={pmForm.barcode||""} onChange={e=>pmUpd("barcode",e.target.value)} />
-        </div>
-        <div>
-          <label style={lbl}>EAN Code</label>
-          <input style={inp} value={pmForm.ean||""} onChange={e=>pmUpd("ean",e.target.value)} />
-        </div>
-      </div>
-      {/* More Barcodes */}
-      <div style={{ marginBottom:8 }}>
-        <label style={lbl}>More Barcodes / Reference Numbers</label>
-        <div style={{ display:"flex", gap:6, marginBottom:6 }}>
-          <input style={{ ...inp, flex:1 }} placeholder={lang==="bn"?"Reference নম্বর লিখুন...":"Enter reference number..."} value={newRef} onChange={e=>setNewRef(e.target.value)}
-            onKeyDown={e=>{ if(e.key==="Enter"&&newRef.trim()){ pmUpd("moreBarcodes",[...mbs,newRef.trim()]); setNewRef(""); } }} />
-          <button onClick={()=>{ if(newRef.trim()){ pmUpd("moreBarcodes",[...mbs,newRef.trim()]); setNewRef(""); } }}
-            style={{ padding:"9px 14px", borderRadius:8, border:"none", background:"#f97316", color:"#fff", cursor:"pointer", fontSize:13, fontWeight:700, flexShrink:0 }}>+</button>
-        </div>
-        {mbs.length>0&&(
-          <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-            {mbs.map((r,i)=>(
-              <span key={i} style={{ background:_th.accentDim, border:"1px solid #f97316", color:"#f97316", borderRadius:20, padding:"3px 10px", fontSize:12, display:"flex", alignItems:"center", gap:5 }}>
-                {r}
-                <button onClick={()=>pmUpd("moreBarcodes",mbs.filter((_,j)=>j!==i))} style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:13, padding:0, lineHeight:1 }}>✕</button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Tax Settings ── */}
-      <div style={sec}>🧾 Tax Settings</div>
-      <div style={g2}>
-        <div>
-          <label style={lbl}>Sales VAT %</label>
-          <select style={{ ...inp, background:_th.bgCard }} value={pmForm.salesVat||"0"} onChange={e=>pmUpd("salesVat",e.target.value)}>
-            <option value="0">0%</option>
-            <option value="5">5%</option>
-          </select>
-        </div>
-        <div>
-          <label style={lbl}>Purchase VAT %</label>
-          <select style={{ ...inp, background:_th.bgCard }} value={pmForm.purchaseVat||"0"} onChange={e=>pmUpd("purchaseVat",e.target.value)}>
-            <option value="0">0%</option>
-            <option value="5">5%</option>
-          </select>
-        </div>
-      </div>
-
-      {/* ── Pricing ── */}
-      <div style={sec}>💰 Pricing</div>
-      <div style={g2}>
-        <div>
-          <label style={lbl}>Landing Cost</label>
-          <input style={inp} inputMode="decimal" value={pmForm.landingCost||""} onChange={e=>pmUpd("landingCost",e.target.value)} />
-        </div>
-        <div>
-          <label style={lbl}>Margin %</label>
-          <input style={inp} inputMode="decimal" value={pmForm.marginPerc||""} onChange={e=>pmUpd("marginPerc",e.target.value)} />
-        </div>
-      </div>
-      <div style={g2}>
-        <div>
-          <label style={{ ...lbl, color:"#22c55e" }}>Margin Amount 🟢 auto</label>
-          <input style={calcInp} inputMode="decimal" value={pmForm.marginAmount||""} onChange={e=>pmUpd("marginAmount",e.target.value)} />
-        </div>
-        <div>
-          <label style={{ ...lbl, color:"#22c55e" }}>VAT Exclusive Rate 🟢 auto</label>
-          <input style={calcInp} inputMode="decimal" value={pmForm.vatExclusive||""} onChange={e=>pmUpd("vatExclusive",e.target.value)} />
-        </div>
-      </div>
-      <div style={g2}>
-        <div>
-          <label style={{ ...lbl, color:"#06b6d4" }}>VAT Inclusive Rate 🔵 auto</label>
-          <input style={{ ...calcInp, color:"#06b6d4" }} inputMode="decimal" value={pmForm.vatInclusive||""} onChange={e=>pmUpd("vatInclusive",e.target.value)} />
-        </div>
-        <div>
-          {/* VAT on MRP checkbox above MRP box */}
-          <label style={{ display:"flex", alignItems:"center", gap:7, cursor:"pointer", marginBottom:5 }}>
-            <input type="checkbox" checked={!!pmForm.vatOnMrp} onChange={e=>pmUpd("vatOnMrp",e.target.checked)}
-              style={{ width:16, height:16, accentColor:"#f97316", cursor:"pointer" }} />
-            <span style={{ fontSize:11, color:"#f97316", fontWeight:700 }}>✅ VAT on MRP</span>
-          </label>
-          <label style={lbl}>MRP</label>
-          <input style={inp} inputMode="decimal" value={pmForm.mrp||""} onChange={e=>pmUpd("mrp",e.target.value)} />
-        </div>
-      </div>
-
-      {/* ── Other ── */}
-      <div style={g2}>
-        <div>
-          <label style={lbl}>Opening Stock</label>
-          <input style={inp} inputMode="decimal" value={pmForm.openingStock||""} onChange={e=>pmUpd("openingStock",e.target.value)} />
-        </div>
-        <div>
-          <label style={lbl}>{t.pmUnit}</label>
-          <select style={{ ...inp, background:_th.bgCard }} value={pmForm.unit||"Pcs"} onChange={e=>pmUpd("unit",e.target.value)}>
-            {["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr"].map(u=><option key={u} value={u}>{u}</option>)}
-          </select>
-        </div>
-      </div>
-      <div>
-        <label style={lbl}>{lang==="bn"?"বিবরণ":"Description"}</label>
-        <input style={inp} value={pmForm.description||""} onChange={e=>pmUpd("description",e.target.value)} />
-      </div>
     </div>
   );
 }
@@ -4582,11 +4445,13 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     }
   }, [piSubTab, canManagePurchase, canViewSupplierLedger, canVendorPayments]);
 
-  // ── Real-time listener + offline SQLite cache fallback ──
+  // ── Local-first list, then Firebase; SQLite cache stays in background ──
   useEffect(()=>{
     if (!shopId) return;
     setPiLoading(true);
     let unsub2=null;
+    let cancelled=false;
+    let cloudRowsLatest=null;
 
     const normalizePiInvoice = (d) => ({
       ...d.data(),
@@ -4599,14 +4464,16 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     );
 
     const loadOfflinePiInvoices = async ({ cloudRows = null } = {}) => {
+      const mergeSource = cloudRows ?? cloudRowsLatest;
       const res = await offlineList("purchaseInvoices");
+      if (cancelled) return 0;
       const records = Array.isArray(res) ? res : (res.records || []);
       const localRows = records
         .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
         .filter(inv => inv.shopId === shopId);
 
-      if (Array.isArray(cloudRows)) {
-        const merged = new Map(cloudRows.map(inv => [String(inv.id), inv]));
+      if (Array.isArray(mergeSource)) {
+        const merged = new Map(mergeSource.map(inv => [String(inv.id), inv]));
         records
           .filter(r => Number(r?.dirty || 0) === 1)
           .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
@@ -4621,29 +4488,35 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       return localRows.length;
     };
 
-    loadOfflinePiInvoices().catch(err => console.warn("[S4 Offline] purchaseInvoices offline load failed", err));
+    loadOfflinePiInvoices()
+      .then((count) => { if (!cancelled && count > 0) setPiLoading(false); })
+      .catch(err => console.warn("[S4 Offline] purchaseInvoices offline load failed", err));
+
+    const applyCloudRows = (rows) => {
+      if (cancelled) return;
+      cloudRowsLatest = rows;
+      setPiLoading(false);
+      loadOfflinePiInvoices({ cloudRows: rows }).catch(() => {
+        if (!cancelled) setInvoices(sortPiInvoices(rows));
+      });
+      offlineCacheCloudRecords("purchaseInvoices", rows)
+        .catch(err => console.warn("[S4 Offline] purchaseInvoices cache failed", err));
+    };
 
     const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
     const unsub1=onSnapshot(q,snap=>{
-      const rows = snap.docs.map(normalizePiInvoice);
-      offlineCacheCloudRecords("purchaseInvoices", rows)
-        .catch(err => console.warn("[S4 Offline] purchaseInvoices cache failed", err))
-        .finally(()=>loadOfflinePiInvoices({ cloudRows:rows }).finally(()=>setPiLoading(false)));
+      applyCloudRows(snap.docs.map(normalizePiInvoice));
     },()=>{
       // Index নেই — orderBy ছাড়া fallback query, client-side sort
       const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
       unsub2=onSnapshot(q2,snap=>{
-        const docs=snap.docs.map(normalizePiInvoice);
-        const rows=sortPiInvoices(docs);
-        offlineCacheCloudRecords("purchaseInvoices", rows)
-          .catch(err => console.warn("[S4 Offline] purchaseInvoices fallback cache failed", err))
-          .finally(()=>loadOfflinePiInvoices({ cloudRows:rows }).finally(()=>setPiLoading(false)));
+        applyCloudRows(sortPiInvoices(snap.docs.map(normalizePiInvoice)));
       },err2=>{
         console.error(err2);
-        loadOfflinePiInvoices().finally(()=>setPiLoading(false));
+        loadOfflinePiInvoices().finally(()=>{ if (!cancelled) setPiLoading(false); });
       });
     });
-    return ()=>{ unsub1(); unsub2&&unsub2(); };
+    return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
   },[shopId]);
 
   // ── Generate invoice no — preview instantly, commit on save ──
@@ -4658,34 +4531,24 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piPreviewNextInvoiceNo = () =>
     piFormatInvoiceNo(piMaxLocalSerial() + 1);
 
-  const genInvoiceNo = async () => {
-    try {
-      const serial = await runTransaction(db, async tx => {
-        const shopRef = doc(db, "shops", shopId);
-        const shopSnap = await tx.get(shopRef);
-        const next = Number(shopSnap.data()?.lastPISerial || 0) + 1;
-        tx.update(shopRef, { lastPISerial: next });
-        return next;
-      });
-      return piFormatInvoiceNo(serial);
-    } catch (e1) {
-      console.warn("[S4 PI] genInvoiceNo transaction failed, using local serial", e1);
-      return piPreviewNextInvoiceNo();
-    }
+  const ensureNewPiInvoiceNo = () => {
+    if (editInvoiceId) return piInvoiceNo;
+    const no = piInvoiceNo || piPreviewNextInvoiceNo();
+    if (no !== piInvoiceNo) setPiInvoiceNo(no);
+    return no;
   };
 
-  const ensureNewPiInvoiceNo = async () => {
-    if (editInvoiceId) return piInvoiceNo;
-    try {
-      const no = await genInvoiceNo();
-      setPiInvoiceNo(no);
-      return no;
-    } catch (e) {
-      console.warn("[S4 PI] ensureNewPiInvoiceNo failed, keeping preview number", e);
-      const fallback = piInvoiceNo || piPreviewNextInvoiceNo();
-      setPiInvoiceNo(fallback);
-      return fallback;
-    }
+  const bumpShopPiSerial = (invoiceNo) => {
+    const m = String(invoiceNo || "").match(/PI-?(\d+)$/i);
+    if (!m || !navigator.onLine) return;
+    const serial = Number(m[1]);
+    if (!Number.isFinite(serial) || serial <= 0) return;
+    runTransaction(db, async tx => {
+      const shopRef = doc(db, "shops", shopId);
+      const shopSnap = await tx.get(shopRef);
+      const current = Number(shopSnap.data()?.lastPISerial || 0);
+      if (serial > current) tx.update(shopRef, { lastPISerial: serial });
+    }).catch(err => console.warn("[S4 PI] lastPISerial background bump failed", err));
   };
 
   // ── Generate payment voucher no (local-first, cloud when online) ──
@@ -5071,6 +4934,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       toast(successMessage);
     }
 
+    if (!editInvoiceId) bumpShopPiSerial(payload.invoiceNo);
+
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
     }
@@ -5082,7 +4947,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piSaveDraft = async () => {
     setPiSaving(true);
     try {
-      const invoiceNo = editInvoiceId ? piInvoiceNo : await ensureNewPiInvoiceNo();
+      const invoiceNo = editInvoiceId ? piInvoiceNo : ensureNewPiInvoiceNo();
       const payload = piBuild("draft", invoiceNo);
       if (!payload) return;
       await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_saved);
@@ -5096,7 +4961,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piConfirm = async () => {
     setPiSaving(true);
     try {
-      const invoiceNo = editInvoiceId ? piInvoiceNo : await ensureNewPiInvoiceNo();
+      const invoiceNo = editInvoiceId ? piInvoiceNo : ensureNewPiInvoiceNo();
       const payload = piBuild("confirmed", invoiceNo);
       if (!payload) return;
       await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_confirmed);
@@ -6054,11 +5919,13 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const [siStatusF,setSiStatusF]   = useState("ALL");
   const [siViewAll,setSiViewAll]   = useState(isOwner);
 
-  // Listener + offline SQLite cache fallback
+  // Local-first list, then Firebase; SQLite cache stays in background
   useEffect(()=>{
     if (!shopId) return;
     setSiLoading(true);
     let u2=null;
+    let cancelled=false;
+    let cloudRowsLatest=null;
 
     const normalizeSiInvoice = (d) => ({
       ...d.data(),
@@ -6074,40 +5941,63 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       inv.shopId === shopId && (isOwner || inv.createdBy === user.uid)
     );
 
-    const loadOfflineSiInvoices = async () => {
+    const loadOfflineSiInvoices = async ({ cloudRows = null } = {}) => {
+      const mergeSource = cloudRows ?? cloudRowsLatest;
       const res = await offlineList("salesInvoices");
-      const rawRows = Array.isArray(res) ? res : (res.records || []).map(r => r.data || r);
-      const rows = filterSiRows(rawRows);
-      if (rows.length) setInvoices(sortSiInvoices(rows));
-      return rows.length;
+      if (cancelled) return 0;
+      const records = Array.isArray(res) ? res : (res.records || []);
+      const localRows = filterSiRows(records
+        .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) })));
+
+      if (Array.isArray(mergeSource)) {
+        const merged = new Map(mergeSource.map(inv => [String(inv.id), inv]));
+        records
+          .filter(r => Number(r?.dirty || 0) === 1)
+          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
+          .filter(inv => inv.shopId === shopId && (isOwner || inv.createdBy === user.uid))
+          .forEach(inv => merged.set(String(inv.id), inv));
+        const rows = sortSiInvoices(filterSiRows([...merged.values()]));
+        setInvoices(rows);
+        return rows.length;
+      }
+
+      if (localRows.length) setInvoices(sortSiInvoices(localRows));
+      return localRows.length;
     };
 
-    loadOfflineSiInvoices().catch(err => console.warn("[S4 Offline] salesInvoices offline load failed", err));
+    loadOfflineSiInvoices()
+      .then((count) => { if (!cancelled && count > 0) setSiLoading(false); })
+      .catch(err => console.warn("[S4 Offline] salesInvoices offline load failed", err));
+
+    const applyCloudRows = (rows) => {
+      if (cancelled) return;
+      cloudRowsLatest = rows;
+      setSiLoading(false);
+      loadOfflineSiInvoices({ cloudRows: rows }).catch(() => {
+        if (!cancelled) setInvoices(sortSiInvoices(filterSiRows(rows)));
+      });
+      offlineCacheCloudRecords("salesInvoices", rows)
+        .catch(err => console.warn("[S4 Offline] salesInvoices cache failed", err));
+    };
 
     const baseQ = isOwner
       ? query(collection(db,"salesInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"))
       : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
 
     const u1=onSnapshot(baseQ,snap=>{
-      const rows = snap.docs.map(normalizeSiInvoice);
-      setInvoices(rows);
-      offlineCacheCloudRecords("salesInvoices", rows).catch(err => console.warn("[S4 Offline] salesInvoices cache failed", err));
-      setSiLoading(false);
+      applyCloudRows(snap.docs.map(normalizeSiInvoice));
     },()=>{
       const fbQ=isOwner
         ? query(collection(db,"salesInvoices"),where("shopId","==",shopId))
         : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid));
       u2=onSnapshot(fbQ,snap=>{
-        const rows = sortSiInvoices(snap.docs.map(normalizeSiInvoice));
-        setInvoices(rows);
-        offlineCacheCloudRecords("salesInvoices", rows).catch(err => console.warn("[S4 Offline] salesInvoices fallback cache failed", err));
-        setSiLoading(false);
+        applyCloudRows(sortSiInvoices(snap.docs.map(normalizeSiInvoice)));
       },err=>{
         console.error(err);
-        loadOfflineSiInvoices().finally(()=>setSiLoading(false));
+        loadOfflineSiInvoices().finally(()=>{ if (!cancelled) setSiLoading(false); });
       });
     });
-    return ()=>{ u1(); u2&&u2(); };
+    return ()=>{ cancelled=true; u1(); u2&&u2(); };
   },[shopId,isOwner,user.uid]);
 
   const siMaxLocalSerial = () => invoices.reduce((mx, inv) => {
@@ -6121,34 +6011,24 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siPreviewNextInvoiceNo = () =>
     siFormatInvoiceNo(siMaxLocalSerial() + 1);
 
-  const genSiNo = async () => {
-    try {
-      const serial = await runTransaction(db, async tx => {
-        const shopRef = doc(db, "shops", shopId);
-        const shopSnap = await tx.get(shopRef);
-        const next = Number(shopSnap.data()?.lastSISerial || 0) + 1;
-        tx.update(shopRef, { lastSISerial: next });
-        return next;
-      });
-      return siFormatInvoiceNo(serial);
-    } catch (e1) {
-      console.warn("[S4 SI] genSiNo transaction failed, using local serial", e1);
-      return siPreviewNextInvoiceNo();
-    }
+  const ensureNewSiInvoiceNo = () => {
+    if (editInvId) return siInvoiceNo;
+    const no = siInvoiceNo || siPreviewNextInvoiceNo();
+    if (no !== siInvoiceNo) setSiInvoiceNo(no);
+    return no;
   };
 
-  const ensureNewSiInvoiceNo = async () => {
-    if (editInvId) return siInvoiceNo;
-    try {
-      const no = await genSiNo();
-      setSiInvoiceNo(no);
-      return no;
-    } catch (e) {
-      console.warn("[S4 SI] ensureNewSiInvoiceNo failed, keeping preview number", e);
-      const fallback = siInvoiceNo || siPreviewNextInvoiceNo();
-      setSiInvoiceNo(fallback);
-      return fallback;
-    }
+  const bumpShopSiSerial = (invoiceNo) => {
+    const m = String(invoiceNo || "").match(/SI-?(\d+)$/i);
+    if (!m || !navigator.onLine) return;
+    const serial = Number(m[1]);
+    if (!Number.isFinite(serial) || serial <= 0) return;
+    runTransaction(db, async tx => {
+      const shopRef = doc(db, "shops", shopId);
+      const shopSnap = await tx.get(shopRef);
+      const current = Number(shopSnap.data()?.lastSISerial || 0);
+      if (serial > current) tx.update(shopRef, { lastSISerial: serial });
+    }).catch(err => console.warn("[S4 SI] lastSISerial background bump failed", err));
   };
 
   const siOpenNew = () => {
@@ -6322,6 +6202,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       toast(successMessage);
     }
 
+    if (!editInvId) bumpShopSiSerial(payload.invoiceNo);
+
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice save sync failed", err));
     }
@@ -6338,7 +6220,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siSaveDraft = async () => {
     setSiSaving(true);
     try {
-      const invoiceNo = editInvId ? siInvoiceNo : await ensureNewSiInvoiceNo();
+      const invoiceNo = editInvId ? siInvoiceNo : ensureNewSiInvoiceNo();
       const p = siBuild("draft", invoiceNo);
       if (!p) return;
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_saved);
@@ -6352,7 +6234,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siConfirm = async () => {
     setSiSaving(true);
     try {
-      const invoiceNo = editInvId ? siInvoiceNo : await ensureNewSiInvoiceNo();
+      const invoiceNo = editInvId ? siInvoiceNo : ensureNewSiInvoiceNo();
       const p = siBuild("confirmed", invoiceNo);
       if (!p) return;
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_confirmed, { print:true });
@@ -8836,6 +8718,18 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
 
   const [tab,setTab]=useState("dashboard");
 
+  // Global desktop shortcut: open Product Master from anywhere in the app.
+  useEffect(() => {
+    const onProductMasterShortcut = (event) => {
+      if (event.key !== "F2") return;
+      if (!(isOwner || perms.viewProducts === true)) return;
+      event.preventDefault();
+      setTab("products");
+    };
+    window.addEventListener("keydown", onProductMasterShortcut);
+    return () => window.removeEventListener("keydown", onProductMasterShortcut);
+  }, [isOwner, perms.viewProducts]);
+
   // ── INVOICE STATE ──
   // items = confirmed invoice list (locked rows)
   // currentItem = the form being filled right now
@@ -8883,6 +8777,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [cloudUploadBusy, setCloudUploadBusy] = useState(false);
   const [lastCloudPullAt, setLastCloudPullAt] = useState(null);
   const [settingsPage,setSettingsPage]=useState(null);
+  const [showShopPartFormatSettings,setShowShopPartFormatSettings]=useState(false);
   const [orderSettingsSaving,setOrderSettingsSaving]=useState(false);
   const [orderModuleOverride,setOrderModuleOverride]=useState(null);
   const hasOrderModuleSetting = Object.prototype.hasOwnProperty.call(localShop || {}, "orderModuleEnabled");
@@ -9673,6 +9568,27 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   // ── Products — realtime listener with offline cache fallback ──
   const [productsLoading,setProductsLoading]=useState(false);
+  const [productMaintenance,setProductMaintenance]=useState({ active:false, catalogEpoch:0 });
+  const [productReplacementActive,setProductReplacementActive]=useState(false);
+  const productMaintenanceRef=useRef({ active:false, catalogEpoch:0 });
+  const productMaintenanceId=shopId;
+
+  useEffect(() => {
+    if (!shopId || !db) return;
+    return onSnapshot(
+      doc(db, "productMaintenance", productMaintenanceId),
+      (snap) => {
+        const next = snap.exists()
+          ? { active:!!snap.data().active, catalogEpoch:Number(snap.data().catalogEpoch)||0, ...snap.data() }
+          : { active:false, catalogEpoch:0 };
+        productMaintenanceRef.current = next;
+        setProductMaintenance(next);
+        if (next.active) window.S4Offline?.pauseCollectionSync?.("products");
+        else if (!productReplacementActive) window.S4Offline?.resumeCollectionSync?.("products");
+      },
+      (err) => console.warn("[Product Master] maintenance lock listener failed", err)
+    );
+  }, [shopId, productMaintenanceId, productReplacementActive]);
 
   const fetchProducts = async () => {
     setSyncRefreshKey((value) => value + 1);
@@ -9771,22 +9687,668 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   };
 
   // ── PRODUCT MASTER STATE ──
-  const emptyPmForm = {
-    name:"", code:"", barcode:"", ean:"", moreBarcodes:[],
-    brand:"", category:"", subcategory:"",
+  const createEmptyPmForm = () => ({
+    name:"", code:"", shopPartNumber:"", shopPartSerial:0, shopPartFormatKey:"",
+    originalPartKey:"", shopPartGroupKey:"",
+    barcode:"", ean:"", moreBarcodes:[],
+    brand:"", company:"", productGroup:"", category:"", subcategory:"",
+    commodityCode:"", productType:"Goods", arabicName:"", weightBarcode:false, rateBarcode:false,
     salesVat:"0", purchaseVat:"0",
     landingCost:"", marginPerc:"", marginAmount:"",
-    vatExclusive:"", vatInclusive:"", vatOnMrp:false, mrp:"",
-    openingStock:"", unit:"Pcs", description:""
-  };
+    vatExclusive:"", vatInclusive:"", vatOnMrp:false, mrp:"", averageCost:"",
+    openingStock:"", openingRate:"", openingWarehouse:"", unit:"Pcs", customUnits:[], unitDefinitions:[],
+    customerTypes:[], unitPrices:[], multiCustomerRatesEnabled:false,
+    defaultDiscount:"", reorderMin:"", reorderMax:"", reorderQty:"", rackLocation:"",
+    specificationText:"", photoUrl:"", description:""
+  });
   const [pmSearch,setPmSearch]=useState("");
   const [pmCatFilter,setPmCatFilter]=useState("ALL");
   const [pmShowAdd,setPmShowAdd]=useState(false);
   const [pmEditId,setPmEditId]=useState(null);
-  const [pmForm,setPmForm]=useState(emptyPmForm);
-  const [pmDetailId,setPmDetailId]=useState(null); // full detail modal
-  const pmReset = () => setPmForm(emptyPmForm);
-  const pmDetail = products.find(p=>p.id===pmDetailId)||null;
+  const [pmForm,setPmForm]=useState(createEmptyPmForm);
+  const [savingProduct,setSavingProduct]=useState(false);
+  const [shopPartFormat,setShopPartFormat]=useState(() => {
+    try {
+      return normalizeShopPartFormat(JSON.parse(localStorage.getItem(`s4-shop-part-format-${shopId}`) || "{}"));
+    } catch {
+      return { ...DEFAULT_SHOP_PART_FORMAT };
+    }
+  });
+  const [shopPartEnabled,setShopPartEnabled]=useState(() => {
+    const saved = localStorage.getItem(`s4-shop-part-enabled-${shopId}`);
+    return saved === null ? true : saved === "true";
+  });
+  const [shopPartSettingsSaving,setShopPartSettingsSaving]=useState(false);
+  const shopPartFormatRef = useRef(shopPartFormat);
+  const shopPartEnabledRef = useRef(shopPartEnabled);
+  const shopPartSerialRef = useRef(0);
+  const shopPartAllocationRef = useRef(new Map());
+  const shopPartNumberOwnersRef = useRef(new Map());
+  const shopPartBackfillRef = useRef("");
+  const pmReset = () => setPmForm(createEmptyPmForm());
+
+  const rebuildShopPartIndex = (rows = products) => {
+    const allocations = new Map();
+    const numberOwners = new Map();
+    let highest = 0;
+    rows.forEach((product) => {
+      const serial = Number(product.shopPartSerial) || shopPartSerial(product.shopPartNumber);
+      if (serial > highest) highest = serial;
+      const groupKey = productPartGroupKey(product);
+      if (!groupKey || !product.shopPartNumber) return;
+      const existing = allocations.get(groupKey);
+      const assignment = {
+        shopPartNumber: product.shopPartNumber,
+        shopPartSerial: serial,
+        originalPartKey: normalizeOriginalPartNumber(product.code),
+        shopPartGroupKey: groupKey,
+      };
+      if (!existing || (!existing.shopPartSerial && serial) || existing.shopPartSerial > serial) {
+        allocations.set(groupKey, assignment);
+      }
+      numberOwners.set(String(product.shopPartNumber).toLowerCase(), groupKey);
+    });
+    shopPartSerialRef.current = highest;
+    shopPartAllocationRef.current = allocations;
+    shopPartNumberOwnersRef.current = numberOwners;
+  };
+
+  const reserveShopPartNumber = (productLike, { reuse = "", previousGroupKey = "" } = {}) => {
+    const originalPartKey = normalizeOriginalPartNumber(productLike?.code);
+    const groupKey = productPartGroupKey({ ...productLike, originalPartKey });
+    if (!groupKey) {
+      return { shopPartNumber: "", originalPartKey: "", shopPartGroupKey: "" };
+    }
+
+    const existing = shopPartAllocationRef.current.get(groupKey);
+    if (existing) {
+      return { ...existing, originalPartKey, shopPartGroupKey: groupKey };
+    }
+
+    const reuseOwner = reuse
+      ? shopPartNumberOwnersRef.current.get(String(reuse).toLowerCase())
+      : "";
+    const canReuse = reuse && (!reuseOwner || reuseOwner === groupKey) && (
+      !previousGroupKey ||
+      previousGroupKey === groupKey ||
+      String(previousGroupKey).startsWith("PRODUCT:")
+    );
+    if (canReuse) {
+      const serial = Number(productLike.shopPartSerial) || shopPartSerial(reuse) || ++shopPartSerialRef.current;
+      const assignment = {
+        shopPartNumber: reuse,
+        shopPartSerial: serial,
+        originalPartKey,
+        shopPartGroupKey: groupKey,
+      };
+      shopPartAllocationRef.current.set(groupKey, assignment);
+      shopPartNumberOwnersRef.current.set(String(reuse).toLowerCase(), groupKey);
+      shopPartSerialRef.current = Math.max(shopPartSerialRef.current, serial);
+      return assignment;
+    }
+
+    shopPartSerialRef.current = Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1;
+    const serial = shopPartSerialRef.current;
+    const candidate = formatShopPartNumber(serial, productLike.code, shopPartFormatRef.current);
+    const shopPartNumber = uniqueShopPartNumber(
+      candidate,
+      new Set(shopPartNumberOwnersRef.current.keys()),
+      shopPartFormatRef.current.collisionSeparator
+    );
+    const assignment = {
+      shopPartNumber,
+      shopPartSerial: serial,
+      originalPartKey,
+      shopPartGroupKey: groupKey,
+    };
+    shopPartAllocationRef.current.set(groupKey, assignment);
+    shopPartNumberOwnersRef.current.set(shopPartNumber.toLowerCase(), groupKey);
+    return assignment;
+  };
+
+  useEffect(() => {
+    shopPartFormatRef.current = shopPartFormat;
+    localStorage.setItem(`s4-shop-part-format-${shopId}`, JSON.stringify(shopPartFormat));
+  }, [shopId, shopPartFormat]);
+
+  useEffect(() => {
+    shopPartEnabledRef.current = shopPartEnabled;
+    localStorage.setItem(`s4-shop-part-enabled-${shopId}`, String(shopPartEnabled));
+  }, [shopId, shopPartEnabled]);
+
+  useEffect(() => {
+    if (!shopId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const settingsId = `shop-part-format-${shopId}`;
+        const localRecord = await offlineGetById("settings", settingsId);
+        let data = localRecord?.data || null;
+        if (navigator.onLine && db) {
+          const cloudSnap = await getDoc(doc(db, "settings", settingsId));
+          if (cloudSnap.exists()) {
+            data = cloudSnap.data();
+            offlineCacheCloudRecords("settings", [{ id: settingsId, ...data }]).catch(() => {});
+          }
+        }
+        if (cancelled || !data) return;
+        if (data.format) setShopPartFormat(normalizeShopPartFormat(data.format));
+        if (typeof data.enabled === "boolean") setShopPartEnabled(data.enabled);
+      } catch (err) {
+        console.warn("[S4 ShopPart] format load failed", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [shopId]);
+
+  const persistShopPartUpdates = async (updates) => {
+    const updateMap = new Map(updates.map((patch) => [patch.id, patch]));
+    setProducts((previous) => previous.map((product) => (
+      updateMap.has(product.id) ? { ...product, ...updateMap.get(product.id) } : product
+    )));
+    if (pmEditId && updateMap.has(pmEditId)) {
+      setPmForm((previous) => ({ ...previous, ...updateMap.get(pmEditId) }));
+    }
+
+    const chunkSize = 25;
+    for (let index = 0; index < updates.length; index += chunkSize) {
+      const chunk = updates.slice(index, index + chunkSize);
+      await Promise.all(chunk.map((patch) => offlineUpdate("products", patch.id, {
+        productCatalogEpoch:productMaintenanceRef.current.catalogEpoch || 0,
+        shopPartNumber: patch.shopPartNumber,
+        shopPartSerial: patch.shopPartSerial,
+        shopPartFormatKey: patch.shopPartFormatKey,
+        originalPartKey: patch.originalPartKey,
+        shopPartGroupKey: patch.shopPartGroupKey,
+        updatedAt: new Date().toISOString(),
+      })));
+    }
+  };
+
+  const applyShopPartFormatToProducts = async (format) => {
+    if (!products.length) return;
+    const normalizedFormat = normalizeShopPartFormat(format);
+    const formatKey = shopPartFormatKey(normalizedFormat);
+    const groups = new Map();
+    products.forEach((product) => {
+      const groupKey = productPartGroupKey(product);
+      if (!groupKey) return;
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups.get(groupKey).push(product);
+    });
+
+    const orderedGroups = [...groups.entries()].sort(([, left], [, right]) => {
+      const leftSerial = Math.min(...left.map((item) => Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER));
+      const rightSerial = Math.min(...right.map((item) => Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER));
+      return leftSerial - rightSerial || String(left[0]?.code || left[0]?.id).localeCompare(String(right[0]?.code || right[0]?.id));
+    });
+
+    const usedNumbers = new Set();
+    const usedSerials = new Set();
+    let nextSerial = 0;
+    const updates = [];
+    orderedGroups.forEach(([groupKey, groupProducts]) => {
+      let serial = Math.min(...groupProducts
+        .map((item) => Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber))
+        .filter(Boolean));
+      if (!Number.isFinite(serial) || serial < 1 || usedSerials.has(serial)) {
+        do { nextSerial += 1; } while (usedSerials.has(nextSerial));
+        serial = nextSerial;
+      }
+      usedSerials.add(serial);
+      nextSerial = Math.max(nextSerial, serial);
+
+      const representative = groupProducts[0];
+      const candidate = formatShopPartNumber(serial, representative.code, normalizedFormat);
+      const shopPartNumber = uniqueShopPartNumber(candidate, usedNumbers, normalizedFormat.collisionSeparator);
+      usedNumbers.add(shopPartNumber.toLowerCase());
+      const originalPartKey = normalizeOriginalPartNumber(representative.code);
+      groupProducts.forEach((product) => updates.push({
+        id: product.id,
+        shopPartNumber,
+        shopPartSerial: serial,
+        shopPartFormatKey: formatKey,
+        originalPartKey,
+        shopPartGroupKey: groupKey,
+      }));
+    });
+
+    await persistShopPartUpdates(updates);
+    const updateMap = new Map(updates.map((patch) => [patch.id, patch]));
+    rebuildShopPartIndex(products.map((product) => (
+      updateMap.has(product.id) ? { ...product, ...updateMap.get(product.id) } : product
+    )));
+  };
+
+  const saveShopPartFormat = async (format, { applyToExisting = true } = {}) => {
+    if (shopPartSettingsSaving) return;
+    setShopPartSettingsSaving(true);
+    try {
+      const normalized = normalizeShopPartFormat(format);
+      setShopPartFormat(normalized);
+      shopPartFormatRef.current = normalized;
+      localStorage.setItem(`s4-shop-part-format-${shopId}`, JSON.stringify(normalized));
+      await offlineUpsert("settings", `shop-part-format-${shopId}`, {
+        shopId,
+        type: "shopPartNumberFormat",
+        enabled: shopPartEnabledRef.current,
+        format: normalized,
+        updatedBy: user.uid,
+        updatedAt: new Date().toISOString(),
+      });
+      if (applyToExisting && shopPartEnabledRef.current) await applyShopPartFormatToProducts(normalized);
+      toast(lang==="bn"?"✅ Shop Part Number format সংরক্ষণ হয়েছে":"✅ Shop Part Number format saved");
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part format sync failed", err));
+      }
+    } catch (err) {
+      hErr(err);
+      throw err;
+    } finally {
+      setShopPartSettingsSaving(false);
+    }
+  };
+
+  const saveShopPartEnabled = async (enabled) => {
+    if (shopPartSettingsSaving) return;
+    setShopPartSettingsSaving(true);
+    try {
+      setShopPartEnabled(enabled);
+      shopPartEnabledRef.current = enabled;
+      localStorage.setItem(`s4-shop-part-enabled-${shopId}`, String(enabled));
+      await offlineUpsert("settings", `shop-part-format-${shopId}`, {
+        shopId,
+        type: "shopPartNumberFormat",
+        enabled,
+        format: normalizeShopPartFormat(shopPartFormatRef.current),
+        updatedBy: user.uid,
+        updatedAt: new Date().toISOString(),
+      });
+      if (enabled) {
+        shopPartBackfillRef.current = "";
+        await applyShopPartFormatToProducts(shopPartFormatRef.current);
+      }
+      toast(enabled
+        ? (lang==="bn" ? "✅ Shop Part Number চালু হয়েছে" : "✅ Shop Part Number enabled")
+        : (lang==="bn" ? "✅ Shop Part Number বন্ধ হয়েছে; আগের নম্বর সংরক্ষিত আছে" : "✅ Shop Part Number disabled; existing numbers are retained")
+      );
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part toggle sync failed", err));
+      }
+    } catch (err) {
+      hErr(err);
+    } finally {
+      setShopPartSettingsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    rebuildShopPartIndex(products);
+  }, [products]);
+
+  useEffect(() => {
+    if (!shopPartEnabled || !shopId || !products.length) return;
+    const missingCount = products.filter((product) => !String(product.shopPartNumber || "").trim()).length;
+    const signature = `${shopId}:${products.length}:${missingCount}`;
+    if (shopPartBackfillRef.current === signature || !missingCount) {
+      shopPartBackfillRef.current = signature;
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      rebuildShopPartIndex(products);
+      const updates = [];
+      for (const product of products) {
+        if (cancelled) return;
+        if (String(product.shopPartNumber || "").trim()) continue;
+        const assigned = reserveShopPartNumber(product);
+        if (!assigned.shopPartNumber) continue;
+        updates.push({
+          id: product.id,
+          shopPartNumber: assigned.shopPartNumber,
+          shopPartSerial: assigned.shopPartSerial,
+          shopPartFormatKey: shopPartFormatKey(shopPartFormatRef.current),
+          originalPartKey: assigned.originalPartKey,
+          shopPartGroupKey: assigned.shopPartGroupKey,
+        });
+      }
+      if (!updates.length) {
+        shopPartBackfillRef.current = signature;
+        return;
+      }
+
+      setProducts((previous) => previous.map((product) => {
+        const patch = updates.find((entry) => entry.id === product.id);
+        return patch ? { ...product, ...patch } : product;
+      }));
+
+      for (const patch of updates) {
+        try {
+          await offlineUpdate("products", patch.id, {
+            productCatalogEpoch:productMaintenanceRef.current.catalogEpoch || 0,
+            shopPartNumber: patch.shopPartNumber,
+            shopPartSerial: patch.shopPartSerial,
+            shopPartFormatKey: patch.shopPartFormatKey,
+            originalPartKey: patch.originalPartKey,
+            shopPartGroupKey: patch.shopPartGroupKey,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.warn("[S4 ShopPart] backfill failed", patch.id, err);
+        }
+      }
+
+      shopPartBackfillRef.current = `${shopId}:${products.length + updates.length}:0`;
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part backfill sync failed", err));
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [shopId, products, shopPartEnabled]);
+
+  const pmFormFromProduct = (p) => ({
+    ...createEmptyPmForm(),
+    ...p,
+    name:p.name||"",
+    code:p.code||"",
+    shopPartNumber:p.shopPartNumber||"",
+    shopPartSerial:Number(p.shopPartSerial)||shopPartSerial(p.shopPartNumber),
+    shopPartFormatKey:p.shopPartFormatKey||"",
+    originalPartKey:p.originalPartKey||normalizeOriginalPartNumber(p.code),
+    shopPartGroupKey:p.shopPartGroupKey||productPartGroupKey(p),
+    barcode:p.barcode||"",
+    ean:p.ean||"",
+    moreBarcodes:Array.isArray(p.moreBarcodes)?p.moreBarcodes:[],
+    brand:p.brand||p.company||"",
+    company:p.company||p.brand||"",
+    productGroup:p.productGroup||"",
+    category:p.category||"",
+    subcategory:p.subcategory||"",
+    unit:p.unit||"Pcs",
+    productType:p.productType||"Goods",
+    salesVat:String(p.salesVat ?? p.vatPerc ?? "0"),
+    purchaseVat:String(p.purchaseVat ?? "0"),
+    landingCost:String(p.landingCost||""),
+    marginPerc:String(p.marginPerc||""),
+    marginAmount:String(p.marginAmount||""),
+    vatExclusive:String(p.vatExclusive||""),
+    vatInclusive:String(p.vatInclusive||""),
+    mrp:String(p.mrp||""),
+    openingStock:String(p.openingStock||""),
+    customUnits:Array.isArray(p.customUnits)?p.customUnits:[],
+    unitDefinitions:Array.isArray(p.unitDefinitions)?p.unitDefinitions:[],
+    customerTypes:Array.isArray(p.customerTypes)?p.customerTypes:[],
+    unitPrices:Array.isArray(p.unitPrices)?p.unitPrices:[],
+  });
+
+  const startProductEdit = (p) => {
+    setPmForm(pmFormFromProduct(p));
+    setPmEditId(p.id);
+    setPmShowAdd(true);
+  };
+
+  const collectProductBarcodes = (p) => [
+    p.barcode,
+    p.ean,
+    ...(Array.isArray(p.moreBarcodes)?p.moreBarcodes:[]),
+    ...(Array.isArray(p.unitPrices)?p.unitPrices.map(r=>r.barcode):[]),
+  ].map(v=>String(v||"").trim()).filter(Boolean);
+
+  const validateProductForm = (skipId=null) => {
+    if (!pmForm.name.trim()) return t.e3;
+    // Code / Model is intentionally excluded. Barcode, EAN and More Barcodes
+    // share one unique namespace, both within this form and across products.
+    const identityCodes = [
+      pmForm.barcode,
+      pmForm.ean,
+      ...(Array.isArray(pmForm.moreBarcodes)?pmForm.moreBarcodes:[]),
+      ...(Array.isArray(pmForm.unitPrices)?pmForm.unitPrices.map(r=>r.barcode):[]),
+    ].map(v=>String(v||"").trim()).filter(Boolean);
+    const normalized = identityCodes.map(v=>v.toLowerCase());
+    const repeatedAt = normalized.findIndex((code,index)=>normalized.indexOf(code)!==index);
+    if (repeatedAt>=0) {
+      const code = identityCodes[repeatedAt];
+      return lang==="bn"?`একই Barcode/EAN দুইবার দেওয়া যাবে না: ${code}`:`The same Barcode/EAN cannot be entered twice: ${code}`;
+    }
+    const currentCodes = new Set(normalized);
+    const duplicate = products.find(p => p.id !== skipId && [
+      p.barcode,
+      p.ean,
+      ...(Array.isArray(p.moreBarcodes)?p.moreBarcodes:[]),
+      ...(Array.isArray(p.unitPrices)?p.unitPrices.map(r=>r.barcode):[]),
+    ].map(v=>String(v||"").trim().toLowerCase()).filter(Boolean).some(code=>currentCodes.has(code)));
+    if (duplicate) return lang==="bn"?`Barcode/EAN আগে থেকেই আছে: ${duplicate.name}`:`Barcode/EAN already exists: ${duplicate.name}`;
+    return "";
+  };
+
+  const buildProductPayload = (created=false, productId=null) => {
+    const now = new Date().toISOString();
+    const cleanName = pmForm.name.trim();
+    const assigned = shopPartEnabledRef.current
+      ? reserveShopPartNumber({
+          id: productId || pmEditId || undefined,
+          code: pmForm.code,
+          shopPartSerial: pmForm.shopPartSerial,
+          shopPartGroupKey: pmForm.shopPartGroupKey,
+          originalPartKey: pmForm.originalPartKey,
+        }, {
+          reuse: created ? "" : (pmForm.shopPartNumber || ""),
+          previousGroupKey: created ? "" : (pmForm.shopPartGroupKey || productPartGroupKey(pmForm)),
+        })
+      : {
+          shopPartNumber: created ? "" : (pmForm.shopPartNumber || ""),
+          shopPartSerial: created ? 0 : (Number(pmForm.shopPartSerial) || 0),
+          originalPartKey: created ? "" : (pmForm.originalPartKey || ""),
+          shopPartGroupKey: created ? "" : (pmForm.shopPartGroupKey || ""),
+        };
+    return {
+      ...pmForm,
+      shopId,
+      productCatalogEpoch: productMaintenanceRef.current.catalogEpoch || 0,
+      name: cleanName,
+      code: String(pmForm.code || "").trim(),
+      shopPartNumber: assigned.shopPartNumber,
+      shopPartSerial: assigned.shopPartSerial,
+      shopPartFormatKey: shopPartFormatKey(shopPartFormatRef.current),
+      originalPartKey: assigned.originalPartKey,
+      shopPartGroupKey: assigned.shopPartGroupKey,
+      brand: pmForm.brand || pmForm.company || "",
+      company: pmForm.company || pmForm.brand || "",
+      averageCost: pmForm.averageCost || pmForm.landingCost || "",
+      moreBarcodes: Array.isArray(pmForm.moreBarcodes) ? pmForm.moreBarcodes.filter(Boolean) : [],
+      unitPrices: Array.isArray(pmForm.unitPrices) ? pmForm.unitPrices : [],
+      customUnits: Array.isArray(pmForm.customUnits) ? pmForm.customUnits : [],
+      unitDefinitions: Array.isArray(pmForm.unitDefinitions) ? pmForm.unitDefinitions : [],
+      customerTypes: Array.isArray(pmForm.customerTypes) ? pmForm.customerTypes : [],
+      updatedBy: user.uid,
+      updatedAt: now,
+      ...(created ? { createdBy:user.uid, createdAt:now } : {}),
+    };
+  };
+
+  const csvCell = (v) => `"${String(v ?? "").replace(/"/g,'""')}"`;
+  const downloadTextFile = (name, content, type="text/csv;charset=utf-8") => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const getFilteredProducts = () => products.filter(p=>{
+    const refs = collectProductBarcodes(p).join(' ');
+    const hay = [p.name,p.code,p.shopPartNumber,p.originalPartKey,p.barcode,p.ean,p.brand,p.company,p.category,p.subcategory,p.productGroup,refs].filter(Boolean).join(' ');
+    const matchQ = nsmatch(hay, pmSearch);
+    const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
+    return matchQ && matchCat;
+  });
+
+  const exportProductsCsv = (rows=getFilteredProducts()) => {
+    const headers = ["ProductId","ProductName","ShopPartNumber","ShopPartSerial","ShopPartFormatKey","OriginalPartKey","ShopPartGroupKey","CodeModel","Barcode","EAN","ProductGroup","Company","Category","SubCategory","CommodityCode","BaseUnit","ProductType","ArabicName","SalesVAT","PurchaseVAT","LandingCost","AverageCost","Margin%","MarginAmount","VATExclusive","VATInclusive","VATOnMrp","MRP","OpeningStock","OpeningRate","Warehouse","Rack","DefaultDiscount","ReorderMin","ReorderMax","ReorderQty","WeightBarcode","RateBarcode","MoreBarcodes","UnitPricesJson","CustomUnitsJson","UnitDefinitionsJson","CustomerTypesJson","MultiCustomerRatesEnabled","SpecificationText","PhotoUrl","Description"];
+    const body = rows.map(p => [p.id,p.name,p.shopPartNumber,p.shopPartSerial,p.shopPartFormatKey,p.originalPartKey,p.shopPartGroupKey,p.code,p.barcode,p.ean,p.productGroup,p.company||p.brand,p.category,p.subcategory,p.commodityCode,p.unit,p.productType,p.arabicName,p.salesVat,p.purchaseVat,p.landingCost,p.averageCost,p.marginPerc,p.marginAmount,p.vatExclusive,p.vatInclusive,p.vatOnMrp,p.mrp,p.openingStock,p.openingRate,p.openingWarehouse,p.rackLocation,p.defaultDiscount,p.reorderMin,p.reorderMax,p.reorderQty,p.weightBarcode?"TRUE":"",p.rateBarcode?"TRUE":"",Array.isArray(p.moreBarcodes)?p.moreBarcodes.join(";"):"",Array.isArray(p.unitPrices)?JSON.stringify(p.unitPrices):"",Array.isArray(p.customUnits)?JSON.stringify(p.customUnits):"",Array.isArray(p.unitDefinitions)?JSON.stringify(p.unitDefinitions):"",Array.isArray(p.customerTypes)?JSON.stringify(p.customerTypes):"",p.multiCustomerRatesEnabled?"TRUE":"",p.specificationText,p.photoUrl,p.description].map(csvCell).join(","));
+    downloadTextFile(`product-master-${new Date().toISOString().slice(0,10)}.csv`, [headers.map(csvCell).join(","), ...body].join("\n"));
+    toast(lang==="bn"?"✅ Product export হয়েছে":"✅ Products exported");
+  };
+
+  // Receives rows already mapped to Product Master fields by the Import window
+  // (src/product-master/modals/ImportModal.jsx). Rows are created one by one so a
+  // single bad row is reported instead of aborting the whole file.
+  const importProductRecords = async (records) => {
+    if (clearingProducts || productBulkDeleteRef.current) {
+      const message = lang==="bn"
+        ? "Product clear শেষ হওয়ার আগে import করা যাবে না। একটু অপেক্ষা করুন।"
+        : "Wait for product clear to finish before importing.";
+      toast(message, "err");
+      return { created:0, skipped:records.length, errors:[{ row:"-", reason:message }] };
+    }
+    if (productMaintenanceRef.current.active && !productReplacementActive) {
+      const message = "Product Master is being replaced on another device. Import is temporarily locked.";
+      toast(message, "err");
+      return { created:0, skipped:records.length, errors:[{ row:"-", reason:message }] };
+    }
+    const summary = { created:0, skipped:0, errors:[] };
+    rebuildShopPartIndex(products);
+    const existingIds = new Set(products.map((product) => String(product.id || "").trim()).filter(Boolean));
+    const existingCodes = new Set(products.flatMap(product => [
+      product.barcode,
+      product.ean,
+      ...(Array.isArray(product.moreBarcodes)?product.moreBarcodes:[]),
+      ...(Array.isArray(product.unitPrices)?product.unitPrices.map(row=>row.barcode):[]),
+    ]).map(v=>String(v||"").trim().toLowerCase()).filter(Boolean));
+
+    for (let i = 0; i < records.length; i += 1) {
+      const record = records[i];
+      const rowNo = i + 2; // header occupies row 1
+      const name = String(record.name||"").trim();
+      if (!name) { summary.skipped += 1; summary.errors.push({ row:rowNo, reason:"Product Name is empty" }); continue; }
+      const requestedId = String(record.id || "").trim();
+      if (requestedId && existingIds.has(requestedId)) {
+        summary.skipped += 1;
+        summary.errors.push({ row:rowNo, reason:`Product ID is duplicated: ${requestedId}` });
+        continue;
+      }
+
+      const moreBarcodes = String(record.moreBarcodes || "")
+        .split(/[;,|]/)
+        .map(v=>v.trim())
+        .filter(Boolean);
+      const arrayFields = ["unitPrices", "customUnits", "unitDefinitions", "customerTypes"];
+      const parsedArrays = {};
+      let arrayError = "";
+      for (const field of arrayFields) {
+        if (!record[field]) {
+          parsedArrays[field] = [];
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(record[field]);
+          if (!Array.isArray(parsed)) throw new Error("must be an array");
+          parsedArrays[field] = parsed;
+        } catch {
+          arrayError = `${field} JSON is invalid`;
+          break;
+        }
+      }
+      if (arrayError) {
+        summary.skipped += 1;
+        summary.errors.push({ row:rowNo, reason:arrayError });
+        continue;
+      }
+      const unitPrices = parsedArrays.unitPrices;
+      const rowCodes = [record.barcode, record.ean, ...moreBarcodes, ...unitPrices.map(row=>row?.barcode)]
+        .map(v=>String(v||"").trim()).filter(Boolean);
+      const repeated = rowCodes.find((value,index)=>rowCodes.findIndex(other=>other.toLowerCase()===value.toLowerCase())!==index);
+      if (repeated) { summary.skipped += 1; summary.errors.push({ row:rowNo, reason:`The same Barcode/EAN is entered twice: ${repeated}` }); continue; }
+      const clash = rowCodes
+        .find(v=>v&&existingCodes.has(v.toLowerCase()));
+      if (clash) { summary.skipped += 1; summary.errors.push({ row:rowNo, reason:`Barcode/EAN already exists: ${clash}` }); continue; }
+
+      const now = new Date().toISOString();
+      try {
+        const draftId = requestedId || globalThis.crypto?.randomUUID?.() || `import-${Date.now()}-${i}`;
+        const assigned = record.shopPartNumber || shopPartEnabledRef.current
+          ? reserveShopPartNumber({
+              id:draftId,
+              code:record.code,
+              shopPartSerial:Number(record.shopPartSerial)||shopPartSerial(record.shopPartNumber),
+              originalPartKey:record.originalPartKey,
+              shopPartGroupKey:record.shopPartGroupKey,
+            }, {
+              reuse:String(record.shopPartNumber||"").trim(),
+              previousGroupKey:record.shopPartGroupKey,
+            })
+          : { shopPartNumber: "", shopPartSerial: 0, originalPartKey: "", shopPartGroupKey: "" };
+        const payload = {
+          ...createEmptyPmForm(), ...record, shopId, name,
+          id: draftId,
+          productCatalogEpoch: productMaintenanceRef.current.catalogEpoch || 0,
+          code: String(record.code || "").trim(),
+          shopPartNumber: assigned.shopPartNumber,
+          shopPartSerial: assigned.shopPartSerial,
+          shopPartFormatKey: record.shopPartFormatKey || shopPartFormatKey(shopPartFormatRef.current),
+          originalPartKey: assigned.originalPartKey,
+          shopPartGroupKey: assigned.shopPartGroupKey,
+          brand: record.company || "",
+          unit: record.unit || "Pcs",
+          productType: record.productType || "Goods",
+          salesVat: record.salesVat || "0",
+          purchaseVat: record.purchaseVat || "0",
+          moreBarcodes,
+          unitPrices,
+          customUnits:parsedArrays.customUnits,
+          unitDefinitions:parsedArrays.unitDefinitions,
+          customerTypes:parsedArrays.customerTypes,
+          multiCustomerRatesEnabled: ["true","1","yes","y"].includes(String(record.multiCustomerRatesEnabled || "").trim().toLowerCase()) || unitPrices.length > 0,
+          weightBarcode: ["true","1","yes","y"].includes(String(record.weightBarcode || "").trim().toLowerCase()),
+          rateBarcode: ["true","1","yes","y"].includes(String(record.rateBarcode || "").trim().toLowerCase()),
+          createdBy:user.uid, createdAt:now, updatedAt:now,
+        };
+        const result = await offlineCreate("products", payload);
+        const created = { ...result.data, id: result.documentId };
+        setProducts(prev => [created, ...prev.filter(p=>p.id!==created.id)].sort((a,b)=>(a.name||"").localeCompare(b.name||"")));
+        rowCodes.forEach(code=>existingCodes.add(code.toLowerCase()));
+        existingIds.add(draftId);
+        summary.created += 1;
+      } catch (err) {
+        summary.skipped += 1;
+        summary.errors.push({ row:rowNo, reason:String(err?.message||err) });
+      }
+    }
+
+    toast(lang==="bn"?`✅ ${summary.created} import, ${summary.skipped} skip`:`✅ ${summary.created} imported, ${summary.skipped} skipped`);
+    if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product import sync failed", err));
+    return summary;
+  };
+
+  const exportWeighingBarcodeCsv = (rows=getFilteredProducts()) => {
+    const body = rows.filter(p=>p.weightBarcode||p.rateBarcode).map(p => [p.barcode||p.ean||p.code, p.name, p.vatInclusive||p.mrp||p.vatExclusive||0, p.unit||"Pcs", p.weightBarcode?"WEIGHT":"RATE"].map(csvCell).join(","));
+    downloadTextFile(`weighing-barcode-${new Date().toISOString().slice(0,10)}.csv`, [["Barcode","ProductName","Rate","Unit","Type"].map(csvCell).join(","), ...body].join("\n"));
+    toast(lang==="bn"?"✅ Weighing barcode file তৈরি হয়েছে":"✅ Weighing barcode file generated");
+  };
+
+  const printProductBarcodes = (rows) => {
+    const list = (Array.isArray(rows)?rows:[rows]).filter(Boolean);
+    if (!list.length) return toast(lang==="bn"?"Print করার product নেই":"No product to print", "err");
+    const skipped = [];
+    const labels = list.map(p => {
+      const code = p.barcode||p.ean||p.code||p.name;
+      const barcodeSvg = code128SvgMarkup(code, { moduleWidth: 2, height: 48, fontSize: 11 });
+      if (!barcodeSvg) {
+        skipped.push(p.name || code || "Unnamed product");
+        return "";
+      }
+      return `<div class="label"><div class="name">${String(p.name||"").replace(/[<>&]/g,"")}</div>${barcodeSvg}<div class="price">MRP ${String(p.mrp||p.vatInclusive||"").replace(/[<>&]/g,"")}</div></div>`;
+    }).filter(Boolean).join("");
+    if (!labels) return toast(lang==="bn"?"CODE128 print করার মতো barcode নেই":"No CODE128-compatible barcode to print", "err");
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return toast(lang==="bn"?"Popup allow করুন":"Allow popup to print", "err");
+    win.document.write(`<html><head><title>Product Barcodes</title><style>body{font-family:Arial,sans-serif;margin:16px}.sheet{display:flex;flex-wrap:wrap;gap:10px}.label{width:190px;border:1px solid #111;padding:8px;text-align:center;page-break-inside:avoid}.name{font-size:12px;font-weight:700;height:30px;overflow:hidden}.label svg{max-width:100%;height:auto;margin:4px 0}.price{font-size:11px;margin-top:3px}.skip{font-size:11px;color:#b91c1c;margin-bottom:10px}@media print{button,.skip{display:none}.label{break-inside:avoid}}</style></head><body><button onclick="window.print()">Print</button>${skipped.length?`<div class="skip">Skipped ${skipped.length} unsupported barcode(s): ${skipped.slice(0,10).map(x=>String(x).replace(/[<>&]/g,"")).join(", ")}${skipped.length>10?"...":""}</div>`:""}<div class="sheet">${labels}</div></body></html>`);
+    win.document.close();
+  };
 
   // Smart pmUpd — triggers auto-calculations
   const pmUpd = (field, val) => {
@@ -9844,24 +10406,39 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         next.mrp = val ? (vi?String(vi):"") : (ve?String(ve):"");
       }
 
+      if (field==="code" && shopPartEnabledRef.current) {
+        const originalPartKey = normalizeOriginalPartNumber(val);
+        const groupKey = originalPartKey ? `PART:${originalPartKey}` : "";
+        const assigned = groupKey ? shopPartAllocationRef.current.get(groupKey) : null;
+        next.originalPartKey = originalPartKey;
+        next.shopPartGroupKey = groupKey;
+        next.shopPartNumber = assigned?.shopPartNumber || (
+          originalPartKey
+            ? formatShopPartNumber(
+                Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1,
+                val,
+                shopPartFormatRef.current
+              )
+            : ""
+        );
+        next.shopPartSerial = assigned?.shopPartSerial || 0;
+      }
+
       return next;
     });
   };
 
   const addProduct = async () => {
-    if (!pmForm.name.trim()) return toast(t.e3,"err");
+    if (productMaintenanceRef.current.active) {
+      return toast("Product Master replacement is in progress. Saving is temporarily locked.", "err");
+    }
+    const validationError = validateProductForm();
+    if (validationError) return toast(validationError,"err");
 
-    const now = new Date().toISOString();
+    const draftId = globalThis.crypto?.randomUUID?.() || `product-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const payload = { ...buildProductPayload(true, draftId), id: draftId };
 
-    const payload = {
-      shopId,
-      ...pmForm,
-      name: pmForm.name.trim(),
-      createdBy: user.uid,
-      createdAt: now,
-      updatedAt: now,
-    };
-
+    setSavingProduct(true);
     try {
       const result = await offlineCreate("products", payload);
       const created = { ...result.data, id: result.documentId };
@@ -9880,22 +10457,21 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     } catch(e) {
       hErr(e);
+    } finally {
+      setSavingProduct(false);
     }
   };
 
   const editProduct = async (id) => {
-    if (!pmForm.name.trim()) return toast(t.e3,"err");
+    if (productMaintenanceRef.current.active) {
+      return toast("Product Master replacement is in progress. Saving is temporarily locked.", "err");
+    }
+    const validationError = validateProductForm(id);
+    if (validationError) return toast(validationError,"err");
 
-    const now = new Date().toISOString();
+    const payload = buildProductPayload(false, id);
 
-    const payload = {
-      ...pmForm,
-      shopId,
-      name: pmForm.name.trim(),
-      updatedBy: user.uid,
-      updatedAt: now,
-    };
-
+    setSavingProduct(true);
     try {
       const result = await offlineUpdate("products", id, payload);
       const updated = { ...result.data, id };
@@ -9908,7 +10484,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
       pmReset();
       setPmEditId(null);
-      setPmDetailId(null);
+      setPmShowAdd(false);
       toast(t.pmUpdated);
 
       if (navigator.onLine) {
@@ -9916,6 +10492,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     } catch(e) {
       hErr(e);
+    } finally {
+      setSavingProduct(false);
     }
   };
 
@@ -9923,7 +10501,13 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     if (!window.confirm(lang==="bn"?"এই পণ্যটি মুছে ফেলবেন?":"Delete this product?")) return;
 
     const now = new Date().toISOString();
-    const tombstone = { isDeleted: true, deletedAt: now, updatedAt: now };
+    const tombstone = {
+      isDeleted:true,
+      deletedAt:now,
+      updatedAt:now,
+      updatedBy:user.uid,
+      productCatalogEpoch:productMaintenanceRef.current.catalogEpoch || 0,
+    };
 
     try {
       if (navigator.onLine && db) {
@@ -9941,7 +10525,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
 
       setProducts(p=>p.filter(x=>x.id!==id));
-      setPmDetailId(null);
+      if (pmEditId === id) { setPmEditId(null); pmReset(); }
       toast(t.pmDeleted,"err");
 
       if (navigator.onLine) {
@@ -9954,27 +10538,23 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const clearAllShopProducts = async () => {
     if (clearingProducts) return;
-
-    const initialCount = products.length;
-    if (!initialCount && (!navigator.onLine || !db || !shopId)) return;
-
-    if (!window.confirm(
-      lang==="bn"
-        ? `সব পণ্য মুছে ফেলবেন? (${initialCount || "cloud"}টি) পরে নতুন import করতে পারবেন।`
-        : `Delete all products? (${initialCount || "cloud"}) You can import fresh data after.`
-    )) return;
+    if (!isOwner) {
+      toast("Only the Shop Owner can clear Product Master data.", "err");
+      return { ok:false, reason:"OWNER_REQUIRED" };
+    }
+    if (!navigator.onLine || !db || !shopId) {
+      toast("Internet connection is required for a safe Clear & Import.", "err");
+      return { ok:false, reason:"ONLINE_REQUIRED" };
+    }
 
     setClearingProducts(true);
     productBulkDeleteRef.current = true;
-    setProducts([]);
-    setPmDetailId(null);
-    setPmEditId(null);
-
-    const now = new Date().toISOString();
-    const tombstone = { isDeleted: true, deletedAt: now, updatedAt: now };
+    window.S4Offline?.pauseCollectionSync?.("products");
     let done = 0;
-    let usedSoftDelete = false;
+    let lockAcquired = false;
     const chunkSize = 200;
+    const operationId = globalThis.crypto?.randomUUID?.() || `replace-${Date.now()}`;
+    const nextEpoch = (Number(productMaintenanceRef.current.catalogEpoch) || 0) + 1;
 
     const reportProgress = (total) => {
       toast(lang==="bn"?`🗑️ ${done}/${total}...`:`🗑️ ${done}/${total}...`);
@@ -10002,65 +10582,113 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       throw lastErr;
     };
 
-    const softDeleteChunk = async (chunk) => {
-      usedSoftDelete = true;
-      await commitBatchWithRetry((batch) => {
-        chunk.forEach((p) => {
-          batch.set(doc(db, "products", p.id), tombstone, { merge: true });
-        });
-      });
-    };
-
     try {
-      await offlineClearCollection("products");
+      exportProductsCsv(products);
+      await setDoc(doc(db, "productMaintenance", productMaintenanceId), {
+        shopId,
+        type:"productMaintenance",
+        active:true,
+        catalogEpoch:nextEpoch,
+        operationId,
+        startedBy:user.uid,
+        startedAt:serverTimestamp(),
+        updatedAt:serverTimestamp(),
+      }, { merge:true });
+      lockAcquired = true;
+      const activeMaintenance = {
+        active:true,
+        catalogEpoch:nextEpoch,
+        operationId,
+        startedBy:user.uid,
+      };
+      productMaintenanceRef.current = activeMaintenance;
+      setProductMaintenance(activeMaintenance);
+      setProductReplacementActive(true);
 
-      let rows = [...products];
-      if (navigator.onLine && db && shopId) {
-        const snap = await getDocs(query(collection(db, "products"), where("shopId", "==", shopId)));
-        if (snap.docs.length) {
-          rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        }
-      }
-
-      if (!rows.length) {
-        toast(lang==="bn"?"কোনো পণ্য নেই":"No products to delete", "err");
-        return;
-      }
+      const snap = await getDocs(query(collection(db, "products"), where("shopId", "==", shopId)));
+      const rows = snap.docs.map((d) => ({ id:d.id, ...d.data() }));
+      setProducts([]);
+      setPmEditId(null);
 
       toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
       reportProgress(rows.length);
 
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
-        try {
-          await commitBatchWithRetry((batch) => {
-            chunk.forEach((p) => batch.delete(doc(db, "products", p.id)));
-          });
-        } catch (cloudErr) {
-          const denied = String(cloudErr?.code || cloudErr?.message || "").includes("permission");
-          if (!denied) throw cloudErr;
-          await softDeleteChunk(chunk);
-        }
+        await commitBatchWithRetry((batch) => {
+          chunk.forEach((p) => batch.delete(doc(db, "products", p.id)));
+        });
         done += chunk.length;
         reportProgress(rows.length);
       }
 
-      if (usedSoftDelete) {
-        toast(
-          lang==="bn"
-            ? "✅ পণ্য লুকানো হয়েছে। Import করতে পারবেন।"
-            : "✅ Products hidden. You can import now.",
-          "err"
-        );
-      } else {
-        toast(lang==="bn"?"✅ সব পণ্য মুছে ফেলা হয়েছে":"✅ All products deleted");
+      await offlineClearShopCollection("products", shopId);
+      const verifyCloud = await getDocs(query(collection(db, "products"), where("shopId", "==", shopId)));
+      const verifyLocal = await offlineList("products");
+      const localRemaining = verifyLocal.records.filter((row) => row.data?.shopId === shopId);
+      if (!verifyCloud.empty || localRemaining.length) {
+        throw new Error(`Clear verification failed (cloud ${verifyCloud.size}, local ${localRemaining.length}).`);
       }
+      toast("✅ Backup downloaded and Product Master cleared. Select the new import file.");
+      return { ok:true, deleted:rows.length, catalogEpoch:nextEpoch };
     } catch (e) {
       hErr(e);
+      toast("Product sync remains locked to prevent old data returning. Retry Clear & Import or contact support.", "err");
+      return { ok:false, reason:String(e?.message||e) };
     } finally {
       productBulkDeleteRef.current = false;
       setClearingProducts(false);
+      if (!lockAcquired) window.S4Offline?.resumeCollectionSync?.("products");
       setSyncRefreshKey((value) => value + 1);
+    }
+  };
+
+  const finishProductReplacement = async () => {
+    if (!productReplacementActive || !isOwner || !db || !shopId) return;
+    const catalogEpoch = Number(productMaintenanceRef.current.catalogEpoch) || 0;
+    try {
+      await setDoc(doc(db, "productMaintenance", productMaintenanceId), {
+        shopId,
+        type:"productMaintenance",
+        active:false,
+        catalogEpoch,
+        completedBy:user.uid,
+        completedAt:serverTimestamp(),
+        updatedAt:serverTimestamp(),
+      }, { merge:true });
+      const completed = { ...productMaintenanceRef.current, active:false, catalogEpoch };
+      productMaintenanceRef.current = completed;
+      setProductMaintenance(completed);
+      setProductReplacementActive(false);
+      window.S4Offline?.resumeCollectionSync?.("products");
+
+      let syncResult = null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        syncResult = await window.S4Offline?.syncNow?.();
+        if (!syncResult?.skipped) break;
+        await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+      }
+      setSyncRefreshKey((value) => value + 1);
+      if (syncResult?.failed) {
+        toast(`Import saved locally, but ${syncResult.failed} product sync item(s) need retry.`, "err");
+      } else {
+        const [cloudSnap, localResult] = await Promise.all([
+          getDocs(query(collection(db, "products"), where("shopId", "==", shopId))),
+          offlineList("products"),
+        ]);
+        const cloudCount = cloudSnap.docs.filter((item) => isActiveProduct(item.data())).length;
+        const localCount = localResult.records.filter(
+          (row) => row.data?.shopId === shopId && isActiveProduct(row.data)
+        ).length;
+        if (cloudCount !== localCount) {
+          toast(`Replacement saved, but verification differs (local ${localCount}, cloud ${cloudCount}). Sync will retry.`, "err");
+        } else {
+          toast(`✅ Product replacement completed. Verified ${localCount} products locally and in Firebase.`);
+        }
+      }
+    } catch (error) {
+      hErr(error);
+      toast("Could not finish replacement. Product sync remains locked for safety.", "err");
     }
   };
 
@@ -11441,257 +12069,51 @@ const startEditOrder = (order) => {
       )}
 
       {(isOwner||can("viewProducts"))&&tab==="products"&&(
-        <div style={isDesktop?s.desktopPanel:s.panel}>
-
-          {/* ── PRODUCT DETAIL MODAL ── */}
-          {pmDetailId&&pmDetail&&(
-            <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:200, overflowY:"auto", display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"20px 12px 40px" }}>
-              <div style={{ width:"100%", maxWidth:560, background:th.bgCard, borderRadius:16, border:`1px solid ${th.border}`, overflow:"hidden" }}>
-                {/* Modal header */}
-                <div style={{ background:th.bgInp, padding:"14px 16px", display:"flex", alignItems:"center", gap:10, borderBottom:`1px solid ${th.border}` }}>
-                  <div style={{ width:44, height:44, background:th.border, borderRadius:12, display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, flexShrink:0 }}>📦</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:15, fontWeight:800, color:th.txtPrimary, lineHeight:1.2 }}>{pmDetail.name}</div>
-                    {pmDetail.category&&<div style={{ fontSize:11, color:"#f97316", marginTop:2 }}>🗂️ {pmDetail.category}</div>}
-                  </div>
-                  <div style={{ display:"flex", gap:6 }}>
-                    {isOwner&&<><button style={s.edBtn} onClick={()=>{ setPmForm({name:pmDetail.name,code:pmDetail.code||"",barcode:pmDetail.barcode||"",ean:pmDetail.ean||"",brand:pmDetail.brand||"",category:pmDetail.category||"",subcategory:pmDetail.subcategory||"",landingCost:pmDetail.landingCost||"",vatPerc:pmDetail.vatPerc||"",vatExclusive:pmDetail.vatExclusive||"",vatInclusive:pmDetail.vatInclusive||"",mrp:pmDetail.mrp||"",openingStock:pmDetail.openingStock||"",unit:pmDetail.unit||"Pcs",description:pmDetail.description||""}); setPmEditId(pmDetail.id); setPmShowAdd(false); }}>✏️</button>
-                    <button style={s.dlBtn} onClick={()=>deleteProduct(pmDetail.id)}>🗑️</button></>}
-                    <button style={{ ...s.stBtn, padding:"6px 12px" }} onClick={()=>{ setPmDetailId(null); setPmEditId(null); pmReset(); }}>✕</button>
-                  </div>
-                </div>
-
-                {/* Edit form inside modal */}
-                {isOwner&&pmEditId===pmDetail.id?(
-                  <div style={{ padding:16 }}>
-                    <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:12 }}>✏️ {t.editTitle}</div>
-                    <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} th={th} />
-                    <div style={s.row}>
-                      <button style={{ ...s.sendBtn, flex:1 }} onClick={()=>editProduct(pmDetail.id)}>{t.saveEdit}</button>
-                      <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmEditId(null); pmReset(); }}>{t.cancel}</button>
-                    </div>
-                  </div>
-                ):(
-                  <div style={{ padding:16 }}>
-                    {/* Info grid */}
-                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
-                      {[
-                        { lbl:lang==="bn"?"কোড / মডেল":"Code / Model", val:pmDetail.code, icon:"📋" },
-                        { lbl:"Barcode", val:pmDetail.barcode, icon:"🔢" },
-                        { lbl:"EAN Code", val:pmDetail.ean, icon:"📊" },
-                        { lbl:lang==="bn"?"ব্র্যান্ড":"Brand", val:pmDetail.brand, icon:"🏷️" },
-                        { lbl:lang==="bn"?"সাব-ক্যাটাগরি":"Sub-Category", val:pmDetail.subcategory, icon:"🗂️" },
-                        { lbl:lang==="bn"?"ইউনিট":"Unit", val:pmDetail.unit, icon:"📐" },
-                      ].map(({lbl,val,icon})=> val?(
-                        <div key={lbl} style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
-                          <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0 }}>{icon} {lbl}</div>
-                          <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{val}</div>
-                        </div>
-                      ):null)}
-                    </div>
-                    {/* Pricing section */}
-                    <div style={{ background:th.bgInp, borderRadius:12, padding:"12px 14px", marginBottom:10 }}>
-                      <div style={{ fontSize:11, color:"#f97316", fontWeight:700, marginBottom:10, textTransform:"uppercase", letterSpacing:0 }}>💰 {lang==="bn"?"মূল্য তথ্য":"Pricing Info"}</div>
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-                        {[
-                          { lbl:lang==="bn"?"Landing Cost":"Landing Cost", val:pmDetail.landingCost, color:"#a1a1aa" },
-                          { lbl:lang==="bn"?"VAT %":"VAT %", val:pmDetail.vatPerc?`${pmDetail.vatPerc}%`:null, color:"#f59e0b" },
-                          { lbl:lang==="bn"?"VAT Excl.":"VAT Excl.", val:pmDetail.vatExclusive, color:"#22c55e" },
-                          { lbl:lang==="bn"?"VAT Incl.":"VAT Incl.", val:pmDetail.vatInclusive, color:"#06b6d4" },
-                          { lbl:"MRP", val:pmDetail.mrp, color:"#f97316" },
-                          { lbl:lang==="bn"?"Opening Stock":"Opening Stock", val:pmDetail.openingStock, color:"#a855f7" },
-                        ].map(({lbl,val,color})=>(
-                          <div key={lbl} style={{ textAlign:"center", padding:"8px 6px", background:th.bgCard, borderRadius:8 }}>
-                            <div style={{ fontSize:9, color:"#71717a", marginBottom:4, textTransform:"uppercase" }}>{lbl}</div>
-                            <div style={{ fontSize:14, fontWeight:800, color: val?color:"#3f3f46" }}>{val||"—"}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    {pmDetail.description&&(
-                      <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
-                        <div style={{ fontSize:10, color:"#71717a", marginBottom:4 }}>📝 {lang==="bn"?"বিবরণ":"Description"}</div>
-                        <div style={{ fontSize:12, color:"#d4d4d8" }}>{pmDetail.description}</div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── HEADER ── */}
-          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
-            <div style={s.secTitle}>{t.pmTitle} {products.length>0&&<span style={{ fontSize:11, color:"#71717a", fontWeight:400 }}>({products.length})</span>}</div>
-            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-              <button style={{ ...s.addCoBtn, borderColor:"#3f3f46", color:"#71717a" }} onClick={fetchProducts} disabled={productsLoading||clearingProducts}>{productsLoading||clearingProducts?"⏳":"🔄"}</button>
-              {isOwner&&(products.length>0||clearingProducts)&&(
-                <button style={{ ...s.addCoBtn, borderColor:"#450a0a", color:"#ef4444" }}
-                  onClick={clearAllShopProducts}
-                  disabled={clearingProducts}>🗑️ {clearingProducts?(lang==="bn"?"মুছছে...":"Deleting..."):(lang==="bn"?"সব মুছুন":"Clear All")}</button>
-              )}
-              {isOwner&&(<>
-              <label style={{ ...s.addCoBtn, cursor:"pointer", background:"rgba(99,102,241,0.1)", borderColor:"#6366f1", color:"#818cf8" }}>
-                📥 Import
-                <input type="file" accept=".csv" style={{ display:"none" }} onChange={async (e)=>{
-                  const file=e.target.files[0]; if (!file) return; e.target.value='';
-                  if (getCloudSyncBlockReason() === "FIREBASE_AUTH_REQUIRED") {
-                    return toast(t.syncNeedEmailLogin, "err");
-                  }
-                  if (products.length>0&&!window.confirm(lang==="bn"?`ইতিমধ্যে ${products.length}টি পণ্য আছে। আগে "সব মুছুন" করুন। তারপরও import করবেন?`:`${products.length} products exist. Clear first. Continue anyway?`)) return;
-                  toast(lang==="bn"?"📥 ফাইল পড়া হচ্ছে...":"📥 Reading file...");
-                  try {
-                    const text=await file.text();
-                    const lines=text.split('\n').filter(l=>l.trim());
-                    if (lines.length<2) return toast(lang==="bn"?"ফাইলে কোনো ডেটা নেই":"No data","err");
-                    const h=lines[0].split(',').map(x=>x.trim().replace(/^"|"$/g,'').toLowerCase());
-                    const fi=(kws)=>h.findIndex(x=>kws.some(k=>x.includes(k)));
-                    const idx={
-                      name:fi(['productname','name']), code:fi(['productcode','code','model']),
-                      barcode:fi(['barcode']), ean:fi(['ean']),
-                      brand:fi(['company','brand']), category:fi(['category']),
-                      subcategory:fi(['subcategory']), landingCost:fi(['landingcost','landing']),
-                      vatPerc:fi(['vat_perc','vatperc','vat%']), vatExclusive:fi(['vatexclusive','exclusive']),
-                      vatInclusive:fi(['vatinclusive','inclusive']), mrp:fi(['mrp']),
-                      openingStock:fi(['openingstock','opening']), unit:fi(['unit']),
-                      description:fi(['description']),
-                    };
-                    if (idx.name<0) return toast(lang==="bn"?"'ProductName' column নেই":"'ProductName' column not found","err");
-                    const seen=new Set(); const rows=[];
-                    for (const line of lines.slice(1)) {
-                      const c=line.split(',').map(x=>x.trim().replace(/^"|"$/g,''));
-                      const name=(c[idx.name]||'').trim(); if (!name||name==='nan') continue;
-                      const code=(idx.code>=0?c[idx.code]||'':'').trim();
-                      const key=`${name}||${code}`.toLowerCase(); if (seen.has(key)) continue; seen.add(key);
-                      const clean=(i,zeroEmpty=false)=>{ if (i<0) return ''; let v=(c[i]||'').trim(); if (v==='UNAVAILABLE'||v==='nan') return ''; if (zeroEmpty) { try { if (parseFloat(v)===0) return ''; } catch{} } return v; };
-                      rows.push({ shopId, name, code, barcode:clean(idx.barcode), ean:clean(idx.ean),
-                        brand:clean(idx.brand), category:clean(idx.category), subcategory:clean(idx.subcategory),
-                        landingCost:clean(idx.landingCost,true), vatPerc:clean(idx.vatPerc,true),
-                        vatExclusive:clean(idx.vatExclusive,true), vatInclusive:clean(idx.vatInclusive,true),
-                        mrp:clean(idx.mrp,true), openingStock:clean(idx.openingStock,true),
-                        unit:['Nos','nan',''].includes(clean(idx.unit))?'Pcs':clean(idx.unit),
-                        description:clean(idx.description),
-                      });
-                    }
-                    if (!rows.length) return toast(lang==="bn"?"কোনো valid product নেই":"No valid products","err");
-                    toast(lang==="bn"?`📥 ${rows.length}টি import হচ্ছে...`:`📥 Importing ${rows.length}...`);
-                    let done=0;
-                    const now = new Date().toISOString();
-                    for (let i=0;i<rows.length;i+=500) {
-                      const batch=writeBatch(db);
-                      const importedDocs=[];
-                      rows.slice(i,i+500).forEach(p=>{
-                        const ref=doc(collection(db,"products"));
-                        const payload={
-                          ...p,
-                          shopId,
-                          createdBy:user.uid,
-                          createdAt:serverTimestamp(),
-                          updatedAt:now,
-                        };
-                        batch.set(ref,payload);
-                        importedDocs.push({
-                          id:ref.id,
-                          ...p,
-                          shopId,
-                          createdBy:user.uid,
-                          createdAt:now,
-                          updatedAt:now,
-                        });
-                      });
-                      await batch.commit();
-                      await offlineCacheCloudRecords("products", importedDocs);
-                      done+=importedDocs.length;
-                      toast(`📥 ${done}/${rows.length}...`);
-                    }
-                    await fetchProducts();
-                    toast(lang==="bn"?`✅ ${done}টি পণ্য import সম্পন্ন!`:`✅ ${done} products imported!`);
-                  } catch(err){ toast(err.message||"Import failed","err"); }
-                }} />
-              </label>
-              <button style={s.addCoBtn} onClick={()=>{ setPmShowAdd(!pmShowAdd); pmReset(); setPmEditId(null); setPmDetailId(null); }}>
-                {pmShowAdd?`✕ ${t.cancel}`:t.pmAdd}
-              </button>
-              </>)}
-            </div>
-          </div>
-
-          {/* ── ADD FORM ── */}
-          {pmShowAdd&&(
-            <div style={{ ...s.card, border:"1px solid #f97316", marginBottom:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316", marginBottom:12 }}>➕ {t.pmAdd}</div>
-              <PmForm pmForm={pmForm} pmUpd={pmUpd} t={t} lang={lang} th={th} />
-              <div style={s.row}>
-                <button style={{ ...s.sendBtn, flex:1 }} onClick={addProduct}>{t.addBtn}</button>
-                <button style={{ ...s.stBtn, flex:1 }} onClick={()=>{ setPmShowAdd(false); pmReset(); }}>{t.cancel}</button>
-              </div>
-            </div>
-          )}
-
-          {/* ── SEARCH + CATEGORY FILTER ── */}
-          <div style={{ position:"relative", marginBottom:10 }}>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-            <input style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
-              placeholder={t.pmSearch} value={pmSearch} onChange={e=>setPmSearch(e.target.value)} />
-            {pmSearch&&<button onClick={()=>setPmSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:"#71717a", cursor:"pointer", fontSize:16 }}>✕</button>}
-          </div>
-
-          {/* Category filter pills */}
-          {!pmSearch&&products.length>0&&(()=>{
-            const cats = ["ALL",...[...new Set(products.map(p=>p.category).filter(Boolean))].sort()];
-            return (
-              <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:10, marginBottom:6 }}>
-                {cats.map(cat=>(
-                  <button key={cat} onClick={()=>setPmCatFilter(cat)}
-                    style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit",
-                      background:pmCatFilter===cat?"#f97316":"transparent",
-                      borderColor:pmCatFilter===cat?"#f97316":th.borderMid,
-                      color:pmCatFilter===cat?"#fff":th.txtMuted }}>
-                    {cat==="ALL"?(lang==="bn"?"সব":"All"):cat}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-
-          {/* ── PRODUCT LIST ── */}
-          {productsLoading&&<div style={s.empty}><div style={{ fontSize:36 }}>⏳</div><div>{lang==="bn"?"লোড হচ্ছে...":"Loading..."}</div></div>}
-          {!productsLoading&&products.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>📦</div><div>{t.pmNoProducts}</div></div>}
-          {!productsLoading&&(()=>{
-            const filtered = products.filter(p=>{
-              const refs = (p.moreBarcodes||[]).join(' ');
-              const hay = [p.name,p.code,p.barcode,p.ean,p.brand,p.category,refs].filter(Boolean).join(' ');
-              const matchQ = nsmatch(hay, pmSearch);
-              const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
-              return matchQ && matchCat;
-            });
-            if (filtered.length===0) return <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results"}</div></div>;
-            return filtered.map(p=>(
-              <div key={p.id} style={{ ...s.card, cursor:"pointer", transition:"border-color 0.15s" }}
-                onClick={()=>{ setPmDetailId(p.id); setPmEditId(null); pmReset(); }}>
-                <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  {/* Color dot by category */}
-                  <div style={{ width:42, height:42, borderRadius:12, background:th.bgInp, border:`1px solid ${th.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:20, flexShrink:0 }}>📦</div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{p.name}</div>
-                    <div style={{ fontSize:11, color:"#71717a", marginTop:2, display:"flex", flexWrap:"wrap", gap:6 }}>
-                      {p.code&&<span>📋 {p.code}</span>}
-                      {p.brand&&<span>🏷️ {p.brand}</span>}
-                      {p.barcode&&<span>🔢 {p.barcode}</span>}
-                    </div>
-                    <div style={{ display:"flex", gap:6, marginTop:5, flexWrap:"wrap", alignItems:"center" }}>
-                      {p.category&&<span style={{ fontSize:10, background:th.accentDim, color:"#f97316", padding:"2px 8px", borderRadius:20, border:"1px solid #451a03" }}>{p.category}</span>}
-                      {p.vatExclusive&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>{t.cur}{p.vatExclusive}</span>}
-                      {p.mrp&&parseFloat(p.mrp)>0&&<span style={{ fontSize:10, color:"#71717a" }}>MRP {p.mrp}</span>}
-                      {p.openingStock&&parseFloat(p.openingStock)>0&&<span style={{ fontSize:10, color:"#818cf8" }}>Stock: {p.openingStock}</span>}
-                      <span style={{ fontSize:10, color:"#52525b", marginLeft:"auto" }}>{p.unit}</span>
-                    </div>
-                  </div>
-                  <span style={{ fontSize:20, color:"#3f3f46", flexShrink:0 }}>›</span>
-                </div>
-              </div>
-            ));
-          })()}
+        <div style={{
+          position:"fixed",
+          inset:0,
+          zIndex:2000,
+          width:"100vw",
+          height:"100dvh",
+          margin:0,
+          padding:0,
+          overflow:isDesktop?"hidden":"auto",
+          background:"#adc3e3"
+        }}>
+          <ProductMasterScreen
+            key={shopId || "default-shop"}
+            shopId={shopId}
+            products={products}
+            filteredProducts={getFilteredProducts()}
+            productsLoading={productsLoading}
+            clearingProducts={clearingProducts}
+            companies={cos}
+            form={pmForm}
+            upd={pmUpd}
+            selectedId={pmEditId}
+            search={pmSearch}
+            onSearchChange={setPmSearch}
+            category={pmCatFilter}
+            onCategoryChange={setPmCatFilter}
+            canDelete={isOwner}
+            saving={savingProduct}
+            onNew={()=>{ pmReset(); setPmEditId(null); setPmShowAdd(true); }}
+            onSave={()=>{ if (pmEditId) editProduct(pmEditId); else addProduct(); }}
+            onDelete={()=>{ if (pmEditId) deleteProduct(pmEditId); }}
+            onClose={()=>{ setPmShowAdd(false); setPmEditId(null); pmReset(); setTab("dashboard"); }}
+            onSelectProduct={startProductEdit}
+            onRefresh={fetchProducts}
+            onClearAll={clearAllShopProducts}
+            replacementActive={productReplacementActive}
+            onFinishReplacement={finishProductReplacement}
+            productMaintenanceActive={productMaintenance.active}
+            onExport={()=>exportProductsCsv(getFilteredProducts())}
+            onImportRecords={importProductRecords}
+            onGenerateWeighingFile={()=>exportWeighingBarcodeCsv(getFilteredProducts())}
+            onPrintBarcodes={printProductBarcodes}
+            shopPartEnabled={shopPartEnabled}
+            notify={(message,kind)=>toast(message, kind==="err"?"err":"ok")}
+          />
         </div>
       )}
 
@@ -12337,6 +12759,22 @@ const startEditOrder = (order) => {
                 </button>
               )}
 
+              {/* Utilities (owner only) */}
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("utilities")}>
+                  <span style={s.settingsRowIcon}>🧰</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{lang==="bn"?"ইউটিলিটিস":"Utilities"}</div>
+                    <div style={s.settingsRowSub}>
+                      {lang==="bn"
+                        ? `Shop Part Number: ${shopPartEnabled?"চালু":"বন্ধ"}`
+                        : `Shop Part Number: ${shopPartEnabled?"Enabled":"Disabled"}`}
+                    </div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
+
               {/* Invite codes (owner only) */}
               {isOwner&&(
                 <button style={s.settingsRow} onClick={()=>setSettingsPage("invite")}>
@@ -12691,6 +13129,81 @@ const startEditOrder = (order) => {
               onSettingsChanged={setBranchTransferSettings}
               toast={toast}
             />
+          )}
+
+          {settingsPage==="utilities"&&isOwner&&(
+            <div style={s.card}>
+              <div style={s.settingsLbl}>{lang==="bn"?"🧰 ইউটিলিটিস":"🧰 Utilities"}</div>
+              <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.6, marginBottom:14 }}>
+                {lang==="bn"
+                  ? "বিশেষ software option শুধু Owner এখান থেকে চালু, বন্ধ বা configure করতে পারবেন।"
+                  : "Only the Owner can enable, disable, or configure special software options here."}
+              </div>
+
+              <div style={{ padding:"14px 0", borderTop:`1px solid ${th.border}`, borderBottom:`1px solid ${th.border}` }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontSize:14, fontWeight:800, color:th.txtPrimary }}>
+                      {lang==="bn"?"Shop Part Number Settings":"Shop Part Number Settings"}
+                    </div>
+                    <div style={{ fontSize:12, color:th.txtMuted, marginTop:4, lineHeight:1.5 }}>
+                      {shopPartEnabled
+                        ? (lang==="bn"
+                            ? "চালু আছে—Product Master ও Search-এ Shop Part Number দেখা যাবে।"
+                            : "Enabled—Shop Part Number is visible in Product Master and Search.")
+                        : (lang==="bn"
+                            ? "বন্ধ আছে—field লুকানো থাকবে এবং নতুন নম্বর তৈরি হবে না। আগের নম্বর মুছবে না।"
+                            : "Disabled—the field stays hidden and no new number is generated. Existing numbers are retained.")}
+                    </div>
+                  </div>
+                  <PermToggle
+                    isOn={shopPartEnabled}
+                    disabled={shopPartSettingsSaving}
+                    onToggle={()=>{
+                      const next = !shopPartEnabled;
+                      if (!next && !window.confirm(
+                        lang==="bn"
+                          ? "Shop Part Number বন্ধ করবেন? আগের নম্বর সংরক্ষিত থাকবে, কিন্তু Product Master থেকে লুকানো হবে।"
+                          : "Disable Shop Part Number? Existing numbers will be retained but hidden from Product Master."
+                      )) return;
+                      saveShopPartEnabled(next);
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginTop:14, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
+                  <button
+                    type="button"
+                    style={s.addCoBtn}
+                    disabled={shopPartSettingsSaving}
+                    onClick={()=>setShowShopPartFormatSettings(true)}
+                  >
+                    {lang==="bn"?"⚙️ Format Configure করুন":"⚙️ Configure Format"}
+                  </button>
+                  <span style={{ fontSize:11, color:th.txtMuted, fontFamily:"monospace" }}>
+                    {shopPartFormat.pattern}
+                  </span>
+                </div>
+                {shopPartSettingsSaving&&(
+                  <div style={{ fontSize:12, color:"#f97316", marginTop:10 }}>
+                    {lang==="bn"?"Shop Part Number update হচ্ছে...":"Updating Shop Part Numbers..."}
+                  </div>
+                )}
+              </div>
+
+              {showShopPartFormatSettings&&(
+                <>
+                  <style>{PM_CSS}</style>
+                  <ShopPartFormatModal
+                    value={shopPartFormat}
+                    featureEnabled={shopPartEnabled}
+                    onSave={saveShopPartFormat}
+                    notify={(message,kind)=>toast(message, kind==="err"?"err":"ok")}
+                    onClose={()=>setShowShopPartFormatSettings(false)}
+                  />
+                </>
+              )}
+            </div>
           )}
 
           {settingsPage==="orderModule"&&isOwner&&(

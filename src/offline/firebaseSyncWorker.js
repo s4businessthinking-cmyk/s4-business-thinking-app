@@ -8,6 +8,7 @@ import {
 } from "./sqliteDb";
 
 let syncRunning = false;
+const pausedCollections = new Set();
 
 function isOnline() {
   return typeof navigator !== "undefined" ? navigator.onLine : false;
@@ -50,6 +51,10 @@ async function syncOneQueueItem(item) {
   const collectionName = payload.collectionName || item.collection_name;
   const documentId = payload.documentId || item.document_id;
 
+  if (pausedCollections.has(collectionName)) {
+    return { ok: true, skipped: true, reason: "COLLECTION_SYNC_PAUSED", collectionName, documentId };
+  }
+
   const ref = getFirebaseDocRef(collectionName, documentId);
 
   if (operation === "DELETE") {
@@ -78,6 +83,17 @@ async function syncOneQueueItem(item) {
 export async function uploadLocalRecordsBatch(collectionName, records = []) {
   if (!db) {
     throw new Error("Firebase Firestore is not ready.");
+  }
+
+  if (pausedCollections.has(collectionName)) {
+    return {
+      uploaded: 0,
+      failed: 0,
+      skipped: true,
+      reason: "COLLECTION_SYNC_PAUSED",
+      collectionName,
+      errors: [],
+    };
   }
 
   const BATCH_SIZE = 400;
@@ -162,7 +178,10 @@ export async function syncPendingQueueToFirebase() {
 
     for (const item of queue) {
       try {
-        await syncOneQueueItem(item);
+        const itemResult = await syncOneQueueItem(item);
+        if (itemResult?.skipped) {
+          continue;
+        }
         await markSyncDone(item.id);
         result.done += 1;
       } catch (error) {
@@ -185,6 +204,20 @@ export async function syncPendingQueueToFirebase() {
   } finally {
     syncRunning = false;
   }
+}
+
+export function pauseCollectionSync(collectionName) {
+  if (collectionName) pausedCollections.add(collectionName);
+  return { ok: true, collectionName };
+}
+
+export function resumeCollectionSync(collectionName) {
+  if (collectionName) pausedCollections.delete(collectionName);
+  return { ok: true, collectionName };
+}
+
+export function isCollectionSyncPaused(collectionName) {
+  return pausedCollections.has(collectionName);
 }
 
 export function startAutoFirebaseSync(options = {}) {

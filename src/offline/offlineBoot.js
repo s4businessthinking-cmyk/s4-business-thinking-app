@@ -12,6 +12,9 @@ import {
 import {
   syncPendingQueueToFirebase,
   startAutoFirebaseSync,
+  pauseCollectionSync,
+  resumeCollectionSync,
+  isCollectionSyncPaused,
 } from "./firebaseSyncWorker";
 import {
   activateLicenseOffline,
@@ -81,6 +84,9 @@ export async function startOfflineEngine() {
       search: offlineSearch,
       clearCollection: offlineClearCollection,
       syncNow: syncPendingQueueToFirebase,
+      pauseCollectionSync,
+      resumeCollectionSync,
+      isCollectionSyncPaused,
       test: async () => {
         const created = await offlineCreate("offline_test", {
           name: "S4 Offline Test",

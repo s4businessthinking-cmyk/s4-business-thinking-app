@@ -247,7 +247,7 @@ export async function saveLocalRecord(collectionName, documentId, data) {
   return { ok: true, id, collectionName, documentId };
 }
 
-export async function cacheCloudRecord(collectionName, documentId, data) {
+export async function cacheCloudRecord(collectionName, documentId, data, options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -290,7 +290,7 @@ export async function cacheCloudRecord(collectionName, documentId, data) {
     [id, collectionName, documentId, dataJson, now, now]
   );
 
-  await persist();
+  if (!options.skipPersist) await persist();
 
   return { ok: true, collectionName, documentId };
 }
@@ -309,11 +309,13 @@ export async function cacheCloudRecords(collectionName, records = []) {
       continue;
     }
 
-    const result = await cacheCloudRecord(collectionName, documentId, record);
+    const result = await cacheCloudRecord(collectionName, documentId, record, { skipPersist: true });
 
     if (result?.skipped) skipped += 1;
     else cached += 1;
   }
+
+  if (cached > 0) await persist();
 
   return { ok: true, collectionName, cached, skipped };
 }
@@ -353,6 +355,65 @@ export async function clearLocalCollection(collectionName) {
   await persist();
 
   return { ok: true, collectionName, clearedAt: now };
+}
+
+export async function clearLocalCollectionForShop(collectionName, shopId) {
+  await bootOfflineSqlite();
+  if (!collectionName || !shopId) throw new Error("Collection name and shopId are required.");
+
+  const now = new Date().toISOString();
+  const localRows = query(
+    `SELECT document_id, data_json FROM local_records WHERE collection_name = ?`,
+    [collectionName]
+  );
+  const documentIds = new Set(
+    localRows
+      .filter((row) => {
+        try { return JSON.parse(row.data_json || "{}").shopId === shopId; }
+        catch { return false; }
+      })
+      .map((row) => row.document_id)
+  );
+  const queueRows = query(
+    `SELECT id, document_id, payload_json FROM sync_queue WHERE collection_name = ?`,
+    [collectionName]
+  );
+  const queueIds = queueRows
+    .filter((row) => {
+      if (documentIds.has(row.document_id)) return true;
+      try { return JSON.parse(row.payload_json || "{}").data?.shopId === shopId; }
+      catch { return false; }
+    })
+    .map((row) => row.id);
+
+  db.run("BEGIN");
+  try {
+    documentIds.forEach((documentId) => {
+      db.run(
+        `DELETE FROM local_records WHERE collection_name = ? AND document_id = ?`,
+        [collectionName, documentId]
+      );
+    });
+    queueIds.forEach((queueId) => db.run(`DELETE FROM sync_queue WHERE id = ?`, [queueId]));
+    db.run(
+      `INSERT OR REPLACE INTO app_meta (key, value, updated_at) VALUES (?, ?, ?)`,
+      [`collection_cleared:${collectionName}:${shopId}`, now, now]
+    );
+    db.run("COMMIT");
+  } catch (error) {
+    db.run("ROLLBACK");
+    throw error;
+  }
+
+  await persist();
+  return {
+    ok:true,
+    collectionName,
+    shopId,
+    clearedRecords:documentIds.size,
+    clearedQueueItems:queueIds.length,
+    clearedAt:now,
+  };
 }
 
 export async function purgeLocalRecord(collectionName, documentId) {

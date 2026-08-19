@@ -81,6 +81,15 @@ ALL CORE STAGES (0–16) COMPLETE. Remaining deferred (environment/hardware-depe
 4. Existing app (`spare-parts-app.jsx`) stays working — no breaking changes
 5. Each STAGE ends with: run → test → fix → update this file → git commit (when user asks)
 
+### User-approved change to Rule 4 (2026-07-29) — Product Master replacement
+
+The user supplied `product-master.zip` (a Next.js + Prisma + Tailwind Product Master
+with an 11-window modal system) and asked for it to replace the Product Master screen
+inside the production app. Ported to `src/product-master/` as dependency-free JSX
+(scoped Windows/ERP skin, own CODE128 encoder) and mounted from the `products` tab of
+`spare-parts-app.jsx`. All product data still flows through the existing offline-first
+store (`offlineCreate`/`offlineUpdate` + Firebase sync) — no new backend, no new deps.
+
 ---
 
 ## Reuse From Current App (Locked)

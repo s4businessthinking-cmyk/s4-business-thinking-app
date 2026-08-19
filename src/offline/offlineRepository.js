@@ -9,6 +9,7 @@ import {
   cacheCloudRecord,
   cacheCloudRecords,
   clearLocalCollection,
+  clearLocalCollectionForShop,
   purgeLocalRecord,
 } from "./sqliteDb";
 
@@ -177,6 +178,10 @@ export async function offlineCacheCloudRecords(collectionName, records = []) {
 
 export async function offlineClearCollection(collectionName) {
   return clearLocalCollection(collectionName);
+}
+
+export async function offlineClearShopCollection(collectionName, shopId) {
+  return clearLocalCollectionForShop(collectionName, shopId);
 }
 
 export async function offlinePurgeLocal(collectionName, documentId) {

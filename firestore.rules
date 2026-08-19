@@ -56,6 +56,20 @@ service cloud.firestore {
       return isOwnerOfShop(shopId) || hasShopPermission(shopId, 'receiveBranchTransfer');
     }
 
+    function productCatalogWriteAllowed(shopId) {
+      return !exists(/databases/$(database)/documents/productMaintenance/$(shopId)) ||
+        (
+          get(/databases/$(database)/documents/productMaintenance/$(shopId)).data.active != true &&
+          request.resource.data.productCatalogEpoch ==
+            get(/databases/$(database)/documents/productMaintenance/$(shopId)).data.catalogEpoch
+        );
+    }
+
+    function legacyOrMaintenanceDeleteAllowed(shopId) {
+      return !exists(/databases/$(database)/documents/productMaintenance/$(shopId)) ||
+        get(/databases/$(database)/documents/productMaintenance/$(shopId)).data.active == true;
+    }
+
     function isBranchTransferReceiverByResource() {
       return isAuthenticated()
         && userExists(request.auth.uid)
@@ -169,9 +183,18 @@ service cloud.firestore {
 
     match /products/{productId} {
       allow read: if sameShopByResource();
-      allow create: if sameShopByRequest();
-      allow update: if sameShopByResource();
-      allow delete: if sameShopByResource() && isOwnerOfShop(resource.data.shopId);
+      allow create: if sameShopByRequest() && productCatalogWriteAllowed(request.resource.data.shopId);
+      allow update: if sameShopByResource() && productCatalogWriteAllowed(resource.data.shopId);
+      allow delete: if sameShopByResource()
+        && isOwnerOfShop(resource.data.shopId)
+        && legacyOrMaintenanceDeleteAllowed(resource.data.shopId);
+    }
+
+    match /productMaintenance/{shopId} {
+      allow read: if isShopMember(shopId);
+      allow create, update: if isOwnerOfShop(shopId)
+        && request.resource.data.shopId == shopId;
+      allow delete: if false;
     }
 
     match /inventory/{inventoryId} {

@@ -1,7 +1,7 @@
 {
   "name": "s4-business-thinking",
   "private": true,
-  "version": "1.0.35",
+  "version": "1.0.36",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -39,6 +39,7 @@
     "firebase": "^10.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "read-excel-file": "^9.3.5",
     "sql.js": "^1.14.1",
     "uuid": "^14.0.1"
   },
