@@ -13,14 +13,26 @@ export function normalizeOriginalPartNumber(value) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+export function coreOriginalPartKey(value) {
+  const tokens = String(value || "").toUpperCase().match(/[A-Z0-9]+/g) || [];
+  if (!tokens.length) return "";
+  const mixed = tokens.find((token) => /[A-Z]/.test(token) && /\d/.test(token) && token.length >= 4);
+  if (mixed) return mixed;
+  if (tokens.length >= 2 && /^[A-Z]{1,8}$/.test(tokens[0]) && /^\d{3,}$/.test(tokens[1])) {
+    return `${tokens[0]}${tokens[1]}`;
+  }
+  const oem = tokens.find((token) => /\d/.test(token) && token.length >= 4);
+  return oem || tokens[0];
+}
+
 export function productPartGroupKey(product) {
-  const fromCode = normalizeOriginalPartNumber(product?.code);
+  const fromCode = coreOriginalPartKey(product?.code);
   if (fromCode) return `PART:${fromCode}`;
 
   const existingGroup = String(product?.shopPartGroupKey || "");
   if (existingGroup.startsWith("PART:") || existingGroup.startsWith("PRODUCT:")) return existingGroup;
 
-  const fromStored = normalizeOriginalPartNumber(product?.originalPartKey);
+  const fromStored = coreOriginalPartKey(product?.originalPartKey);
   if (fromStored) return `PART:${fromStored}`;
 
   return product?.id ? `PRODUCT:${product.id}` : "";
@@ -58,13 +70,14 @@ export function nameWordsToken(value, wordCount = 1) {
 
 export function formatShopPartNumber(serial, originalPartNumber = "", settings = DEFAULT_SHOP_PART_FORMAT, extras = {}) {
   const format = normalizeShopPartFormat(settings);
-  const original = String(originalPartNumber || "").trim().replace(/[^A-Za-z0-9]/g, "");
+  const original = coreOriginalPartKey(originalPartNumber) || String(originalPartNumber || "").trim().replace(/[^A-Za-z0-9]/g, "");
   const brand = normalizeBrandToken(extras.brand || extras.company);
   const productName = String(extras.name || extras.productName || "").trim();
+  const modelCode = String(extras.code || originalPartNumber || "").trim();
   const nameCompact = normalizeBrandToken(productName);
   const safeSerial = Math.max(1, Number(serial) || 1);
   const output = format.pattern.replace(
-    /\{(ORIGINAL|FIRST|LAST|SERIAL|BRAND|COMPANY|NAMEWORD|NAME)(\d{0,2})\}/gi,
+    /\{(ORIGINAL|FIRST|LAST|SERIAL|BRAND|COMPANY|NAMEWORD|NAME|CODEWORD)(\d{0,2})\}/gi,
     (_, token, countText) => {
       const key = token.toUpperCase();
       if (key === "BRAND" || key === "COMPANY") {
@@ -76,6 +89,9 @@ export function formatShopPartNumber(serial, originalPartNumber = "", settings =
       }
       if (key === "NAMEWORD") {
         return nameWordsToken(productName, Number(countText) || 1);
+      }
+      if (key === "CODEWORD") {
+        return nameWordsToken(modelCode, Number(countText) || 1);
       }
       if (key === "NAME") {
         const source = nameCompact || "ITEM";
@@ -139,4 +155,47 @@ export function nextLocalShopPartSerial(products) {
     ),
     0
   ) + 1;
+}
+
+export function shopPartAlignmentPatches(products = []) {
+  const groups = new Map();
+  products.forEach((product) => {
+    const groupKey = productPartGroupKey(product);
+    if (!groupKey.startsWith("PART:")) return;
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey).push(product);
+  });
+
+  const patches = [];
+  groups.forEach((members, groupKey) => {
+    const numbered = members.filter((item) => String(item.shopPartNumber || "").trim());
+    const uniqueNumbers = new Set(numbered.map((item) => String(item.shopPartNumber).toLowerCase()));
+    if (uniqueNumbers.size < 2) return;
+    const winner = numbered.reduce((best, item) => {
+      const serial = Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER;
+      const bestSerial = Number(best.shopPartSerial) || shopPartSerial(best.shopPartNumber) || Number.MAX_SAFE_INTEGER;
+      if (serial !== bestSerial) return serial < bestSerial ? item : best;
+      return String(item.shopPartNumber).localeCompare(String(best.shopPartNumber)) < 0 ? item : best;
+    });
+    const winnerSerial = Number(winner.shopPartSerial) || shopPartSerial(winner.shopPartNumber);
+    const originalPartKey = coreOriginalPartKey(winner.code) || groupKey.slice(5);
+
+    members.forEach((product) => {
+      const alreadyAligned =
+        String(product.shopPartNumber || "") === String(winner.shopPartNumber || "") &&
+        (Number(product.shopPartSerial) || shopPartSerial(product.shopPartNumber)) === winnerSerial &&
+        product.shopPartGroupKey === groupKey &&
+        product.originalPartKey === originalPartKey;
+      if (alreadyAligned) return;
+      patches.push({
+        id: product.id,
+        shopPartNumber: winner.shopPartNumber,
+        shopPartSerial: winnerSerial,
+        originalPartKey,
+        shopPartGroupKey: groupKey,
+        shopPartFormatKey: product.shopPartFormatKey || winner.shopPartFormatKey,
+      });
+    });
+  });
+  return patches;
 }

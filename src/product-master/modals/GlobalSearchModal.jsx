@@ -17,7 +17,7 @@ const EMPTY_FIELDS = {
 
 const SEARCH_COLUMNS = [
   { key: "productName", label: "Product Name", width: 180 },
-  { key: "productCode", label: "Product Code", width: 115 },
+  { key: "productCode", label: "Product Code", width: 240 },
   { key: "shopPartNumber", label: "Shop Part No", width: 110 },
   { key: "barcode", label: "Barcode", width: 130 },
   { key: "ean", label: "EAN", width: 115 },
@@ -34,14 +34,16 @@ const SEARCH_COLUMNS = [
 const defaultColumnSettings = () => SEARCH_COLUMNS.map((column) => ({ ...column }));
 const loadColumnSettings = () => {
   try {
-    const saved = JSON.parse(localStorage.getItem("s4-product-search-columns") || "[]");
+    const saved = JSON.parse(localStorage.getItem("s4-product-search-columns-v2") || localStorage.getItem("s4-product-search-columns") || "[]");
     if (!Array.isArray(saved) || saved.length !== SEARCH_COLUMNS.length) return defaultColumnSettings();
     const byKey = new Map(SEARCH_COLUMNS.map((column) => [column.key, column]));
     if (saved.some((column) => !byKey.has(column.key))) return defaultColumnSettings();
-    return saved.map((column) => ({
-      ...byKey.get(column.key),
-      width: Math.max(50, Math.min(500, Number(column.width) || byKey.get(column.key).width)),
-    }));
+    return saved.map((column) => {
+      const defaults = byKey.get(column.key);
+      let width = Math.max(50, Math.min(800, Number(column.width) || defaults.width));
+      if (column.key === "productCode" && width <= 115) width = defaults.width;
+      return { ...defaults, width };
+    });
   } catch {
     return defaultColumnSettings();
   }
@@ -71,6 +73,7 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   const [selectedId, setSelectedId] = useState(null);
   const firstInputRef = useRef(null);
   const gridRef = useRef(null);
+  const columnSettingsRef = useRef(columnSettings);
   const activeColumnSettings = useMemo(
     () => columnSettings.filter((column) => shopPartEnabled || column.key !== "shopPartNumber"),
     [columnSettings, shopPartEnabled]
@@ -119,6 +122,10 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   useEffect(() => {
     firstInputRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    columnSettingsRef.current = columnSettings;
+  }, [columnSettings]);
 
   useEffect(() => {
     if (!autoSearch) return undefined;
@@ -171,11 +178,34 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   const applyColumnSettings = () => {
     const applied = draftColumns.map((column) => ({
       ...column,
-      width: Math.max(50, Math.min(500, Number(column.width) || 50)),
+      width: Math.max(50, Math.min(800, Number(column.width) || 50)),
     }));
     setColumnSettings(applied);
-    localStorage.setItem("s4-product-search-columns", JSON.stringify(applied));
+    localStorage.setItem("s4-product-search-columns-v2", JSON.stringify(applied));
     setShowColumnSettings(false);
+  };
+  const persistColumnSettings = (next) => {
+    setColumnSettings(next);
+    localStorage.setItem("s4-product-search-columns-v2", JSON.stringify(next));
+  };
+  const startColumnResize = (event, key) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const startWidth = Number(columnSettings.find((column) => column.key === key)?.width) || 80;
+    const onMove = (moveEvent) => {
+      const width = Math.max(50, Math.min(800, startWidth + (moveEvent.clientX - startX)));
+      setColumnSettings((previous) => previous.map((column) => (
+        column.key === key ? { ...column, width } : column
+      )));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      persistColumnSettings(columnSettingsRef.current);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   const columnValue = (product, key) => ({
@@ -259,7 +289,14 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
               <thead>
                 <tr>
                   {activeColumnSettings.map((column) => (
-                    <th key={column.key} style={{ width: Number(column.width) }}>{column.label}</th>
+                    <th key={column.key} style={{ width: Number(column.width) }}>
+                      <span className="pm-search-col-label">{column.label}</span>
+                      <span
+                        className="pm-search-col-resizer"
+                        onMouseDown={(event) => startColumnResize(event, column.key)}
+                        title="Drag to resize column"
+                      />
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -275,9 +312,14 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
                     onDoubleClick={() => recall(product)}
                     title="Double-click to recall this product in Product Master (tap once on mobile)"
                   >
-                    {activeColumnSettings.map((column) => (
-                      <td key={column.key} style={{ width: Number(column.width) }}>{columnValue(product, column.key)}</td>
-                    ))}
+                    {activeColumnSettings.map((column) => {
+                      const value = columnValue(product, column.key);
+                      return (
+                        <td key={column.key} style={{ width: Number(column.width) }} title={String(value || "")}>
+                          {value}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
                 {!results.length && (
@@ -338,7 +380,7 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
                     id="pm-search-column-width"
                     type="number"
                     min="50"
-                    max="500"
+                    max="800"
                     value={draftColumns.find((column) => column.key === selectedColumn)?.width ?? ""}
                     onChange={(event) => updateSelectedWidth(event.target.value)}
                   />

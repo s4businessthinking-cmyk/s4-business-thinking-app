@@ -455,7 +455,7 @@ textarea.pm-input { resize: vertical; }
   top: 0;
   z-index: 1;
   height: 20px;
-  padding: 2px 3px;
+  padding: 2px 8px 2px 3px;
   border-right: 1px solid #9aa7ae;
   border-bottom: 1px solid #8a989f;
   background: linear-gradient(180deg, #f8fafb, #e1e5e7);
@@ -463,6 +463,20 @@ textarea.pm-input { resize: vertical; }
   white-space: nowrap;
   overflow: hidden;
   font-weight: 700;
+}
+.pm-search-col-label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pm-search-col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
 }
 .pm-search-grid td {
   height: 19px;

@@ -47,9 +47,10 @@ import {
   DEFAULT_SHOP_PART_FORMAT,
   formatShopPartNumber,
   nextLocalShopPartSerial,
-  normalizeOriginalPartNumber,
+  coreOriginalPartKey,
   normalizeShopPartFormat,
   productPartGroupKey,
+  shopPartAlignmentPatches,
   shopPartFormatKey,
   shopPartSerial,
   uniqueShopPartNumber,
@@ -9757,6 +9758,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const shopPartAllocationRef = useRef(new Map());
   const shopPartNumberOwnersRef = useRef(new Map());
   const shopPartBackfillRef = useRef("");
+  const shopPartAlignRef = useRef("");
   const pmReset = () => setPmForm(createEmptyPmForm());
 
   const rebuildShopPartIndex = (rows = products) => {
@@ -9772,7 +9774,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       const assignment = {
         shopPartNumber: product.shopPartNumber,
         shopPartSerial: serial,
-        originalPartKey: normalizeOriginalPartNumber(product.code),
+        originalPartKey: coreOriginalPartKey(product.code),
         shopPartGroupKey: groupKey,
       };
       if (!existing || (!existing.shopPartSerial && serial) || existing.shopPartSerial > serial) {
@@ -9786,7 +9788,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   };
 
   const reserveShopPartNumber = (productLike, { reuse = "", previousGroupKey = "" } = {}) => {
-    const originalPartKey = normalizeOriginalPartNumber(productLike?.code);
+    const originalPartKey = coreOriginalPartKey(productLike?.code);
     const groupKey = productPartGroupKey({ ...productLike, originalPartKey });
     if (!groupKey) {
       return { shopPartNumber: "", originalPartKey: "", shopPartGroupKey: "" };
@@ -9825,6 +9827,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       brand: productLike.company || productLike.brand,
       company: productLike.company || productLike.brand,
       name: productLike.name,
+      code: productLike.code,
     });
     const shopPartNumber = uniqueShopPartNumber(
       candidate,
@@ -9939,10 +9942,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         brand: representative.company || representative.brand,
         company: representative.company || representative.brand,
         name: representative.name,
+        code: representative.code,
       });
       const shopPartNumber = uniqueShopPartNumber(candidate, usedNumbers, normalizedFormat.collisionSeparator);
       usedNumbers.add(shopPartNumber.toLowerCase());
-      const originalPartKey = normalizeOriginalPartNumber(representative.code);
+      const originalPartKey = coreOriginalPartKey(representative.code);
       groupProducts.forEach((product) => updates.push({
         id: product.id,
         shopPartNumber,
@@ -10125,6 +10129,32 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     return () => { cancelled = true; };
   }, [shopId, products, shopPartEnabled]);
 
+  useEffect(() => {
+    if (!shopPartEnabled || !shopId || !products.length) return;
+    const signature = `${shopId}:${products.length}:core-align-v1`;
+    if (shopPartAlignRef.current === signature) return;
+    const patches = shopPartAlignmentPatches(products);
+    if (!patches.length) {
+      shopPartAlignRef.current = signature;
+      return;
+    }
+
+    shopPartAlignRef.current = signature;
+    let cancelled = false;
+    (async () => {
+      await persistShopPartUpdates(patches);
+      if (cancelled) return;
+      rebuildShopPartIndex(products.map((product) => {
+        const patch = patches.find((entry) => entry.id === product.id);
+        return patch ? { ...product, ...patch } : product;
+      }));
+      if (navigator.onLine) {
+        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part align sync failed", err));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [shopId, products, shopPartEnabled]);
+
   const pmFormFromProduct = (p) => ({
     ...createEmptyPmForm(),
     ...p,
@@ -10133,7 +10163,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     shopPartNumber:p.shopPartNumber||"",
     shopPartSerial:Number(p.shopPartSerial)||shopPartSerial(p.shopPartNumber),
     shopPartFormatKey:p.shopPartFormatKey||"",
-    originalPartKey:p.originalPartKey||normalizeOriginalPartNumber(p.code),
+    originalPartKey:p.originalPartKey||coreOriginalPartKey(p.code),
     shopPartGroupKey:p.shopPartGroupKey||productPartGroupKey(p),
     barcode:p.barcode||"",
     ean:p.ean||"",
@@ -10500,7 +10530,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
 
       if (field==="code" && shopPartEnabledRef.current) {
-        const originalPartKey = normalizeOriginalPartNumber(val);
+        const originalPartKey = coreOriginalPartKey(val);
         const groupKey = originalPartKey ? `PART:${originalPartKey}` : "";
         const assigned = groupKey ? shopPartAllocationRef.current.get(groupKey) : null;
         next.originalPartKey = originalPartKey;
@@ -10511,7 +10541,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
                 Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1,
                 val,
                 shopPartFormatRef.current,
-                { brand: next.company || next.brand, company: next.company || next.brand, name: next.name }
+                { brand: next.company || next.brand, company: next.company || next.brand, name: next.name, code: val }
               )
             : ""
         );

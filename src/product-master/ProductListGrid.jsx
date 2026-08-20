@@ -29,8 +29,8 @@ export default function ProductListGrid({
                 onClick={() => onSelect(p)}
               >
                 <td>{p.name}</td>
-                {shopPartEnabled && <td style={{ whiteSpace: "nowrap" }}>{p.shopPartNumber || "-"}</td>}
-                <td style={{ whiteSpace: "nowrap" }}>{p.code || p.barcode || "-"}</td>
+                {shopPartEnabled && <td style={{ whiteSpace: "nowrap" }} title={p.shopPartNumber || ""}>{p.shopPartNumber || "-"}</td>}
+                <td style={{ whiteSpace: "nowrap" }} title={p.code || p.barcode || ""}>{p.code || p.barcode || "-"}</td>
               </tr>
             ))}
           </tbody>

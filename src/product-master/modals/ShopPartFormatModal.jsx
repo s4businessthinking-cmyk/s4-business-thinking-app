@@ -21,6 +21,7 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
       brand: sampleBrand,
       company: sampleBrand,
       name: sampleName,
+      code: sampleOriginal,
     }),
     [draft, sampleOriginal, sampleBrand, sampleName, sampleSerial]
   );
@@ -70,6 +71,7 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
 
           <div className="pm-shop-part-format__tokens">
             <span>Insert at cursor:</span>
+            <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{CODEWORD}")}>Model 1st word</button>
             <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{NAMEWORD}")}>Name 1 word</button>
             <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{NAMEWORD2}")}>Name 2 words</button>
             <button type="button" className="pm-btn-secondary" onClick={() => insertToken("{NAME}")}>Product Name</button>
@@ -139,6 +141,7 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
           </label>
           <div className="pm-shop-part-format__result">{preview}</div>
           <div className="pm-shop-part-format__examples">
+            <span><b>ALUMINUM-001233:</b> {"{CODEWORD}-{SERIAL6}"}</span>
             <span><b>OIL-001233:</b> {"{NAMEWORD}-{SERIAL6}"}</span>
             <span><b>OILFILTER-001233:</b> {"{NAMEWORD2}-{SERIAL6}"}</span>
             <span><b>VOLVO-001233:</b> {"{BRAND}-{SERIAL6}"}</span>
@@ -158,7 +161,7 @@ export default function ShopPartFormatModal({ value, featureEnabled = true, onSa
             onChange={(event) => setApplyToExisting(event.target.checked)}
           />
           {featureEnabled
-            ? "Rewrite ALL existing Shop Part Numbers to this format. Leave unchecked to keep codes already generated; only new/empty products will use the new format."
+            ? "Rewrite ALL existing Shop Part Numbers to this format. Leave unchecked to keep codes already generated; only new/empty products will use the new format. Same OEM/model-first-word groups already share one Shop Part Number automatically."
             : "The feature is currently OFF. This format will be applied when Shop Part Number is enabled."}
         </label>
 
