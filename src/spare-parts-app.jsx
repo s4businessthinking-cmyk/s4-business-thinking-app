@@ -211,7 +211,7 @@ const DEFAULT_PERMISSIONS = {
   setStatus: false,
   markDelivery: false,
   deleteOrder: false,
-  viewProducts: false,
+  viewProducts: true,
   manageSales: true,
   manageCustomers: true,
 
@@ -3798,32 +3798,70 @@ function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvo
 }
 
 // ─── PI: SALESMAN READ-ONLY VIEW ──────────────────────────────
-function PiSalesmanView({ t, lang, th, shopId }) {
+function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0 }) {
   const [invoices,setInvoices]   = useState([]);
   const [loading,setLoading]     = useState(true);
   const [searchQ,setSearchQ]     = useState("");
   const [dateRange,setDateRange] = useState("30"); // 7 | 30 | 90 | "all"
 
-  // real-time listener with fallback
+  // Local-first, then Firebase live listener; always cache to SQLite for offline.
   useEffect(()=>{
     if (!shopId) return;
     setLoading(true);
     let unsub2=null;
+    let cancelled=false;
+
+    const normalize = (d) => ({
+      ...d.data(),
+      id:d.id,
+      createdAt:d.data().createdAt?.toDate?.() || d.data().createdAt || new Date(),
+    });
+
+    const sortRows = (rows=[]) => [...rows].sort((a,b)=>
+      new Date(b.createdAt||0) - new Date(a.createdAt||0)
+    );
+
+    const loadLocal = async () => {
+      try {
+        const res = await offlineList("purchaseInvoices");
+        if (cancelled) return;
+        const records = Array.isArray(res) ? res : (res.records || []);
+        const rows = sortRows(records
+          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
+          .filter(inv => inv.shopId === shopId));
+        if (rows.length) {
+          setInvoices(rows);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.warn("[S4 Offline] PiSalesmanView local load failed", err);
+      }
+    };
+
+    const applyCloud = (rows) => {
+      if (cancelled) return;
+      setInvoices(sortRows(rows));
+      setLoading(false);
+      offlineCacheCloudRecords("purchaseInvoices", rows)
+        .catch(err => console.warn("[S4 Offline] PiSalesmanView cache failed", err));
+    };
+
+    loadLocal();
+
     const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
     const unsub1=onSnapshot(q,snap=>{
-      setInvoices(snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()})));
-      setLoading(false);
+      applyCloud(snap.docs.map(normalize));
     },()=>{
       const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
       unsub2=onSnapshot(q2,snap=>{
-        const docs=snap.docs.map(d=>({...d.data(),id:d.id,createdAt:d.data().createdAt?.toDate?.()||new Date()}));
-        docs.sort((a,b)=>b.createdAt-a.createdAt);
-        setInvoices(docs);
-        setLoading(false);
-      },err2=>{ console.error(err2); setLoading(false); });
+        applyCloud(sortRows(snap.docs.map(normalize)));
+      },err2=>{
+        console.error(err2);
+        loadLocal().finally(()=>{ if (!cancelled) setLoading(false); });
+      });
     });
-    return ()=>{ unsub1(); unsub2&&unsub2(); };
-  },[shopId]);
+    return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
+  },[shopId,syncRefreshKey]);
 
   // flatten all items from all confirmed/paid invoices
   const allItems = [];
@@ -4405,7 +4443,7 @@ function printPaymentVoucher(voucher, shop, lang) {
 }
 
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0 }) {
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
   const can = (key) => isOwner || perms[key] === true;
@@ -4550,7 +4588,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       });
     });
     return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
-  },[shopId]);
+  },[shopId,syncRefreshKey]);
 
   // ── Generate invoice no — preview instantly, commit on save ──
   const piMaxLocalSerial = () => invoices.reduce((mx, inv) => {
@@ -5929,7 +5967,7 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0 }) {
   const isOwner = profile?.role==="owner";
 
   const [invoices,setInvoices]     = useState([]);
@@ -6031,7 +6069,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       });
     });
     return ()=>{ cancelled=true; u1(); u2&&u2(); };
-  },[shopId,isOwner,user.uid]);
+  },[shopId,isOwner,user.uid,syncRefreshKey]);
 
   const siMaxLocalSerial = () => invoices.reduce((mx, inv) => {
     const m = String(inv.invoiceNo || "").match(/SI-?(\d+)$/i);
@@ -9205,6 +9243,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         window.S4Offline?.syncNow?.().catch((err) =>
           console.warn("[S4 Sync] auth restore upload failed", err)
         );
+        // Salesman/PC: once Firebase session is ready, pull shop data into local SQLite
+        // so products/invoices stay available offline after first sync.
+        shouldAutoPullShop(shopId).then((shouldPull) => {
+          if (!shouldPull) return null;
+          return runCloudDownload({ silent: true });
+        }).catch((err) => console.warn("[S4 Sync] auth restore cloud pull failed", err));
       }
     });
   }, [shopId]);
@@ -9240,7 +9284,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     if (!shopId) return;
     let cancelled = false;
 
-    (async () => {
+    const tryAutoPull = async () => {
       try {
         if (!(await shouldAutoPullShop(shopId))) return;
         const result = await runCloudDownload({ silent: true });
@@ -9250,9 +9294,16 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       } catch (error) {
         console.warn("[S4 Sync] auto cloud pull failed", error);
       }
-    })();
+    };
 
-    return () => { cancelled = true; };
+    tryAutoPull();
+    // Keep salesman/PC local SQLite warm while online (empty catalog / stale pull).
+    const timer = window.setInterval(tryAutoPull, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [shopId, isOwner, isOrderManager, user?.uid]);
 
   const [showChequePrinter,setShowChequePrinter]=useState(false);
@@ -12809,12 +12860,13 @@ const startEditOrder = (order) => {
           shopId={shopId} user={user} profile={profile}
           vendors={vendors} products={products}
           shop={localShop} toast={toast} isDesktop={isDesktop}
+          syncRefreshKey={syncRefreshKey}
         />
       )}
 
       {tab==="purchase"&&!canStaffSupplierArea&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
-          <PiSalesmanView t={t} lang={lang} th={th} shopId={shopId} />
+          <PiSalesmanView t={t} lang={lang} th={th} shopId={shopId} syncRefreshKey={syncRefreshKey} />
         </div>
       )}
 
@@ -12826,6 +12878,7 @@ const startEditOrder = (order) => {
           shop={localShop} toast={toast} isDesktop={isDesktop}
           siShowCode={siShowCode} siColorPrint={siColorPrint}
           canManageCustomers={can("manageCustomers")}
+          syncRefreshKey={syncRefreshKey}
           onCustomerCreated={(created) => setCustomers((prev) => [...prev, created].sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||"")))}
         />
       )}

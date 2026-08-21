@@ -85,34 +85,36 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   );
 
   function matches(actual, expected) {
-    const haystack = clean(actual);
-    const needle = clean(expected);
+    const haystack = clean(actual).replace(/\s+/g, " ");
+    const needle = clean(expected).replace(/\s+/g, " ");
     if (!needle) return true;
     return extendedSearch ? haystack.includes(needle) : haystack.startsWith(needle);
   }
 
-  function runSearch({ allowEmpty = true } = {}) {
-    if (!hasCriteria && !allowEmpty) {
+  function runSearch({ allowEmpty = true, nextFields = fields } = {}) {
+    const criteria = Object.values(nextFields).some((value) => String(value).trim());
+    if (!criteria && !allowEmpty) {
       setResults([]);
       setSelectedId(null);
       return;
     }
 
-    const found = products.filter((product) => {
+    const catalog = Array.isArray(products) ? products : [];
+    const found = catalog.filter((product) => {
       const refs = productRefs(product);
       return (
-        matches(product.name, fields.productName) &&
-        matches(product.code, fields.productCode) &&
-        (!shopPartEnabled || matches(product.shopPartNumber, fields.shopPartNumber)) &&
-        (!fields.barcode || refs.some((value) => matches(value, fields.barcode))) &&
-        matches(product.ean, fields.ean) &&
-        (!fields.alternateCodes || refs.some((value) => matches(value, fields.alternateCodes))) &&
-        matches(product.company || product.brand, fields.company) &&
-        matches(product.category, fields.category) &&
-        matches(product.subcategory, fields.subCategory) &&
-        matches(product.productGroup, fields.productGroup) &&
-        matches(product.commodityCode, fields.commodityCode) &&
-        matches(product.mrp, fields.mrp)
+        matches(product.name, nextFields.productName) &&
+        matches(product.code, nextFields.productCode) &&
+        (!shopPartEnabled || matches(product.shopPartNumber, nextFields.shopPartNumber)) &&
+        (!nextFields.barcode || refs.some((value) => matches(value, nextFields.barcode))) &&
+        matches(product.ean, nextFields.ean) &&
+        (!nextFields.alternateCodes || refs.some((value) => matches(value, nextFields.alternateCodes))) &&
+        matches(product.company || product.brand, nextFields.company) &&
+        matches(product.category, nextFields.category) &&
+        matches(product.subcategory, nextFields.subCategory) &&
+        matches(product.productGroup, nextFields.productGroup) &&
+        matches(product.commodityCode, nextFields.commodityCode) &&
+        matches(product.mrp, nextFields.mrp)
       );
     });
     setResults(found.slice(0, 500));
@@ -142,7 +144,15 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
         event.stopPropagation();
         if (showColumnSettings) setShowColumnSettings(false);
         else onClose();
-      } else if (event.key === "Control") {
+        return;
+      }
+      // Only jump to grid when Control is pressed outside text fields.
+      // Stealing focus on every Control keydown broke typing/paste in search boxes.
+      if (event.key === "Control") {
+        const tag = String(event.target?.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "textarea" || tag === "select" || event.target?.isContentEditable) {
+          return;
+        }
         gridRef.current?.focus();
       }
     };
@@ -259,10 +269,17 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
                   <span>{label}</span>
                   <input
                     ref={index === 0 ? firstInputRef : undefined}
-                    value={fields[key]}
+                    type="text"
+                    autoComplete="off"
+                    spellCheck={false}
+                    value={fields[key] ?? ""}
                     onChange={(event) => updateField(key, event.target.value)}
+                    onInput={(event) => updateField(key, event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === "Enter") runSearch();
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        runSearch({ nextFields: { ...fields, [key]: event.currentTarget.value } });
+                      }
                     }}
                   />
                 </label>

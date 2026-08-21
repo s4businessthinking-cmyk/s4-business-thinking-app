@@ -398,6 +398,8 @@ textarea.pm-input { resize: vertical; }
   font: 12px Tahoma, sans-serif;
   box-shadow: inset 1px 1px 1px rgba(0, 0, 0, .14);
   outline: none;
+  pointer-events: auto;
+  user-select: text;
 }
 .pm-search-field input:focus {
   border-color: #176d88;
@@ -461,7 +463,7 @@ textarea.pm-input { resize: vertical; }
   background: linear-gradient(180deg, #f8fafb, #e1e5e7);
   text-align: left;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
   font-weight: 700;
 }
 .pm-search-col-label {

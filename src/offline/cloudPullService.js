@@ -93,16 +93,27 @@ export function getShopCloudPulledAt(shopId) {
 
 export async function shouldAutoPullShop(shopId) {
   if (!shopId || !isOnline()) return false;
-  if (getShopCloudPulledAt(shopId)) return false;
 
   try {
-    const status = await getOfflineStatus();
-    if (Number(status?.localRecords || 0) > 12) return false;
+    const localProducts = await getLocalRecords("products");
+    const shopProductCount = localProducts.filter((row) => {
+      const recordShopId = String(row.data?.shopId || "").trim();
+      return recordShopId === String(shopId) && !row.data?.deleted;
+    }).length;
+    if (shopProductCount === 0) return true;
   } catch {
-    return true;
+    // If local DB check fails, still try a first-time / stale pull below.
   }
 
-  return true;
+  const pulledAt = getShopCloudPulledAt(shopId);
+  if (!pulledAt) return true;
+
+  const ageMs = Date.now() - new Date(pulledAt).getTime();
+  if (!Number.isFinite(ageMs) || ageMs < 0) return true;
+  // Refresh shop catalog periodically so salesman/PC keeps local SQLite warm.
+  if (ageMs > 6 * 60 * 60 * 1000) return true;
+
+  return false;
 }
 
 function normalizeFirestoreDoc(docSnap) {
@@ -337,6 +348,10 @@ export function sortPulledRecords(data) {
     customers: [...(data.customers || [])].sort(byName("customerName")),
     vendors: [...(data.vendors || [])].sort(byName("vendorName")),
     orders: [...(data.orders || [])].sort(byCreatedDesc),
+    salesInvoices: [...(data.salesInvoices || [])].sort(byCreatedDesc),
+    purchaseInvoices: [...(data.purchaseInvoices || [])].sort(byCreatedDesc),
+    purchasePayments: [...(data.purchasePayments || [])].sort(byCreatedDesc),
+    supplierPayments: [...(data.supplierPayments || [])].sort(byCreatedDesc),
     team: [...(data.users || [])].map((row) => ({ ...row, id: row.id })),
     shop: data.shop || null,
     inviteCodes: data.inviteCodes || [],

@@ -162,6 +162,8 @@ export default function ProductMasterScreen({
 
   useEffect(() => {
     const onKey = (e) => {
+      const tag = String(e.target?.tagName || "").toLowerCase();
+      const typing = tag === "input" || tag === "textarea" || tag === "select" || e.target?.isContentEditable;
       if (e.key === "Escape" && !modalRef.current) {
         e.preventDefault();
         closeRef.current();
@@ -170,8 +172,9 @@ export default function ProductMasterScreen({
       if (e.key === "F10") {
         e.preventDefault();
         setActiveModal("search");
+        return;
       }
-      if (!modalRef.current && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      if (!modalRef.current && !typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         saveRef.current();
       }
