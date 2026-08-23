@@ -47,7 +47,12 @@ export function ProductTypeaheadInput({
     window.setTimeout(() => {
       if (!wrapRef.current?.contains(document.activeElement)) {
         setOpen(false);
-        const exact = findExactProductMatch(products, field === "code" ? { code: value } : { name: value });
+        const exact = findExactProductMatch(
+          products,
+          field === "code" || field === "shopPart"
+            ? { code: value, shopPartNumber: value }
+            : { name: value }
+        );
         if (exact && value.trim()) pickProduct(exact);
       }
     }, 140);
@@ -153,7 +158,7 @@ export function ProductTypeaheadInput({
                 {product.name}
               </div>
               <div style={{ fontSize: 11, color: th?.txtMuted || "#71717a", marginTop: 2 }}>
-                {[product.code, product.brand, product.category].filter(Boolean).join(" · ")}
+                {[product.shopPartNumber, product.code, product.brand, product.category].filter(Boolean).join(" · ")}
               </div>
             </button>
           ))}

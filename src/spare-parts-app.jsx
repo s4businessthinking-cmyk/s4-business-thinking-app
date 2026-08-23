@@ -50,7 +50,7 @@ import {
   coreOriginalPartKey,
   normalizeShopPartFormat,
   productPartGroupKey,
-  shopPartAlignmentPatches,
+  shopPartCorrectionPatches,
   shopPartFormatKey,
   shopPartSerial,
   uniqueShopPartNumber,
@@ -748,7 +748,7 @@ const TR = {
     pi_editBtn:"✏️ এডিট",
     pi_deleteBtn:"🗑️ মুছুন",
     pi_cancelForm:"✕ বাতিল",
-    pi_pmSearchPh:"পণ্য খুঁজুন...",
+    pi_pmSearchPh:"নাম / Shop Code / কোড খুঁজুন...",
   },
   en: {
     appSub:"Parts Order Management",
@@ -1273,7 +1273,7 @@ const TR = {
     pi_editBtn:"✏️ Edit",
     pi_deleteBtn:"🗑️ Delete",
     pi_cancelForm:"✕ Cancel",
-    pi_pmSearchPh:"Search products...",
+    pi_pmSearchPh:"Search name / shop code / model...",
   },
 };
 
@@ -2024,7 +2024,7 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
   const [q,setQ]=useState("");
   const filtered=products.filter(p=>{
     if (!q) return true;
-    const hay = [p.name,p.code,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
+    const hay = [p.name,p.code,p.shopPartNumber,p.originalPartKey,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
     return nsmatch(hay, q);
   });
   const inp={ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
@@ -2044,6 +2044,7 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
             <button key={p.id} onClick={()=>onSelect(p)} style={{ width:"100%", textAlign:"left", padding:"12px 16px", background:"transparent", border:"none", borderBottom:`1px solid ${th.border}`, color:th.txtSecondary, cursor:"pointer", fontFamily:"inherit" }}>
               <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{p.name}</div>
               <div style={{ fontSize:11, color:th.txtMuted, marginTop:3, display:"flex", gap:8, flexWrap:"wrap" }}>
+                {p.shopPartNumber&&<span style={{ color:"#38bdf8" }}>🏷️ {p.shopPartNumber}</span>}
                 {p.code&&<span>📋 {p.code}</span>}
                 {p.brand&&<span>🏷️ {p.brand}</span>}
                 {p.category&&<span>🗂️ {p.category}</span>}
@@ -5346,7 +5347,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
               onChange={(value)=>setPiCurrent((p)=>({ ...p, code:value }))}
               onSelectProduct={piSelectProduct}
               field="code"
-              placeholder={t.pi_code}
+              placeholder={lang==="bn"?"Code / Shop Code":"Code / Shop Code"}
               th={th}
               lang={lang}
               onKeyDown={(e)=>e.key==="Enter"&&piAddCurrentItem()}
@@ -5806,7 +5807,7 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
 
   const filtered = products.filter(p=>{
     if (!q) return true;
-    const hay = [p.name,p.code,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
+    const hay = [p.name,p.code,p.shopPartNumber,p.originalPartKey,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
     return nsmatch(hay, q);
   });
 
@@ -5842,7 +5843,7 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
         {/* Search */}
         <div style={{ padding:"10px 14px", borderBottom:`1px solid ${th.border}` }}>
           <input autoFocus style={{ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" }}
-            placeholder={lang==="bn"?"পণ্যের নাম, কোড বা ব্র্যান্ড লিখুন...":"Search by name, code or brand..."}
+            placeholder={lang==="bn"?"পণ্যের নাম, Shop Code, কোড বা ব্র্যান্ড...":"Search by name, shop code, code or brand..."}
             value={q} onChange={e=>setQ(e.target.value)} />
         </div>
 
@@ -5854,6 +5855,7 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
                 <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
+                  {p.shopPartNumber&&<span style={{ color:"#38bdf8" }}>SP {p.shopPartNumber}</span>}
                   {p.code&&<span>📋 {p.code}</span>}
                   {p.brand&&<span>🏷️ {p.brand}</span>}
                   {p.vatExclusive&&<span style={{ color:"#22c55e", fontWeight:700 }}>{t.cur}{p.vatExclusive}</span>}
@@ -6640,7 +6642,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               onChange={(value)=>setSiCurrent((p)=>({ ...p, code:value }))}
               onSelectProduct={siSelectProduct}
               field="code"
-              placeholder={t.si_code}
+              placeholder={lang==="bn"?"Code / Shop Code":"Code / Shop Code"}
               th={th}
               lang={lang}
               onKeyDown={(e)=>e.key==="Enter"&&siAddCurrentItem()}
@@ -9234,6 +9236,39 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   }, [shopId, user?.uid]);
 
   useEffect(() => {
+    if (!shopId) return;
+    let cancelled = false;
+
+    const tryAutoPull = async ({ force = false } = {}) => {
+      try {
+        const forceKey = `s4-force-cloud-pull:${shopId}`;
+        const forced =
+          force ||
+          (typeof sessionStorage !== "undefined" && sessionStorage.getItem(forceKey) === "1");
+        if (!forced && !(await shouldAutoPullShop(shopId))) return;
+        const result = await runCloudDownload({ silent: !forced });
+        if (forced && typeof sessionStorage !== "undefined") {
+          try { sessionStorage.removeItem(forceKey); } catch {}
+        }
+        if (!cancelled && result?.ok && !forced) {
+          toast(t.syncAutoPullOk);
+        }
+      } catch (error) {
+        console.warn("[S4 Sync] auto cloud pull failed", error);
+      }
+    };
+
+    tryAutoPull({ force: false });
+    // Keep salesman/PC local SQLite warm while online (empty catalog / stale pull).
+    const timer = window.setInterval(() => tryAutoPull({ force: false }), 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [shopId, isOwner, isOrderManager, user?.uid]);
+
+  useEffect(() => {
     if (!auth || !shopId) return;
 
     return onAuthStateChanged(auth, (fbUser) => {
@@ -9243,11 +9278,16 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         window.S4Offline?.syncNow?.().catch((err) =>
           console.warn("[S4 Sync] auth restore upload failed", err)
         );
-        // Salesman/PC: once Firebase session is ready, pull shop data into local SQLite
-        // so products/invoices stay available offline after first sync.
-        shouldAutoPullShop(shopId).then((shouldPull) => {
+        const forceKey = `s4-force-cloud-pull:${shopId}`;
+        const forced = typeof sessionStorage !== "undefined" && sessionStorage.getItem(forceKey) === "1";
+        (forced ? Promise.resolve(true) : shouldAutoPullShop(shopId)).then((shouldPull) => {
           if (!shouldPull) return null;
-          return runCloudDownload({ silent: true });
+          return runCloudDownload({ silent: !forced }).then((result) => {
+            if (forced && result?.ok && typeof sessionStorage !== "undefined") {
+              try { sessionStorage.removeItem(forceKey); } catch {}
+            }
+            return result;
+          });
         }).catch((err) => console.warn("[S4 Sync] auth restore cloud pull failed", err));
       }
     });
@@ -9279,32 +9319,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       cancelled = true;
     };
   }, [settingsPage, isOwner, shopId]);
-
-  useEffect(() => {
-    if (!shopId) return;
-    let cancelled = false;
-
-    const tryAutoPull = async () => {
-      try {
-        if (!(await shouldAutoPullShop(shopId))) return;
-        const result = await runCloudDownload({ silent: true });
-        if (!cancelled && result?.ok) {
-          toast(t.syncAutoPullOk);
-        }
-      } catch (error) {
-        console.warn("[S4 Sync] auto cloud pull failed", error);
-      }
-    };
-
-    tryAutoPull();
-    // Keep salesman/PC local SQLite warm while online (empty catalog / stale pull).
-    const timer = window.setInterval(tryAutoPull, 5 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [shopId, isOwner, isOrderManager, user?.uid]);
 
   const [showChequePrinter,setShowChequePrinter]=useState(false);
   const [newPosition,setNewPosition]=useState("");
@@ -10182,9 +10196,9 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   useEffect(() => {
     if (!shopPartEnabled || !shopId || !products.length) return;
-    const signature = `${shopId}:${products.length}:core-align-v1`;
+    const signature = `${shopId}:${products.length}:core-correct-v2`;
     if (shopPartAlignRef.current === signature) return;
-    const patches = shopPartAlignmentPatches(products);
+    const patches = shopPartCorrectionPatches(products, shopPartFormatRef.current);
     if (!patches.length) {
       shopPartAlignRef.current = signature;
       return;
@@ -12036,7 +12050,7 @@ const startEditOrder = (order) => {
                     onChange={(value)=>updCurrentItem("code", value)}
                     onSelectProduct={selectProductToOrder}
                     field="code"
-                    placeholder={t.code}
+                    placeholder={lang==="bn"?"Code / Shop Code":"Code / Shop Code"}
                     th={th}
                     lang={lang}
                     onKeyDown={handleEnterAdd}
@@ -13798,6 +13812,11 @@ export default function App() {
     setUser(result.user);
     setProfile(result.profile);
     saveCachedProfile(result.user.uid, result.profile);
+
+    const resolvedShopId = result.shop?.id || result.profile?.shopId || "";
+    if (resolvedShopId && typeof sessionStorage !== "undefined") {
+      try { sessionStorage.setItem(`s4-force-cloud-pull:${resolvedShopId}`, "1"); } catch {}
+    }
 
     if (result.shop?.id) {
       saveCachedShop(result.shop.id, result.shop);

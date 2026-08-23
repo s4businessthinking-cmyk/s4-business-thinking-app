@@ -67,11 +67,19 @@ clearStaleShellWebCache()
   .finally(async () => {
     startOfflineEngine();
     await notifyMobileAppReady();
-    runMobileAutoUpdate({
-      checkGitHubUpdate,
-      APP_VERSION,
-      silent: true,
-    }).catch(() => {});
+
+    const runSilentMobileUpdate = () =>
+      runMobileAutoUpdate({
+        checkGitHubUpdate,
+        APP_VERSION,
+        silent: true,
+      }).catch(() => {});
+
+    runSilentMobileUpdate();
+    // Re-check periodically while the app stays open (WhatsApp-style background update).
+    if (typeof window !== "undefined") {
+      window.setInterval(runSilentMobileUpdate, 30 * 60 * 1000);
+    }
   });
 
 const RootApp = isErpDashboardRoute() ? ErpBuildDashboard : App;

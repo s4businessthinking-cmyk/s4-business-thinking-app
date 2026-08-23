@@ -2,7 +2,7 @@
 // 🔥 FIREBASE CONFIG — S4 Business Thinking
 // ============================================================
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -22,6 +22,9 @@ try {
   const app = initializeApp(firebaseConfig);
   _auth = getAuth(app);
   _db = getFirestore(app);
+  setPersistence(_auth, browserLocalPersistence).catch((err) => {
+    console.warn("[S4 Auth] Firebase persistence setup failed", err);
+  });
 } catch (e) {
   console.error("Firebase init failed:", e);
 }

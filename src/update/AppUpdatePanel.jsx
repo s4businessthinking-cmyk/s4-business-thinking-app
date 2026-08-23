@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import {
   APP_VERSION,
   checkGitHubUpdate,
-  dismissAutoUpdatePrompt,
   getReleasePlatform,
   openUpdateDownload,
-  shouldPromptAutoUpdate,
 } from "./githubUpdateService";
 import {
   applyMobileOtaUpdate,
@@ -34,13 +32,13 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           upToDate: "আপনার installed app আপ-টু-ডেট",
           downloadApk: "APK ডাউনলোড (backup)",
           desktopPending:
-            "⚠️ Update download হলে 'Restart now' চাপুন। Restart না দিলে নতুন feature আসবে না।",
+            "✅ নতুন version download হলে app নিজে থেকে restart হয়ে update হয়ে যাবে — কোনো button চাপতে হবে না।",
           desktopRestart:
-            "Windows app নিজে থেকে update download করে। Restart করলেই নতুন feature চালু হবে — uninstall লাগবে না।",
+            "Windows app WhatsApp-এর মতো নিজে থেকে update নেয়। Internet থাকলে download + restart automatic — uninstall লাগবে না।",
           mobileAuto:
-            "✅ Mobile app নিজে থেকে auto update নেবে। Internet থাকলে app খুললেই update download হবে এবং কয়েক সেকেন্ডে apply হবে — uninstall/APK install লাগবে না।",
+            "✅ Mobile app WhatsApp-এর মতো নিজে থেকে auto update নেবে। Internet থাকলে app খুললেই update হবে — uninstall/APK লাগবে না।",
           mobileManualApk:
-            "পুরোনো app-এ OTA না থাকলে একবার APK install করুন। তারপর থেকে auto update চলবে।",
+            "খুব পুরোনো app-এ OTA না থাকলে একবার APK install করুন। তারপর থেকে সব update automatic।",
           noBundleHint:
             "এই version-এর auto-update file এখনো ready নয়। কিছুক্ষণ পর আবার চেষ্টা করুন।",
           otaFailed: "Auto update apply করা যায়নি। Internet চালু রেখে আবার চেষ্টা করুন।",
@@ -59,13 +57,13 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           upToDate: "Your installed app is up to date",
           downloadApk: "Download APK (backup)",
           desktopPending:
-            "⚠️ After the update downloads, click 'Restart now'. New features will not appear until you restart.",
+            "✅ When a new version downloads, the app restarts and updates by itself — no buttons to press.",
           desktopRestart:
-            "The Windows app downloads updates automatically. Restart to apply them — no uninstall needed.",
+            "The Windows app updates itself like WhatsApp. Online = automatic download + restart. No uninstall.",
           mobileAuto:
-            "✅ The mobile app updates itself automatically. When online, it downloads and applies updates in seconds — no uninstall or APK install needed.",
+            "✅ The mobile app updates itself like WhatsApp. When online, opening the app applies updates — no uninstall or APK.",
           mobileManualApk:
-            "If your app is too old for OTA, install the APK once. After that, updates are automatic.",
+            "If the app is too old for OTA, install the APK once. After that, all updates are automatic.",
           noBundleHint:
             "The auto-update file is not ready yet. Please try again later.",
           otaFailed: "Could not apply the auto update. Stay online and try again.",
@@ -263,59 +261,29 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
 }
 
 export async function runStartupUpdatePrompt({ lang, toast }) {
+  // Fully silent startup update (WhatsApp-style). No confirms, no "download?" prompts.
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
   try {
     const update = await checkGitHubUpdate(APP_VERSION);
-    if (!update.hasUpdate || !shouldPromptAutoUpdate(update.latestVersion)) return;
+    if (!update.hasUpdate) return;
 
+    // Desktop: electron-updater downloads + restarts by itself (electron/main.cjs).
     if (update.platform === "desktop") {
-      toast(
-        lang === "bn"
-          ? `🔄 Version ${update.latestVersion} available। Download হলে app restart দিন — uninstall লাগবে না।`
-          : `🔄 Version ${update.latestVersion} is available. Restart after it downloads — no uninstall needed.`,
-        "ok"
-      );
-      dismissAutoUpdatePrompt(update.latestVersion);
       return;
     }
 
+    // Android: apply OTA bundle silently when Capgo updater is present.
     if (update.platform === "android" && update.bundleUrl) {
-      const otaResult = await runMobileAutoUpdate({
+      await runMobileAutoUpdate({
         checkGitHubUpdate,
         APP_VERSION,
         toast,
         lang,
-        silent: false,
+        silent: true,
       });
-
-      if (otaResult.applied) {
-        dismissAutoUpdatePrompt(update.latestVersion);
-        return;
-      }
-
-      if (otaResult.reason === "UNSUPPORTED" && update.apkUrl) {
-        const message =
-          lang === "bn"
-            ? `নতুন version ${update.latestVersion}। OTA support নেই — একবার APK install করতে হবে।`
-            : `Version ${update.latestVersion} is available. OTA is not supported — install the APK once.`;
-        const ok = window.confirm(message);
-        if (ok) openUpdateDownload(update.apkUrl);
-        else dismissAutoUpdatePrompt(update.latestVersion);
-      }
-      return;
-    }
-
-    if (update.apkUrl) {
-      const message =
-        lang === "bn"
-          ? `নতুন version ${update.latestVersion} available। APK download করবেন?`
-          : `Version ${update.latestVersion} is available. Download the APK now?`;
-      const ok = window.confirm(message);
-      if (ok) openUpdateDownload(update.apkUrl);
-      else dismissAutoUpdatePrompt(update.latestVersion);
     }
   } catch {
-    // Silent on startup.
+    // Silent on startup — never block the user.
   }
 }

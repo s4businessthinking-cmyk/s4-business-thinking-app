@@ -13,24 +13,67 @@ export function normalizeOriginalPartNumber(value) {
     .replace(/[^A-Z0-9]/g, "");
 }
 
+/**
+ * Identity key for shop-part grouping.
+ * Same Code/Model core → same shop code.
+ * Different Code/Model core → different shop code.
+ *
+ * Examples:
+ * - ALUMINUM/TYPE MAXICO → ALUMINUM
+ * - COPPER/TYPE MAXICO → COPPER
+ * - ME017242 MORE ROSA → ME017242
+ * - 17801-78020 HINO → 1780178020
+ * - 17801-77050 → 1780177050
+ * - GC-1306 TAIWAN → GC1306
+ * - 8098 MITSUBISHI → 8098
+ */
 export function coreOriginalPartKey(value) {
   const tokens = String(value || "").toUpperCase().match(/[A-Z0-9]+/g) || [];
   if (!tokens.length) return "";
-  const mixed = tokens.find((token) => /[A-Z]/.test(token) && /\d/.test(token) && token.length >= 4);
-  if (mixed) return mixed;
-  if (tokens.length >= 2 && /^[A-Z]{1,8}$/.test(tokens[0]) && /^\d{3,}$/.test(tokens[1])) {
-    return `${tokens[0]}${tokens[1]}`;
+
+  const isSizeToken = (token) =>
+    /^\d{1,3}(MM|CM|M|IN|PK|V|W|A|LTR|L)$/i.test(token) ||
+    /^\d{1,3}V\d*$/i.test(token);
+
+  // GC-1306 / GC-86307R / MK-600069 — brand prefix + number first
+  if (tokens.length >= 2 && /^[A-Z]{1,10}$/.test(tokens[0])) {
+    if (/^\d{3,}$/.test(tokens[1]) || (/[A-Z]/.test(tokens[1]) && /\d/.test(tokens[1]) && tokens[1].length >= 4)) {
+      return `${tokens[0]}${tokens[1]}`;
+    }
   }
-  const oem = tokens.find((token) => /\d/.test(token) && token.length >= 4);
-  return oem || tokens[0];
+
+  // Leading catalog / OE numbers before later mixed tokens (28113-4H000, 8098 ...)
+  if (/^\d{4,}$/.test(tokens[0])) {
+    if (tokens[1] && /[A-Z]/.test(tokens[1]) && /\d/.test(tokens[1]) && /^[A-Z0-9]{2,}$/.test(tokens[1])) {
+      return `${tokens[0]}${tokens[1]}`;
+    }
+    if (tokens[1] && /^\d{3,}$/.test(tokens[1]) && tokens[0].length <= 6) {
+      return `${tokens[0]}${tokens[1]}`;
+    }
+    return tokens[0];
+  }
+
+  // Mixed OEM: ME013343, E420L, S5512 — skip sizes like 90MM / 24V
+  const mixed = tokens.find((token) => {
+    if (!(/[A-Z]/.test(token) && /\d/.test(token))) return false;
+    if (isSizeToken(token)) return false;
+    if (token.length >= 5) return true;
+    return token.length >= 4 && /\d{3,}/.test(token);
+  });
+  if (mixed) return mixed;
+
+  const longDigits = tokens.find((token) => /^\d+$/.test(token) && token.length >= 6);
+  if (longDigits) return longDigits;
+
+  const word = tokens.find((token) => /^[A-Z]{3,}$/.test(token));
+  if (word) return word;
+
+  return tokens.find((token) => token.length >= 3 && !isSizeToken(token)) || tokens[0];
 }
 
 export function productPartGroupKey(product) {
   const fromCode = coreOriginalPartKey(product?.code);
   if (fromCode) return `PART:${fromCode}`;
-
-  const existingGroup = String(product?.shopPartGroupKey || "");
-  if (existingGroup.startsWith("PART:") || existingGroup.startsWith("PRODUCT:")) return existingGroup;
 
   const fromStored = coreOriginalPartKey(product?.originalPartKey);
   if (fromStored) return `PART:${fromStored}`;
@@ -157,45 +200,152 @@ export function nextLocalShopPartSerial(products) {
   ) + 1;
 }
 
-export function shopPartAlignmentPatches(products = []) {
-  const groups = new Map();
+function pickWinnerByLowestSerial(members = []) {
+  return members.reduce((best, item) => {
+    const serial = Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER;
+    const bestSerial = Number(best.shopPartSerial) || shopPartSerial(best.shopPartNumber) || Number.MAX_SAFE_INTEGER;
+    if (serial !== bestSerial) return serial < bestSerial ? item : best;
+    return String(item.shopPartNumber || "").localeCompare(String(best.shopPartNumber || "")) < 0 ? item : best;
+  });
+}
+
+/**
+ * Correct shop part numbers:
+ * 1) Same Code/Model core must share one shop code.
+ * 2) Different Code/Model cores must NOT share one shop code (split & reassign).
+ */
+export function shopPartCorrectionPatches(products = [], format = DEFAULT_SHOP_PART_FORMAT) {
+  const normalizedFormat = normalizeShopPartFormat(format);
+  const formatKey = shopPartFormatKey(normalizedFormat);
+  const byGroup = new Map();
+  const byShopNumber = new Map();
+
   products.forEach((product) => {
+    if (!product?.id) return;
     const groupKey = productPartGroupKey(product);
-    if (!groupKey.startsWith("PART:")) return;
-    if (!groups.has(groupKey)) groups.set(groupKey, []);
-    groups.get(groupKey).push(product);
+    if (!groupKey) return;
+    if (!byGroup.has(groupKey)) byGroup.set(groupKey, []);
+    byGroup.get(groupKey).push(product);
+
+    const shopNo = String(product.shopPartNumber || "").trim().toLowerCase();
+    if (!shopNo) return;
+    if (!byShopNumber.has(shopNo)) byShopNumber.set(shopNo, []);
+    byShopNumber.get(shopNo).push(product);
   });
 
-  const patches = [];
-  groups.forEach((members, groupKey) => {
-    const numbered = members.filter((item) => String(item.shopPartNumber || "").trim());
-    const uniqueNumbers = new Set(numbered.map((item) => String(item.shopPartNumber).toLowerCase()));
-    if (uniqueNumbers.size < 2) return;
-    const winner = numbered.reduce((best, item) => {
-      const serial = Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER;
-      const bestSerial = Number(best.shopPartSerial) || shopPartSerial(best.shopPartNumber) || Number.MAX_SAFE_INTEGER;
-      if (serial !== bestSerial) return serial < bestSerial ? item : best;
-      return String(item.shopPartNumber).localeCompare(String(best.shopPartNumber)) < 0 ? item : best;
-    });
-    const winnerSerial = Number(winner.shopPartSerial) || shopPartSerial(winner.shopPartNumber);
-    const originalPartKey = coreOriginalPartKey(winner.code) || groupKey.slice(5);
+  const patchMap = new Map();
+  const usedNumbers = new Set(
+    products
+      .map((product) => String(product.shopPartNumber || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  let nextSerial = nextLocalShopPartSerial(products) - 1;
 
+  const queuePatch = (product, assignment) => {
+    const currentSerial = Number(product.shopPartSerial) || shopPartSerial(product.shopPartNumber) || 0;
+    const already =
+      String(product.shopPartNumber || "") === String(assignment.shopPartNumber || "") &&
+      currentSerial === Number(assignment.shopPartSerial || 0) &&
+      product.shopPartGroupKey === assignment.shopPartGroupKey &&
+      product.originalPartKey === assignment.originalPartKey;
+    if (already) return;
+    patchMap.set(product.id, {
+      id: product.id,
+      shopPartNumber: assignment.shopPartNumber,
+      shopPartSerial: assignment.shopPartSerial,
+      originalPartKey: assignment.originalPartKey,
+      shopPartGroupKey: assignment.shopPartGroupKey,
+      shopPartFormatKey: product.shopPartFormatKey || formatKey,
+    });
+  };
+
+  // A) Split wrongly shared shop numbers across different model cores.
+  byShopNumber.forEach((members) => {
+    const groups = new Map();
     members.forEach((product) => {
-      const alreadyAligned =
-        String(product.shopPartNumber || "") === String(winner.shopPartNumber || "") &&
-        (Number(product.shopPartSerial) || shopPartSerial(product.shopPartNumber)) === winnerSerial &&
-        product.shopPartGroupKey === groupKey &&
-        product.originalPartKey === originalPartKey;
-      if (alreadyAligned) return;
-      patches.push({
-        id: product.id,
-        shopPartNumber: winner.shopPartNumber,
-        shopPartSerial: winnerSerial,
+      const groupKey = productPartGroupKey(product);
+      if (!groups.has(groupKey)) groups.set(groupKey, []);
+      groups.get(groupKey).push(product);
+    });
+    if (groups.size < 2) return;
+
+    const ordered = [...groups.entries()].sort(([, left], [, right]) => {
+      const leftWin = pickWinnerByLowestSerial(left);
+      const rightWin = pickWinnerByLowestSerial(right);
+      const leftSerial = Number(leftWin.shopPartSerial) || shopPartSerial(leftWin.shopPartNumber) || Number.MAX_SAFE_INTEGER;
+      const rightSerial = Number(rightWin.shopPartSerial) || shopPartSerial(rightWin.shopPartNumber) || Number.MAX_SAFE_INTEGER;
+      return leftSerial - rightSerial;
+    });
+
+    ordered.forEach(([groupKey, groupMembers], index) => {
+      const originalPartKey = coreOriginalPartKey(groupMembers[0].code) || groupKey.slice(5);
+      if (index === 0) {
+        const winner = pickWinnerByLowestSerial(groupMembers);
+        const winnerSerial = Number(winner.shopPartSerial) || shopPartSerial(winner.shopPartNumber);
+        groupMembers.forEach((product) => queuePatch(product, {
+          shopPartNumber: winner.shopPartNumber,
+          shopPartSerial: winnerSerial,
+          originalPartKey,
+          shopPartGroupKey: groupKey,
+        }));
+        return;
+      }
+
+      do { nextSerial += 1; } while (
+        usedNumbers.has(
+          formatShopPartNumber(nextSerial, groupMembers[0].code, normalizedFormat, {
+            brand: groupMembers[0].company || groupMembers[0].brand,
+            company: groupMembers[0].company || groupMembers[0].brand,
+            name: groupMembers[0].name,
+            code: groupMembers[0].code,
+          }).toLowerCase()
+        )
+      );
+
+      const candidate = formatShopPartNumber(nextSerial, groupMembers[0].code, normalizedFormat, {
+        brand: groupMembers[0].company || groupMembers[0].brand,
+        company: groupMembers[0].company || groupMembers[0].brand,
+        name: groupMembers[0].name,
+        code: groupMembers[0].code,
+      });
+      const shopPartNumber = uniqueShopPartNumber(candidate, usedNumbers, normalizedFormat.collisionSeparator);
+      usedNumbers.add(shopPartNumber.toLowerCase());
+      groupMembers.forEach((product) => queuePatch(product, {
+        shopPartNumber,
+        shopPartSerial: nextSerial,
         originalPartKey,
         shopPartGroupKey: groupKey,
-        shopPartFormatKey: product.shopPartFormatKey || winner.shopPartFormatKey,
-      });
+      }));
     });
   });
-  return patches;
+
+  // B) Merge same model core onto one shop code (lowest serial wins).
+  byGroup.forEach((members, groupKey) => {
+    if (!groupKey.startsWith("PART:")) return;
+    const effective = members.map((product) => patchMap.get(product.id) ? { ...product, ...patchMap.get(product.id) } : product);
+    const numbered = effective.filter((item) => String(item.shopPartNumber || "").trim());
+    if (!numbered.length) return;
+    const uniqueNumbers = new Set(numbered.map((item) => String(item.shopPartNumber).toLowerCase()));
+    if (uniqueNumbers.size < 2 && members.every((item) => {
+      const key = coreOriginalPartKey(item.code);
+      return item.shopPartGroupKey === groupKey && item.originalPartKey === key;
+    })) return;
+
+    const winner = pickWinnerByLowestSerial(numbered);
+    const winnerSerial = Number(winner.shopPartSerial) || shopPartSerial(winner.shopPartNumber);
+    const originalPartKey = coreOriginalPartKey(winner.code) || groupKey.slice(5);
+    members.forEach((product) => queuePatch(product, {
+      shopPartNumber: winner.shopPartNumber,
+      shopPartSerial: winnerSerial,
+      originalPartKey,
+      shopPartGroupKey: groupKey,
+    }));
+  });
+
+  return [...patchMap.values()];
+}
+
+/** @deprecated use shopPartCorrectionPatches */
+export function shopPartAlignmentPatches(products = [], format = DEFAULT_SHOP_PART_FORMAT) {
+  return shopPartCorrectionPatches(products, format);
 }

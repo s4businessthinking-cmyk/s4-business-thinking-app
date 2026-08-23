@@ -1,9 +1,9 @@
 const { autoUpdater } = require("electron-updater");
-const { dialog } = require("electron");
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 
-const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const UPDATE_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000;
+const SILENT_INSTALL_DELAY_MS = 2500;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -37,7 +37,7 @@ app.on("window-all-closed", () => {
 function setupAutoUpdater() {
   if (!app.isPackaged) return;
 
-  let updateReady = false;
+  let installing = false;
 
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -47,18 +47,39 @@ function setupAutoUpdater() {
     console.error("[S4 AutoUpdate] error", error);
   });
 
-  autoUpdater.on("update-available", () => {
-    console.log("[S4 AutoUpdate] update available");
+  autoUpdater.on("update-available", (info) => {
+    console.log("[S4 AutoUpdate] update available", info?.version || "");
   });
 
   autoUpdater.on("update-not-available", () => {
     console.log("[S4 AutoUpdate] no update available");
   });
 
-  autoUpdater.on("update-downloaded", () => {
-    updateReady = true;
-    promptRestartForUpdate();
+  autoUpdater.on("download-progress", (progress) => {
+    if (progress?.percent != null) {
+      console.log(`[S4 AutoUpdate] download ${Math.round(progress.percent)}%`);
+    }
   });
+
+  // WhatsApp-style: no dialog, no buttons — download then restart into new version.
+  autoUpdater.on("update-downloaded", (info) => {
+    console.log("[S4 AutoUpdate] downloaded", info?.version || "");
+    installUpdateSilently();
+  });
+
+  function installUpdateSilently() {
+    if (installing) return;
+    installing = true;
+    console.log("[S4 AutoUpdate] silent install starting...");
+    setTimeout(() => {
+      try {
+        autoUpdater.quitAndInstall(false, true);
+      } catch (error) {
+        installing = false;
+        console.error("[S4 AutoUpdate] quitAndInstall failed", error);
+      }
+    }, SILENT_INSTALL_DELAY_MS);
+  }
 
   const checkForUpdates = () => {
     autoUpdater.checkForUpdates().catch((error) => {
@@ -66,38 +87,6 @@ function setupAutoUpdater() {
     });
   };
 
-  setTimeout(checkForUpdates, 5000);
+  setTimeout(checkForUpdates, 4000);
   setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL_MS);
-
-  setInterval(() => {
-    if (updateReady) {
-      promptRestartForUpdate();
-    }
-  }, 30 * 60 * 1000);
-
-  app.on("browser-window-created", () => {
-    if (updateReady) {
-      setTimeout(promptRestartForUpdate, 1500);
-    }
-  });
-}
-
-function promptRestartForUpdate() {
-  dialog
-    .showMessageBox({
-      type: "warning",
-      buttons: ["Restart now", "Later"],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-      title: "S4 Business Thinking — Update Ready",
-      message: "নতুন feature ব্যবহার করতে app restart করতে হবে।",
-      detail:
-        "The update has been downloaded. Until you restart, the app will keep running the old version and new features will not appear.\n\nClick 'Restart now' to install the update.",
-    })
-    .then((result) => {
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall(false, true);
-      }
-    });
 }

@@ -14,7 +14,10 @@ export function buildProductHaystack(product) {
   return [
     product.name,
     product.code,
+    product.shopPartNumber,
+    product.originalPartKey,
     product.brand,
+    product.company,
     product.category,
     product.barcode,
     product.ean,
@@ -24,12 +27,26 @@ export function buildProductHaystack(product) {
     .join(" ");
 }
 
+function productIdentityKeys(product) {
+  return [
+    product.code,
+    product.shopPartNumber,
+    product.originalPartKey,
+    product.barcode,
+    product.ean,
+    ...(product.moreBarcodes || []),
+  ]
+    .filter(Boolean)
+    .map(nsq);
+}
+
 function productRank(product, query, field = "any") {
   const q = nsq(query);
   if (!q) return 0;
 
   const name = nsq(product.name);
-  const code = nsq(product.code || product.barcode || "");
+  const code = nsq(product.code || "");
+  const shopPart = nsq(product.shopPartNumber || "");
   let score = 0;
 
   if (field === "name" || field === "any") {
@@ -38,10 +55,10 @@ function productRank(product, query, field = "any") {
     else if (name.includes(q)) score += 60;
   }
 
-  if (field === "code" || field === "any") {
-    if (code === q) score += 140;
-    else if (code.startsWith(q)) score += 100;
-    else if (code.includes(q)) score += 70;
+  if (field === "code" || field === "shopPart" || field === "any") {
+    if (shopPart === q || code === q) score += 150;
+    else if (shopPart.startsWith(q) || code.startsWith(q)) score += 110;
+    else if (shopPart.includes(q) || code.includes(q)) score += 80;
   }
 
   if (nsmatch(buildProductHaystack(product), query)) score += 20;
@@ -63,13 +80,16 @@ export function filterProducts(products = [], query = "", { field = "any", limit
     .map((row) => row.product);
 }
 
-export function findExactProductMatch(products = [], { name = "", code = "" } = {}) {
+export function findExactProductMatch(products = [], { name = "", code = "", shopPartNumber = "" } = {}) {
+  const shopKey = nsq(shopPartNumber || code);
+  if (shopKey) {
+    const byShop = products.find((p) => nsq(p.shopPartNumber) === shopKey);
+    if (byShop) return byShop;
+  }
+
   const codeKey = nsq(code);
   if (codeKey) {
-    const byCode = products.find((p) => {
-      const keys = [p.code, p.barcode, p.ean, ...(p.moreBarcodes || [])].filter(Boolean).map(nsq);
-      return keys.includes(codeKey);
-    });
+    const byCode = products.find((p) => productIdentityKeys(p).includes(codeKey));
     if (byCode) return byCode;
   }
 
