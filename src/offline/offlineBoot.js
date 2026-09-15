@@ -1,4 +1,10 @@
-import { bootOfflineSqlite, getOfflineStatus } from "./sqliteDb";
+import {
+  startAutoFirebaseSync,
+  syncPendingQueueToFirebase,
+  pauseCollectionSync,
+  resumeCollectionSync,
+  isCollectionSyncPaused,
+} from "./firebaseSyncWorker";
 import {
   offlineCreate,
   offlineUpdate,
@@ -6,16 +12,13 @@ import {
   offlineRemove,
   offlineList,
   offlineSearch,
-  offlineEngineStatus,
   offlineClearCollection,
+  offlineEngineStatus,
 } from "./offlineRepository";
 import {
-  syncPendingQueueToFirebase,
-  startAutoFirebaseSync,
-  pauseCollectionSync,
-  resumeCollectionSync,
-  isCollectionSyncPaused,
-} from "./firebaseSyncWorker";
+  bootOfflineSqlite,
+  getOfflineStatus,
+} from "./sqliteDb";
 import {
   activateLicenseOffline,
   createLicenseFingerprint,
@@ -62,9 +65,30 @@ function exposeDevLicenseHelpers() {
     });
 }
 
+/**
+ * Validates that the offline engine started successfully.
+ * Throws an error if boot failed, preventing silent failures.
+ */
+function assertOfflineEngineReady(bootResult) {
+  if (!bootResult?.ok) {
+    const error = new Error(
+      `[S4 Offline] Engine boot failed: ${bootResult?.error || "unknown error"}. ` +
+      "Sync will not work. This is a critical error."
+    );
+    console.error(error);
+    throw error;
+  }
+}
+
 export async function startOfflineEngine() {
   try {
+    console.log("[S4 Offline] Starting offline engine...");
+    
     const boot = await bootOfflineSqlite();
+    
+    // Validate boot success
+    assertOfflineEngineReady(boot);
+    
     const status = await getOfflineStatus();
 
     const autoSync = startAutoFirebaseSync({
@@ -133,17 +157,17 @@ export async function startOfflineEngine() {
 
     return { ok: true, boot, status };
   } catch (error) {
+    const errorMsg = error?.message || String(error);
+    
     window.__S4_OFFLINE_ENGINE__ = {
       ready: false,
-      error: error?.message || String(error),
+      error: errorMsg,
       startedAt: new Date().toISOString(),
     };
 
-    console.warn("[S4 Offline] SQLite engine failed", error);
+    console.error("[S4 Offline] SQLite engine failed", error);
 
-    return {
-      ok: false,
-      error: error?.message || String(error),
-    };
+    // Re-throw to allow caller to handle
+    throw error;
   }
 }

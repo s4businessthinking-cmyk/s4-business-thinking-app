@@ -35,11 +35,21 @@ export async function offlineCreate(collectionName, data = {}) {
 
   await saveLocalRecord(collectionName, documentId, record);
 
-  await enqueueSync(collectionName, documentId, "CREATE", {
+  const syncResult = await enqueueSync(collectionName, documentId, "CREATE", {
     collectionName,
     documentId,
     data: record,
   });
+
+  if (!syncResult?.ok) {
+    console.error(
+      `[S4 Offline] Failed to enqueue sync for CREATE: ${collectionName}/${documentId}`,
+      syncResult
+    );
+    throw new Error(
+      `Failed to queue ${collectionName} for sync: ${syncResult?.error || "unknown error"}`
+    );
+  }
 
   return {
     ok: true,
@@ -62,11 +72,21 @@ export async function offlineUpdate(collectionName, documentId, patch = {}) {
 
   await saveLocalRecord(collectionName, documentId, record);
 
-  await enqueueSync(collectionName, documentId, "UPDATE", {
+  const syncResult = await enqueueSync(collectionName, documentId, "UPDATE", {
     collectionName,
     documentId,
     data: record,
   });
+
+  if (!syncResult?.ok) {
+    console.error(
+      `[S4 Offline] Failed to enqueue sync for UPDATE: ${collectionName}/${documentId}`,
+      syncResult
+    );
+    throw new Error(
+      `Failed to queue ${collectionName} for sync: ${syncResult?.error || "unknown error"}`
+    );
+  }
 
   return {
     ok: true,
@@ -91,11 +111,21 @@ export async function offlineUpsert(collectionName, documentId, data = {}) {
 
   await saveLocalRecord(collectionName, documentId, record);
 
-  await enqueueSync(collectionName, documentId, "UPSERT", {
+  const syncResult = await enqueueSync(collectionName, documentId, "UPSERT", {
     collectionName,
     documentId,
     data: record,
   });
+
+  if (!syncResult?.ok) {
+    console.error(
+      `[S4 Offline] Failed to enqueue sync for UPSERT: ${collectionName}/${documentId}`,
+      syncResult
+    );
+    throw new Error(
+      `Failed to queue ${collectionName} for sync: ${syncResult?.error || "unknown error"}`
+    );
+  }
 
   return {
     ok: true,
@@ -110,10 +140,20 @@ export async function offlineUpsert(collectionName, documentId, data = {}) {
 export async function offlineRemove(collectionName, documentId) {
   await deleteLocalRecord(collectionName, documentId);
 
-  await enqueueSync(collectionName, documentId, "DELETE", {
+  const syncResult = await enqueueSync(collectionName, documentId, "DELETE", {
     collectionName,
     documentId,
   });
+
+  if (!syncResult?.ok) {
+    console.error(
+      `[S4 Offline] Failed to enqueue sync for DELETE: ${collectionName}/${documentId}`,
+      syncResult
+    );
+    throw new Error(
+      `Failed to queue ${collectionName} for sync: ${syncResult?.error || "unknown error"}`
+    );
+  }
 
   return {
     ok: true,
