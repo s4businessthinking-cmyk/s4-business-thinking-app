@@ -1,4 +1,4 @@
-import { offlineUpsert } from "../offline/offlineRepository";
+import { offlineUpsert, offlineRemove } from "../offline/offlineRepository";
 import {
   assertFirebaseReady,
   buildLocalAuthEmail,
@@ -19,11 +19,61 @@ import {
   verifyLocalUserPassword,
 } from "./localAuthService";
 
-function triggerBackgroundSync() {
-  if (typeof window !== "undefined" && window.S4Offline?.syncNow && navigator.onLine) {
-    window.S4Offline.syncNow().catch((error) => {
-      console.warn("[S4 Users] background sync failed", error);
-    });
+/**
+ * Triggers background sync with proper error handling and fallback.
+ * If offline engine sync fails, attempts direct cloud write as fallback.
+ */
+async function triggerBackgroundSync(fallbackCloudWrite = null) {
+  if (typeof window === "undefined") return;
+  
+  // Check if offline engine is ready
+  if (!window.S4Offline?.syncNow) {
+    console.warn(
+      "[S4 Users] Offline sync engine not ready. " +
+      (fallbackCloudWrite ? "Using fallback cloud write." : "Sync skipped.")
+    );
+    if (fallbackCloudWrite) {
+      try {
+        await fallbackCloudWrite();
+      } catch (err) {
+        console.error("[S4 Users] Fallback cloud write failed", err);
+        throw err;
+      }
+    }
+    return;
+  }
+  
+  if (!navigator.onLine) {
+    console.info("[S4 Users] Offline mode - data queued for sync");
+    return;
+  }
+  
+  try {
+    const result = await window.S4Offline.syncNow();
+    if (!result?.ok) {
+      console.warn(
+        "[S4 Users] Background sync returned non-ok status",
+        result
+      );
+      if (fallbackCloudWrite) {
+        console.info("[S4 Users] Attempting fallback cloud write");
+        await fallbackCloudWrite();
+      }
+    }
+  } catch (error) {
+    console.warn("[S4 Users] Background sync failed", error);
+    if (fallbackCloudWrite) {
+      console.info("[S4 Users] Attempting fallback cloud write after sync error");
+      try {
+        await fallbackCloudWrite();
+      } catch (fallbackErr) {
+        console.error(
+          "[S4 Users] Fallback cloud write also failed",
+          fallbackErr
+        );
+        throw fallbackErr;
+      }
+    }
   }
 }
 
@@ -126,6 +176,8 @@ export function buildLegacyMembersFromInvites(usedInvites = [], existingIds = ne
       shopId: invite.shopId || "",
       status: "active",
       legacyInvite: true,
+      inviteCode: invite.code || "",
+      inviteId: invite.id || uid,
     });
     existingIds.add(uid);
   }
@@ -201,21 +253,30 @@ export async function ensureStaffCloudLoginRecords(member, shopId) {
 
   assertFirebaseReady(isOnline());
 
-  await writeCloudUserProfile(uid, {
-    role: "salesman",
-    shopId,
-    personName: member.personName || localUser?.personName || username,
-    username: localUser?.username || username,
-    email: authEmail,
-    position: member.position || "Salesman",
-    permissions: member.permissions ?? localUser?.permissions ?? null,
-    mobile: member.mobile || "",
-    area: member.area || "",
-    country: member.country || "BD",
-    countryName: member.countryName || "",
-    localUserId: member.localUserId || localUser?.id || "",
-    status: member.status || "active",
-  });
+  try {
+    await writeCloudUserProfile(uid, {
+      role: "salesman",
+      shopId,
+      personName: member.personName || localUser?.personName || username,
+      username: localUser?.username || username,
+      email: authEmail,
+      position: member.position || "Salesman",
+      permissions: member.permissions ?? localUser?.permissions ?? null,
+      mobile: member.mobile || "",
+      area: member.area || "",
+      country: member.country || "BD",
+      countryName: member.countryName || "",
+      localUserId: member.localUserId || localUser?.id || "",
+      status: member.status || "active",
+    });
+  } catch (err) {
+    console.error(
+      "[S4 Team] writeCloudUserProfile failed for",
+      uid,
+      err
+    );
+    throw err;
+  }
 
   await writeStaffLoginIndex({
     username: localUser?.username || username,
@@ -245,10 +306,19 @@ export async function backfillShopStaffCloudRecords(shopId, members = []) {
   return { ok: true, updated };
 }
 
+/**
+ * Syncs a team member to cloud via offline-first pattern.
+ * Data is queued locally and synced when online.
+ * Includes validation to prevent silent failures.
+ */
 async function syncTeamMemberToCloud(localUser, extras = {}) {
   const docId = localUser.firebaseUid || localUser.id;
+  
+  if (!docId) {
+    throw new Error("[S4 Team] Cannot sync: missing user id or firebase uid");
+  }
 
-  await offlineUpsert("users", docId, {
+  const payload = {
     uid: docId,
     id: docId,
     role: localUser.role,
@@ -265,9 +335,40 @@ async function syncTeamMemberToCloud(localUser, extras = {}) {
     localUserId: localUser.id,
     status: "active",
     updatedAt: new Date().toISOString(),
-  });
+  };
 
-  triggerBackgroundSync();
+  try {
+    const result = await offlineUpsert("users", docId, payload);
+    if (!result?.ok) {
+      throw new Error(
+        `[S4 Team] offlineUpsert returned non-ok status: ${JSON.stringify(result)}`
+      );
+    }
+  } catch (err) {
+    console.error(
+      "[S4 Team] Failed to queue salesman for sync",
+      docId,
+      err
+    );
+    throw err;
+  }
+
+  // Attempt sync with fallback
+  await triggerBackgroundSync(async () => {
+    // Fallback: direct cloud write
+    if (isOnline()) {
+      try {
+        await writeCloudUserProfile(docId, payload);
+      } catch (fallbackErr) {
+        console.error(
+          "[S4 Team] Fallback cloud write failed for salesman",
+          docId,
+          fallbackErr
+        );
+        throw fallbackErr;
+      }
+    }
+  });
 }
 
 export async function createShopStaffUser({
@@ -303,6 +404,7 @@ export async function createShopStaffUser({
     isEmergencyBootstrap: false,
   });
 
+  // Sync via offline-first pattern
   await syncTeamMemberToCloud(localUser, {
     position,
     mobile,
@@ -311,22 +413,7 @@ export async function createShopStaffUser({
     countryName,
   });
 
-  await writeCloudUserProfile(fbUser.uid, {
-    role: "salesman",
-    shopId,
-    personName,
-    username: localUser.username,
-    email: authEmail.email,
-    position,
-    permissions: localUser.permissions,
-    mobile,
-    area,
-    country,
-    countryName,
-    localUserId: localUser.id,
-    status: "active",
-  });
-
+  // Also write staff login index
   await writeStaffLoginIndex({
     username,
     shopId,
@@ -373,18 +460,28 @@ export async function updateShopMemberPermissions(
     await updateLocalUserProfile(localUser.id, { permissions });
   }
 
-  await offlineUpsert("users", docId, {
-    uid: docId,
-    id: docId,
-    shopId,
-    role: localUser?.role || memberRecord?.role || "salesman",
-    personName: localUser?.personName || memberRecord?.personName || "",
-    username: localUser?.username || memberRecord?.username || "",
-    email: localUser?.email || memberRecord?.email || "",
-    permissions,
-    ...(position ? { position } : {}),
-    updatedAt: new Date().toISOString(),
-  });
+  // Queue for sync
+  try {
+    await offlineUpsert("users", docId, {
+      uid: docId,
+      id: docId,
+      shopId,
+      role: localUser?.role || memberRecord?.role || "salesman",
+      personName: localUser?.personName || memberRecord?.personName || "",
+      username: localUser?.username || memberRecord?.username || "",
+      email: localUser?.email || memberRecord?.email || "",
+      permissions,
+      ...(position ? { position } : {}),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(
+      "[S4 Team] Failed to queue permission update for sync",
+      docId,
+      err
+    );
+    throw err;
+  }
 
   if (isOnline() && shopId && docId) {
     const mergedMember = {
@@ -404,7 +501,8 @@ export async function updateShopMemberPermissions(
     await ensureStaffCloudLoginRecords(mergedMember, shopId);
   }
 
-  triggerBackgroundSync();
+  // Trigger sync
+  await triggerBackgroundSync();
   return { ok: true, docId };
 }
 
@@ -421,19 +519,29 @@ export async function removeShopTeamMember(member, { ownerUid = "" } = {}) {
   const docId = localUser?.firebaseUid || memberId;
   const shopId = member?.shopId || localUser?.shopId || "";
 
-  await offlineUpsert("users", docId, {
-    uid: docId,
-    id: docId,
-    shopId,
-    role: member?.role || localUser?.role || "salesman",
-    personName: member?.personName || localUser?.personName || "",
-    username: member?.username || localUser?.username || "",
-    email: member?.email || localUser?.email || "",
-    status: "disabled",
-    disabledAt: new Date().toISOString(),
-    disabledBy: ownerUid || "",
-    updatedAt: new Date().toISOString(),
-  });
+  // Mark as disabled in offline storage
+  try {
+    await offlineUpsert("users", docId, {
+      uid: docId,
+      id: docId,
+      shopId,
+      role: member?.role || localUser?.role || "salesman",
+      personName: member?.personName || localUser?.personName || "",
+      username: member?.username || localUser?.username || "",
+      email: member?.email || localUser?.email || "",
+      status: "disabled",
+      disabledAt: new Date().toISOString(),
+      disabledBy: ownerUid || "",
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(
+      "[S4 Team] Failed to queue member removal for sync",
+      docId,
+      err
+    );
+    throw err;
+  }
 
   const username = member?.username || localUser?.username;
   if (username) {
@@ -444,8 +552,73 @@ export async function removeShopTeamMember(member, { ownerUid = "" } = {}) {
     await deleteLocalUser(localUser.id);
   }
 
-  triggerBackgroundSync();
+  // Trigger sync
+  await triggerBackgroundSync();
   return { ok: true, memberId: docId };
+}
+
+/**
+ * Removes a legacy invite-based salesman from the team.
+ * Used when salesmen were created via invite codes but need to be deleted.
+ * This is particularly useful for removing fake/invalid salesmen from the invite list.
+ */
+export async function removeLegacyInviteSalesman(inviteSalesman, { ownerUid = "" } = {}) {
+  if (!inviteSalesman?.legacyInvite) {
+    throw new Error("Only legacy invite-based salesmen can be removed via this function.");
+  }
+
+  const memberId = inviteSalesman?.uid || inviteSalesman?.id;
+  if (!memberId) throw new Error("Salesman uid is required.");
+
+  const shopId = inviteSalesman?.shopId || "";
+  if (!shopId) throw new Error("Shop id is required.");
+
+  // Mark as disabled in cloud storage
+  try {
+    await offlineUpsert("users", memberId, {
+      uid: memberId,
+      id: memberId,
+      shopId,
+      role: "salesman",
+      personName: inviteSalesman?.personName || "Staff",
+      username: inviteSalesman?.username || "",
+      email: inviteSalesman?.email || "",
+      status: "disabled",
+      disabledAt: new Date().toISOString(),
+      disabledBy: ownerUid || "",
+      isDeleted: true,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error(
+      "[S4 Team] Failed to queue legacy salesman removal for sync",
+      memberId,
+      err
+    );
+    throw err;
+  }
+
+  // If this legacy salesman has a username, remove from staff login index
+  if (inviteSalesman?.username) {
+    try {
+      await deleteStaffLoginIndex(inviteSalesman.username);
+    } catch (err) {
+      console.warn(
+        "[S4 Team] Could not delete staff login index for legacy salesman",
+        inviteSalesman.username,
+        err
+      );
+    }
+  }
+
+  // Trigger sync to propagate deletion to cloud
+  await triggerBackgroundSync();
+
+  return {
+    ok: true,
+    memberId,
+    message: "Legacy invite-based salesman has been removed.",
+  };
 }
 
 export async function resetShopMemberPassword(localUserId, newPassword) {
