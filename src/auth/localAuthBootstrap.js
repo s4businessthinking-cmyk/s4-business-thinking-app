@@ -438,7 +438,7 @@ async function seedCloudInviteCodesForShop(shopId, codes = []) {
   }
 }
 
-async function getUserProfileWithRetry(uid, retries = 2) {
+async function getUserProfileWithRetry(uid, retries = 5) {
   let lastError;
   for (let attempt = 0; attempt <= retries; attempt += 1) {
     try {
@@ -446,7 +446,8 @@ async function getUserProfileWithRetry(uid, retries = 2) {
     } catch (error) {
       lastError = error;
       if (error?.code !== "permission-denied" || attempt === retries) break;
-      await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+      const delay = Math.min(500 * 2 ** attempt, 3000);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
   throw lastError;
