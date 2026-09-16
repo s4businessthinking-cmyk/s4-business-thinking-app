@@ -85,6 +85,7 @@ import {
   repairStaffProfileIfNeeded,
 } from "./auth/localAuthBootstrap";
 import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAuthService";
+import { createStockLedgerEntry } from "./inventory/stockManagementService";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
 import {
@@ -118,6 +119,59 @@ import s4LogoUrl from "./assets/s4-logo.png";
 function isActiveProduct(product) {
   if (!product) return false;
   return product.isDeleted !== true && product.deleted !== true;
+}
+
+// Invoice statuses that represent stock actually having moved (draft and
+// cancelled invoices never touch stock).
+const STOCK_AFFECTING_INVOICE_STATUSES = ["confirmed", "paid", "partial"];
+
+// Applies the stock-ledger delta between an invoice's previous saved state
+// and its new state: reverses the old line items (if the old status had
+// already moved stock) and applies the new line items (if the new status
+// moves stock). This covers create, edit (items or status changed), and
+// cancel in one place — a plain status change with unchanged items nets to
+// zero and simply re-records a reversal + re-application, which is fine
+// since we skip calling this when items truly didn't change (see call sites).
+async function applyInvoiceStockEffect({
+  oldInvoice,
+  newInvoice,
+  invoiceId,
+  applyType,
+  reverseType,
+  referenceType,
+  unitCostKey,
+  shopId,
+  actor,
+}) {
+  const oldAffects = oldInvoice && STOCK_AFFECTING_INVOICE_STATUSES.includes(oldInvoice.status);
+  const newAffects = newInvoice && STOCK_AFFECTING_INVOICE_STATUSES.includes(newInvoice.status);
+  if (!oldAffects && !newAffects) return;
+
+  const runLine = async (it, movementType) => {
+    const qty = Number(it?.qty) || 0;
+    if (!it?.productId || qty <= 0) return;
+    try {
+      await createStockLedgerEntry({
+        productId: it.productId,
+        shopId,
+        quantity: qty,
+        movementType,
+        referenceType,
+        referenceId: invoiceId,
+        unitCost: Number(it[unitCostKey]) || 0,
+        actor,
+      });
+    } catch (err) {
+      console.warn(`[S4 Stock] ${movementType} ledger entry failed`, it.productId, err);
+    }
+  };
+
+  if (oldAffects) {
+    for (const it of (oldInvoice.items || [])) await runLine(it, reverseType);
+  }
+  if (newAffects) {
+    for (const it of (newInvoice.items || [])) await runLine(it, applyType);
+  }
 }
 
 function mergeProductCatalog(cloudRows = [], localRows = []) {
@@ -1506,7 +1560,10 @@ function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, onLoginSu
       }
       onLoginSuccess(result);
     } catch(err) {
-      toast(err?.message || String(err), "err");
+      const msg = err?.code === "permission-denied"
+        ? (lang==="bn" ? "সাময়িক সার্ভার সমস্যা হয়েছে — আবার Login করুন" : "Temporary server issue — please try logging in again")
+        : (err?.message || String(err));
+      toast(msg, "err");
     } finally { setBusy(false); }
   };
   return (
@@ -4982,6 +5039,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   const savePurchaseInvoiceOffline = async (payload, successMessage) => {
     const nowIso = new Date().toISOString();
+    const priorInvoice = editInvoiceId ? invoices.find(inv => inv.id === editInvoiceId) : null;
+    let savedId;
 
     if (editInvoiceId) {
       const result = await offlineUpdate("purchaseInvoices", editInvoiceId, {
@@ -4991,6 +5050,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       });
 
       const updated = { ...result.data, id: editInvoiceId };
+      savedId = editInvoiceId;
       setInvoices(prev => prev.map(inv => inv.id === editInvoiceId ? updated : inv));
       setSelInvoice(prev => prev && prev.id === editInvoiceId ? updated : prev);
       toast(successMessage || t.pi_updated);
@@ -5002,9 +5062,22 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       });
 
       const created = { ...result.data, id: result.id };
+      savedId = result.id;
       setInvoices(prev => [created, ...prev]);
       toast(successMessage);
     }
+
+    await applyInvoiceStockEffect({
+      oldInvoice: priorInvoice,
+      newInvoice: payload,
+      invoiceId: savedId,
+      applyType: "purchase",
+      reverseType: "adjustment",
+      referenceType: "purchase_invoice",
+      unitCostKey: "unitCost",
+      shopId,
+      actor: { uid: user?.uid, personName: profile?.personName },
+    });
 
     if (!editInvoiceId) bumpShopPiSerial(payload.invoiceNo);
 
@@ -5069,6 +5142,19 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       const updated = { ...result.data, id: inv.id };
       setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
       setSelInvoice(updated);
+
+      await applyInvoiceStockEffect({
+        oldInvoice: inv,
+        newInvoice: updated,
+        invoiceId: inv.id,
+        applyType: "purchase",
+        reverseType: "adjustment",
+        referenceType: "purchase_invoice",
+        unitCostKey: "unitCost",
+        shopId,
+        actor: { uid: user?.uid, personName: profile?.personName },
+      });
+
       toast(t.pi_cancelledMsg,"err");
 
       if (navigator.onLine) {
@@ -6250,6 +6336,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
   const saveSalesInvoiceOffline = async (payload, successMessage, options = {}) => {
     const nowIso = new Date().toISOString();
+    const priorInvoice = editInvId ? invoices.find(inv => inv.id === editInvId) : null;
     let savedInvoice;
 
     if (editInvId) {
@@ -6274,6 +6361,18 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       setInvoices(prev => [savedInvoice, ...prev]);
       toast(successMessage);
     }
+
+    await applyInvoiceStockEffect({
+      oldInvoice: priorInvoice,
+      newInvoice: payload,
+      invoiceId: savedInvoice.id,
+      applyType: "sale",
+      reverseType: "return",
+      referenceType: "sales_invoice",
+      unitCostKey: "unitPrice",
+      shopId,
+      actor: { uid: user?.uid, personName: profile?.personName },
+    });
 
     if (!editInvId) bumpShopSiSerial(payload.invoiceNo);
 
@@ -6355,6 +6454,19 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       const updated = { ...result.data, id: inv.id };
       setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
       setSelInv(updated);
+
+      await applyInvoiceStockEffect({
+        oldInvoice: inv,
+        newInvoice: updated,
+        invoiceId: inv.id,
+        applyType: "sale",
+        reverseType: "return",
+        referenceType: "sales_invoice",
+        unitCostKey: "unitPrice",
+        shopId,
+        actor: { uid: user?.uid, personName: profile?.personName },
+      });
+
       toast(t.si_cancelledMsg,"err");
 
       if (navigator.onLine) {

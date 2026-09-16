@@ -438,6 +438,20 @@ async function seedCloudInviteCodesForShop(shopId, codes = []) {
   }
 }
 
+async function getUserProfileWithRetry(uid, retries = 2) {
+  let lastError;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await getDoc(doc(db, "users", uid));
+    } catch (error) {
+      lastError = error;
+      if (error?.code !== "permission-denied" || attempt === retries) break;
+      await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
 async function loginWithFirebaseEmail(email, password) {
   if (!auth || !db) {
     return { ok: false, reason: "FIREBASE_UNAVAILABLE" };
@@ -462,7 +476,16 @@ async function loginWithFirebaseEmail(email, password) {
     };
   }
 
-  const profSnap = await getDoc(doc(db, "users", fbUser.uid));
+  try {
+    // Force a fresh ID token so Firestore rules immediately see the
+    // just-created auth session (avoids a transient permission-denied
+    // race on the very first read right after sign-in).
+    await fbUser.getIdToken(true);
+  } catch (error) {
+    console.warn("[S4 Auth] ID token refresh failed after sign-in", error);
+  }
+
+  const profSnap = await getUserProfileWithRetry(fbUser.uid);
   if (!profSnap.exists()) {
     try { await signOut(auth); } catch {}
     return { ok: false, reason: "PROFILE_NOT_FOUND" };
@@ -1092,6 +1115,11 @@ export function friendlyLocalAuthError(result, lang = "bn") {
     }
     if (code === "auth/network-request-failed") {
       return isBn ? "ইন্টারনেট সংযোগ চেক করুন" : "Please check your internet connection";
+    }
+    if (code === "permission-denied") {
+      return isBn
+        ? "সাময়িক সার্ভার সমস্যা হয়েছে — আবার Login করুন"
+        : "Temporary server issue — please try logging in again";
     }
     return result?.message || (isBn ? "লগইন ব্যর্থ" : "Login failed");
   }
