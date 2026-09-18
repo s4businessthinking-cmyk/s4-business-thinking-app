@@ -20,7 +20,13 @@ if (fs.existsSync(zipPath)) {
   fs.unlinkSync(zipPath);
 }
 
-execSync(`tar --force-local -a -c -f "${zipPath}" -C "${distDir}" .`, {
+// Relative paths (not absolute "S:\..." / "D:\...") sidestep a tar quirk on
+// Windows where a drive-letter colon in the -f archive path is misread as
+// remote host syntax ("host:file") by some tar builds.
+const relativeZipPath = path.relative(root, zipPath);
+const relativeDistDir = path.relative(root, distDir);
+
+execSync(`tar -a -c -f "${relativeZipPath}" -C "${relativeDistDir}" .`, {
   cwd: root,
   stdio: "inherit",
   shell: true,
