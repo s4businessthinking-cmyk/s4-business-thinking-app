@@ -2,6 +2,7 @@ import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { bootOfflineSqlite } from "../offline/sqliteDb";
 import { auth, db, generateInviteCode } from "../firebase-config";
+import { computeAuthDiagnostics, logAuthDiagnostic, summarizeDiagnostic } from "./authDiagnostics";
 import {
   assertFirebaseReady,
   buildLocalAuthEmail,
@@ -450,7 +451,41 @@ async function getUserProfileWithRetry(uid, retries = 7) {
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
+
+  if (lastError?.code === "permission-denied") {
+    // Every retry failed identically — this is not a transient race, so
+    // find out what the token Firestore actually used looked like
+    // instead of surfacing a generic "server issue" to the user.
+    const diagnostic = await computeAuthDiagnostics({ auth, expectedUid: uid }).catch(
+      (diagError) => ({
+        ok: false,
+        verdict: "DIAGNOSTIC_FAILED",
+        error: diagError?.message || String(diagError),
+      })
+    );
+    logAuthDiagnostic("login-profile-read-denied", diagnostic);
+    lastError.s4Diagnostics = diagnostic;
+
+    if (diagnostic?.verdict === "UID_MISMATCH") {
+      // The session Firestore is using belongs to a different account
+      // than the one we just signed in as. Clear it so the *next* login
+      // attempt starts from a clean slate instead of failing forever.
+      try { await signOut(auth); } catch {}
+    }
+  }
+
   throw lastError;
+}
+
+function buildFirebaseErrorResult(error) {
+  const diagnostic = error?.s4Diagnostics || null;
+  return {
+    ok: false,
+    reason: diagnostic?.verdict === "CLOCK_SKEW" ? "DEVICE_CLOCK_SKEW" : "FIREBASE_ERROR",
+    code: error?.code || "",
+    message: error?.message || String(error),
+    diagnostics: diagnostic,
+  };
 }
 
 async function loginWithFirebaseEmail(email, password) {
@@ -600,12 +635,7 @@ async function loginWithRemoteStaffUsername(username, password) {
       return { ok: false, reason: "INVALID_PASSWORD" };
     }
 
-    return {
-      ok: false,
-      reason: "FIREBASE_ERROR",
-      code,
-      message: error?.message || String(error),
-    };
+    return buildFirebaseErrorResult(error);
   }
 }
 
@@ -676,12 +706,7 @@ export async function loginWithCredentials(identifier, password) {
       if (localResult.reason === "INVALID_PASSWORD") {
         return localResult;
       }
-      return {
-        ok: false,
-        reason: "FIREBASE_ERROR",
-        code: error?.code || "",
-        message: error?.message || String(error),
-      };
+      return buildFirebaseErrorResult(error);
     }
   }
 
@@ -1107,6 +1132,9 @@ export function friendlyLocalAuthError(result, lang = "bn") {
     VALIDATION: isBn
       ? "ইউজারনেম/ইমেইল ও পাসওয়ার্ড দিন"
       : "Username/email and password required",
+    DEVICE_CLOCK_SKEW: isBn
+      ? "আপনার ডিভাইসের তারিখ/সময় ভুল আছে, তাই Login যাচাই করা যাচ্ছে না। Settings > Date & time-এ গিয়ে 'Automatic date & time' চালু করুন, তারপর আবার Login করুন।"
+      : "Your device's date & time is wrong, so login can't be verified. Turn on 'Automatic date & time' in your phone's Settings, then log in again.",
   };
 
   if (reason === "FIREBASE_ERROR") {
@@ -1119,11 +1147,12 @@ export function friendlyLocalAuthError(result, lang = "bn") {
     }
     if (code === "permission-denied") {
       const detail = String(result?.message || "").slice(0, 120);
+      const diagSummary = summarizeDiagnostic(result?.diagnostics);
       return (
         (isBn
           ? "সাময়িক সার্ভার সমস্যা হয়েছে — আবার Login করুন"
           : "Temporary server issue — please try logging in again") +
-        ` [${code}${detail ? ": " + detail : ""}]`
+        ` [${code}${detail ? ": " + detail : ""}${diagSummary ? " | " + diagSummary : ""}]`
       );
     }
     return (

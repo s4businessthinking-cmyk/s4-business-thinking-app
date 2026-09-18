@@ -5,7 +5,7 @@ import { initializeApp } from "firebase/app";
 import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
 import { initializeFirestore } from "firebase/firestore";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDceMFkkUFUz8tnFvZIe-pt9v5mDd0Hn4o",
   authDomain: "s4-business-thinking-31213.firebaseapp.com",
   projectId: "s4-business-thinking-31213",
