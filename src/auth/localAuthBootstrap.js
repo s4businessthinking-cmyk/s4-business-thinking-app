@@ -1118,11 +1118,18 @@ export function friendlyLocalAuthError(result, lang = "bn") {
       return isBn ? "ইন্টারনেট সংযোগ চেক করুন" : "Please check your internet connection";
     }
     if (code === "permission-denied") {
-      return isBn
-        ? "সাময়িক সার্ভার সমস্যা হয়েছে — আবার Login করুন"
-        : "Temporary server issue — please try logging in again";
+      const detail = String(result?.message || "").slice(0, 120);
+      return (
+        (isBn
+          ? "সাময়িক সার্ভার সমস্যা হয়েছে — আবার Login করুন"
+          : "Temporary server issue — please try logging in again") +
+        ` [${code}${detail ? ": " + detail : ""}]`
+      );
     }
-    return result?.message || (isBn ? "লগইন ব্যর্থ" : "Login failed");
+    return (
+      (result?.message || (isBn ? "লগইন ব্যর্থ" : "Login failed")) +
+      (code ? ` [${code}]` : "")
+    );
   }
 
   return map[reason] || (isBn ? "লগইন ব্যর্থ" : "Login failed");
