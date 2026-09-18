@@ -70,7 +70,9 @@ import {
   shouldAutoPullShop,
   getShopCloudPulledAt,
   sortPulledRecords,
+  SHOP_PULL_COLLECTIONS,
 } from "./offline/cloudPullService";
+import { subscribeShopCollection, subscribeFirebaseAuthReady } from "./offline/realtimeSync";
 import {
   ensureLocalAuthBootstrap,
   restoreLocalAuthSession,
@@ -115,6 +117,17 @@ import { PM_CSS } from "./product-master/pmStyles.js";
 import { code128SvgMarkup } from "./product-master/code128.js";
 
 import s4LogoUrl from "./assets/s4-logo.png";
+
+// Tracks whether there is a genuine Firebase Auth session (auth.currentUser),
+// as distinct from the local-only offline session that `restoreLocalAuthSession()`
+// can produce before (or without ever) establishing one. Any component that
+// attaches a Firestore onSnapshot listener should gate on this — a shopId-scoped
+// query without a real auth session just produces a silent permission-denied.
+function useFirebaseAuthReady() {
+  const [ready, setReady] = useState(() => !!auth?.currentUser);
+  useEffect(() => subscribeFirebaseAuthReady(setReady), []);
+  return ready;
+}
 
 function isActiveProduct(product) {
   if (!product) return false;
@@ -366,7 +379,7 @@ const TR = {
     helpEmailBtn:"✉️ Email",
     helpWebsiteBtn:"🌐 Website",
     helpMenuSub:"WhatsApp, Facebook, Email, Website",
-    connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন",
+    connected:"🟢 সংযুক্ত (রিয়েল-টাইম)", connecting:"🟡 সংযোগ হচ্ছে...", offline:"🔴 অফলাইন", reconnecting:"🟡 Sync পুনরায় সংযোগ হচ্ছে...",
     teamTitle:"👥 টিম মেম্বার", youLabel:"আপনি", ownerLabel:"মালিক", salesmanLabel:"কর্মী",
     confirmLogout:"লগআউট করতে চান?",
     tabCheque:"🖨️ চেক প্রিন্ট",
@@ -891,7 +904,7 @@ const TR = {
     helpEmailBtn:"✉️ Email",
     helpWebsiteBtn:"🌐 Website",
     helpMenuSub:"WhatsApp, Facebook, Email, Website",
-    connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline",
+    connected:"🟢 Connected (real-time)", connecting:"🟡 Connecting...", offline:"🔴 Offline", reconnecting:"🟡 Sync reconnecting...",
     teamTitle:"👥 Team Members", youLabel:"You", ownerLabel:"Owner", salesmanLabel:"Staff",
     confirmLogout:"Do you want to logout?",
     tabCheque:"🖨️ Cheque Print",
@@ -3861,11 +3874,13 @@ function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0 }) {
   const [loading,setLoading]     = useState(true);
   const [searchQ,setSearchQ]     = useState("");
   const [dateRange,setDateRange] = useState("30"); // 7 | 30 | 90 | "all"
+  const authSyncReady = useFirebaseAuthReady();
 
   // Local-first, then Firebase live listener; always cache to SQLite for offline.
   useEffect(()=>{
     if (!shopId) return;
     setLoading(true);
+    let unsub1=()=>{};
     let unsub2=null;
     let cancelled=false;
 
@@ -3906,20 +3921,22 @@ function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0 }) {
 
     loadLocal();
 
-    const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
-    const unsub1=onSnapshot(q,snap=>{
-      applyCloud(snap.docs.map(normalize));
-    },()=>{
-      const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
-      unsub2=onSnapshot(q2,snap=>{
-        applyCloud(sortRows(snap.docs.map(normalize)));
-      },err2=>{
-        console.error(err2);
-        loadLocal().finally(()=>{ if (!cancelled) setLoading(false); });
+    if (authSyncReady) {
+      const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
+      unsub1=onSnapshot(q,snap=>{
+        applyCloud(snap.docs.map(normalize));
+      },()=>{
+        const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
+        unsub2=onSnapshot(q2,snap=>{
+          applyCloud(sortRows(snap.docs.map(normalize)));
+        },err2=>{
+          console.error(err2);
+          loadLocal().finally(()=>{ if (!cancelled) setLoading(false); });
+        });
       });
-    });
+    }
     return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
-  },[shopId,syncRefreshKey]);
+  },[shopId,syncRefreshKey,authSyncReady]);
 
   // flatten all items from all confirmed/paid invoices
   const allItems = [];
@@ -4502,6 +4519,7 @@ function printPaymentVoucher(voucher, shop, lang) {
 
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
 function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0 }) {
+  const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
   const can = (key) => isOwner || perms[key] === true;
@@ -4578,6 +4596,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   useEffect(()=>{
     if (!shopId) return;
     setPiLoading(true);
+    let unsub1=()=>{};
     let unsub2=null;
     let cancelled=false;
     let cloudRowsLatest=null;
@@ -4632,21 +4651,23 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         .catch(err => console.warn("[S4 Offline] purchaseInvoices cache failed", err));
     };
 
-    const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
-    const unsub1=onSnapshot(q,snap=>{
-      applyCloudRows(snap.docs.map(normalizePiInvoice));
-    },()=>{
-      // Index নেই — orderBy ছাড়া fallback query, client-side sort
-      const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
-      unsub2=onSnapshot(q2,snap=>{
-        applyCloudRows(sortPiInvoices(snap.docs.map(normalizePiInvoice)));
-      },err2=>{
-        console.error(err2);
-        loadOfflinePiInvoices().finally(()=>{ if (!cancelled) setPiLoading(false); });
+    if (authSyncReady) {
+      const q=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"));
+      unsub1=onSnapshot(q,snap=>{
+        applyCloudRows(snap.docs.map(normalizePiInvoice));
+      },()=>{
+        // Index নেই — orderBy ছাড়া fallback query, client-side sort
+        const q2=query(collection(db,"purchaseInvoices"),where("shopId","==",shopId));
+        unsub2=onSnapshot(q2,snap=>{
+          applyCloudRows(sortPiInvoices(snap.docs.map(normalizePiInvoice)));
+        },err2=>{
+          console.error(err2);
+          loadOfflinePiInvoices().finally(()=>{ if (!cancelled) setPiLoading(false); });
+        });
       });
-    });
+    }
     return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
-  },[shopId,syncRefreshKey]);
+  },[shopId,syncRefreshKey,authSyncReady]);
 
   // ── Generate invoice no — preview instantly, commit on save ──
   const piMaxLocalSerial = () => invoices.reduce((mx, inv) => {
@@ -4707,6 +4728,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   useEffect(()=>{
     if (!shopId) return;
     setPmtLoading(true);
+    let unsub1=()=>{};
     let unsub2=null;
 
     const normalizePiPayment = (d) => ({
@@ -4729,26 +4751,28 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
     loadOfflinePiPayments().catch(err => console.warn("[S4 Offline] purchasePayments offline load failed", err));
 
-    const q=query(collection(db,"purchasePayments"),where("shopId","==",shopId),orderBy("createdAt","desc"));
-    const unsub1=onSnapshot(q,snap=>{
-      const rows = snap.docs.map(normalizePiPayment);
-      setPayments(rows);
-      offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments cache failed", err));
-      setPmtLoading(false);
-    },()=>{
-      const q2=query(collection(db,"purchasePayments"),where("shopId","==",shopId));
-      unsub2=onSnapshot(q2,snap=>{
-        const rows = sortPiPayments(snap.docs.map(normalizePiPayment));
+    if (authSyncReady) {
+      const q=query(collection(db,"purchasePayments"),where("shopId","==",shopId),orderBy("createdAt","desc"));
+      unsub1=onSnapshot(q,snap=>{
+        const rows = snap.docs.map(normalizePiPayment);
         setPayments(rows);
-        offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments fallback cache failed", err));
+        offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments cache failed", err));
         setPmtLoading(false);
-      },err2=>{
-        console.error(err2);
-        loadOfflinePiPayments().finally(()=>setPmtLoading(false));
+      },()=>{
+        const q2=query(collection(db,"purchasePayments"),where("shopId","==",shopId));
+        unsub2=onSnapshot(q2,snap=>{
+          const rows = sortPiPayments(snap.docs.map(normalizePiPayment));
+          setPayments(rows);
+          offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments fallback cache failed", err));
+          setPmtLoading(false);
+        },err2=>{
+          console.error(err2);
+          loadOfflinePiPayments().finally(()=>setPmtLoading(false));
+        });
       });
-    });
+    }
     return ()=>{ unsub1(); unsub2&&unsub2(); };
-  },[shopId]);
+  },[shopId, authSyncReady]);
 
   // ── This vendor's open (payable) invoices — confirmed/partial with balance > 0, oldest first ──
   const getVendorOpenInvoices = (vendorId, vendorName) => invoices
@@ -6056,6 +6080,7 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
 
 // ── SALES INVOICE TAB (main) ──
 function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0 }) {
+  const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
 
   const [invoices,setInvoices]     = useState([]);
@@ -6082,6 +6107,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   useEffect(()=>{
     if (!shopId) return;
     setSiLoading(true);
+    let u1=()=>{};
     let u2=null;
     let cancelled=false;
     let cloudRowsLatest=null;
@@ -6139,25 +6165,27 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         .catch(err => console.warn("[S4 Offline] salesInvoices cache failed", err));
     };
 
-    const baseQ = isOwner
-      ? query(collection(db,"salesInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"))
-      : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
+    if (authSyncReady) {
+      const baseQ = isOwner
+        ? query(collection(db,"salesInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"))
+        : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
 
-    const u1=onSnapshot(baseQ,snap=>{
-      applyCloudRows(snap.docs.map(normalizeSiInvoice));
-    },()=>{
-      const fbQ=isOwner
-        ? query(collection(db,"salesInvoices"),where("shopId","==",shopId))
-        : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid));
-      u2=onSnapshot(fbQ,snap=>{
-        applyCloudRows(sortSiInvoices(snap.docs.map(normalizeSiInvoice)));
-      },err=>{
-        console.error(err);
-        loadOfflineSiInvoices().finally(()=>{ if (!cancelled) setSiLoading(false); });
+      u1=onSnapshot(baseQ,snap=>{
+        applyCloudRows(snap.docs.map(normalizeSiInvoice));
+      },()=>{
+        const fbQ=isOwner
+          ? query(collection(db,"salesInvoices"),where("shopId","==",shopId))
+          : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid));
+        u2=onSnapshot(fbQ,snap=>{
+          applyCloudRows(sortSiInvoices(snap.docs.map(normalizeSiInvoice)));
+        },err=>{
+          console.error(err);
+          loadOfflineSiInvoices().finally(()=>{ if (!cancelled) setSiLoading(false); });
+        });
       });
-    });
+    }
     return ()=>{ cancelled=true; u1(); u2&&u2(); };
-  },[shopId,isOwner,user.uid,syncRefreshKey]);
+  },[shopId,isOwner,user.uid,syncRefreshKey,authSyncReady]);
 
   const siMaxLocalSerial = () => invoices.reduce((mx, inv) => {
     const m = String(inv.invoiceNo || "").match(/SI-?(\d+)$/i);
@@ -8817,7 +8845,7 @@ function SyncSettingsPanel({
     <div style={s.card}>
       <div style={s.settingsLbl}>{t.syncStatus}</div>
       <div style={{ fontSize:14, fontWeight:700, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", marginBottom:12 }}>
-        {syncState==="connected"?t.connected:syncState==="offline"?t.offline:t.connecting}
+        {syncState==="connected"?t.connected:syncState==="offline"?t.offline:syncState==="reconnecting"?t.reconnecting:t.connecting}
       </div>
 
       <div style={{ display:"grid", gap:8, marginBottom:14 }}>
@@ -8899,6 +8927,22 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th,
   const [inviteCodes,setInviteCodes]=useState([]);
   const [products,setProducts]=useState([]);
   const [syncState,setSyncState]=useState("connecting");
+  // Genuine Firebase Auth session (auth.currentUser), distinct from the local-only
+  // offline session that can hand us a usable shopId before/without one. Every
+  // Firestore onSnapshot listener below gates on this so a local-only session never
+  // attaches a shopId-scoped listener that would just permission-deny silently.
+  const authSyncReady = useFirebaseAuthReady();
+
+  // Visible, non-spammy status when we're online but the real-time listeners
+  // above are deliberately not attached because there's no genuine Firebase
+  // Auth session yet (a local-only session came up first, or the session
+  // never established one). Reported as "reconnecting" — the listeners
+  // above re-attach automatically the moment authSyncReady flips true.
+  useEffect(() => {
+    if (!shopId || authSyncReady) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    setSyncState("reconnecting");
+  }, [shopId, authSyncReady]);
   const [localShop,setLocalShop]=useState(shopProp);
 
   const [tab,setTab]=useState("dashboard");
@@ -9112,19 +9156,22 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       .then((row) => applyMemberRecord(row?.data))
       .catch((error) => console.warn("[S4 Team] offline profile sync failed", error));
 
-    const unsub = onSnapshot(
-      doc(db, "users", user.uid),
-      (snap) => {
-        if (snap.exists()) applyMemberRecord(snap.data());
-      },
-      (error) => console.warn("[S4 Team] cloud profile sync failed", error)
-    );
+    let unsub = () => {};
+    if (authSyncReady) {
+      unsub = onSnapshot(
+        doc(db, "users", user.uid),
+        (snap) => {
+          if (snap.exists()) applyMemberRecord(snap.data());
+        },
+        (error) => console.warn("[S4 Team] cloud profile sync failed", error)
+      );
+    }
 
     return () => {
       cancelled = true;
       unsub();
     };
-  }, [user?.uid, isOwner, profile.localUserId, lang]);
+  }, [user?.uid, isOwner, profile.localUserId, lang, authSyncReady]);
 
   const refreshSyncDashboard = async () => {
     try {
@@ -9347,8 +9394,15 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     return () => window.clearInterval(timer);
   }, [shopId, user?.uid]);
 
+  // Cold-start / catch-up pull only. Continuous freshness is now handled by the
+  // real-time onSnapshot listeners above and the background collection sync
+  // below — this just covers a brand-new install (empty local catalog) or a
+  // very stale local cache, and re-runs once when a genuine Firebase Auth
+  // session becomes available (it can't do anything useful before that).
+  // Manual "Cloud Download" in Settings > Sync (runCloudDownload) remains the
+  // user-triggered fallback for a full re-pull at any time.
   useEffect(() => {
-    if (!shopId) return;
+    if (!shopId || !authSyncReady) return;
     let cancelled = false;
 
     const tryAutoPull = async ({ force = false } = {}) => {
@@ -9371,14 +9425,41 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     };
 
     tryAutoPull({ force: false });
-    // Keep salesman/PC local SQLite warm while online (empty catalog / stale pull).
-    const timer = window.setInterval(() => tryAutoPull({ force: false }), 5 * 60 * 1000);
 
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
     };
-  }, [shopId, isOwner, isOrderManager, user?.uid]);
+  }, [shopId, isOwner, isOrderManager, user?.uid, authSyncReady]);
+
+  // ── Background real-time sync for collections that don't have their own
+  // always-mounted listener above (purchaseInvoices/purchasePayments/
+  // salesInvoices already get true real-time UI updates from their own tab
+  // components while that tab is open; this keeps their local SQLite cache
+  // live even while the user is on a different tab, so switching to that tab
+  // — or working fully offline — never shows minutes-old data). Gated on
+  // genuine Firebase auth + auto-retry with backoff via subscribeShopCollection. ──
+  useEffect(() => {
+    if (!shopId) return;
+
+    const backgroundCollections = SHOP_PULL_COLLECTIONS.filter(
+      (name) => !["products", "companies", "customers", "vendors", "orders", "users"].includes(name)
+    );
+
+    const unsubscribers = backgroundCollections.map((collectionName) =>
+      subscribeShopCollection({
+        collectionName,
+        shopId,
+        onRows: () => {}, // cache-only: no MainApp-level UI state for these
+        onStatus: ({ state }) => {
+          if (state === "connected") {
+            setLastCloudPullAt(new Date().toISOString());
+          }
+        },
+      })
+    );
+
+    return () => unsubscribers.forEach((unsub) => unsub());
+  }, [shopId]);
 
   useEffect(() => {
     if (!auth || !shopId) return;
@@ -9453,21 +9534,24 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       }
     })();
 
-    const unsub = onSnapshot(
-      doc(db, "shops", shopId),
-      (snap) => {
-        if (!snap.exists()) return;
-        const data = { id: snap.id, ...snap.data() };
-        applyShopRecord(data, { cache: true });
-      },
-      (err) => console.warn("[S4 Shop] online listener failed", err)
-    );
+    let unsub = () => {};
+    if (authSyncReady) {
+      unsub = onSnapshot(
+        doc(db, "shops", shopId),
+        (snap) => {
+          if (!snap.exists()) return;
+          const data = { id: snap.id, ...snap.data() };
+          applyShopRecord(data, { cache: true });
+        },
+        (err) => console.warn("[S4 Shop] online listener failed", err)
+      );
+    }
 
     return () => {
       cancelled = true;
       unsub();
     };
-  }, [shopId]);
+  }, [shopId, authSyncReady]);
 
   // ── Orders real-time listener with offline cache fallback ──
   useEffect(() => {
@@ -9517,23 +9601,26 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setSyncState("connected");
     };
 
-    const q = (isOwner||isOrderManager)
-      ? query(collection(db,"orders"), where("shopId","==",shopId), orderBy("createdAt","desc"))
-      : query(collection(db,"orders"), where("shopId","==",shopId), where("createdBy","==",user.uid), orderBy("createdAt","desc"));
+    let unsub = () => {};
+    if (authSyncReady) {
+      const q = (isOwner||isOrderManager)
+        ? query(collection(db,"orders"), where("shopId","==",shopId), orderBy("createdAt","desc"))
+        : query(collection(db,"orders"), where("shopId","==",shopId), where("createdBy","==",user.uid), orderBy("createdAt","desc"));
 
-    const unsub = onSnapshot(
-      q,
-      applyDocs,
-      err => {
-        console.error("orders listener:", err);
-        loadLocalOrders();
-      }
-    );
+      unsub = onSnapshot(
+        q,
+        applyDocs,
+        err => {
+          console.error("orders listener:", err);
+          loadLocalOrders();
+        }
+      );
+    }
 
     loadLocalOrders();
 
     return () => unsub();
-  },[shopId,isOwner,isOrderManager,user?.uid]);
+  },[shopId,isOwner,isOrderManager,user?.uid,authSyncReady]);
 
   // ── Companies real-time listener with offline fallback ──
   useEffect(() => {
@@ -9569,19 +9656,22 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setSyncState("connected");
     };
 
-    const unsub = onSnapshot(
-      query(collection(db,"companies"), where("shopId","==",shopId), orderBy("name")),
-      applyDocs,
-      (err) => {
-        console.error("companies listener:", err);
-        loadLocalCompanies();
-      }
-    );
+    let unsub = () => {};
+    if (authSyncReady) {
+      unsub = onSnapshot(
+        query(collection(db,"companies"), where("shopId","==",shopId), orderBy("name")),
+        applyDocs,
+        (err) => {
+          console.error("companies listener:", err);
+          loadLocalCompanies();
+        }
+      );
+    }
 
     loadLocalCompanies();
 
     return () => unsub();
-  },[shopId]);
+  },[shopId,authSyncReady]);
   
   // ── Vendors real-time listener with offline fallback ──
   useEffect(() => {
@@ -9617,27 +9707,30 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setSyncState("connected");
     };
 
+    let unsub1 = () => {};
     let unsub2 = null;
 
-    const unsub1 = onSnapshot(
-      query(collection(db,"vendors"), where("shopId","==",shopId), orderBy("vendorName")),
-      applyDocs,
-      () => {
-        unsub2 = onSnapshot(
-          query(collection(db,"vendors"), where("shopId","==",shopId)),
-          applyDocs,
-          (err) => {
-            console.error("vendors listener error:", err);
-            loadLocalVendors();
-          }
-        );
-      }
-    );
+    if (authSyncReady) {
+      unsub1 = onSnapshot(
+        query(collection(db,"vendors"), where("shopId","==",shopId), orderBy("vendorName")),
+        applyDocs,
+        () => {
+          unsub2 = onSnapshot(
+            query(collection(db,"vendors"), where("shopId","==",shopId)),
+            applyDocs,
+            (err) => {
+              console.error("vendors listener error:", err);
+              loadLocalVendors();
+            }
+          );
+        }
+      );
+    }
 
     loadLocalVendors();
 
     return () => { unsub1(); unsub2 && unsub2(); };
-  }, [shopId]);
+  }, [shopId, authSyncReady]);
 
   // ── Customers real-time listener with offline fallback ──
   useEffect(() => {
@@ -9673,27 +9766,30 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setSyncState("connected");
     };
 
+    let unsub1 = () => {};
     let unsub2 = null;
 
-    const unsub1 = onSnapshot(
-      query(collection(db,"customers"), where("shopId","==",shopId), orderBy("customerName")),
-      applyDocs,
-      () => {
-        unsub2 = onSnapshot(
-          query(collection(db,"customers"), where("shopId","==",shopId)),
-          applyDocs,
-          (err) => {
-            console.error("customers listener:", err);
-            loadLocalCustomers();
-          }
-        );
-      }
-    );
+    if (authSyncReady) {
+      unsub1 = onSnapshot(
+        query(collection(db,"customers"), where("shopId","==",shopId), orderBy("customerName")),
+        applyDocs,
+        () => {
+          unsub2 = onSnapshot(
+            query(collection(db,"customers"), where("shopId","==",shopId)),
+            applyDocs,
+            (err) => {
+              console.error("customers listener:", err);
+              loadLocalCustomers();
+            }
+          );
+        }
+      );
+    }
 
     loadLocalCustomers();
 
     return () => { unsub1(); unsub2 && unsub2(); };
-  }, [shopId]);
+  }, [shopId, authSyncReady]);
 
   const cloudTeamRef = useRef([]);
   const inviteCodesRef = useRef([]);
@@ -9749,6 +9845,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     rebuildTeam();
 
+    if (!authSyncReady) return undefined;
+
     return onSnapshot(
       query(collection(db,"users"), where("shopId","==",shopId)),
       (snap) => {
@@ -9764,17 +9862,17 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         rebuildTeam();
       }
     );
-  },[shopId]);
+  },[shopId, authSyncReady]);
 
   // ── Invite codes listener (owner only) ──
   useEffect(() => {
-    if (!isOwner) return;
+    if (!isOwner || !authSyncReady) return undefined;
     return onSnapshot(
       query(collection(db,"inviteCodes"), where("shopId","==",shopId)),
       snap => setInviteCodes(snap.docs.map(d=>({...d.data(), code:d.id}))),
       err  => console.error(err)
     );
-  },[shopId, isOwner]);
+  },[shopId, isOwner, authSyncReady]);
 
   // ── Products — realtime listener with offline cache fallback ──
   const [productsLoading,setProductsLoading]=useState(false);
@@ -9784,7 +9882,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const productMaintenanceId=shopId;
 
   useEffect(() => {
-    if (!shopId || !db) return;
+    if (!shopId || !db || !authSyncReady) return undefined;
     return onSnapshot(
       doc(db, "productMaintenance", productMaintenanceId),
       (snap) => {
@@ -9798,7 +9896,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       },
       (err) => console.warn("[Product Master] maintenance lock listener failed", err)
     );
-  }, [shopId, productMaintenanceId, productReplacementActive]);
+  }, [shopId, productMaintenanceId, productReplacementActive, authSyncReady]);
 
   const fetchProducts = async () => {
     setSyncRefreshKey((value) => value + 1);
@@ -9850,22 +9948,25 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setProductsLoading(false);
     };
 
+    let unsub1 = () => {};
     let unsub2 = null;
 
-    const unsub1 = onSnapshot(
-      query(collection(db, "products"), where("shopId", "==", shopId), orderBy("name")),
-      applyDocs,
-      () => {
-        unsub2 = onSnapshot(
-          query(collection(db, "products"), where("shopId", "==", shopId)),
-          applyDocs,
-          (err) => {
-            console.error("products listener:", err);
-            loadLocalProducts();
-          }
-        );
-      }
-    );
+    if (authSyncReady) {
+      unsub1 = onSnapshot(
+        query(collection(db, "products"), where("shopId", "==", shopId), orderBy("name")),
+        applyDocs,
+        () => {
+          unsub2 = onSnapshot(
+            query(collection(db, "products"), where("shopId", "==", shopId)),
+            applyDocs,
+            (err) => {
+              console.error("products listener:", err);
+              loadLocalProducts();
+            }
+          );
+        }
+      );
+    }
 
     loadLocalProducts();
 
@@ -9873,7 +9974,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       unsub1();
       unsub2 && unsub2();
     };
-  }, [shopId, syncRefreshKey]);
+  }, [shopId, syncRefreshKey, authSyncReady]);
 
   const hErr  = (e) => { console.error(e); toast(e.message||String(e),"err"); };
 
@@ -13175,10 +13276,10 @@ const startEditOrder = (order) => {
 
               {/* Sync status */}
               <button style={s.settingsRow} onClick={()=>setSettingsPage("sync")}>
-                <span style={s.settingsRowIcon}>{syncState==="connected"?"🟢":syncState==="offline"?"🔴":"🟡"}</span>
+                <span style={s.settingsRowIcon}>{syncState==="connected"?"🟢":syncState==="offline"?"🔴":syncState==="reconnecting"?"🟠":"🟡"}</span>
                 <div style={{ flex:1 }}>
                   <div style={s.settingsRowLabel}>{t.syncStatus}</div>
-                  <div style={s.settingsRowSub}>{syncState==="connected"?"Online":syncState==="offline"?"Offline":"Connecting..."}</div>
+                  <div style={s.settingsRowSub}>{syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..."}</div>
                 </div>
               </button>
 
@@ -13781,7 +13882,7 @@ const startEditOrder = (order) => {
             </div>
             <div style={{ flex:1 }} />
             <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
-              {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":"🟡 Connecting..."}
+              {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":syncState==="reconnecting"?"🟠 Reconnecting...":"🟡 Connecting..."}
             </div>
             <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
           </div>

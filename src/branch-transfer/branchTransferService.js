@@ -1,14 +1,12 @@
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { db } from "../firebase-config";
 import { restoreLocalAuthSession } from "../auth/localAuthBootstrap";
 import {
-  offlineCacheCloudRecords,
   offlineCreate,
   offlineGetById,
   offlineList,
   offlineUpdate,
   offlineUpsert,
 } from "../offline/offlineRepository";
+import { subscribeShopCollection } from "../offline/realtimeSync";
 import {
   BRANCH_TRANSFER_STATUSES,
   DEFAULT_BRANCH_TRANSFER_SETTINGS,
@@ -97,14 +95,6 @@ function receiverIdentityValues(transfer = {}) {
     .filter(Boolean);
 }
 
-function dirtyShopRows(result, shopId) {
-  const rows = Array.isArray(result) ? result : result?.records || [];
-  return rows
-    .filter((row) => Number(row?.dirty || 0) === 1)
-    .map((row) => ({ ...(row?.data || {}), id: row?.data?.id || row?.document_id || row?.id }))
-    .filter((row) => String(row.shopId || "") === String(shopId));
-}
-
 function actorFromSession(session) {
   const profile = session?.profile || {};
   const user = session?.user || {};
@@ -176,59 +166,36 @@ export async function listShopRecords(collectionName, shopId) {
 }
 
 export function subscribeShopRecords(collectionName, shopId, onRows, onError = () => {}) {
-  let cancelled = false;
-  let unsubscribe = () => {};
+  if (!shopId) {
+    return subscribeShopCollectionFallback(collectionName, shopId, onRows);
+  }
 
+  return subscribeShopCollection({
+    collectionName,
+    shopId,
+    loadLocalRows: () => listShopRecords(collectionName, shopId),
+    sortRows: sortNewest,
+    onRows,
+    onStatus: ({ state, error }) => {
+      // Preserve the pre-existing external contract: onError only fires for
+      // genuine listener errors, not for the expected "auth not ready yet" /
+      // "offline" states (those resolve on their own once the real Firebase
+      // session or connectivity comes back, and are already reflected by the
+      // local-first `onRows` call).
+      if (state === "reconnecting" && error) onError(error);
+    },
+  });
+}
+
+function subscribeShopCollectionFallback(collectionName, shopId, onRows) {
+  let cancelled = false;
   listShopRecords(collectionName, shopId)
     .then((rows) => {
       if (!cancelled) onRows(rows);
     })
-    .catch(onError);
-
-  if (db && shopId) {
-    try {
-      const q = query(collection(db, collectionName), where("shopId", "==", shopId));
-      unsubscribe = onSnapshot(
-        q,
-        (snapshot) => {
-          const cloudRows = sortNewest(
-            snapshot.docs.map((entry) => ({
-              id: entry.id,
-              ...entry.data(),
-            }))
-          );
-
-          Promise.resolve()
-            .then(() => offlineCacheCloudRecords(collectionName, cloudRows))
-            .catch((error) =>
-              console.warn(`[S4 Branch Transfer] ${collectionName} cache failed`, error)
-            )
-            .then(() => offlineList(collectionName))
-            .then((localResult) => {
-              const merged = new Map(cloudRows.map((row) => [String(row.id), row]));
-              for (const row of dirtyShopRows(localResult, shopId)) {
-                merged.set(String(row.id), row);
-              }
-              if (!cancelled) onRows(sortNewest([...merged.values()]));
-            })
-            .catch((error) => {
-              console.warn(`[S4 Branch Transfer] ${collectionName} local merge failed`, error);
-              if (!cancelled) onRows(cloudRows);
-            });
-        },
-        (error) => {
-          console.warn(`[S4 Branch Transfer] ${collectionName} listener failed`, error);
-          onError(error);
-        }
-      );
-    } catch (error) {
-      onError(error);
-    }
-  }
-
+    .catch(() => {});
   return () => {
     cancelled = true;
-    unsubscribe?.();
   };
 }
 
