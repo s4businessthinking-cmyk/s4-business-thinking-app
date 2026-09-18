@@ -3,7 +3,7 @@
 // ============================================================
 import { initializeApp } from "firebase/app";
 import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDceMFkkUFUz8tnFvZIe-pt9v5mDd0Hn4o",
@@ -21,7 +21,15 @@ let _auth = null, _db = null;
 try {
   const app = initializeApp(firebaseConfig);
   _auth = getAuth(app);
-  _db = getFirestore(app);
+  // Android WebView (Capacitor) can't reliably hold Firestore's default
+  // streaming (WebChannel) connection open — it intermittently drops and
+  // resurfaces as a misleading "permission-denied" right after login.
+  // Auto-detecting long-polling makes the mobile build fall back to a
+  // connection type the WebView handles correctly.
+  _db = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+    useFetchStreams: false,
+  });
   setPersistence(_auth, browserLocalPersistence).catch((err) => {
     console.warn("[S4 Auth] Firebase persistence setup failed", err);
   });

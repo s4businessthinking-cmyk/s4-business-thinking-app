@@ -4,7 +4,7 @@ const path = require("path");
 
 const androidDir = path.join(__dirname, "..", "android");
 const isWin = process.platform === "win32";
-const gradle = isWin ? "gradlew.bat" : "./gradlew";
+const gradle = path.join(androidDir, isWin ? "gradlew.bat" : "gradlew");
 const taskParts = process.argv.slice(2);
 const stacktrace = taskParts.includes("--stacktrace");
 const task = taskParts.find((part) => !part.startsWith("--")) || "assembleRelease";
@@ -18,7 +18,7 @@ if (!isWin) {
   }
 }
 
-execSync(`${gradle} ${task}${stacktrace ? " --stacktrace" : ""}`, {
+execSync(`"${gradle}" ${task}${stacktrace ? " --stacktrace" : ""}`, {
   stdio: "inherit",
   cwd: androidDir,
   shell: true,

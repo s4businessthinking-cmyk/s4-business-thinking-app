@@ -20,7 +20,7 @@ if (fs.existsSync(zipPath)) {
   fs.unlinkSync(zipPath);
 }
 
-execSync(`tar -a -c -f "${zipPath}" -C "${distDir}" .`, {
+execSync(`tar --force-local -a -c -f "${zipPath}" -C "${distDir}" .`, {
   cwd: root,
   stdio: "inherit",
   shell: true,
