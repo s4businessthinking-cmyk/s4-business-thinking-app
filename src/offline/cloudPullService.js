@@ -7,14 +7,19 @@ import {
   where,
 } from "firebase/firestore";
 import { db, auth } from "../firebase-config";
-import { offlineCacheCloudRecords, offlineUpsert } from "./offlineRepository";
+import { offlineCacheCloudRecords } from "./offlineRepository";
 import { saveCachedShop } from "./shopService";
 import { addLocalInviteCode } from "../auth/localAuthBootstrap";
 import {
   syncPendingQueueToFirebase,
   uploadLocalRecordsBatch,
 } from "./firebaseSyncWorker";
-import { getOfflineStatus, getLocalRecords } from "./sqliteDb";
+import {
+  getOfflineStatus,
+  getLocalRecords,
+  getFailingSyncGroups,
+  bulkEnqueueUpsert,
+} from "./sqliteDb";
 
 const CLOUD_PULL_META_PREFIX = "s4-cloud-pull-v1";
 
@@ -343,9 +348,10 @@ export async function uploadPendingShopChanges(shopId) {
  * (or has a stale/mismatched) shopId used to be silently excluded from
  * uploadPendingShopChanges() by filterRecordsForShop() forever, or a queue
  * item that kept failing could fall out of the pending count after enough
- * retries. Re-queuing here uses the normal offlineUpsert() path (the same
- * one every ordinary edit uses), so the fix goes through the exact same,
- * already-correct upload machinery — nothing new to trust.
+ * retries. Re-queuing here uses bulkEnqueueUpsert() — the same local_records
+ * + sync_queue writes every ordinary edit produces, just batched to a single
+ * persist per collection instead of one per record, since this can touch
+ * thousands of rows in one pass.
  */
 export async function reconcileShopWithCloud(shopId) {
   if (!shopId) return { ok: false, reason: "SHOP_ID_REQUIRED" };
@@ -373,21 +379,13 @@ export async function reconcileShopWithCloud(shopId) {
         (row) => !cloudIds.has(String(row.document_id))
       );
 
-      let requeued = 0;
-      for (const row of missingRows) {
-        try {
-          await offlineUpsert(collectionName, row.document_id, {
-            ...(row.data || {}),
-            shopId,
-          });
-          requeued += 1;
-        } catch (error) {
-          console.warn(
-            `[S4 Reconcile] ${collectionName}/${row.document_id} re-queue failed`,
-            error
-          );
-        }
-      }
+      const { queued: requeued } = await bulkEnqueueUpsert(
+        collectionName,
+        missingRows.map((row) => ({
+          documentId: row.document_id,
+          data: { ...(row.data || {}), shopId },
+        }))
+      );
 
       totalMissing += missingRows.length;
       totalRequeued += requeued;
@@ -428,6 +426,17 @@ export async function getSyncDashboardStatus() {
     ...status,
     online: isOnline(),
   };
+}
+
+/**
+ * The real diagnostic behind the "repeatedly failing" count: groups
+ * permanently-retrying sync_queue rows by their actual last_error +
+ * collection, with a sample document id per group, so the owner (or support)
+ * can see e.g. "23 products failing with INVALID_DOCUMENT_ID: ..." instead
+ * of a single opaque number.
+ */
+export async function getFailingSyncSamples(limit = 20) {
+  return getFailingSyncGroups(limit);
 }
 
 export function sortPulledRecords(data) {

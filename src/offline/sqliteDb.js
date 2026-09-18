@@ -511,7 +511,7 @@ export async function getPendingSyncQueue() {
   });
 }
 
-export async function markSyncDone(queueId) {
+export async function markSyncDone(queueId, options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -541,12 +541,16 @@ export async function markSyncDone(queueId) {
     );
   }
 
-  await persist();
+  // A full sql.js export+IndexedDB write on every single row is fine for a
+  // one-off user edit, but ruinous for a bulk sync pass over thousands of
+  // queued items (that's an O(n) full-database re-serialize). Bulk callers
+  // pass skipPersist and persist once after the whole chunk instead.
+  if (!options.skipPersist) await persist();
 
   return { ok: true };
 }
 
-export async function markSyncFailed(queueId, errorMessage) {
+export async function markSyncFailed(queueId, errorMessage, options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -561,7 +565,7 @@ export async function markSyncFailed(queueId, errorMessage) {
     [String(errorMessage || "Unknown sync error"), now, queueId]
   );
 
-  await persist();
+  if (!options.skipPersist) await persist();
 
   return { ok: true };
 }
@@ -601,4 +605,94 @@ export async function getOfflineStatus() {
     localRecords: Number(local?.[0]?.count || 0),
     online: navigator.onLine,
   };
+}
+
+/**
+ * Diagnostic for the "repeatedly failing" bucket: groups permanently-retrying
+ * queue items by their actual last_error + collection, so the real failure
+ * reason (permission-denied / invalid-argument / resource-exhausted /
+ * deadline-exceeded / etc.) is visible instead of a single opaque count.
+ */
+export async function getFailingSyncGroups(limit = 20) {
+  await bootOfflineSqlite();
+
+  const rows = query(
+    `SELECT last_error, collection_name, COUNT(*) AS count,
+            MIN(document_id) AS sample_document_id,
+            MAX(retry_count) AS max_retry_count
+     FROM sync_queue
+     WHERE status = 'FAILED' AND retry_count >= ?
+     GROUP BY last_error, collection_name
+     ORDER BY count DESC
+     LIMIT ?`,
+    [MAX_SYNC_RETRIES, limit]
+  );
+
+  return rows.map((row) => ({
+    lastError: row.last_error || "Unknown error",
+    collectionName: row.collection_name,
+    count: Number(row.count || 0),
+    sampleDocumentId: row.sample_document_id,
+    maxRetryCount: Number(row.max_retry_count || 0),
+  }));
+}
+
+/**
+ * Bulk version of saveLocalRecord()+enqueueSync() for backfill/reconcile
+ * passes that touch thousands of records at once. Doing that through the
+ * normal per-record offlineUpsert() path persists (a full sql.js
+ * export + IndexedDB write of the WHOLE local database) twice per record —
+ * for a multi-thousand-record backfill that's tens of thousands of full-DB
+ * serializations. This does all the row writes in one open transaction-like
+ * pass and persists once at the end.
+ */
+export async function bulkEnqueueUpsert(collectionName, records = []) {
+  await bootOfflineSqlite();
+
+  const now = new Date().toISOString();
+  let queued = 0;
+
+  for (const record of records) {
+    const documentId = record?.documentId;
+    if (!documentId) continue;
+
+    const data = { ...(record.data || {}), id: documentId, _offline_updated_at: now };
+    const localId = `${collectionName}:${documentId}`;
+    const dataJson = JSON.stringify(data);
+
+    db.run(
+      `INSERT INTO local_records
+        (id, collection_name, document_id, data_json, deleted, dirty, version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 0, 1, 1, ?, ?)
+       ON CONFLICT(collection_name, document_id)
+       DO UPDATE SET
+        data_json = excluded.data_json,
+        deleted = 0,
+        dirty = 1,
+        version = local_records.version + 1,
+        updated_at = excluded.updated_at`,
+      [localId, collectionName, documentId, dataJson, now, now]
+    );
+
+    const queueId = uuidv4();
+    db.run(
+      `INSERT INTO sync_queue
+        (id, collection_name, document_id, operation, payload_json, status, retry_count, created_at, updated_at)
+       VALUES (?, ?, ?, 'UPSERT', ?, 'PENDING', 0, ?, ?)`,
+      [
+        queueId,
+        collectionName,
+        documentId,
+        JSON.stringify({ collectionName, documentId, data }),
+        now,
+        now,
+      ]
+    );
+
+    queued += 1;
+  }
+
+  if (queued > 0) await persist();
+
+  return { ok: true, collectionName, queued };
 }

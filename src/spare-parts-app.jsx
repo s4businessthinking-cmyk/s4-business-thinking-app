@@ -71,6 +71,7 @@ import {
   shouldAutoPullShop,
   getShopCloudPulledAt,
   sortPulledRecords,
+  getFailingSyncSamples,
   SHOP_PULL_COLLECTIONS,
 } from "./offline/cloudPullService";
 import { subscribeShopCollection, subscribeFirebaseAuthReady } from "./offline/realtimeSync";
@@ -8841,6 +8842,24 @@ function SyncSettingsPanel({
   onRefresh,
 }) {
   const isOnline = typeof navigator !== "undefined" ? navigator.onLine : false;
+  const [showFailingDetails, setShowFailingDetails] = useState(false);
+  const [failingSamples, setFailingSamples] = useState(null);
+  const [failingLoading, setFailingLoading] = useState(false);
+
+  const toggleFailingDetails = async () => {
+    const next = !showFailingDetails;
+    setShowFailingDetails(next);
+    if (!next || failingSamples) return;
+    setFailingLoading(true);
+    try {
+      setFailingSamples(await getFailingSyncSamples());
+    } catch (error) {
+      console.warn("[S4 Sync] failing sample fetch failed", error);
+      setFailingSamples([]);
+    } finally {
+      setFailingLoading(false);
+    }
+  };
 
   return (
     <div style={s.card}>
@@ -8863,8 +8882,41 @@ function SyncSettingsPanel({
           {t.syncPendingLbl}: <strong style={{ color:th.txtPrimary }}>{syncDashboard?.pendingSync ?? 0}</strong>
         </div>
         {Number(syncDashboard?.failingSync) > 0 && (
-          <div style={{ fontSize:12, color:"#f59e0b" }}>
-            {lang==="bn" ? "⚠️ বারবার ব্যর্থ (retry চলছে)" : "⚠️ Repeatedly failing (still retrying)"}: <strong style={{ color:"#f59e0b" }}>{syncDashboard.failingSync}</strong>
+          <div>
+            <button
+              type="button"
+              onClick={toggleFailingDetails}
+              style={{
+                display:"block", width:"100%", textAlign:"left", background:"none", border:"none",
+                padding:0, cursor:"pointer", fontSize:12, color:"#f59e0b", fontFamily:"inherit",
+              }}
+            >
+              {lang==="bn" ? "⚠️ বারবার ব্যর্থ (retry চলছে)" : "⚠️ Repeatedly failing (still retrying)"}: <strong style={{ color:"#f59e0b" }}>{syncDashboard.failingSync}</strong>{" "}
+              {showFailingDetails ? "▲" : (lang==="bn" ? "▼ বিস্তারিত দেখুন" : "▼ tap for details")}
+            </button>
+            {showFailingDetails && (
+              <div style={{ marginTop:6, padding:10, borderRadius:8, background:th.bgInp, display:"grid", gap:8 }}>
+                {failingLoading && (
+                  <div style={{ fontSize:11, color:th.txtMuted }}>{lang==="bn"?"লোড হচ্ছে...":"Loading..."}</div>
+                )}
+                {!failingLoading && failingSamples?.length === 0 && (
+                  <div style={{ fontSize:11, color:th.txtMuted }}>
+                    {lang==="bn" ? "কোনো বিস্তারিত পাওয়া যায়নি (সম্ভবত এইমাত্র ঠিক হয়ে গেছে)।" : "No details found (they may have just recovered)."}
+                  </div>
+                )}
+                {!failingLoading && failingSamples?.map((group, i) => (
+                  <div key={i} style={{ fontSize:11, borderBottom: i < failingSamples.length - 1 ? `1px solid ${th.border}` : "none", paddingBottom:8 }}>
+                    <div style={{ color:th.txtPrimary, fontWeight:700 }}>
+                      {group.collectionName} × {group.count} {lang==="bn"?`(${group.maxRetryCount}বার retry)`:`(retried ${group.maxRetryCount}x)`}
+                    </div>
+                    <div style={{ color:th.txtMuted }}>
+                      {lang==="bn"?"নমুনা ID":"sample id"}: <span style={{ wordBreak:"break-all" }}>{group.sampleDocumentId || "—"}</span>
+                    </div>
+                    <div style={{ color:"#ef4444", wordBreak:"break-word", marginTop:2 }}>{group.lastError}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div style={{ fontSize:12, color:th.txtMuted }}>
