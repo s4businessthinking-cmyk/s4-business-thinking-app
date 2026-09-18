@@ -482,13 +482,18 @@ export async function enqueueSync(collectionName, documentId, operation, payload
 export async function getPendingSyncQueue() {
   await bootOfflineSqlite();
 
+  // Deliberately NOT capped by retry_count: a queue item that fails
+  // MAX_SYNC_RETRIES times used to fall out of this query forever (and out of
+  // getOfflineStatus()'s pendingSync count), so it silently stopped being
+  // retried with no visible sign anything was wrong — the record stayed
+  // "dirty" locally but nothing ever tried uploading it again. Every
+  // non-DONE item is retried on every sync pass; retry_count/last_error are
+  // kept for diagnostics only, not as a cutoff.
   const rows = query(
     `SELECT *
      FROM sync_queue
-     WHERE status = 'PENDING'
-        OR (status = 'FAILED' AND retry_count < ?)
-     ORDER BY created_at ASC`,
-    [MAX_SYNC_RETRIES]
+     WHERE status = 'PENDING' OR status = 'FAILED'
+     ORDER BY created_at ASC`
   );
 
   return rows.map((row) => {
@@ -564,11 +569,18 @@ export async function markSyncFailed(queueId, errorMessage) {
 export async function getOfflineStatus() {
   await bootOfflineSqlite();
 
+  // Same as getPendingSyncQueue(): no retry_count cutoff, so a persistently
+  // failing item keeps counting as pending instead of quietly vanishing.
   const pending = query(
     `SELECT COUNT(*) AS count
      FROM sync_queue
-     WHERE status = 'PENDING'
-        OR (status = 'FAILED' AND retry_count < ?)`,
+     WHERE status = 'PENDING' OR status = 'FAILED'`
+  );
+
+  const failing = query(
+    `SELECT COUNT(*) AS count
+     FROM sync_queue
+     WHERE status = 'FAILED' AND retry_count >= ?`,
     [MAX_SYNC_RETRIES]
   );
 
@@ -582,6 +594,10 @@ export async function getOfflineStatus() {
     ok: true,
     engine: "SQLite",
     pendingSync: Number(pending?.[0]?.count || 0),
+    // Diagnostic only: how many of the pending items have already failed
+    // MAX_SYNC_RETRIES+ times (still retried, but worth a closer look if
+    // this stays non-zero — e.g. a bad field value Firestore keeps rejecting).
+    failingSync: Number(failing?.[0]?.count || 0),
     localRecords: Number(local?.[0]?.count || 0),
     online: navigator.onLine,
   };

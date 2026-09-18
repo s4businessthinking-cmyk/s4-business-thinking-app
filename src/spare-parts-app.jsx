@@ -65,6 +65,7 @@ import {
 import {
   pullShopFromCloud,
   uploadPendingShopChanges,
+  reconcileShopWithCloud,
   getSyncDashboardStatus,
   getCloudSyncBlockReason,
   shouldAutoPullShop,
@@ -4858,7 +4859,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       };
 
       const result = await offlineCreate("purchasePayments", paymentPayload);
-      const created = { ...result.data, id: result.id, createdAt: nowIso };
+      const created = { ...result.data, id: result.documentId, createdAt: nowIso };
       setPayments((prev) => [created, ...prev]);
 
       if (navigator.onLine) {
@@ -5085,8 +5086,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         updatedAt: nowIso,
       });
 
-      const created = { ...result.data, id: result.id };
-      savedId = result.id;
+      const created = { ...result.data, id: result.documentId };
+      savedId = result.documentId;
       setInvoices(prev => [created, ...prev]);
       toast(successMessage);
     }
@@ -6385,7 +6386,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         updatedAt: nowIso,
       });
 
-      savedInvoice = { ...result.data, id: result.id };
+      savedInvoice = { ...result.data, id: result.documentId };
       setInvoices(prev => [savedInvoice, ...prev]);
       toast(successMessage);
     }
@@ -8861,6 +8862,11 @@ function SyncSettingsPanel({
         <div style={{ fontSize:12, color:th.txtMuted }}>
           {t.syncPendingLbl}: <strong style={{ color:th.txtPrimary }}>{syncDashboard?.pendingSync ?? 0}</strong>
         </div>
+        {Number(syncDashboard?.failingSync) > 0 && (
+          <div style={{ fontSize:12, color:"#f59e0b" }}>
+            {lang==="bn" ? "⚠️ বারবার ব্যর্থ (retry চলছে)" : "⚠️ Repeatedly failing (still retrying)"}: <strong style={{ color:"#f59e0b" }}>{syncDashboard.failingSync}</strong>
+          </div>
+        )}
         <div style={{ fontSize:12, color:th.txtMuted }}>
           {t.syncLocalRecordsLbl}: <strong style={{ color:th.txtPrimary }}>{syncDashboard?.localRecords ?? 0}</strong>
         </div>
@@ -9265,23 +9271,22 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
     setCloudUploadBusy(true);
     try {
-      const stageCollection = async (collectionName, rows) => {
-        if (!rows?.length) return;
-        await offlineCacheCloudRecords(
-          collectionName,
-          rows.map((row) => ({
-            ...row,
-            shopId: row.shopId || shopId,
-            id: row.id || row.uid,
-          }))
-        );
-      };
-
-      await stageCollection("products", products);
-      await stageCollection("companies", cos);
-      await stageCollection("customers", customers);
-      await stageCollection("vendors", vendors);
-      await stageCollection("orders", orders);
+      // Repair pass first: find any local record (in any collection) that
+      // Firestore doesn't actually have — regardless of what its local dirty
+      // flag says — and re-queue it with the correct shopId. This is what
+      // catches records that got silently stuck (e.g. missing a shopId tag,
+      // or abandoned after repeated sync failures) before the normal
+      // "upload everything pending" pass below runs.
+      const reconcileResult = await reconcileShopWithCloud(shopId);
+      if (reconcileResult?.skipped) {
+        if (reconcileResult?.reason === "FIREBASE_AUTH_REQUIRED") {
+          toast(t.syncNeedEmailLogin, "err");
+        } else {
+          toast(t.syncNeedInternet, "err");
+        }
+        return;
+      }
+      const repairedCount = reconcileResult?.totalRequeued || 0;
 
       const result = await uploadPendingShopChanges(shopId);
       if (result?.reason === "OFFLINE" || result?.skipped) {
@@ -9295,7 +9300,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
       const productCount = result.productsUploaded || 0;
       const uploaded = result.totalUploaded || result.done || 0;
-      if (uploaded === 0 && (syncDashboard?.localRecords || 0) > 0) {
+      if (uploaded === 0 && repairedCount === 0 && (syncDashboard?.localRecords || 0) > 0) {
         toast(
           lang === "bn"
             ? "⚠️ Cloud-এ upload হয়নি। Logout → email/password দিয়ে login → v1.0.12+ install করুন"
@@ -9305,9 +9310,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         return;
       }
 
+      const repairedSuffix = repairedCount
+        ? (lang === "bn" ? `, মেরামত: ${repairedCount}` : `, repaired: ${repairedCount}`)
+        : "";
       const msg = lang==="bn"
-        ? `${t.syncUploadOk} (${uploaded} records, products: ${productCount})`
-        : `${t.syncUploadOk} (${uploaded} records, products: ${productCount})`;
+        ? `${t.syncUploadOk} (${uploaded} records, products: ${productCount}${repairedSuffix})`
+        : `${t.syncUploadOk} (${uploaded} records, products: ${productCount}${repairedSuffix})`;
       toast(result.failed || result.totalFailed ? `${msg} ⚠️` : msg, result.failed || result.totalFailed ? "err" : "ok");
       await refreshSyncDashboard();
     } catch (error) {

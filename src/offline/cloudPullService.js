@@ -7,7 +7,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db, auth } from "../firebase-config";
-import { offlineCacheCloudRecords } from "./offlineRepository";
+import { offlineCacheCloudRecords, offlineUpsert } from "./offlineRepository";
 import { saveCachedShop } from "./shopService";
 import { addLocalInviteCode } from "../auth/localAuthBootstrap";
 import {
@@ -60,7 +60,14 @@ function filterRecordsForShop(collectionName, shopId, rows = []) {
   return rows
     .filter((row) => {
       const recordShopId = String(row.data?.shopId || "").trim();
-      return recordShopId === String(shopId);
+      // A local record with NO shopId tag at all is not "some other shop's
+      // data" — a device's local SQLite only ever holds one shop's records —
+      // it's almost always a record written before shopId was consistently
+      // stamped (an older bulk import, a legacy migration, etc). Treat it as
+      // this shop's own record instead of silently dropping it from every
+      // upload forever. Only a record explicitly tagged for a DIFFERENT shop
+      // is excluded.
+      return !recordShopId || recordShopId === String(shopId);
     })
     .map((row) => ({
       ...row,
@@ -321,6 +328,97 @@ export async function uploadPendingShopChanges(shopId) {
     totalFailed,
     done: totalUploaded,
     total: totalUploaded + totalFailed,
+  };
+}
+
+/**
+ * Repair/backfill pass: for every SHOP_PULL_COLLECTIONS collection, compares
+ * this device's local SQLite records against what actually exists in
+ * Firestore for this shop, and re-queues (with the correct shopId stamped on)
+ * any local record that Firestore doesn't have — regardless of whether its
+ * local `dirty` flag or the sync queue currently think it's already synced.
+ *
+ * This exists because a record can end up permanently un-uploadable without
+ * ever showing up as "pending": e.g. a record whose stored data is missing
+ * (or has a stale/mismatched) shopId used to be silently excluded from
+ * uploadPendingShopChanges() by filterRecordsForShop() forever, or a queue
+ * item that kept failing could fall out of the pending count after enough
+ * retries. Re-queuing here uses the normal offlineUpsert() path (the same
+ * one every ordinary edit uses), so the fix goes through the exact same,
+ * already-correct upload machinery — nothing new to trust.
+ */
+export async function reconcileShopWithCloud(shopId) {
+  if (!shopId) return { ok: false, reason: "SHOP_ID_REQUIRED" };
+  if (!db) return { ok: false, reason: "FIREBASE_NOT_READY" };
+
+  const blockReason = getCloudSyncBlockReason();
+  if (blockReason) {
+    return { ok: false, skipped: true, reason: blockReason };
+  }
+
+  const results = [];
+  let totalMissing = 0;
+  let totalRequeued = 0;
+
+  for (const collectionName of SHOP_PULL_COLLECTIONS) {
+    try {
+      const [localRecords, cloudSnap] = await Promise.all([
+        getLocalRecords(collectionName),
+        getDocs(query(collection(db, collectionName), where("shopId", "==", shopId))),
+      ]);
+
+      const cloudIds = new Set(cloudSnap.docs.map((entry) => String(entry.id)));
+      const shopLocalRows = filterRecordsForShop(collectionName, shopId, localRecords);
+      const missingRows = shopLocalRows.filter(
+        (row) => !cloudIds.has(String(row.document_id))
+      );
+
+      let requeued = 0;
+      for (const row of missingRows) {
+        try {
+          await offlineUpsert(collectionName, row.document_id, {
+            ...(row.data || {}),
+            shopId,
+          });
+          requeued += 1;
+        } catch (error) {
+          console.warn(
+            `[S4 Reconcile] ${collectionName}/${row.document_id} re-queue failed`,
+            error
+          );
+        }
+      }
+
+      totalMissing += missingRows.length;
+      totalRequeued += requeued;
+      results.push({
+        collection: collectionName,
+        localCount: shopLocalRows.length,
+        cloudCount: cloudIds.size,
+        missingCount: missingRows.length,
+        requeued,
+        ok: true,
+      });
+    } catch (error) {
+      results.push({
+        collection: collectionName,
+        ok: false,
+        error: error?.message || String(error),
+      });
+    }
+  }
+
+  let uploadResult = null;
+  if (totalRequeued > 0) {
+    uploadResult = await syncPendingQueueToFirebase();
+  }
+
+  return {
+    ok: true,
+    totalMissing,
+    totalRequeued,
+    results,
+    uploadResult,
   };
 }
 
