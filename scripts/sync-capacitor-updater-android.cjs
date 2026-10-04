@@ -14,31 +14,44 @@ const pluginsJsonPath = path.join(
   "capacitor.plugins.json"
 );
 
-const updaterModule = `include ':capgo-capacitor-updater'
-project(':capgo-capacitor-updater').projectDir = new File('../node_modules/@capgo/capacitor-updater/android')`;
-
-let settings = fs.readFileSync(settingsPath, "utf8");
-if (!settings.includes("capgo-capacitor-updater")) {
-  fs.writeFileSync(settingsPath, `${settings.trim()}\n${updaterModule}\n`);
-}
-
-let buildGradle = fs.readFileSync(buildGradlePath, "utf8");
-const depLine = "    implementation project(':capgo-capacitor-updater')";
-if (!buildGradle.includes("capgo-capacitor-updater")) {
-  buildGradle = buildGradle.replace(
-    /dependencies \{\s*\n\s*\n\s*\}/,
-    `dependencies {\n${depLine}\n\n}`
-  );
-  fs.writeFileSync(buildGradlePath, buildGradle);
-}
-
 const plugins = [
   {
+    module: "capgo-capacitor-updater",
+    dir: "../node_modules/@capgo/capacitor-updater/android",
     pkg: "@capgo/capacitor-updater",
     classpath: "ee.forgr.capacitor_updater.CapacitorUpdaterPlugin",
   },
+  {
+    module: "capacitor-filesystem",
+    dir: "../node_modules/@capacitor/filesystem/android",
+    pkg: "@capacitor/filesystem",
+    classpath: "com.capacitorjs.plugins.filesystem.FilesystemPlugin",
+  },
+  {
+    module: "capacitor-share",
+    dir: "../node_modules/@capacitor/share/android",
+    pkg: "@capacitor/share",
+    classpath: "com.capacitorjs.plugins.share.SharePlugin",
+  },
 ];
 
+let settings = fs.readFileSync(settingsPath, "utf8");
+let buildGradle = fs.readFileSync(buildGradlePath, "utf8");
+for (const plugin of plugins) {
+  if (!settings.includes(`':${plugin.module}'`)) {
+    settings = `${settings.trim()}\n\ninclude ':${plugin.module}'\nproject(':${plugin.module}').projectDir = new File('${plugin.dir}')\n`;
+  }
+  const depLine = `    implementation project(':${plugin.module}')`;
+  if (!buildGradle.includes(depLine)) {
+    buildGradle = buildGradle.replace(/dependencies \{\n/, `dependencies {\n${depLine}\n`);
+  }
+}
+fs.writeFileSync(settingsPath, settings);
+fs.writeFileSync(buildGradlePath, buildGradle);
+
 fs.mkdirSync(path.dirname(pluginsJsonPath), { recursive: true });
-fs.writeFileSync(pluginsJsonPath, `${JSON.stringify(plugins, null, 2)}\n`);
-console.log("[S4 Android] Capacitor Updater native plugin synced");
+fs.writeFileSync(
+  pluginsJsonPath,
+  `${JSON.stringify(plugins.map(({ pkg, classpath }) => ({ pkg, classpath })), null, 2)}\n`
+);
+console.log("[S4 Android] Capacitor native plugins synced:", plugins.map((p) => p.pkg).join(", "));

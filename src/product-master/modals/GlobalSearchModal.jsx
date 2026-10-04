@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 const EMPTY_FIELDS = {
   productName: "",
   productCode: "",
-  shopPartNumber: "",
   barcode: "",
   ean: "",
   alternateCodes: "",
@@ -18,7 +17,6 @@ const EMPTY_FIELDS = {
 const SEARCH_COLUMNS = [
   { key: "productName", label: "Product Name", width: 180 },
   { key: "productCode", label: "Product Code", width: 240 },
-  { key: "shopPartNumber", label: "Shop Part No", width: 110 },
   { key: "barcode", label: "Barcode", width: 130 },
   { key: "ean", label: "EAN", width: 115 },
   { key: "company", label: "Company Name", width: 135 },
@@ -60,8 +58,19 @@ function productRefs(product) {
   ].filter(Boolean);
 }
 
-export default function GlobalSearchModal({ products, shopPartEnabled = true, onSelect, onClose }) {
-  const [fields, setFields] = useState(EMPTY_FIELDS);
+const EMBEDDED_COLUMNS = [
+  { key: "productName", label: "Product Name", width: 190 },
+  { key: "productCode", label: "Code", width: 110 },
+  { key: "mrp", label: "MRP", width: 70 },
+];
+const EMBEDDED_BASIC_FIELDS = 3;
+
+export default function GlobalSearchModal({
+  products, onSelect, onClose, embedded = false, selectedProductId = null,
+  initialFields = null, rowTitle = "Double-click to recall this product in Product Master (tap once on mobile)",
+}) {
+  const [showAllFields, setShowAllFields] = useState(false);
+  const [fields, setFields] = useState(() => ({ ...EMPTY_FIELDS, ...(initialFields || {}) }));
   const [results, setResults] = useState([]);
   const [extendedSearch, setExtendedSearch] = useState(true);
   const [autoSearch, setAutoSearch] = useState(true);
@@ -74,10 +83,7 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   const firstInputRef = useRef(null);
   const gridRef = useRef(null);
   const columnSettingsRef = useRef(columnSettings);
-  const activeColumnSettings = useMemo(
-    () => columnSettings.filter((column) => shopPartEnabled || column.key !== "shopPartNumber"),
-    [columnSettings, shopPartEnabled]
-  );
+  const activeColumnSettings = embedded ? EMBEDDED_COLUMNS : columnSettings;
 
   const hasCriteria = useMemo(
     () => Object.values(fields).some((value) => String(value).trim()),
@@ -105,7 +111,6 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
       return (
         matches(product.name, nextFields.productName) &&
         matches(product.code, nextFields.productCode) &&
-        (!shopPartEnabled || matches(product.shopPartNumber, nextFields.shopPartNumber)) &&
         (!nextFields.barcode || refs.some((value) => matches(value, nextFields.barcode))) &&
         matches(product.ean, nextFields.ean) &&
         (!nextFields.alternateCodes || refs.some((value) => matches(value, nextFields.alternateCodes))) &&
@@ -122,8 +127,9 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   }
 
   useEffect(() => {
-    firstInputRef.current?.focus();
-  }, []);
+    // Embedded on mobile: focusing would pop the keyboard every time Product Master opens.
+    if (!embedded) firstInputRef.current?.focus();
+  }, [embedded]);
 
   useEffect(() => {
     columnSettingsRef.current = columnSettings;
@@ -131,13 +137,14 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
 
   useEffect(() => {
     if (!autoSearch) return undefined;
-    const timer = setTimeout(() => runSearch({ allowEmpty: false }), 220);
+    const timer = setTimeout(() => runSearch({ allowEmpty: embedded }), 220);
     return () => clearTimeout(timer);
     // Search is intentionally recalculated from all field values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fields, autoSearch, extendedSearch, products]);
 
   useEffect(() => {
+    if (embedded) return undefined;
     const onKey = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -158,12 +165,32 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose, showColumnSettings]);
+  }, [onClose, showColumnSettings, embedded]);
 
   const updateField = (key, value) => setFields((prev) => ({ ...prev, [key]: value }));
+  const focusGrid = () => {
+    if (!results.length) return;
+    if (!results.some((p) => p.id === selectedId)) setSelectedId(results[0].id);
+    gridRef.current?.focus();
+  };
+  const onGridKeyDown = (event) => {
+    if (embedded || !results.length) return;
+    const index = results.findIndex((p) => p.id === selectedId);
+    const step = { ArrowDown: 1, ArrowUp: -1, PageDown: 10, PageUp: -10 }[event.key];
+    if (step) {
+      event.preventDefault();
+      const next = Math.max(0, Math.min(results.length - 1, (index < 0 ? -1 : index) + step));
+      setSelectedId(results[next].id);
+      gridRef.current?.querySelectorAll("tbody tr")[next]?.scrollIntoView({ block: "nearest" });
+    } else if (event.key === "Enter" && index >= 0) {
+      event.preventDefault();
+      recall(results[index]);
+    }
+  };
   const recall = (product) => {
     onSelect(product);
-    onClose();
+    if (embedded) setSelectedId(product.id);
+    else onClose();
   };
   const openColumnSettings = () => {
     setDraftColumns(columnSettings.map((column) => ({ ...column })));
@@ -221,7 +248,6 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   const columnValue = (product, key) => ({
     productName: product.name,
     productCode: product.code,
-    shopPartNumber: product.shopPartNumber,
     barcode: product.barcode,
     ean: product.ean,
     company: product.company || product.brand,
@@ -237,7 +263,6 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
   const fieldsConfig = [
     ["productName", "Product Name"],
     ["productCode", "Product Code"],
-    ["shopPartNumber", "Shop Part No"],
     ["barcode", "Barcode / Additional Barcodes"],
     ["ean", "EAN"],
     ["alternateCodes", "Alternate Codes"],
@@ -247,24 +272,26 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
     ["productGroup", "Product Group"],
     ["commodityCode", "Commodity Code"],
     ["mrp", "M.R.P"],
-  ].filter(([key]) => shopPartEnabled || key !== "shopPartNumber");
+  ];
 
-  return (
-    <div className="pm-search-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <section className="pm-search-window" onMouseDown={(event) => event.stopPropagation()}>
+  const highlightId = embedded ? selectedProductId : selectedId;
+  const visibleFields = embedded && !showAllFields ? fieldsConfig.slice(0, EMBEDDED_BASIC_FIELDS) : fieldsConfig;
+
+  const windowBody = (
+      <section className={`pm-search-window${embedded ? " pm-search-embedded" : ""}`} onMouseDown={(event) => event.stopPropagation()}>
         <header className="pm-search-title">
           <strong>Search Product</strong>
-          <button type="button" aria-label="Close Search" onClick={onClose}>✕</button>
+          {!embedded && <button type="button" aria-label="Close Search" onClick={onClose}>✕</button>}
+          {embedded && <span className="pm-search-embedded-hint">Tap a product to open it</span>}
+          {embedded && <button type="button" className="pm-search-back" onClick={onClose}>← Back</button>}
         </header>
 
         <div className="pm-search-content">
           <fieldset className="pm-search-fields">
             <legend>Type any part of the data to search in any of the following fields</legend>
-            <span className="pm-search-control-hint">Press Control key to move focus in Search list Grid</span>
+            {!embedded && <span className="pm-search-control-hint">Press Control key to move focus in Search list Grid</span>}
             <div className="pm-search-field-grid">
-              {fieldsConfig.map(([key, label], index) => (
+              {visibleFields.map(([key, label], index) => (
                 <label key={key} className="pm-search-field">
                   <span>{label}</span>
                   <input
@@ -279,12 +306,20 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
                       if (event.key === "Enter") {
                         event.preventDefault();
                         runSearch({ nextFields: { ...fields, [key]: event.currentTarget.value } });
+                      } else if (event.key === "ArrowDown" && !embedded) {
+                        event.preventDefault();
+                        focusGrid();
                       }
                     }}
                   />
                 </label>
               ))}
               <div className="pm-search-command">
+                {embedded && (
+                  <button type="button" className="pm-search-more" onClick={() => setShowAllFields((v) => !v)}>
+                    {showAllFields ? "Less fields ▲" : "More fields ▼"}
+                  </button>
+                )}
                 <button type="button" onClick={() => runSearch()}>Search</button>
                 <button type="button" className="pm-search-lang" onClick={() => setLang(lang === "EN" ? "AR" : "EN")}>
                   {lang}
@@ -298,7 +333,8 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
             {results.length > 0 && <span>{results.length}{results.length === 500 ? "+" : ""} products</span>}
           </div>
 
-          <div ref={gridRef} tabIndex={0} className="pm-search-grid-wrap">
+          <div ref={gridRef} tabIndex={0} className="pm-search-grid-wrap" onKeyDown={onGridKeyDown}
+            onFocus={() => { if (!embedded && results.length && !results.some((p) => p.id === selectedId)) setSelectedId(results[0].id); }}>
             <table
               className="pm-search-grid"
               style={{ minWidth: activeColumnSettings.reduce((total, column) => total + Number(column.width), 0) }}
@@ -308,11 +344,13 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
                   {activeColumnSettings.map((column) => (
                     <th key={column.key} style={{ width: Number(column.width) }}>
                       <span className="pm-search-col-label">{column.label}</span>
-                      <span
-                        className="pm-search-col-resizer"
-                        onMouseDown={(event) => startColumnResize(event, column.key)}
-                        title="Drag to resize column"
-                      />
+                      {!embedded && (
+                        <span
+                          className="pm-search-col-resizer"
+                          onMouseDown={(event) => startColumnResize(event, column.key)}
+                          title="Drag to resize column"
+                        />
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -321,13 +359,13 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
                 {results.map((product) => (
                   <tr
                     key={product.id}
-                    className={selectedId === product.id ? "is-selected" : ""}
+                    className={highlightId === product.id ? "is-selected" : ""}
                     onClick={() => {
-                      if (window.matchMedia?.("(pointer: coarse)").matches) recall(product);
+                      if (embedded || window.matchMedia?.("(pointer: coarse)").matches) recall(product);
                       else setSelectedId(product.id);
                     }}
                     onDoubleClick={() => recall(product)}
-                    title="Double-click to recall this product in Product Master (tap once on mobile)"
+                    title={rowTitle}
                   >
                     {activeColumnSettings.map((column) => {
                       const value = columnValue(product, column.key);
@@ -363,11 +401,13 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
               <strong>Auto Search while typing in text box</strong>
             </label>
           </div>
-          <button type="button" className="pm-search-close" onClick={onClose}>Close</button>
-          <button type="button" className="pm-search-columns-link" onClick={openColumnSettings}>
-            Click here to change the Search List Column Settings
-          </button>
-          {showColumnSettings && (
+          {!embedded && <button type="button" className="pm-search-close" onClick={onClose}>Close</button>}
+          {!embedded && (
+            <button type="button" className="pm-search-columns-link" onClick={openColumnSettings}>
+              Click here to change the Search List Column Settings
+            </button>
+          )}
+          {!embedded && showColumnSettings && (
             <div className="pm-search-column-settings" role="dialog" aria-label="Column Settings">
               <div className="pm-search-column-settings__title">
                 <strong>Column Settings</strong>
@@ -376,7 +416,7 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
               <div className="pm-search-column-settings__body">
                 <div className="pm-search-column-settings__list">
                   <div className="pm-search-column-settings__head">Field List</div>
-                  {draftColumns.filter((column) => shopPartEnabled || column.key !== "shopPartNumber").map((column) => (
+                  {draftColumns.map((column) => (
                     <button
                       type="button"
                       key={column.key}
@@ -416,6 +456,14 @@ export default function GlobalSearchModal({ products, shopPartEnabled = true, on
           )}
         </footer>
       </section>
+  );
+
+  if (embedded) return windowBody;
+  return (
+    <div className="pm-search-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      {windowBody}
     </div>
   );
 }

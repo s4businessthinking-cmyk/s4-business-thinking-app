@@ -1,4 +1,4 @@
-import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "../backend/firestore";
 import { db } from "../firebase-config";
 import {
   getPendingSyncQueue,
@@ -6,9 +6,13 @@ import {
   markSyncFailed,
   getOfflineStatus,
   persistOfflineDb,
+  SYNC_QUEUED_EVENT,
 } from "./sqliteDb";
 
+const QUEUED_SYNC_DEBOUNCE_MS = 150;
+
 let syncRunning = false;
+let syncRequestedWhileRunning = false;
 const pausedCollections = new Set();
 
 // Firestore hard-caps a batch at 500 writes; stay well under it.
@@ -232,6 +236,7 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
  */
 export async function syncPendingQueueToFirebase() {
   if (syncRunning) {
+    syncRequestedWhileRunning = true;
     return {
       ok: false,
       skipped: true,
@@ -339,6 +344,12 @@ export async function syncPendingQueueToFirebase() {
     return result;
   } finally {
     syncRunning = false;
+    if (syncRequestedWhileRunning) {
+      syncRequestedWhileRunning = false;
+      setTimeout(() => {
+        syncPendingQueueToFirebase().catch((error) => console.warn("[S4 Sync] follow-up sync failed", error));
+      }, 0);
+    }
   }
 }
 
@@ -373,6 +384,15 @@ export function startAutoFirebaseSync(options = {}) {
 
   window.addEventListener("online", run);
 
+  // Upload right after each local save; a burst of saves becomes one sync.
+  let queuedTimer = null;
+  const onQueued = () => {
+    if (!isOnline()) return;
+    clearTimeout(queuedTimer);
+    queuedTimer = setTimeout(run, QUEUED_SYNC_DEBOUNCE_MS);
+  };
+  window.addEventListener(SYNC_QUEUED_EVENT, onQueued);
+
   const onVisible = () => {
     if (typeof document !== "undefined" && document.visibilityState === "visible" && isOnline()) {
       run();
@@ -396,6 +416,8 @@ export function startAutoFirebaseSync(options = {}) {
     intervalMs,
     stop: () => {
       window.removeEventListener("online", run);
+      window.removeEventListener(SYNC_QUEUED_EVENT, onQueued);
+      clearTimeout(queuedTimer);
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", onVisible);
       }

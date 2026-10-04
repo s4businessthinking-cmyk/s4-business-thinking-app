@@ -5,7 +5,7 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   onAuthStateChanged,
-} from "firebase/auth";
+} from "./backend/auth";
 import {
   collection,
   doc,
@@ -23,7 +23,7 @@ import {
   runTransaction,
   writeBatch,
   serverTimestamp,
-} from "firebase/firestore";
+} from "./backend/firestore";
 import {
   auth,
   db,
@@ -43,18 +43,6 @@ import {
   offlineClearShopCollection,
   offlinePurgeLocal,
 } from "./offline/offlineRepository";
-import {
-  DEFAULT_SHOP_PART_FORMAT,
-  formatShopPartNumber,
-  nextLocalShopPartSerial,
-  coreOriginalPartKey,
-  normalizeShopPartFormat,
-  productPartGroupKey,
-  shopPartCorrectionPatches,
-  shopPartFormatKey,
-  shopPartSerial,
-  uniqueShopPartNumber,
-} from "./product-master/shopPartNumbers";
 import {
   loadCachedShop,
   saveCachedShop,
@@ -90,8 +78,30 @@ import {
 } from "./auth/localAuthBootstrap";
 import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAuthService";
 import { createStockLedgerEntry } from "./inventory/stockManagementService";
+import ReorderAlertCard from "./inventory/ReorderAlertCard";
+import { unitFactorFor, itemBaseQty } from "./inventory/unitConversion";
+import StockBadge from "./inventory/StockBadge.jsx";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
+import BackupPanel from "./backup/BackupPanel.jsx";
+import { useShopFinance } from "./dashboard/shopFinance.js";
+import ChequeDueAlert, { chequeTypeIcon, chequeTypeLabel } from "./dashboard/ChequeDueAlert.jsx";
+import NotificationBell from "./dashboard/NotificationBell.jsx";
+import PartyFolderList, { FolderToggle } from "./invoices/PartyFolderList.jsx";
+import MobileMenuDrawer from "./dashboard/MobileMenuDrawer.jsx";
+import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "./components/WindowChrome.jsx";
+import PrintSettingsWindow from "./print/PrintSettingsWindow.jsx";
+import { loadPrintSettings, docSettingsFor, paperCss, printHtmlDocument, printWithSettings } from "./print/printSettings.js";
+import { applyDesign, loadPrintDesign, layoutAppliesTo, renderLayoutDocument, amountInWords, generateStatementHTML, SAMPLE_DATA } from "./print/printDesign.js";
+import { useChequeDueNotifications } from "./dashboard/chequeNotifications.js";
+import { startAutoBackup } from "./backup/backupService.js";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
+import SalesInvoiceDesktopForm from "./sales-invoice/SalesInvoiceDesktopForm.jsx";
+import PurchaseInvoiceDesktopForm from "./purchase/PurchaseInvoiceDesktopForm.jsx";
+import AgainstInvoiceVoucherWindow from "./vouchers/AgainstInvoiceVoucherWindow.jsx";
+import PartyLedgerWindow from "./vouchers/PartyLedgerWindow.jsx";
+import PdcWindow from "./vouchers/PdcWindow.jsx";
+import ProfitLossReport from "./reports/ProfitLossReport.jsx";
+import ExpensesTab from "./expenses/ExpensesTab.jsx";
 import {
   BranchTransferSettingsPanel,
   BranchTransferWorkspace,
@@ -114,8 +124,6 @@ import {
   updateOwnPassword,
 } from "./auth/userManagementService";
 import ProductMasterScreen from "./product-master/ProductMasterScreen.jsx";
-import ShopPartFormatModal from "./product-master/modals/ShopPartFormatModal.jsx";
-import { PM_CSS } from "./product-master/pmStyles.js";
 import { code128SvgMarkup } from "./product-master/code128.js";
 
 import s4LogoUrl from "./assets/s4-logo.png";
@@ -131,14 +139,28 @@ function useFirebaseAuthReady() {
   return ready;
 }
 
+function isBlankProduct(product) {
+  return !["name", "code", "barcode"].some((k) => String(product?.[k] ?? "").trim() !== "");
+}
+
 function isActiveProduct(product) {
   if (!product) return false;
-  return product.isDeleted !== true && product.deleted !== true;
+  return product.isDeleted !== true && product.deleted !== true && !isBlankProduct(product);
 }
 
 // Invoice statuses that represent stock actually having moved (draft and
 // cancelled invoices never touch stock).
 const STOCK_AFFECTING_INVOICE_STATUSES = ["confirmed", "paid", "partial"];
+
+// Lines typed without picking a product (e.g. labour) never move stock, so the user confirms that knowingly.
+function unlinkedStockOk(items, lang) {
+  const names = (items || []).filter((it) => !it?.productId && String(it?.name || "").trim()).map((it) => it.name.trim());
+  if (!names.length) return true;
+  const list = names.slice(0, 5).join(", ") + (names.length > 5 ? " …" : "");
+  return window.confirm(lang === "bn"
+    ? `এই আইটেমগুলো Product Master থেকে বাছাই করা হয়নি, তাই স্টকে যোগ/বিয়োগ হবে না:\n${list}\n\nতবুও সেভ করবেন?`
+    : `These items were not picked from the Product Master, so stock will not change:\n${list}\n\nSave anyway?`);
+}
 
 // Applies the stock-ledger delta between an invoice's previous saved state
 // and its new state: reverses the old line items (if the old status had
@@ -161,10 +183,13 @@ async function applyInvoiceStockEffect({
   const oldAffects = oldInvoice && STOCK_AFFECTING_INVOICE_STATUSES.includes(oldInvoice.status);
   const newAffects = newInvoice && STOCK_AFFECTING_INVOICE_STATUSES.includes(newInvoice.status);
   if (!oldAffects && !newAffects) return;
+  const sig = (inv) => JSON.stringify((inv?.items || []).map((it) => [it.productId || "", Number(it.qty) || 0, it.unit || "", Number(it.unitFactor) || 1, Number(it[unitCostKey]) || 0]));
+  if (oldAffects && newAffects && sig(oldInvoice) === sig(newInvoice)) return;
 
   const runLine = async (it, movementType) => {
-    const qty = Number(it?.qty) || 0;
+    const qty = itemBaseQty(it);
     if (!it?.productId || qty <= 0) return;
+    const factor = Number(it.unitFactor) > 0 ? Number(it.unitFactor) : 1;
     try {
       await createStockLedgerEntry({
         productId: it.productId,
@@ -173,7 +198,7 @@ async function applyInvoiceStockEffect({
         movementType,
         referenceType,
         referenceId: invoiceId,
-        unitCost: Number(it[unitCostKey]) || 0,
+        unitCost: (Number(it[unitCostKey]) || 0) / factor,
         actor,
       });
     } catch (err) {
@@ -207,14 +232,7 @@ function mergeProductCatalog(cloudRows = [], localRows = []) {
       merged.set(id, product);
       return;
     }
-    merged.set(id, {
-      ...product,
-      shopPartNumber: product.shopPartNumber || local.shopPartNumber,
-      shopPartSerial: product.shopPartSerial || local.shopPartSerial,
-      shopPartFormatKey: product.shopPartFormatKey || local.shopPartFormatKey,
-      originalPartKey: product.originalPartKey || local.originalPartKey,
-      shopPartGroupKey: product.shopPartGroupKey || local.shopPartGroupKey,
-    });
+    merged.set(id, product);
   });
   return [...merged.values()]
     .filter(isActiveProduct)
@@ -260,6 +278,7 @@ const PERMISSIONS_LIST = [
   { key: "markDelivery",     bn: "ডেলিভারি মার্ক করা",         en: "Mark as Delivered" },
   { key: "deleteOrder",      bn: "অর্ডার ডিলিট করা",           en: "Delete Orders" },
   { key: "viewProducts",     bn: "পণ্য তালিকা দেখা",           en: "View Product List" },
+  { key: "manageProducts",   bn: "পণ্য যোগ / এডিট / Import",   en: "Add / Edit / Import Products" },
   { key: "manageSales",      bn: "বিক্রয় ইনভয়েস ম্যানেজ করা", en: "Manage Sales Invoices" },
   { key: "manageCustomers",  bn: "কাস্টমার যোগ / বেছে নেওয়া", en: "Add / Pick Customers" },
 
@@ -269,6 +288,8 @@ const PERMISSIONS_LIST = [
   { key: "viewSupplierLedger", bn: "সাপ্লায়ার লেজার দেখা",    en: "View Supplier Ledger" },
   { key: "vendorPayments",   bn: "সাপ্লায়ার পেমেন্ট করা",     en: "Make Supplier Payments" },
   { key: "managePurchase",   bn: "ক্রয় ইনভয়েস ম্যানেজ করা",  en: "Manage Purchase Invoices" },
+  { key: "managePdc",        bn: "PDC (পোস্ট ডেটেড চেক) দেখা ও পোস্ট করা", en: "Post Dated Cheques (PDC)" },
+  { key: "manageExpenses",   bn: "দোকানের খরচ লেখা",           en: "Record Shop Expenses" },
   { key: "sendBranchTransfer", bn: "Branch-এ পণ্য পাঠানো",      en: "Send Branch Products" },
   { key: "receiveBranchTransfer", bn: "Branch Transfer Receive", en: "Receive Branch Products" },
 ];
@@ -281,6 +302,7 @@ const DEFAULT_PERMISSIONS = {
   markDelivery: false,
   deleteOrder: false,
   viewProducts: true,
+  manageProducts: false,
   manageSales: true,
   manageCustomers: true,
 
@@ -288,6 +310,8 @@ const DEFAULT_PERMISSIONS = {
   viewSupplierLedger: false,
   vendorPayments: false,
   managePurchase: false,
+  managePdc: false,
+  manageExpenses: false,
   sendBranchTransfer: false,
   receiveBranchTransfer: false,
 };
@@ -446,6 +470,8 @@ const TR = {
     pmFromMaster:"📦 Product Master থেকে বেছে নিন",
     tabPurchase:"🧾 ক্রয় ইনভয়েস",
     tabSales:"🧾 বিক্রয় ইনভয়েস",
+    tabQuotation:"📝 কোটেশন",
+    tabDelivery:"🚚 ডেলিভারি নোট",
     si_title:"🧾 বিক্রয় ইনভয়েস",
     si_new:"+ নতুন ইনভয়েস",
     si_edit:"✏️ এডিট",
@@ -817,7 +843,7 @@ const TR = {
     pi_editBtn:"✏️ এডিট",
     pi_deleteBtn:"🗑️ মুছুন",
     pi_cancelForm:"✕ বাতিল",
-    pi_pmSearchPh:"নাম / Shop Code / কোড খুঁজুন...",
+    pi_pmSearchPh:"নাম / কোড / Barcode খুঁজুন...",
   },
   en: {
     appSub:"Parts Order Management",
@@ -971,6 +997,8 @@ const TR = {
     pmFromMaster:"📦 Select from Product Master",
     tabPurchase:"🧾 Purchase Invoice",
     tabSales:"🧾 Sales Invoice",
+    tabQuotation:"📝 Quotation",
+    tabDelivery:"🚚 Delivery Note",
     si_title:"🧾 Sales Invoice",
     si_new:"+ New Invoice",
     si_edit:"✏️ Edit",
@@ -1342,7 +1370,7 @@ const TR = {
     pi_editBtn:"✏️ Edit",
     pi_deleteBtn:"🗑️ Delete",
     pi_cancelForm:"✕ Cancel",
-    pi_pmSearchPh:"Search name / shop code / model...",
+    pi_pmSearchPh:"Search name / model / barcode...",
   },
 };
 
@@ -1421,7 +1449,67 @@ const THEMES = {
     txtPrimary:"#0f172a", txtSecondary:"#1e293b", txtMuted:"#475569", txtFaint:"#64748b",
     accent:"#2563eb", accentDim:"#dbeafe",
   },
+  // Product Master's Windows/ERP skin; applied to every menu on mobile.
+  erp: {
+    bgRoot:"#f3e6c8", bgCard:"#fbf5e6", bgInp:"#ffffff", bgSel:"#ffffff",
+    bgHdr:"#d9e7f7", bgSidebar:"#d9e7f7", bgOiCard:"#fffaf0",
+    border:"#b9c5d6", borderMid:"#7d94b7",
+    txtPrimary:"#07101c", txtSecondary:"#1f2937", txtMuted:"#475569", txtFaint:"#64748b",
+    accent:"#315eb8", accentDim:"#d4e3f4",
+  },
+  erpDark: {
+    bgRoot:"#121b29", bgCard:"#1b2738", bgInp:"#0d1522", bgSel:"#0d1522",
+    bgHdr:"#16243a", bgSidebar:"#16243a", bgOiCard:"#18233a",
+    border:"#2f4766", borderMid:"#4f6f92",
+    txtPrimary:"#f8fafc", txtSecondary:"#dbeafe", txtMuted:"#b6c7df", txtFaint:"#8fa8c6",
+    accent:"#6b9cf0", accentDim:"#1e3a68",
+  },
 };
+
+const ERP_MOBILE_CSS = `
+.erp-m { font-family: Tahoma, "Segoe UI", Arial, sans-serif; }
+.erp-m input:not([type=checkbox]):not([type=radio]):not([type=range]),
+.erp-m select, .erp-m textarea {
+  border-radius: 2px !important;
+  border: 1px solid #8797a9 !important;
+  background-color: #fff !important;
+  color: #07101c !important;
+  box-shadow: inset 1px 1px 1px rgba(0,0,0,.12) !important;
+}
+.erp-m input:focus, .erp-m select:focus, .erp-m textarea:focus {
+  border-color: #315fa8 !important;
+  box-shadow: inset 1px 1px 1px rgba(0,0,0,.14), 0 0 0 1px #b8d4f5 !important;
+}
+.erp-m button { border-radius: 3px !important; }
+.erp-m button:not(:disabled) {
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.55), inset -1px -1px 0 rgba(35,64,104,.35) !important;
+}
+.erp-m button:active:not(:disabled) { transform: translateY(1px); }
+.erp-m-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-height: 24px; padding: 3px 8px;
+  background: linear-gradient(180deg, #dce9f8 0%, #91acd2 58%, #789bcf 100%);
+  border-bottom: 1px solid #6c87af; color: #064e22;
+  font-family: Tahoma, "Segoe UI", Arial, sans-serif;
+}
+.erp-m.erp-m-dark input:not([type=checkbox]):not([type=radio]):not([type=range]),
+.erp-m.erp-m-dark select, .erp-m.erp-m-dark textarea {
+  border-color: #4f6f92 !important;
+  background-color: #0d1522 !important;
+  color: #f8fafc !important;
+  box-shadow: inset 1px 1px 1px rgba(0,0,0,.4) !important;
+}
+.erp-m.erp-m-dark button:not(:disabled) {
+  box-shadow: inset 1px 1px 0 rgba(255,255,255,.12), inset -1px -1px 0 rgba(0,0,0,.45) !important;
+}
+.erp-m-dark .erp-m-title {
+  background: linear-gradient(180deg, #2c4a7d 0%, #1e3a68 58%, #162c52 100%);
+  border-bottom-color: #0f1f3d; color: #d8ffe5;
+}
+.erp-m-dark .erp-m-title span { color: #b6c7df; }
+.erp-m-title strong { font-size: 13px; letter-spacing: .3px; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.erp-m-title span { font-size: 10px; color: #1f2937; white-space: nowrap; }
+`;
 
 // ─── WA STYLES ───────────────────────────────────────────────
 const WA_STYLES = [
@@ -1478,7 +1566,7 @@ function PriceCell({ initialValue, disabled, placeholder, onOpen }) {
 }
 
 // ─── HEADER ──────────────────────────────────────────────────
-function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
+function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme, shopName, personName, rightSlot, onBack }) {
   const _s = s || _globalS;
   const [titleFx, setTitleFx] = useState(0);
   useEffect(() => {
@@ -1503,15 +1591,34 @@ function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
           50% { filter: drop-shadow(0 0 10px rgba(96,165,250,.95)); }
         }
       `}</style>
-      <div style={_s.hLeft}>
+      <div style={{ ..._s.hLeft, ...(shopName ? { minWidth:0, flex:"1 1 auto" } : {}) }}>
+        {onBack && (
+          <button type="button" onClick={onBack} title={lang==="bn"?"পেছনে":"Back"}
+            style={{ height:38, padding:"0 10px", borderRadius:10, border:`1px solid ${theme==="dark"?"#3f3f46":"#cbd5e1"}`, background:theme==="dark"?"#27272a":"#f1f5f9", color:theme==="dark"?"#f4f4f5":"#0f172a", fontSize:15, fontWeight:900, cursor:"pointer", flexShrink:0, fontFamily:"inherit" }}>
+            ← {lang==="bn"?"পেছনে":"Back"}
+          </button>
+        )}
         <img src={LOGO_URL} alt="S4" style={_s.headerLogo} />
-        <div>
-          <div className="s4-live-3d-title" style={titleStyle}>{APP_NAME}</div>
-          <div style={_s.sub}>{t.appSub}</div>
-        </div>
+        {shopName ? (
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:isDesktop?20:15, fontWeight:900, lineHeight:1.15, letterSpacing:-0.3, color:theme==="dark"?"#f8fafc":"#0f172a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+              🏪 {shopName}
+            </div>
+            <div style={{ ..._s.sub, marginTop:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+              {personName && <span style={{ color:"#3b82f6", fontWeight:800 }}>👤 {personName.toUpperCase()}</span>}
+              {personName && " · "}{APP_NAME}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="s4-live-3d-title" style={titleStyle}>{APP_NAME}</div>
+            <div style={_s.sub}>{t.appSub}</div>
+          </div>
+        )}
       </div>
       <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-        {setTheme && (
+        {rightSlot}
+        {!rightSlot && setTheme && (
           <button
             onClick={() => setTheme(theme==="dark"?"light":"dark")}
             title={theme==="dark"?"Light Mode":"Dark Mode"}
@@ -1526,10 +1633,12 @@ function Header({ t, lang, setLang, children, isDesktop, s, theme, setTheme }) {
             {theme==="dark" ? "☀️" : "🌙"}
           </button>
         )}
-        <div style={_s.langSw}>
-          <button style={{ ..._s.lBtn, ...(lang==="bn"?_s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
-          <button style={{ ..._s.lBtn, ...(lang==="en"?_s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
-        </div>
+        {!rightSlot && (
+          <div style={_s.langSw}>
+            <button style={{ ..._s.lBtn, ...(lang==="bn"?_s.lBtnA:{}) }} onClick={() => setLang("bn")}>বাং</button>
+            <button style={{ ..._s.lBtn, ...(lang==="en"?_s.lBtnA:{}) }} onClick={() => setLang("en")}>EN</button>
+          </div>
+        )}
         {!isDesktop && children}
       </div>
     </div>
@@ -2007,7 +2116,10 @@ const PI_PAY_METHODS  = {
 const PI_VOUCHER_METHODS = {
   cash:   { bn:"নগদ", en:"Cash",   icon:"💵" },
   cheque: { bn:"চেক",  en:"Cheque", icon:"📃" },
+  bank_transfer: { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer", icon:"🏦" },
+  card:   { bn:"কার্ড", en:"Card", icon:"💳" },
 };
+const VOUCHER_CARD_TYPES = ["Visa", "Mastercard", "American Express", "Debit Card", "Other"];
 const PI_CHEQUE_STATUSES = {
   pending:  { bn:"⏳ অপেক্ষমান",      en:"⏳ Pending",  color:"#f59e0b", bg:"#451a03" },
   cleared:  { bn:"✅ ক্লিয়ার হয়েছে",  en:"✅ Cleared",  color:"#22c55e", bg:"#052e16" },
@@ -2020,9 +2132,11 @@ const PI_STATUSES = {
   paid:      { bn:"পরিশোধিত",     en:"Paid",      color:"#22c55e", bg:"#052e16" },
   cancelled: { bn:"বাতিল",        en:"Cancelled", color:"#71717a", bg:"#27272a" },
 };
-const piFmt2     = (n) => (Math.round((parseFloat(n)||0)*100)/100).toFixed(2);
-const piN2       = (v) => parseFloat(v)||0;
-const piToday    = () => new Date().toISOString().split("T")[0];
+const piR2       = (n) => Math.round(((parseFloat(n)||0)+Number.EPSILON)*100)/100;
+const piFmt2     = (n) => piR2(n).toFixed(2);
+const piN2       = (v) => parseFloat(String(v??"").replace(/,/g,""))||0;
+const localIsoDate = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().split("T")[0];
+const piToday    = () => localIsoDate();
 
 // ─── GLOBAL SEARCH NORMALIZER ─────────────────────────────────
 // . - / \ space _ সরিয়ে lowercase করে — code search এর জন্য
@@ -2036,14 +2150,14 @@ const nsmatch = (haystack, needle) => {
   return haystack.toLowerCase().includes(needle.toLowerCase());
 };
 function piCalcLine(it) {
-  const qty=piN2(it.qty), cost=piN2(it.unitCost), dp=piN2(it.discountPerc), tp=piN2(it.taxPerc);
-  const gross=qty*cost, disc=gross*dp/100, base=gross-disc, tax=base*tp/100;
-  return { gross, disc, tax, total:base+tax };
+  const qty=piN2(it.qty), cost=piN2(it.unitCost), dp=Math.min(Math.max(piN2(it.discountPerc),0),100), tp=Math.max(piN2(it.taxPerc),0);
+  const gross=piR2(qty*cost), disc=piR2(gross*dp/100), base=piR2(gross-disc), tax=piR2(base*tp/100);
+  return { gross, disc, tax, total:piR2(base+tax) };
 }
 function piCalcTotals(items) {
   let sub=0,disc=0,tax=0,grand=0;
   items.forEach(it=>{ const c=piCalcLine(it); sub+=c.gross; disc+=c.disc; tax+=c.tax; grand+=c.total; });
-  return { sub, disc, tax, grand };
+  return { sub:piR2(sub), disc:piR2(disc), tax:piR2(tax), grand:piR2(grand) };
 }
 function piEmptyLine() {
   return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
@@ -2096,7 +2210,7 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
   const [q,setQ]=useState("");
   const filtered=products.filter(p=>{
     if (!q) return true;
-    const hay = [p.name,p.code,p.shopPartNumber,p.originalPartKey,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
+    const hay = [p.name,p.code,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
     return nsmatch(hay, q);
   });
   const inp={ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
@@ -2116,7 +2230,6 @@ function PiProductPicker({ products, onSelect, onClose, t, th }) {
             <button key={p.id} onClick={()=>onSelect(p)} style={{ width:"100%", textAlign:"left", padding:"12px 16px", background:"transparent", border:"none", borderBottom:`1px solid ${th.border}`, color:th.txtSecondary, cursor:"pointer", fontFamily:"inherit" }}>
               <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{p.name}</div>
               <div style={{ fontSize:11, color:th.txtMuted, marginTop:3, display:"flex", gap:8, flexWrap:"wrap" }}>
-                {p.shopPartNumber&&<span style={{ color:"#38bdf8" }}>🏷️ {p.shopPartNumber}</span>}
                 {p.code&&<span>📋 {p.code}</span>}
                 {p.brand&&<span>🏷️ {p.brand}</span>}
                 {p.category&&<span>🗂️ {p.category}</span>}
@@ -2161,7 +2274,7 @@ function PiDetailView({ invoice, onEdit, onCancel, onDelete, onBack, t, th, lang
   const balance = grand - invoice.amountPaid;
   const canEdit   = ["draft","confirmed"].includes(invoice.status);
   const canPay    = ["confirmed","partial"].includes(invoice.status) && balance>0.01;
-  const canCancel = ["draft","confirmed","partial"].includes(invoice.status);
+  const canCancel = ["draft","confirmed","partial","paid"].includes(invoice.status);
   const dr = { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
   return (
     <div>
@@ -3571,305 +3684,6 @@ function CustomerMasterWindow({ t, lang, th, shopId, user, customers, team, toas
   );
 }
 
-// ─── PI: SUPPLIER LEDGER ──────────────────────────────────────
-function PiSupplierLedger({ invoices, t, th, lang, canVendorPayments, onViewInvoices, onPayVendor }) {
-  const [selVendor,setSelVendor] = useState(null);
-  const [supplierSearch,setSupplierSearch] = useState("");
-  const [ledgerDateFrom,setLedgerDateFrom] = useState("");
-  const [ledgerDateTo,setLedgerDateTo] = useState("");
-  const [vendorInvoiceSearch,setVendorInvoiceSearch] = useState("");
-  const [vendorDateFrom,setVendorDateFrom] = useState("");
-  const [vendorDateTo,setVendorDateTo] = useState("");
-
-  const isBn = lang === "bn";
-  const searchPlaceholder = isBn ? "সাপ্লায়ার নাম, মোবাইল, ইনভয়েস নং বা পণ্য খুঁজুন..." : "Search supplier, mobile, invoice no or item...";
-  const invoiceSearchPlaceholder = isBn ? "ইনভয়েস নং, পণ্য বা তারিখ খুঁজুন..." : "Search invoice no, item or date...";
-  const fromLabel = isBn ? "শুরু তারিখ" : "From";
-  const toLabel = isBn ? "শেষ তারিখ" : "To";
-  const clearLabel = isBn ? "ক্লিয়ার" : "Clear";
-  const dateFilterTitle = isBn ? "ইনভয়েস তারিখ ফিল্টার" : "Invoice date filter";
-
-  const normalizeDate = (v) => String(v || "").slice(0,10);
-  const inDateRange = (dateValue, from, to) => {
-    const d = normalizeDate(dateValue);
-    if (!d) return !from && !to;
-    if (from && d < from) return false;
-    if (to && d > to) return false;
-    return true;
-  };
-  const invoiceHay = (inv) => [
-    inv.invoiceNo,
-    inv.supplierInvoiceNo,
-    inv.invoiceDate,
-    inv.vendorName,
-    inv.vendorMobile,
-    inv.createdByName,
-    ...(inv.items || []).map(it => `${it.name || ""} ${it.code || ""} ${it.brand || ""}`)
-  ].filter(Boolean).join(" ");
-
-  const baseInvoices = (invoices || []).filter(inv => inDateRange(inv.invoiceDate || inv.createdAt, ledgerDateFrom, ledgerDateTo));
-  const searchedInvoices = baseInvoices.filter(inv => {
-    const q = supplierSearch.trim();
-    if (!q) return true;
-    return nsmatch(invoiceHay(inv), q);
-  });
-
-  // Aggregate invoices by vendor after search/date filter.
-  const ledger = {};
-  searchedInvoices.forEach(inv=>{
-    const key = inv.vendorId || inv.vendorName || "—";
-    if (!ledger[key]) {
-      ledger[key] = {
-        key,
-        vendorId:inv.vendorId || null,
-        vendorName:inv.vendorName || "—",
-        vendorMobile:inv.vendorMobile || "",
-        invoices:[],
-        total:0,
-        paid:0,
-        balance:0
-      };
-    }
-    ledger[key].invoices.push(inv);
-    ledger[key].total   += inv.grandTotal || 0;
-    ledger[key].paid    += inv.amountPaid || 0;
-    ledger[key].balance += inv.balanceDue || 0;
-  });
-
-  const vendors = Object.values(ledger)
-    .map(v => ({ ...v, invoices:[...v.invoices].sort((a,b)=>String(b.invoiceDate||"").localeCompare(String(a.invoiceDate||""))) }))
-    .sort((a,b)=>b.balance-a.balance);
-
-  const allVendorCount = new Set((invoices || []).map(inv => inv.vendorId || inv.vendorName || "—")).size;
-  const clearMainFilters = () => {
-    setSupplierSearch("");
-    setLedgerDateFrom("");
-    setLedgerDateTo("");
-  };
-  const clearVendorFilters = () => {
-    setVendorInvoiceSearch("");
-    setVendorDateFrom("");
-    setVendorDateTo("");
-  };
-
-  const inputStyle = {
-    padding:"10px 12px",
-    borderRadius:10,
-    border:`1px solid ${th.borderMid}`,
-    background:th.bgCard,
-    color:th.txtPrimary,
-    fontSize:13,
-    outline:"none",
-    width:"100%",
-    boxSizing:"border-box",
-    fontFamily:"inherit"
-  };
-  const labelStyle = { fontSize:10, color:th.txtMuted, fontWeight:800, textTransform:"uppercase", marginBottom:4 };
-
-  if (selVendor) {
-    const vd = vendors.find(v=>v.key===selVendor) || (() => {
-      const fullLedger = {};
-      (invoices || []).forEach(inv=>{
-        const key = inv.vendorId || inv.vendorName || "—";
-        if (!fullLedger[key]) fullLedger[key] = { key, vendorId:inv.vendorId || null, vendorName:inv.vendorName || "—", vendorMobile:inv.vendorMobile || "", invoices:[], total:0, paid:0, balance:0 };
-        fullLedger[key].invoices.push(inv);
-        fullLedger[key].total += inv.grandTotal || 0;
-        fullLedger[key].paid += inv.amountPaid || 0;
-        fullLedger[key].balance += inv.balanceDue || 0;
-      });
-      return fullLedger[selVendor] || null;
-    })();
-
-    if (!vd) { setSelVendor(null); return null; }
-
-    const detailInvoices = (vd.invoices || [])
-      .filter(inv => inDateRange(inv.invoiceDate || inv.createdAt, vendorDateFrom, vendorDateTo))
-      .filter(inv => {
-        const q = vendorInvoiceSearch.trim();
-        if (!q) return true;
-        return nsmatch(invoiceHay(inv), q);
-      })
-      .sort((a,b)=>String(b.invoiceDate||"").localeCompare(String(a.invoiceDate||"")));
-
-    const detailTotal = detailInvoices.reduce((a,inv)=>{
-      a.total += inv.grandTotal || 0;
-      a.paid += inv.amountPaid || 0;
-      a.balance += inv.balanceDue || 0;
-      return a;
-    }, { total:0, paid:0, balance:0 });
-
-    return (
-      <div>
-        <button onClick={()=>{ setSelVendor(null); clearVendorFilters(); }} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>
-          ← {isBn ? "লেজারে ফিরুন" : "Back to Ledger"}
-        </button>
-
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10, gap:10 }}>
-          <div>
-            <div style={{ fontSize:16, fontWeight:900, color:"#f97316" }}>🏭 {vd.vendorName}</div>
-            {vd.vendorMobile&&<div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📱 {vd.vendorMobile}</div>}
-          </div>
-          {canVendorPayments&&vd.balance>0.01&&(
-            <button onClick={()=>onPayVendor(vd)} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:12, fontWeight:800, cursor:"pointer", flexShrink:0 }}>{t.pi_makePayment}</button>
-          )}
-        </div>
-
-        {/* Supplier invoice search + invoice date filter */}
-        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:12, marginBottom:12 }}>
-          <div style={{ position:"relative", marginBottom:10 }}>
-            <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-            <input style={{ ...inputStyle, paddingLeft:38 }} placeholder={invoiceSearchPlaceholder} value={vendorInvoiceSearch} onChange={e=>setVendorInvoiceSearch(e.target.value)} />
-            {vendorInvoiceSearch&&<button onClick={()=>setVendorInvoiceSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
-          </div>
-          <div style={{ fontSize:11, color:"#f97316", fontWeight:800, marginBottom:8 }}>📅 {dateFilterTitle}</div>
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:8, alignItems:"end" }}>
-            <div>
-              <div style={labelStyle}>{fromLabel}</div>
-              <input type="date" style={inputStyle} value={vendorDateFrom} onChange={e=>setVendorDateFrom(e.target.value)} />
-            </div>
-            <div>
-              <div style={labelStyle}>{toLabel}</div>
-              <input type="date" style={inputStyle} value={vendorDateTo} onChange={e=>setVendorDateTo(e.target.value)} />
-            </div>
-            <button onClick={clearVendorFilters} style={{ padding:"10px 12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>{clearLabel}</button>
-          </div>
-        </div>
-
-        {/* Summary row */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
-          {[
-            { l:isBn?"মোট ক্রয়":"Total",   v:piFmt2(detailTotal.total),   c:"#f97316" },
-            { l:isBn?"পরিশোধ":"Paid",       v:piFmt2(detailTotal.paid),    c:"#22c55e" },
-            { l:isBn?"বাকি":"Balance",      v:piFmt2(detailTotal.balance), c:detailTotal.balance>0?"#ef4444":"#22c55e" },
-          ].map((k,i)=>(
-            <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 10px", textAlign:"center" }}>
-              <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{t.cur}{k.v}</div>
-              <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
-            </div>
-          ))}
-        </div>
-
-        {detailInvoices.length===0&&(
-          <div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}>
-            <div style={{ fontSize:34 }}>🔍</div>
-            <div>{t.pi_noResults}</div>
-          </div>
-        )}
-
-        {/* Invoice list for this vendor */}
-        {detailInvoices.map(inv=>(
-          <div key={inv.id} onClick={()=>onViewInvoices(inv)} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
-            onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:4 }}>
-              <span style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{inv.invoiceNo}</span>
-              <PiStatusBadge status={inv.status} lang={lang} />
-            </div>
-            <div style={{ fontSize:11, color:th.txtMuted }}>📅 {inv.invoiceDate} · {inv.items?.length||0}{isBn?"টি পণ্য":" items"}</div>
-            <div style={{ display:"flex", gap:10, marginTop:6, flexWrap:"wrap" }}>
-              <span style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{t.cur}{piFmt2(inv.grandTotal)}</span>
-              {inv.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e" }}>✅ {t.cur}{piFmt2(inv.amountPaid)}</span>}
-              {inv.balanceDue>0.01&&<span style={{ fontSize:11, color:"#ef4444" }}>⚠️ {t.cur}{piFmt2(inv.balanceDue)}</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <div style={{ fontSize:16, fontWeight:800, color:"#f97316", marginBottom:4 }}>🏭 {isBn ? "সাপ্লায়ার লেজার" : "Supplier Ledger"}</div>
-      <div style={{ fontSize:12, color:th.txtMuted, marginBottom:12 }}>{isBn ? "প্রতিটি সাপ্লায়ারের মোট ক্রয়, পরিশোধ ও বাকি" : "Total purchase, paid & balance per supplier"}</div>
-
-      {/* Supplier search + invoice date search/filter */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:12, marginBottom:14 }}>
-        <div style={{ position:"relative", marginBottom:10 }}>
-          <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
-          <input style={{ ...inputStyle, paddingLeft:38 }} placeholder={searchPlaceholder} value={supplierSearch} onChange={e=>setSupplierSearch(e.target.value)} />
-          {supplierSearch&&<button onClick={()=>setSupplierSearch("")} style={{ position:"absolute", right:10, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:16, lineHeight:1 }}>✕</button>}
-        </div>
-
-        <div style={{ fontSize:11, color:"#f97316", fontWeight:800, marginBottom:8 }}>📅 {dateFilterTitle}</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto", gap:8, alignItems:"end" }}>
-          <div>
-            <div style={labelStyle}>{fromLabel}</div>
-            <input type="date" style={inputStyle} value={ledgerDateFrom} onChange={e=>setLedgerDateFrom(e.target.value)} />
-          </div>
-          <div>
-            <div style={labelStyle}>{toLabel}</div>
-            <input type="date" style={inputStyle} value={ledgerDateTo} onChange={e=>setLedgerDateTo(e.target.value)} />
-          </div>
-          <button onClick={clearMainFilters} style={{ padding:"10px 12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:12, fontWeight:800, cursor:"pointer", whiteSpace:"nowrap" }}>{clearLabel}</button>
-        </div>
-
-        {(supplierSearch || ledgerDateFrom || ledgerDateTo) && (
-          <div style={{ marginTop:8, fontSize:11, color:th.txtMuted, fontWeight:700 }}>
-            {isBn ? `${vendors.length} জন সাপ্লায়ার পাওয়া গেছে` : `${vendors.length} suppliers found`}
-          </div>
-        )}
-      </div>
-
-      {allVendorCount===0&&(
-        <div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}>
-          <div style={{ fontSize:40, marginBottom:10 }}>🏭</div>
-          <div style={{ fontSize:13 }}>{isBn ? "এখনো কোনো সাপ্লায়ার নেই" : "No suppliers yet"}</div>
-        </div>
-      )}
-
-      {allVendorCount>0&&vendors.length===0&&(
-        <div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}>
-          <div style={{ fontSize:36 }}>🔍</div>
-          <div>{t.pi_noResults}</div>
-        </div>
-      )}
-
-      {vendors.map((vd)=>{
-        const paidPerc = vd.total>0 ? Math.min(100, vd.paid/vd.total*100) : 0;
-        return (
-          <div key={vd.key} onClick={()=>setSelVendor(vd.key)} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:"14px 16px", marginBottom:10, cursor:"pointer" }}
-            onMouseEnter={e=>e.currentTarget.style.borderColor="#f97316"}
-            onMouseLeave={e=>e.currentTarget.style.borderColor=th.border}>
-            {/* Header */}
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8 }}>
-              <div>
-                <div style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>🏭 {vd.vendorName}</div>
-                {vd.vendorMobile&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📱 {vd.vendorMobile}</div>}
-              </div>
-              <span style={{ fontSize:11, color:th.txtMuted, background:th.bgInp, padding:"3px 8px", borderRadius:8, whiteSpace:"nowrap" }}>
-                {vd.invoices.length}{isBn ? "টি ইনভয়েস" : " invoices"}
-              </span>
-            </div>
-            {/* 3 KPI boxes */}
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:10 }}>
-              <div style={{ textAlign:"center", padding:"8px 6px", background:th.bgInp, borderRadius:8 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:"#f97316" }}>{t.cur}{piFmt2(vd.total)}</div>
-                <div style={{ fontSize:9, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{isBn ? "মোট ক্রয়" : "Total"}</div>
-              </div>
-              <div style={{ textAlign:"center", padding:"8px 6px", background:"rgba(34,197,94,0.06)", borderRadius:8 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{t.cur}{piFmt2(vd.paid)}</div>
-                <div style={{ fontSize:9, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{isBn ? "পরিশোধ" : "Paid"}</div>
-              </div>
-              <div style={{ textAlign:"center", padding:"8px 6px", background:vd.balance>0?"rgba(239,68,68,0.06)":"rgba(34,197,94,0.06)", borderRadius:8, border:vd.balance>0?"1px solid rgba(239,68,68,0.2)":"none" }}>
-                <div style={{ fontSize:13, fontWeight:800, color:vd.balance>0?"#ef4444":"#22c55e" }}>{t.cur}{piFmt2(vd.balance)}</div>
-                <div style={{ fontSize:9, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginTop:2 }}>{isBn ? "বাকি" : "Balance"}</div>
-              </div>
-            </div>
-            {/* Progress bar */}
-            <div style={{ height:6, background:th.bgInp, borderRadius:6, overflow:"hidden" }}>
-              <div style={{ height:"100%", width:`${paidPerc}%`, background:"linear-gradient(90deg,#22c55e,#16a34a)", borderRadius:6, transition:"width 0.4s" }} />
-            </div>
-            <div style={{ display:"flex", justifyContent:"space-between", marginTop:4 }}>
-              <span style={{ fontSize:9, color:"#22c55e", fontWeight:700 }}>{paidPerc.toFixed(0)}% {isBn ? "পরিশোধ" : "paid"}</span>
-              {vd.balance>0&&<span style={{ fontSize:9, color:"#ef4444", fontWeight:700 }}>{isBn ? "বাকি আছে" : "outstanding"} {t.cur}{piFmt2(vd.balance)}</span>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 // ─── PI: SALESMAN READ-ONLY VIEW ──────────────────────────────
 function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0 }) {
   const [invoices,setInvoices]   = useState([]);
@@ -4170,6 +3984,8 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
   const [note,setNote]             = useState("");
   const [chequeNo,setChequeNo]     = useState("");
   const [chequeBank,setChequeBank] = useState("");
+  const [refNo,setRefNo] = useState("");
+  const [refBank,setRefBank] = useState("");
   const [chequeDate,setChequeDate] = useState(piToday());
   const [distAmt,setDistAmt]       = useState("");
   const vendorBoxRef = useRef(null);
@@ -4216,13 +4032,16 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
   const handleSave = () => {
     const allocations = openInvoices
       .filter(inv => piN2(amounts[inv.id])>0)
-      .map(inv => ({ invoiceId:inv.id, invoiceNo:inv.invoiceNo, invoiceDate:inv.invoiceDate||"", amount:piN2(amounts[inv.id]) }));
+      .map(inv => ({ invoiceId:inv.id, invoiceNo:inv.invoiceNo, supplierInvoiceNo:inv.supplierInvoiceNo||"", invoiceDate:inv.invoiceDate||"", amount:piN2(amounts[inv.id]) }));
     onSave({
       vendorId:vendor?.id||null, vendorName:vendor?.name||"", vendorMobile:vendor?.mobile||"",
       method, paymentDate, note,
       chequeNo: method==="cheque"?chequeNo:"",
       chequeBank: method==="cheque"?chequeBank:"",
       chequeDate: method==="cheque"?chequeDate:"",
+      refNo: (method==="bank_transfer"||method==="card")?refNo:"",
+      refBank: (method==="bank_transfer"||method==="card")?refBank:"",
+      refDate: (method==="bank_transfer"||method==="card")?paymentDate:"",
       allocations,
     });
   };
@@ -4305,6 +4124,25 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
             </div>
           )}
 
+          {(method==="bank_transfer"||method==="card")&&(
+            <div style={{ background:"rgba(14,165,233,0.06)", border:"1px solid #0ea5e9", borderRadius:10, padding:12, marginBottom:14 }}>
+              <div style={{ fontSize:11, color:"#38bdf8", fontWeight:700, marginBottom:10 }}>{PI_VOUCHER_METHODS[method].icon} {method==="card"?(lang==="bn"?"কার্ডের তথ্য":"Card Details"):(lang==="bn"?"ট্রান্সফারের তথ্য":"Transfer Details")}</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div>
+                  <div style={lbl}>{method==="card"?(lang==="bn"?"অনুমোদন / রেফ নং":"Approval / Ref No"):(lang==="bn"?"রেফারেন্স নং":"Reference No")}</div>
+                  <input style={{ ...inp(), fontFamily:"monospace" }} value={refNo} onChange={e=>setRefNo(e.target.value)} />
+                </div>
+                <div>
+                  <div style={lbl}>{method==="card"?(lang==="bn"?"কার্ডের ধরন":"Card Type"):(lang==="bn"?"ব্যাংক":"Bank")}</div>
+                  <select style={{ ...inp(), background:th.bgCard }} value={refBank} onChange={e=>setRefBank(e.target.value)}>
+                    <option value="">—</option>
+                    {(method==="card"?VOUCHER_CARD_TYPES:UAE_BANKS.map(b=>b.name)).map(b=><option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Auto-distribute helper */}
           {openInvoices.length>1&&(
             <div style={{ display:"flex", gap:8, marginBottom:14, alignItems:"flex-end" }}>
@@ -4322,7 +4160,7 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
           {openInvoices.map(inv=>(
             <div key={inv.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}` }}>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{inv.invoiceNo}</div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>🧾 {inv.supplierInvoiceNo||inv.invoiceNo}{inv.supplierInvoiceNo&&<span style={{ fontSize:11, fontWeight:600, color:th.txtMuted }}> · {inv.invoiceNo}</span>}</div>
                 <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📅 {inv.invoiceDate} · {t.pi_balanceDue}: <span style={{ color:"#ef4444", fontWeight:700 }}>{t.cur} {piFmt2(inv.balanceDue)}</span></div>
               </div>
               <input style={{ ...inp(), width:100, flex:"0 0 100px", textAlign:"right", fontWeight:700, color:"#22c55e", borderColor:piN2(amounts[inv.id])>0?"#22c55e":th.borderMid }}
@@ -4384,6 +4222,12 @@ function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, 
             <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📅 {t.pi_chequeDate}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeDate||"—"}</span></div>
           </>
         )}
+        {(voucher.method==="bank_transfer"||voucher.method==="card")&&(
+          <>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🔖 {voucher.method==="card"?(lang==="bn"?"অনুমোদন / রেফ নং":"Approval / Ref No"):(lang==="bn"?"রেফারেন্স নং":"Reference No")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refNo||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{voucher.method==="card"?(lang==="bn"?"💳 কার্ডের ধরন":"💳 Card Type"):(lang==="bn"?"🏦 ব্যাংক":"🏦 Bank")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refBank||"—"}</span></div>
+          </>
+        )}
         <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span><span style={{ fontSize:18, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span></div>
         {voucher.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #f97316" }}>📝 {voucher.note}</div>}
       </div>
@@ -4394,8 +4238,8 @@ function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, 
         {(voucher.allocations||[]).map((a,i)=>(
           <button key={i} onClick={()=>onViewInvoice(a.invoiceId)} style={{ width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit" }}>
             <div>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>{a.invoiceNo}</div>
-              {a.invoiceDate&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📅 {a.invoiceDate}</div>}
+              <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>🧾 {a.supplierInvoiceNo||a.invoiceNo}</div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>{a.supplierInvoiceNo?`${a.invoiceNo} · `:""}{a.invoiceDate?`📅 ${a.invoiceDate}`:""}</div>
             </div>
             <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {piFmt2(a.amount)}</span>
           </button>
@@ -4422,17 +4266,37 @@ function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, 
 }
 
 // ─── PI: VOUCHER — PRINTABLE HTML ───────────────────────────────
-function generatePaymentVoucherHTML(voucher, shop, lang) {
+function generatePaymentVoucherHTML(rawVoucher, shop, lang, opts={}) {
   const isBn = lang==="bn";
+  const isReceipt = !!rawVoucher.receiptNo;
+  const voucher = isReceipt
+    ? { ...rawVoucher, paymentNo:rawVoucher.receiptNo, paymentDate:rawVoucher.receiptDate, vendorName:rawVoucher.customerName }
+    : rawVoucher;
   const isCheque = voucher.method==="cheque";
   const methodLabel = PI_VOUCHER_METHODS[voucher.method]?.[lang] || voucher.method;
   const cur = "AED";
+  const docNo = a => (!isReceipt && a.supplierInvoiceNo) || a.invoiceNo || "";
   const rows = (voucher.allocations||[]).map(a=>`
-    <tr><td>${a.invoiceNo}</td><td>${a.invoiceDate||"—"}</td><td style="text-align:right">${cur} ${piFmt2(a.amount)}</td></tr>
+    <tr><td><strong>${docNo(a)}</strong>${!isReceipt&&a.supplierInvoiceNo?`<div style="font-size:10px;color:#6b7280">${a.invoiceNo}</div>`:""}</td><td>${a.invoiceDate||"—"}</td><td style="text-align:right">${cur} ${piFmt2(a.amount)}</td></tr>
   `).join("");
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  const design = opts.design || loadPrintDesign();
+  const layout = design.layout.voucher;
+  const vTitle = isReceipt?(isBn?"রিসিট ভাউচার":"RECEIPT VOUCHER"):(isBn?"পেমেন্ট ভাউচার":"PAYMENT VOUCHER");
+  if (!opts.noLayout && layout?.enabled) {
+    const isRef = voucher.method==="bank_transfer"||voucher.method==="card";
+    const fields = {
+      shopName:shop?.companyName||"", shopAddress:[shop?.area,shop?.countryName].filter(Boolean).join(", "), shopPhone:shop?.mobile||"",
+      title:vTitle, voucherNo:voucher.paymentNo||"", date:voucher.paymentDate||"", partyName:voucher.vendorName||"", method:methodLabel||"",
+      amount:piFmt2(voucher.totalAmount), amountWords:amountInWords(voucher.totalAmount, cur),
+      chequeNo:isCheque?(voucher.chequeNo||""):"", chequeBank:isCheque?(voucher.chequeBank||""):isRef?(voucher.refBank||""):"",
+      chequeDate:isCheque?(voucher.chequeDate||""):"", refNo:isRef?(voucher.refNo||""):"", note:voucher.note||"", collectedBy:voucher.collectedByName||"",
+    };
+    const items = (voucher.allocations||[]).map(a=>({ invoiceNo:docNo(a), ourNo:a.invoiceNo||"", invoiceDate:a.invoiceDate||"", amount:piFmt2(a.amount) }));
+    return renderLayoutDocument(layout, "voucher", { fields, items, logo:design.style.voucher?.logo }, { title:`${vTitle} - ${voucher.paymentNo}`, bn:isBn });
+  }
+  return applyDesign(`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Payment Voucher - ${voucher.paymentNo}</title>
+<title>${isReceipt?"Receipt":"Payment"} Voucher - ${voucher.paymentNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -4472,16 +4336,16 @@ body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;fon
     <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
     <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
     ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
-    <div class="title-row"><span class="rc-title">${isBn?"পেমেন্ট ভাউচার":"Payment Voucher"}</span><span class="rc-no">${voucher.paymentNo}</span></div>
+    <div class="title-row"><span class="rc-title">${isReceipt?(isBn?"রিসিট ভাউচার":"Receipt Voucher"):(isBn?"পেমেন্ট ভাউচার":"Payment Voucher")}</span><span class="rc-no">${voucher.paymentNo}</span></div>
   </div>
   <div class="body">
     <div class="info-grid">
       <div class="info-box"><div class="info-label">📅 ${isBn?"তারিখ":"Date"}</div><div class="info-value">${voucher.paymentDate}</div></div>
       <div class="info-box"><div class="info-label">💳 ${isBn?"পদ্ধতি":"Method"}</div><div class="info-value">${PI_VOUCHER_METHODS[voucher.method]?.icon||""} ${methodLabel}</div></div>
-      <div class="info-box" style="grid-column:1/3"><div class="info-label">🏭 ${isBn?"প্রদান করা হয়েছে":"Paid To"}</div><div class="info-value">${voucher.vendorName||"—"}</div></div>
+      <div class="info-box" style="grid-column:1/3"><div class="info-label">${isReceipt?(isBn?"👤 গ্রহণ করা হয়েছে":"👤 Received From"):(isBn?"🏭 প্রদান করা হয়েছে":"🏭 Paid To")}</div><div class="info-value">${voucher.vendorName||"—"}</div></div>
     </div>
     <div class="amount-box">
-      <div class="amount-label">${isBn?"সর্বমোট পরিমাণ":"Total Amount Paid"}</div>
+      <div class="amount-label">${isBn?"সর্বমোট পরিমাণ":(isReceipt?"Total Amount Received":"Total Amount Paid")}</div>
       <div class="amount-val">${cur} ${piFmt2(voucher.totalAmount)}</div>
     </div>
     ${isCheque?`<div class="cheque-box">
@@ -4489,38 +4353,88 @@ body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;fon
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${voucher.chequeBank||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📅 ${isBn?"চেকের তারিখ":"Cheque Date"}</span><span style="font-weight:700">${voucher.chequeDate||"—"}</span></div>
     </div>`:""}
+    ${(voucher.method==="bank_transfer"||voucher.method==="card")&&(voucher.refNo||voucher.refBank)?`<div class="cheque-box">
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🔖 ${voucher.method==="card"?(isBn?"অনুমোদন / রেফ নং":"Approval / Ref No."):(isBn?"রেফারেন্স নং":"Reference No.")}</span><span style="font-weight:700">${voucher.refNo||"—"}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">${voucher.method==="card"?(isBn?"💳 কার্ডের ধরন":"💳 Card Type"):(isBn?"🏦 ব্যাংক":"🏦 Bank")}</span><span style="font-weight:700">${voucher.refBank||"—"}</span></div>
+    </div>`:""}
     <table class="alloc-table">
-      <thead><tr><th>${isBn?"ইনভয়েস নং":"Invoice No."}</th><th>${isBn?"তারিখ":"Date"}</th><th style="text-align:right">${isBn?"পরিমাণ":"Amount"}</th></tr></thead>
+      <thead><tr><th>${isReceipt?(isBn?"ইনভয়েস নং":"Invoice No."):(isBn?"ভেন্ডরের ইনভয়েস নং":"Vendor Invoice No.")}</th><th>${isBn?"তারিখ":"Date"}</th><th style="text-align:right">${isBn?"পরিমাণ":"Amount"}</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     ${voucher.note?`<div class="note-box">📝 ${voucher.note}</div>`:""}
     <div class="sigs">
-      <div><div class="sig-line">${isBn?"প্রদানকারীর স্বাক্ষর":"Paid By Signature"}</div></div>
+      <div><div class="sig-line">${isBn?"প্রদানকারীর স্বাক্ষর":"Paid By Signature"}</div></div>${isReceipt&&voucher.collectedByName?`<div style="grid-column:1/3;font-size:11px;color:#6b7280">${isBn?"সংগ্রহকারী":"Collected by"}: ${voucher.collectedByName}</div>`:""}
       <div><div class="sig-line">${isBn?"গ্রহণকারীর স্বাক্ষর":"Received By Signature"}</div></div>
     </div>
   </div>
   <div class="footer">${isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏"}</div>
 </div>
-</body></html>`;
+</body></html>`, "voucher", opts.style || design.style.voucher);
+}
+
+// Sample documents for the live preview in Print Settings → Design.
+function designPreviewHtml(kind, style, shop, lang, showCode, colorPrint) {
+  const shopInfo = shop?.companyName ? shop : { companyName:"S4 Auto Spare Parts", area:"Industrial Area 4", countryName:"Sharjah", mobile:"+971 50 000 0000", trnNumber:"100000000000003" };
+  if (kind === "voucher") {
+    return generatePaymentVoucherHTML({
+      receiptNo:"RV-0012", receiptDate:"2026-10-04", customerName:"Al Noor Garage", method:"cheque", chequeNo:"004512", chequeBank:"Emirates NBD",
+      chequeDate:"2026-10-10", totalAmount:1500, note:"Against old bills",
+      allocations:[{ invoiceNo:"SI-0001", invoiceDate:"2026-10-01", amount:1000 }, { invoiceNo:"SI-0004", invoiceDate:"2026-10-02", amount:500 }],
+    }, shopInfo, lang, { style, noLayout:true });
+  }
+  if (kind === "statement") {
+    const cols = [["Date"],["Type"],["Doc No"],["Ref"],["Particulars"],["Debit","right"],["Credit","right"],["Balance","right"]].map(([label,align])=>({ label, align }));
+    const keys = ["date","type","no","ref","particulars","debit","credit","balance"];
+    return generateStatementHTML({
+      shopName:shopInfo.companyName, title:"CUSTOMER STATEMENT", subtitle:"01/09/2026 — 04/10/2026", partyLine:"Al Noor Garage · +971 55 111 2222",
+      cols, rows:SAMPLE_DATA.statement.items.map(r=>keys.map(k=>r[k])), foot:["","","","","TOTAL","4,950.00","1,500.00","3,450.00 Dr"],
+    }, style);
+  }
+  return generateSalesInvoiceHTML({
+    invoiceNo:"SI-0001", invoiceDate:"2026-10-04", invoiceType:"tax", customerName:"Al Noor Garage", customerMobile:"+971 55 111 2222",
+    customerAddress:"Ajman", paymentMethod:"credit", status:"partial", amountPaid:500, createdByName:"Admin", salesmanName:"Rahim",
+    note:"Goods once sold will not be taken back.",
+    items:[
+      { name:"Brake Pad Front", code:"BP-101", qty:2, unit:"Pcs", unitPrice:150, discountPerc:0, vatPerc:5 },
+      { name:"Oil Filter", code:"OF-22", qty:4, unit:"Pcs", unitPrice:35, discountPerc:5, vatPerc:5 },
+      { name:"Shock Absorber Rear", code:"SA-9", qty:1, unit:"Pcs", unitPrice:780, discountPerc:0, vatPerc:5 },
+    ],
+  }, shopInfo, lang, showCode, colorPrint, { style, noLayout:true, customerBalance:3450 });
 }
 
 function printPaymentVoucher(voucher, shop, lang) {
-  const html = generatePaymentVoucherHTML(voucher, shop, lang);
-  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
-  const w    = window.open(url, "_blank", "width=680,height=780");
-  if (!w) {
-    URL.revokeObjectURL(url);
-    alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups.");
-    return;
-  }
-  w.addEventListener("load", () => {
-    setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
+  printWithSettings(generatePaymentVoucherHTML(voucher, shop, lang), { lang });
+}
+
+const toVoucherView = (v, kind) => ({
+  id:v.id, no:kind==="receipt" ? v.receiptNo : v.paymentNo, date:kind==="receipt" ? v.receiptDate : v.paymentDate,
+  partyName:kind==="receipt" ? v.customerName : v.vendorName, method:v.method, totalAmount:v.totalAmount, status:v.status,
+  chequeNo:v.chequeNo, chequeBank:v.chequeBank, chequeDate:v.chequeDate, chequeStatus:v.chequeStatus, note:v.note,
+  refNo:v.refNo, refBank:v.refBank, refDate:v.refDate,
+  collectedByName:v.collectedByName, allocations:v.allocations||[], raw:v,
+});
+// Party list for the voucher window: master records plus names that only appear on open bills.
+function voucherParties(masters, openInvoices, idKey, nameKey, masterName, masterMobile) {
+  const pending = new Map();
+  openInvoices.forEach(inv => {
+    const k = inv[idKey] ? `i:${inv[idKey]}` : `n:${String(inv[nameKey]||"").trim()}`;
+    pending.set(k, (pending.get(k)||0) + (parseFloat(inv.balanceDue)||0));
   });
+  const rows = (masters||[]).filter(m=>m&&!m.isDeleted&&!m.deleted).map(m => ({ key:`i:${m.id}`, id:m.id, name:masterName(m)||"", mobile:masterMobile(m)||"", pending:pending.get(`i:${m.id}`)||0 }));
+  const seen = new Set(rows.map(r=>r.key));
+  openInvoices.forEach(inv => {
+    if (inv[idKey]) return;
+    const name = String(inv[nameKey]||"").trim();
+    const k = `n:${name}`;
+    if (!name || seen.has(k)) return;
+    seen.add(k);
+    rows.push({ key:k, id:null, name, mobile:"", pending:pending.get(k)||0 });
+  });
+  return rows.sort((a,b)=>(b.pending>0)-(a.pending>0) || a.name.localeCompare(b.name));
 }
 
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0 }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
@@ -4536,6 +4450,10 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── View state: "list" | "form" | "detail" ──
   const [piView,setPiView]         = useState("list");
+  const [piGroupMode,setPiGroupMode] = useState("folders");
+  const [piOpenParty,setPiOpenParty] = useState(null);
+  const piWin = useWindowState({ maximized:true });
+  useEffect(() => { if (piView!=="form") piWin.restore(); }, [piView]); // eslint-disable-line react-hooks/exhaustive-deps
   const [piSubTab,setPiSubTab]     = useState(
     canManagePurchase ? "invoices" : (canViewSupplierLedger ? "ledger" : (canVendorPayments ? "payments" : "invoices"))
   ); // "invoices" | "ledger" | "payments"
@@ -4548,6 +4466,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [pmtView,setPmtView]           = useState("list");   // "list" | "new" | "detail"
   const [selVoucher,setSelVoucher]     = useState(null);
   const [pmtPrefillVendorId,setPmtPrefillVendorId] = useState(null);
+  const [pmtPrefillInvoiceId,setPmtPrefillInvoiceId] = useState(null);
   const [pmtSaving,setPmtSaving]       = useState(false);
 
   // ── Form state ──
@@ -4556,6 +4475,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [piLines,setPiLines]         = useState([]);
   const [piCurrent,setPiCurrent]     = useState(piEmptyCurrent());
   const [piSaving,setPiSaving]       = useState(false);
+  const piSaveLockRef = useRef(false);
   const piNameRef = useRef(null);
   const piQtyRef = useRef(null);
 
@@ -4685,7 +4605,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   const ensureNewPiInvoiceNo = () => {
     if (editInvoiceId) return piInvoiceNo;
-    const no = piInvoiceNo || piPreviewNextInvoiceNo();
+    const taken = piInvoiceNo && invoices.some(inv => inv.invoiceNo === piInvoiceNo);
+    const no = (!taken && piInvoiceNo) || piPreviewNextInvoiceNo();
     if (no !== piInvoiceNo) setPiInvoiceNo(no);
     return no;
   };
@@ -4751,22 +4672,38 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       return rows.length;
     };
 
-    loadOfflinePiPayments().catch(err => console.warn("[S4 Offline] purchasePayments offline load failed", err));
+    loadOfflinePiPayments()
+      .then((count) => { if (count > 0 || !authSyncReady) setPmtLoading(false); })
+      .catch(err => { console.warn("[S4 Offline] purchasePayments offline load failed", err); if (!authSyncReady) setPmtLoading(false); });
+
+    const applyCloudPayments = async (rows) => {
+      let merged = rows;
+      try {
+        const res = await offlineList("purchasePayments");
+        const records = Array.isArray(res) ? res : (res.records || []);
+        const dirty = records
+          .filter(r => Number(r?.dirty || 0) === 1)
+          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
+          .filter(p => p.shopId === shopId);
+        if (dirty.length) {
+          const map = new Map(rows.map(p => [String(p.id), p]));
+          dirty.forEach(p => map.set(String(p.id), p));
+          merged = sortPiPayments([...map.values()]);
+        }
+      } catch {}
+      setPayments(merged);
+      offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments cache failed", err));
+      setPmtLoading(false);
+    };
 
     if (authSyncReady) {
       const q=query(collection(db,"purchasePayments"),where("shopId","==",shopId),orderBy("createdAt","desc"));
       unsub1=onSnapshot(q,snap=>{
-        const rows = snap.docs.map(normalizePiPayment);
-        setPayments(rows);
-        offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments cache failed", err));
-        setPmtLoading(false);
+        applyCloudPayments(snap.docs.map(normalizePiPayment));
       },()=>{
         const q2=query(collection(db,"purchasePayments"),where("shopId","==",shopId));
         unsub2=onSnapshot(q2,snap=>{
-          const rows = sortPiPayments(snap.docs.map(normalizePiPayment));
-          setPayments(rows);
-          offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments fallback cache failed", err));
-          setPmtLoading(false);
+          applyCloudPayments(sortPiPayments(snap.docs.map(normalizePiPayment)));
         },err2=>{
           console.error(err2);
           loadOfflinePiPayments().finally(()=>setPmtLoading(false));
@@ -4777,6 +4714,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   },[shopId, authSyncReady]);
 
   // ── This vendor's open (payable) invoices — confirmed/partial with balance > 0, oldest first ──
+  // Older vouchers stored only our PI number; fill in the vendor's own invoice number from the invoice.
+  const withSupRefs = (v) => v && ({ ...v, allocations:(v.allocations||[]).map(a=>({ ...a, supplierInvoiceNo:a.supplierInvoiceNo || invoices.find(i=>i.id===a.invoiceId)?.supplierInvoiceNo || "" })) });
+
   const getVendorOpenInvoices = (vendorId, vendorName) => invoices
     .filter(inv => ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01 && (vendorId ? inv.vendorId===vendorId : inv.vendorName===vendorName))
     .sort((a,b) => new Date(a.invoiceDate||0) - new Date(b.invoiceDate||0));
@@ -4785,15 +4725,15 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const getRelatedPayments = (invoiceId) => payments
     .filter(p => (p.allocations||[]).some(a=>a.invoiceId===invoiceId))
     .map(p => ({ payment:p, allocAmount: (p.allocations||[]).find(a=>a.invoiceId===invoiceId)?.amount||0 }))
-    .sort((a,b)=>b.payment.createdAt-a.payment.createdAt);
+    .sort((a,b)=>new Date(b.payment.createdAt||0)-new Date(a.payment.createdAt||0));
 
   // ── Save a Vendor Payment Voucher — offline-first with local invoice updates ──
-  const piSavePaymentVoucher = async (payload) => {
+  const piSavePaymentVoucher = async (payload, { stayOpen = false } = {}) => {
     // payload: { vendorId, vendorName, vendorMobile, method, paymentDate, note, chequeNo, chequeBank, chequeDate, allocations:[{invoiceId,invoiceNo,invoiceDate,amount}] }
-    if (!payload.vendorName) { toast(t.pi_vendorRequired,"err"); return; }
+    if (!payload.vendorName) { toast(t.pi_vendorRequired,"err"); return null; }
     const allocations = (payload.allocations||[]).filter(a=>piN2(a.amount)>0);
-    if (!allocations.length) { toast(t.pi_amountRequired,"err"); return; }
-    if (payload.method==="cheque" && !String(payload.chequeNo||"").trim()) { toast(t.pi_errChequeNo,"err"); return; }
+    if (!allocations.length) { toast(t.pi_amountRequired,"err"); return null; }
+    if (payload.method==="cheque" && !String(payload.chequeNo||"").trim()) { toast(t.pi_errChequeNo,"err"); return null; }
 
     setPmtSaving(true);
     try {
@@ -4844,10 +4784,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         chequeBank: payload.method === "cheque" ? (payload.chequeBank || "").trim() : "",
         chequeDate: payload.method === "cheque" ? (payload.chequeDate || "") : "",
         chequeStatus: payload.method === "cheque" ? "pending" : null,
+        refNo: (payload.refNo || "").trim(),
+        refBank: (payload.refBank || "").trim(),
+        refDate: payload.refDate || "",
         note: (payload.note || "").trim(),
         allocations: allocations.map((a) => ({
           invoiceId: a.invoiceId,
           invoiceNo: a.invoiceNo,
+          supplierInvoiceNo: a.supplierInvoiceNo || invoices.find((i) => i.id === a.invoiceId)?.supplierInvoiceNo || "",
           invoiceDate: a.invoiceDate || "",
           amount: parseFloat(piFmt2(a.amount)),
         })),
@@ -4868,8 +4812,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       }
 
       toast(t.pi_voucherSaved);
-      setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null);
-    } catch(e) { toast(e.message,"err"); }
+      if (!stayOpen) { setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); }
+      return created;
+    } catch(e) { toast(e.message,"err"); return null; }
     finally { setPmtSaving(false); }
   };
 
@@ -4879,7 +4824,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
     for (const alloc of (payment.allocations || [])) {
       const cur = invoices.find((inv) => inv.id === alloc.invoiceId);
-      if (!cur) continue;
+      if (!cur || cur.status === "cancelled") continue;
       const grand = piN2(cur.grandTotal);
       const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - piN2(alloc.amount))));
       const newBalance = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
@@ -4925,7 +4870,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── Cancel a Payment Voucher — reverses every allocation back onto its invoice's balance ──
   const piCancelPaymentVoucher = async (payment) => {
-    if (!window.confirm(t.pi_confirmCancelVoucher)) return;
+    if (!window.confirm(t.pi_confirmCancelVoucher)) return null;
     try {
       if (payment.status === "cancelled") {
         throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
@@ -4933,13 +4878,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       const updatedPayment = await piReversePaymentAllocations(payment);
       setSelVoucher((p) => p && p.id === payment.id ? updatedPayment : p);
       toast(t.pi_voucherCancelled,"err");
-    } catch(e) { toast(e.message,"err"); }
+      return updatedPayment;
+    } catch(e) { toast(e.message,"err"); return null; }
   };
 
   // ── Update a voucher's cheque clearance status. Bounced ⇒ auto-reverses every allocation. ──
-  const piSetVoucherChequeStatus = async (payment, newChequeStatus) => {
+  const piSetVoucherChequeStatus = async (payment, newChequeStatus, extra = {}) => {
     if (newChequeStatus==="bounced") {
-      if (!window.confirm(t.pi_confirmBounce)) return;
+      if (!window.confirm(t.pi_confirmBounce)) return null;
       try {
         if (payment.status === "cancelled") {
           throw new Error(lang==="bn"?"ভাউচারটি ইতিমধ্যে বাতিল":"Voucher already cancelled");
@@ -4950,13 +4896,15 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         });
         setSelVoucher((p) => p && p.id === payment.id ? updatedPayment : p);
         toast(t.pi_chequeBounced,"err");
-      } catch(e) { toast(e.message,"err"); }
+        return updatedPayment;
+      } catch(e) { toast(e.message,"err"); return null; }
     } else {
       try {
         const nowIso = new Date().toISOString();
         const result = await offlineUpdate("purchasePayments", payment.id, {
           ...payment,
           chequeStatus:newChequeStatus,
+          ...(newChequeStatus==="cleared" ? { clearedAt:extra.clearedAt || nowIso, clearedBy:user?.uid || "" } : {}),
           updatedAt:nowIso,
           updatedBy:user?.uid || "",
         });
@@ -4969,7 +4917,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         if (navigator.onLine) {
           window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase payment cheque clear sync failed", err));
         }
-      } catch(e) { toast(e.message,"err"); }
+        return updated;
+      } catch(e) { toast(e.message,"err"); return null; }
     }
   };
 
@@ -4988,8 +4937,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   // ── Open edit form ──
   const piOpenEdit = (inv) => {
     setPiInvoiceNo(inv.invoiceNo);
-    setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
-    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc||"0"), taxPerc:String(it.taxPerc||"5"), salePrice:String(it.salePrice||"") })));
+    setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:(inv.paymentMethod||"cash")!=="cash"&&inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
+    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||"") })));
     setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
   };
@@ -5009,14 +4958,43 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── Load a confirmed item back into the entry row for editing ──
   const piEditLine = (item) => {
-    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc||"0"), taxPerc:String(item.taxPerc||"5"), salePrice:String(item.salePrice||"") });
+    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc??"0"), taxPerc:String(item.taxPerc??"5"), salePrice:String(item.salePrice||"") });
     setPiLines(p=>p.filter(x=>x.id!==item.id));
     setTimeout(()=>piNameRef.current?.focus(), 80);
   };
 
   const piSelectProduct=(prod)=>{
-    setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.vatExclusive||p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.salesVat||prod.purchaseVat||p.taxPerc||"5" }));
+    setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.averageCost||p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.purchaseVat||prod.salesVat||p.taxPerc||"5" }));
     setTimeout(()=>piQtyRef.current?.focus(), 100);
+  };
+
+  useEffect(()=>{
+    if (productFromMaster?.product && piView==="form") piSelectProduct(productFromMaster.product);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[productFromMaster]);
+
+  const piLeaveUnsavedOk = () =>
+    editInvoiceId || !piLines.length || window.confirm(lang==="bn"?"এই বিলের item গুলো সেভ হয়নি। তবুও চলে যাবেন?":"This bill is not saved. Leave anyway?");
+  // A minimized bill must be confirmed away before the list opens another one.
+  const piLeaveMinOk = () => {
+    if (!(piWin.min && piView==="form")) return true;
+    if (!piLeaveUnsavedOk()) return false;
+    piWin.restore();
+    return true;
+  };
+  useEscapeKey(() => {
+    if (piView==="form") { if (piLeaveUnsavedOk()) setPiView("list"); }
+    else if (piView==="detail") { setPiView("list"); setSelInvoice(null); }
+    else { setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); }
+  }, {
+    enabled: !piWin.min && (piView!=="list" || (piSubTab==="payments" && pmtView!=="list")),
+    level: piView==="form" ? 2 : 1,
+  });
+
+  const piOpenFromDesktop = (inv) => {
+    if (!piLeaveUnsavedOk()) return;
+    if (["draft","confirmed"].includes(inv.status)) { piOpenEdit(inv); return; }
+    setSelInvoice(inv); setPiView("detail");
   };
 
   const piHandleVendor=(e)=>{
@@ -5049,18 +5027,25 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── Build payload ──
   const piBuild=(status, invoiceNoOverride)=>{
+    if (!piForm.vendorName.trim()){ toast(lang==="bn"?"❌ Vendor / সাপ্লায়ারের নাম দিন — লিস্টে না থাকলে নাম লিখে দিন":"❌ Enter the vendor / supplier name — type it if it's not in the list","err"); return null; }
+    if (!piForm.supplierInvoiceNo.trim()){ toast(lang==="bn"?"❌ সাপ্লায়ারের Invoice No দিন — নম্বর না থাকলে যেকোনো একটা রেফারেন্স লিখুন":"❌ Enter the supplier's invoice no — type any reference if there is none","err"); return null; }
+    if (piCurrent.name.trim()){ toast(lang==="bn"?"❌ এন্ট্রি সারির আইটেম এখনো যোগ/আপডেট করা হয়নি — Add/Update চাপুন বা সারিটি খালি করুন":"❌ The item in the entry row is not added yet — press Add/Update or clear the row","err"); return null; }
     const valid=piLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.pi_errItems,"err"); return null; }
     for (const it of valid){
       if (!it.name.trim()){ toast(t.pi_errName,"err"); return null; }
       if (!it.qty.toString().trim()||piN2(it.qty)<=0){ toast(t.pi_errQty,"err"); return null; }
       if (piN2(it.unitCost)<0){ toast(t.pi_errCost,"err"); return null; }
+      if (piN2(it.taxPerc)<0){ toast(lang==="bn"?"❌ VAT % ঋণাত্মক হতে পারে না":"❌ VAT % cannot be negative","err"); return null; }
     }
-    const builtItems=valid.map(it=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null }; });
+    const builtItems=valid.map(it=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null }; });
     const { sub, disc, tax, grand } = piCalcTotals(piLines);
-    const paid=piN2(piForm.amountPaid), balanceDue=Math.max(0,grand-paid);
+    const typedPaid=piForm.paymentMethod==="cash" ? parseFloat(piFmt2(grand)) : piN2(piForm.amountPaid);
+    if (typedPaid > grand + 0.01) { toast(lang==="bn"?"পরিশোধিত টাকা মোট বিলের চেয়ে বেশি হতে পারে না!":"Amount paid cannot exceed the grand total!","err"); return null; }
+    const paid=Math.min(Math.max(typedPaid,0), grand), balanceDue=Math.max(0,grand-paid);
     const derivedStatus = status==="confirmed" ? (balanceDue<0.01?"paid":paid>0?"partial":"confirmed") : status;
-    return { shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+    const priorInv = editInvoiceId ? invoices.find(inv => inv.id === editInvoiceId) : null;
+    return { shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
   };
 
   const savePurchaseInvoiceOffline = async (payload, successMessage) => {
@@ -5106,6 +5091,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     });
 
     if (!editInvoiceId) bumpShopPiSerial(payload.invoiceNo);
+    if (STOCK_AFFECTING_INVOICE_STATUSES.includes(payload.status)) await piUpdateProductCosts(payload);
 
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
@@ -5114,34 +5100,93 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     setPiView("list");
   };
 
-  // ── Save ──
-  const piSaveDraft = async () => {
-    setPiSaving(true);
-    try {
-      const invoiceNo = editInvoiceId ? piInvoiceNo : ensureNewPiInvoiceNo();
-      const payload = piBuild("draft", invoiceNo);
-      if (!payload) return;
-      await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_saved);
-    } catch(e) {
-      toast(e.message,"err");
-    } finally {
-      setPiSaving(false);
+  // A confirmed purchase becomes the product's latest cost, and a sale price typed on the line updates the product's price.
+  const piUpdateProductCosts = async (payload) => {
+    if (!can("manageProducts")) return;
+    const nowIso = new Date().toISOString();
+    for (const it of payload.items || []) {
+      if (!it.productId) continue;
+      try {
+        const rec = await offlineGetById("products", it.productId).catch(() => null);
+        const prod = rec?.data || products.find(p => p.id === it.productId);
+        if (!prod) continue;
+        const factor = Number(it.unitFactor) > 0 ? Number(it.unitFactor) : 1;
+        const qty = Number(it.qty) || 0;
+        const netCost = qty > 0 ? (Number(it.lineTotal) - Number(it.taxAmt || 0)) / qty / factor : Number(it.unitCost) / factor;
+        const patch = {};
+        if (netCost > 0 && Math.abs(netCost - (Number(prod.landingCost) || 0)) > 0.0001) {
+          patch.landingCost = String(parseFloat(netCost.toFixed(4)));
+          patch.lastPurchaseCost = patch.landingCost;
+          patch.lastPurchaseDate = payload.invoiceDate || nowIso.slice(0, 10);
+        }
+        const sale = Number(it.salePrice) || 0;
+        if (sale > 0 && factor === 1) {
+          const priceKey = prod.vatInclusive ? "vatInclusive" : prod.mrp ? "mrp" : prod.vatExclusive ? "vatExclusive" : "vatInclusive";
+          if (Math.abs(sale - (Number(prod[priceKey]) || 0)) > 0.0001) patch[priceKey] = String(sale);
+        }
+        if (!Object.keys(patch).length) continue;
+        await offlineUpdate("products", it.productId, { ...prod, ...patch, updatedAt: nowIso });
+      } catch (err) {
+        console.warn("[S4 PI] product cost update failed", it.productId, err);
+      }
     }
   };
 
-  const piConfirm = async () => {
+  // ── Save ──
+  const piSupplierInvoiceDuplicateOk = (payload) => {
+    const key = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const supNo = key(payload.supplierInvoiceNo);
+    const day = String(payload.invoiceDate || "").slice(0, 10);
+    const sameVendor = (inv) => (payload.vendorId && inv.vendorId === payload.vendorId)
+      || (!!key(payload.vendorName) && key(inv.vendorName) === key(payload.vendorName));
+    const others = invoices.filter(inv => inv.id !== editInvoiceId && inv.status !== "cancelled" && sameVendor(inv));
+    const bn = lang==="bn";
+
+    if (supNo) {
+      const same = others.filter(inv => key(inv.supplierInvoiceNo) === supNo);
+      const sameDay = same.find(inv => String(inv.invoiceDate || "").slice(0, 10) === day);
+      if (sameDay) {
+        alert(bn
+          ? `❌ ডুপ্লিকেট! এই সাপ্লায়ারের Supplier Invoice No "${payload.supplierInvoiceNo}" একই তারিখে (${day}) আগেই ${sameDay.invoiceNo}-এ এন্ট্রি করা আছে।\nআবার সেভ করা যাবে না।`
+          : `❌ Duplicate! Supplier invoice "${payload.supplierInvoiceNo}" from this supplier on ${day} is already entered as ${sameDay.invoiceNo}.\nIt cannot be saved again.`);
+        return false;
+      }
+      if (same.length) {
+        const d = same[0];
+        return window.confirm(bn
+          ? `⚠️ এই সাপ্লায়ারের Supplier Invoice No "${payload.supplierInvoiceNo}" আগেই ${d.invoiceNo} (${d.invoiceDate||""})-এ এন্ট্রি করা আছে।\nতারিখ আলাদা — তবুও সেভ করবেন?`
+          : `⚠️ Supplier invoice "${payload.supplierInvoiceNo}" from this supplier is already entered as ${d.invoiceNo} (${d.invoiceDate||""}).\nThe date differs — save anyway?`);
+      }
+      return true;
+    }
+
+    const lookalike = others.find(inv => String(inv.invoiceDate || "").slice(0, 10) === day && Math.abs(piN2(inv.grandTotal) - piN2(payload.grandTotal)) < 0.01);
+    if (!lookalike) return true;
+    return window.confirm(bn
+      ? `⚠️ একই সাপ্লায়ার, একই তারিখ (${day}) আর একই টাকার (${piFmt2(payload.grandTotal)}) বিল আগেই ${lookalike.invoiceNo}-এ আছে।\nডুপ্লিকেট হতে পারে — তবুও সেভ করবেন?`
+      : `⚠️ A bill from this supplier on ${day} for ${piFmt2(payload.grandTotal)} already exists as ${lookalike.invoiceNo}.\nIt may be a duplicate — save anyway?`);
+  };
+
+  const piSaveRun = async (status, successMsg) => {
+    if (piSaveLockRef.current) return;
+    piSaveLockRef.current = true;
     setPiSaving(true);
     try {
       const invoiceNo = editInvoiceId ? piInvoiceNo : ensureNewPiInvoiceNo();
-      const payload = piBuild("confirmed", invoiceNo);
+      const payload = piBuild(status, invoiceNo);
       if (!payload) return;
-      await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : t.pi_confirmed);
+      if (status!=="draft" && !unlinkedStockOk(payload.items, lang)) return;
+      if (!piSupplierInvoiceDuplicateOk(payload)) return;
+      await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : successMsg);
     } catch(e) {
       toast(e.message,"err");
     } finally {
+      piSaveLockRef.current = false;
       setPiSaving(false);
     }
   };
+  const piSaveDraft = () => piSaveRun("draft", t.pi_saved);
+  const piConfirm = () => piSaveRun("confirmed", t.pi_confirmed);
 
   // "Make Payment" from an invoice: jump to the Payments tab, New Voucher form, pre-selected for this vendor.
   // The new voucher form pre-fills this exact invoice's row with its full balance — other open invoices for
@@ -5149,13 +5194,20 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piGoToMakePayment = (inv) => {
     if (!canVendorPayments) return;
     setPmtPrefillVendorId(inv.vendorId || inv.vendorName);
+    setPmtPrefillInvoiceId(inv.id);
     setSelVoucher(null);
     setPmtView("new");
     setPiSubTab("payments");
     setPiView("list");
   };
   const piCancelInv = async (inv) => {
-    if (!window.confirm(t.pi_confirmCancel)) return;
+    const activeVouchers = payments.filter(p => p.status !== "cancelled" && (p.allocations||[]).some(a => a.invoiceId === inv.id));
+    if (activeVouchers.length) {
+      const nos = activeVouchers.map(p => p.paymentNo).join(", ");
+      toast(lang==="bn" ? `আগে পেমেন্ট ভাউচার বাতিল করুন: ${nos}` : `Cancel the payment voucher(s) first: ${nos}`, "err");
+      return false;
+    }
+    if (!window.confirm(t.pi_confirmCancel)) return false;
     try {
       const nowIso = new Date().toISOString();
       const result = await offlineUpdate("purchaseInvoices", inv.id, {
@@ -5186,7 +5238,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice cancel sync failed", err));
       }
-    } catch(e){ toast(e.message,"err"); }
+      return true;
+    } catch(e){ toast(e.message,"err"); return false; }
   };
   const piDelete = async (inv) => {
     if (!window.confirm(t.pi_confirmDelete)) return;
@@ -5212,22 +5265,27 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const hay=[inv.invoiceNo,inv.vendorName,inv.supplierInvoiceNo,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code+" "+it.brand)].filter(Boolean).join(" ");
     return matchSt&&nsmatch(hay,q);
   });
-  const piKPIs = invoices.reduce((a,inv)=>{ a.total++; a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{ total:0,amount:0,paid:0,due:0 });
+  const piKPIs = invoices.reduce((a,inv)=>{ a.total++; if (inv.status==="cancelled"||inv.status==="draft") return a; a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{ total:0,amount:0,paid:0,due:0 });
 
   // ── Styles ──
   const panel = isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
   const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   const secLbl={ fontSize:11, color:"#f97316", fontWeight:700, textTransform:"uppercase", letterSpacing:0, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
   const totals=piCalcTotals(piLines);
-  const paid=piN2(piForm.amountPaid), balance=Math.max(0,totals.grand-paid);
+  const paid=piForm.paymentMethod==="cash" ? totals.grand : piN2(piForm.amountPaid), balance=Math.max(0,totals.grand-paid);
 
   // ══════ LIST VIEW ══════
-  if (piView==="list") return (
+  if (piView==="list" || (piView==="form" && piWin.min && wideDesktop)) return (
     <div style={panel}>
+      {piView==="form"&&piWin.min&&(
+        <MinimizedChip lang={lang} onRestore={piWin.restore}
+          title={`PURCHASE INVOICE ${piInvoiceNo||""}`}
+          onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }} />
+      )}
       {/* Title + New button */}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.pi_title}</div>
-        {canManagePurchase&&piSubTab==="invoices"&&<button onClick={piOpenNew} disabled={piSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:piSaving?"#7c2d12":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:piSaving?"not-allowed":"pointer", opacity:piSaving?0.7:1 }}>{piSaving?"...":(lang==="bn"?"+ নতুন ইনভয়েস":"+ New Invoice")}</button>}
+        {canManagePurchase&&piSubTab==="invoices"&&<button onClick={()=>{ if (piLeaveMinOk()) piOpenNew(); }} disabled={piSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:piSaving?"#7c2d12":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:piSaving?"not-allowed":"pointer", opacity:piSaving?0.7:1 }}>{piSaving?"...":(lang==="bn"?"+ নতুন ইনভয়েস":"+ New Invoice")}</button>}
         {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&<button onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_newPayment}</button>}
       </div>
 
@@ -5246,29 +5304,55 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
       {/* ── SUB-TAB: SUPPLIER LEDGER ── */}
       {piSubTab==="ledger"&&canViewSupplierLedger&&(
-        <PiSupplierLedger invoices={invoices} t={t} th={th} lang={lang}
-          canVendorPayments={canVendorPayments}
-          onViewInvoices={(inv)=>{ setSelInvoice(inv); setPiView("detail"); }}
-          onPayVendor={(vd)=>{ if(!canVendorPayments) return; setPmtPrefillVendorId(vd.vendorId||vd.vendorName); setSelVoucher(null); setPmtView("new"); setPiSubTab("payments"); }} />
+        <PartyLedgerWindow lang={lang} mode="supplier" cur={t.cur||"AED"} shopName={shop?.companyName||""}
+          invoices={invoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.vendorId||null, partyName:inv.vendorName||"", partyMobile:inv.vendorMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.supplierInvoiceNo||"", method:inv.paymentMethod, raw:inv }))}
+          vouchers={canVendorPayments ? payments.map(p=>({ id:p.id, no:p.paymentNo, date:String(p.paymentDate||"").slice(0,10), partyId:p.vendorId||null, partyName:p.vendorName||"", partyMobile:p.vendorMobile||"", method:p.method, amount:p.totalAmount, status:p.status, allocations:withSupRefs(p).allocations, raw:p })) : []}
+          onOpenInvoice={(inv)=>{ setSelInvoice(inv); setPiSubTab(canManagePurchase?"invoices":"ledger"); setPiView("detail"); }}
+          onOpenVoucher={canVendorPayments ? (v)=>{ setSelVoucher(v); setPmtView("detail"); setPiSubTab("payments"); } : undefined}
+          onNewVoucher={canVendorPayments ? (p)=>{ setPmtPrefillVendorId(p.id||p.name); setPmtPrefillInvoiceId(null); setSelVoucher(null); setPmtView("new"); setPiSubTab("payments"); } : undefined}
+          onClose={()=>setPiSubTab(canManagePurchase?"invoices":canVendorPayments?"payments":"ledger")} />
       )}
-
       {/* ── SUB-TAB: PAYMENTS (Vendor Payment Voucher — Cash/Cheque, partial across open invoices) ── */}
       {piSubTab==="payments"&&canVendorPayments&&pmtView==="list"&&(
         <PiPaymentsListTab payments={payments} loading={pmtLoading} t={t} th={th} lang={lang}
           onOpen={(v)=>{ setSelVoucher(v); setPmtView("detail"); }} />
       )}
-      {piSubTab==="payments"&&canVendorPayments&&pmtView==="new"&&(
+      {piSubTab==="payments"&&canVendorPayments&&pmtView==="new"&&isDesktop&&(()=>{
+        const openAll = invoices.filter(inv => ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01);
+        const prefParty = pmtPrefillVendorId ? (vendors.find(v=>v.id===pmtPrefillVendorId) ? { partyId:pmtPrefillVendorId } : { partyName:pmtPrefillVendorId }) : null;
+        return (
+          <AgainstInvoiceVoucherWindow
+            lang={lang} mode="payment" cur={t.cur||"AED"}
+            voucherNo={piFormatPaymentNo(piMaxLocalPaymentSerial() + 1)}
+            parties={voucherParties(vendors, openAll, "vendorId", "vendorName", v=>v.vendorName, v=>v.mobileNumber||v.whatsappNumber)}
+            banks={UAE_BANKS.map(b=>b.name)}
+            getOpenInvoices={(p)=>getVendorOpenInvoices(p.id, p.name)}
+            vouchers={payments.map(p=>toVoucherView(withSupRefs(p),"payment"))}
+            prefill={prefParty ? { ...prefParty, invoiceId:pmtPrefillInvoiceId } : null}
+            saving={pmtSaving}
+            onSave={async (d)=>{
+              const created = await piSavePaymentVoucher({ vendorId:d.partyId, vendorName:d.partyName, vendorMobile:d.partyMobile, method:d.method, paymentDate:d.date, note:d.note, chequeNo:d.chequeNo, chequeBank:d.chequeBank, chequeDate:d.chequeDate, refNo:d.refNo, refBank:d.refBank, refDate:d.refDate, allocations:d.allocations }, { stayOpen:true });
+              return created ? toVoucherView(withSupRefs(created),"payment") : null;
+            }}
+            onCancelVoucher={isOwner ? async (v)=>{ const u = await piCancelPaymentVoucher(v.raw); return u ? toVoucherView(u,"payment") : null; } : undefined}
+            onSetChequeStatus={isOwner ? async (v,st)=>{ const u = await piSetVoucherChequeStatus(v.raw, st); return u ? toVoucherView(u,"payment") : null; } : undefined}
+            onPrint={(v)=>printPaymentVoucher(v.raw, shop, lang)}
+            onClose={()=>{ setPmtView("list"); setPmtPrefillVendorId(null); setPmtPrefillInvoiceId(null); }}
+          />
+        );
+      })()}
+      {piSubTab==="payments"&&canVendorPayments&&pmtView==="new"&&!isDesktop&&(
         <PiNewPaymentForm vendors={vendors} prefillVendorId={pmtPrefillVendorId}
           getVendorOpenInvoices={getVendorOpenInvoices} saving={pmtSaving}
           onSave={piSavePaymentVoucher} onCancel={()=>{ setPmtView("list"); setPmtPrefillVendorId(null); }}
           t={t} th={th} lang={lang} isDesktop={isDesktop} />
       )}
       {piSubTab==="payments"&&canVendorPayments&&pmtView==="detail"&&selVoucher&&(
-        <PiVoucherDetailView voucher={selVoucher} t={t} th={th} lang={lang} isOwner={isOwner}
+        <PiVoucherDetailView voucher={withSupRefs(selVoucher)} t={t} th={th} lang={lang} isOwner={isOwner}
           onBack={()=>{ setPmtView("list"); setSelVoucher(null); }}
           onCancel={()=>piCancelPaymentVoucher(selVoucher)}
           onSetChequeStatus={(st)=>piSetVoucherChequeStatus(selVoucher,st)}
-          onPrint={()=>printPaymentVoucher(selVoucher, shop, lang)}
+          onPrint={()=>printPaymentVoucher(withSupRefs(selVoucher), shop, lang)}
           onViewInvoice={(invoiceId)=>{ const inv=invoices.find(i=>i.id===invoiceId); if(inv){ setSelInvoice(inv); setPiSubTab("invoices"); setPiView("detail"); } }}
         />
       )}
@@ -5308,9 +5392,21 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         {piLoading&&<div style={{ textAlign:"center", padding:"50px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>⏳</div><div>{t.pi_loading}</div></div>}
         {!piLoading&&invoices.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>🧾</div><div>{t.pi_noInvoices}</div></div>}
         {!piLoading&&invoices.length>0&&piFiltered.length===0&&<div style={{ textAlign:"center", padding:"40px 20px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.pi_noResults}</div></div>}
-        {!piLoading&&piFiltered.map(inv=>(
+        {!piLoading&&invoices.length>0&&(
+          <FolderToggle value={piGroupMode} onChange={(m)=>{ setPiGroupMode(m); setPiOpenParty(null); }} lang={lang} th={th} accent="#f97316" />
+        )}
+        {!piLoading&&piGroupMode==="folders"&&piFiltered.length>0&&(
+          <PartyFolderList invoices={piFiltered} idField="vendorId" nameField="vendorName"
+            openKey={piOpenParty} onOpenKey={setPiOpenParty}
+            lang={lang} th={th} cur={t.cur||"AED"} accent="#f97316" partyWord={lang==="bn"?"ভেন্ডর":"vendors"}
+            renderCard={(inv)=>(
+              <PiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang}
+                onClick={()=>{ if (!piLeaveMinOk()) return; setSelInvoice(inv); setPiView("detail"); }} />
+            )} />
+        )}
+        {!piLoading&&piGroupMode==="all"&&piFiltered.map(inv=>(
           <PiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang}
-            onClick={()=>{ setSelInvoice(inv); setPiView("detail"); }} />
+            onClick={()=>{ if (!piLeaveMinOk()) return; setSelInvoice(inv); setPiView("detail"); }} />
         ))}
       </>)}
     </div>
@@ -5332,6 +5428,30 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   );
 
   // ══════ FORM VIEW ══════
+  if (wideDesktop) return (
+    <div style={{ position:"fixed", inset:piWin.max?0:"28px 40px", zIndex:1500, background:"#c7d8ee", padding:piWin.max?6:"0 6px 6px", boxSizing:"border-box", overflowX:"auto", overflowY:"hidden", display:"flex", flexDirection:"column", border:piWin.max?"none":"1px solid #2854ad", boxShadow:piWin.max?"none":"0 18px 50px rgba(2,6,23,0.45)" }}>
+      <div onDoubleClick={piWin.toggleMax} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, margin:piWin.max?"-6px -6px 6px":"0 -6px 6px", padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", flexShrink:0, fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
+        <span>PURCHASE INVOICE{piInvoiceNo?` — ${piInvoiceNo}`:""}</span>
+        <WindowButtons win={piWin} lang={lang} onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }} />
+      </div>
+      <PurchaseInvoiceDesktopForm
+        lang={lang} t={t} shopId={shopId} products={products} vendors={vendors||[]} invoices={invoices}
+        form={piForm} setField={piUpd} lines={piLines} setLines={setPiLines} current={piCurrent} setCurrent={setPiCurrent}
+        totals={totals} paid={paid} balance={balance}
+        invoiceNo={piInvoiceNo} editInvoiceId={editInvoiceId} saving={piSaving} nameRef={piNameRef} qtyRef={piQtyRef}
+        helpers={{ piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS, emptyCurrent:piEmptyCurrent }}
+        onSelectProduct={piSelectProduct} onAddCurrent={piAddCurrentItem} onDelLine={piDelLine} onPickVendor={piPickVendor}
+        onConfirm={piConfirm} onSaveDraft={piSaveDraft}
+        onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }}
+        onNew={()=>{ if (piLeaveUnsavedOk()) piOpenNew(); }}
+        onOpenInvoice={piOpenFromDesktop}
+        onCancelInvoice={isOwner ? async (inv)=>{ if (await piCancelInv(inv)) setPiView("detail"); } : undefined}
+        onOpenProductMaster={onOpenProductMaster}
+        toast={toast}
+      />
+    </div>
+  );
+
   return (
     <div style={panel}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
@@ -5354,8 +5474,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         </div>
         <div style={secLbl}>🏭 {t.pi_vendor}</div>
         <div style={{ marginBottom:10 }}>
-          <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.pi_supplierInvoiceNo}</div>
-          <input style={{ ...inp(), borderColor:"#a855f7", color:"#a855f7" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />
+          <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.pi_supplierInvoiceNo} <span style={{ color:"#ef4444" }}>*</span></div>
+          <input style={{ ...inp(), borderColor:piForm.supplierInvoiceNo.trim()?"#a855f7":"#ef4444", color:"#a855f7" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />
         </div>
         {vendors.length>0&&(
           <div ref={vendorSearchRef} style={{ position:"relative", marginBottom:8 }}>
@@ -5421,7 +5541,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           </div>
         )}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-          <input style={inp()} placeholder={t.pi_vendorManual} value={piForm.vendorName} onChange={e=>piUpd("vendorName",e.target.value)} />
+          <input style={inp(piForm.vendorName.trim()?{}:{ borderColor:"#ef4444" })} placeholder={`${t.pi_vendorManual} *`} value={piForm.vendorName} onChange={e=>{ piUpd("vendorName",e.target.value); if (piForm.vendorId) piUpd("vendorId",""); }} />
           <input style={inp()} placeholder="📱 Mobile" value={piForm.vendorMobile} onChange={e=>piUpd("vendorMobile",e.target.value)} inputMode="tel" />
         </div>
       </div>
@@ -5459,7 +5579,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
               onChange={(value)=>setPiCurrent((p)=>({ ...p, code:value }))}
               onSelectProduct={piSelectProduct}
               field="code"
-              placeholder={lang==="bn"?"Code / Shop Code":"Code / Shop Code"}
+              placeholder={lang==="bn"?"Code / Model":"Code / Model"}
               th={th}
               lang={lang}
               onKeyDown={(e)=>e.key==="Enter"&&piAddCurrentItem()}
@@ -5467,6 +5587,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
             />
             <input style={inp()} placeholder={t.pi_brand} value={piCurrent.brand} onChange={e=>setPiCurrent(p=>({...p,brand:e.target.value}))} />
           </div>
+          {piCurrent.productId && <StockBadge product={products.find(pr=>pr.id===piCurrent.productId)} products={products} shopId={shopId} refreshKey={invoices} lang={lang} />}
 
           {isDesktop ? (
             /* ── Desktop: single row ── */
@@ -5481,7 +5602,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
               <div style={{ flex:"0 0 64px" }}>
                 <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_unit}</div>
                 <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={piCurrent.unit} onChange={e=>setPiCurrent(p=>({...p,unit:e.target.value}))}>
-                  {PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                  {siUnitOptionsFor(products.find(pr=>pr.id===piCurrent.productId), piCurrent.unit).map(u=><option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div style={{ flex:1 }}>
@@ -5523,7 +5644,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
                 <div>
                   <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.pi_unit}</div>
                   <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={piCurrent.unit} onChange={e=>setPiCurrent(p=>({...p,unit:e.target.value}))}>
-                    {PI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                    {siUnitOptionsFor(products.find(pr=>pr.id===piCurrent.productId), piCurrent.unit).map(u=><option key={u} value={u}>{u}</option>)}
                   </select>
                 </div>
                 <div>
@@ -5597,25 +5718,27 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       </div>
 
       {/* Summary */}
-      <PiSummaryBox items={piLines} amountPaid={piForm.amountPaid} th={th} t={t} />
+      <PiSummaryBox items={piLines} amountPaid={paid} th={th} t={t} />
 
       {/* Payment */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={secLbl}>💳 {t.pi_payment}</div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, marginBottom:12 }}>
           {Object.entries(PI_PAY_METHODS).map(([key,pm])=>(
-            <button key={key} onClick={()=>piUpd("paymentMethod",key)} style={{ padding:"10px 8px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", border:`1.5px solid ${piForm.paymentMethod===key?"#f97316":th.borderMid}`, background:piForm.paymentMethod===key?"rgba(249,115,22,0.12)":"transparent", color:piForm.paymentMethod===key?"#f97316":th.txtMuted, fontSize:12, fontWeight:700, display:"flex", alignItems:"center", gap:6, justifyContent:"center" }}>
+            <button key={key} onClick={()=>setPiForm(p=>({ ...p, paymentMethod:key, ...(p.paymentMethod==="cash"&&key!=="cash" ? { amountPaid:"" } : {}) }))} style={{ padding:"10px 8px", borderRadius:10, cursor:"pointer", fontFamily:"inherit", border:`1.5px solid ${piForm.paymentMethod===key?"#f97316":th.borderMid}`, background:piForm.paymentMethod===key?"rgba(249,115,22,0.12)":"transparent", color:piForm.paymentMethod===key?"#f97316":th.txtMuted, fontSize:12, fontWeight:700, display:"flex", alignItems:"center", gap:6, justifyContent:"center" }}>
               <span style={{ fontSize:16 }}>{pm.icon}</span><span>{pm[lang]}</span>
               {piForm.paymentMethod===key&&<span style={{ marginLeft:"auto", fontSize:11 }}>✅</span>}
             </button>
           ))}
         </div>
         <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.pi_amountPaid}</div>
-        <input style={inp()} inputMode="decimal" placeholder="0.00" value={piForm.amountPaid} onChange={e=>piUpd("amountPaid",e.target.value)} />
-        {totals.grand>0&&(
+        {piForm.paymentMethod==="cash"
+          ? <input style={inp({ opacity:0.8 })} readOnly value={piFmt2(totals.grand)} />
+          : <input style={inp()} inputMode="decimal" placeholder="0.00" value={piForm.amountPaid} onChange={e=>piUpd("amountPaid",e.target.value)} />}
+        {totals.grand>0&&piForm.paymentMethod!=="cash"&&(
           <div style={{ marginTop:6 }}>
             <button onClick={()=>piUpd("amountPaid",piFmt2(totals.grand))} style={{ padding:"5px 12px", borderRadius:8, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:11, fontWeight:700, cursor:"pointer" }}>
-              {t.pi_fullPay} (t.cur {piFmt2(totals.grand)})
+              {t.pi_fullPay} ({t.cur} {piFmt2(totals.grand)})
             </button>
           </div>
         )}
@@ -5648,7 +5771,53 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
 // ─── SALES INVOICE ────────────────────────────────────────────
 const SI_PREFIX  = "SI-";
+const QT_PREFIX  = "QT-";
+const DN_PREFIX  = "DN-";
+const QT_VALID_DAYS = 15;
 const SI_UNITS   = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];
+
+// Products saved before the checkbox was ever touched count as enabled.
+function productRatesEnabled(p) {
+  return p?.multiCustomerRatesChosen ? !!p.multiCustomerRatesEnabled : true;
+}
+
+const CUSTOMER_TYPE_ALIASES = {
+  "রিটেইল":"retail", "হোলসেল":"wholesale", "কর্পোরেট":"corporate", "vip":"vip",
+  "সরকারি":"government", "প্রজেক্ট":"project", "অন্যান্য":"other",
+};
+const normCustomerType = (v) => {
+  const key = String(v || "").trim().toLowerCase();
+  return CUSTOMER_TYPE_ALIASES[key] || key;
+};
+const normUnit = (v) => String(v || "").trim().toLowerCase();
+
+function siProductRateRows(prod) {
+  if (!prod || !productRatesEnabled(prod) || !Array.isArray(prod.unitPrices)) return [];
+  return prod.unitPrices.filter((row) => row && row.unit);
+}
+
+// A picked product only offers units it can convert to its base unit; any other unit would be counted as 1 base unit.
+function siUnitOptionsFor(prod, currentUnit) {
+  if (!prod) return [...new Set([...SI_UNITS, currentUnit].filter(Boolean))];
+  const rows = siProductRateRows(prod).filter((row) => Number(row.factor) > 0).map((row) => row.unit);
+  return [...new Set([prod.unit || "Pcs", ...rows, currentUnit].filter(Boolean))];
+}
+
+// Exact unit + customer type wins, then the unit's "All / Default" row, then the product's base price.
+function siResolveRate(prod, unit, customerType) {
+  const basePrice = prod?.vatExclusive || prod?.landingCost || prod?.mrp || "";
+  const wantUnit = normUnit(unit || prod?.unit || "Pcs");
+  const wantType = normCustomerType(customerType);
+  const rows = siProductRateRows(prod).filter((row) => normUnit(row.unit) === wantUnit);
+  const match =
+    (wantType && rows.find((row) => normCustomerType(row.customerType) === wantType)) ||
+    rows.find((row) => !String(row.customerType || "").trim());
+  if (!match) return { unitPrice: basePrice, name: prod?.name || "" };
+  return {
+    unitPrice: match.vatExclusive || match.mrp || match.vatInclusive || basePrice,
+    name: String(match.altName || "").trim() || prod?.name || "",
+  };
+}
 const SI_PAY     = {
   cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
   bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
@@ -5662,21 +5831,57 @@ const SI_STATUSES = {
   paid:      { bn:"পরিশোধিত",     en:"Paid",      color:"#22c55e", bg:"#052e16" },
   cancelled: { bn:"বাতিল",        en:"Cancelled", color:"#71717a", bg:"#27272a" },
 };
-const siFmt2 = (n) => (Math.round((parseFloat(n)||0)*100)/100).toFixed(2);
+const QT_STATUSES = {
+  draft:     SI_STATUSES.draft,
+  open:      { bn:"খোলা",          en:"Open",      color:"#06b6d4", bg:"#083344" },
+  converted: { bn:"ইনভয়েস হয়েছে", en:"Converted", color:"#22c55e", bg:"#052e16" },
+  cancelled: SI_STATUSES.cancelled,
+};
+const DN_STATUSES = {
+  draft:     SI_STATUSES.draft,
+  confirmed: { bn:"ডেলিভারি হয়েছে", en:"Delivered", color:"#06b6d4", bg:"#083344" },
+  invoiced:  { bn:"ইনভয়েস হয়েছে",  en:"Invoiced",  color:"#22c55e", bg:"#052e16" },
+  cancelled: SI_STATUSES.cancelled,
+};
+const siR2 = (n) => Math.round(((parseFloat(n)||0)+Number.EPSILON)*100)/100;
+const siFmt2 = (n) => siR2(n).toFixed(2);
 const siN2   = (v) => parseFloat(v)||0;
-const siToday= () => new Date().toISOString().split("T")[0];
+const siToday= () => localIsoDate();
+const siAddDays = (iso, days) => {
+  const d = new Date(`${iso || siToday()}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().split("T")[0];
+};
+const qtIsExpired = (q) => q?.status==="open" && !!q.validUntil && q.validUntil < siToday();
 
+// A line discount is either Dis% or a flat Dis Amt; a percentage wins when both are set.
 function siCalcLine(it, isTax=true) {
-  const qty=siN2(it.qty), price=siN2(it.unitPrice), dp=siN2(it.discountPerc);
+  const qty=siN2(it.qty), price=siN2(it.unitPrice), dp=Math.min(Math.max(siN2(it.discountPerc),0),100);
   const vp = isTax ? siN2(it.vatPerc) : 0; // Regular invoice: no VAT
-  const gross=qty*price, disc=gross*dp/100, base=gross-disc, vat=base*vp/100;
+  const gross=qty*price;
+  const disc = dp>0 ? gross*dp/100 : Math.min(Math.max(siN2(it.discountFlat),0), gross);
+  const base=gross-disc, vat=base*vp/100;
   return { gross, disc, vat, total:base+vat };
 }
-function siCalcTotals(items, isTax=true) {
-  let sub=0,disc=0,vat=0,grand=0;
-  items.forEach(it=>{ const c=siCalcLine(it,isTax); sub+=c.gross; disc+=c.disc; vat+=c.vat; grand+=c.total; });
-  return { sub, disc, vat, grand };
+// Bill discount reduces the taxable value, so VAT shrinks in the same ratio; adjustment and round off apply last.
+function siCalcTotals(items, isTax=true, extra={}) {
+  let sub=0,lineDisc=0,lineVat=0;
+  items.forEach(it=>{ const c=siCalcLine(it,isTax); sub+=c.gross; lineDisc+=c.disc; lineVat+=c.vat; });
+  const base = sub - lineDisc;
+  const billPerc = Math.min(Math.max(siN2(extra.billDiscPerc),0),100);
+  const billDisc = billPerc>0 ? base*billPerc/100 : Math.min(Math.max(siN2(extra.billDiscAmt),0), Math.max(base,0));
+  const ratio = base>0 ? (base-billDisc)/base : 1;
+  const vat = siR2(lineVat*ratio);
+  const adjustment = siR2(extra.adjustment), roundOff = siR2(extra.roundOff);
+  const net = siR2(siR2(base) - siR2(billDisc) + vat);
+  const grand = siR2(net + adjustment + roundOff);
+  return { sub, disc:lineDisc+billDisc, lineDisc, billDisc, vat, net, adjustment, roundOff, grand };
 }
+// A delivery note carries no discount or VAT.
+const siDeliveryLines = (items) => items.map(it=>({ ...it, discountPerc:"0", discountFlat:"", vatPerc:"0" }));
+const siInvoiceExtras = (inv) => ({
+  billDiscPerc: inv?.billDiscPerc, billDiscAmt: inv?.billDiscAmt, adjustment: inv?.adjustment, roundOff: inv?.roundOff,
+});
 const SI_SHOW_CODE_KEY = "si-show-code";
 const loadSiShowCode = () => { try { return localStorage.getItem(SI_SHOW_CODE_KEY)==="true"; } catch { return false; } };
 const saveSiShowCode = (v) => { try { localStorage.setItem(SI_SHOW_CODE_KEY, v?"true":"false"); } catch {} };
@@ -5685,37 +5890,110 @@ const loadSiColor = () => { try { return localStorage.getItem(SI_COLOR_KEY)==="t
 const saveSiColor = (v) => { try { localStorage.setItem(SI_COLOR_KEY, v?"true":"false"); } catch {} };
 
 function siEmptyLine() {
-  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" };
+  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitPrice:"", discountPerc:"0", discountFlat:"", vatPerc:"5" };
 }
 function siEmptyForm() {
   return {
-    invoiceType:"regular",
+    invoiceType:loadPrintSettings().defaultBillType==="regular" ? "regular" : "tax",
     invoiceDate:siToday(),
-    customerId:"", customerName:"", customerMobile:"", customerAddress:"", customerTrn:"",
+    customerId:"", customerName:"", customerMobile:"", customerAddress:"", customerTrn:"", customerType:"",
     paymentMethod:"cash", amountPaid:"",
     deliveryNoteNo:"", vehicleNo:"",
     note:"",
+    refNo:"", salesmanId:"", salesmanName:"", currency:"AED", stockLocation:"main", stockLocationName:"Main",
+    billDiscPerc:"", billDiscAmt:"", adjustment:"", roundOff:"", creditDays:"", hideCodeInPrint:false,
+    validUntil:"",
   };
 }
 
 // ── Print / PDF Generator ──
-function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
+function generateSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opts={}) {
+  const ps         = opts.settings || loadPrintSettings();
+  const ds         = docSettingsFor(ps, invoice);
+  const lang       = ds.language==="en"||ds.language==="bn" ? ds.language : appLang;
   const isBn       = lang==="bn";
   const invType    = invoice.invoiceType||"regular";
   const isTax      = invType==="tax";
   const isDelivery = invType==="delivery";
+  const isQuote    = invoice.docKind==="quotation";
 
   // Delivery note keeps amount columns, but VAT/Tax is not applied.
   const effectiveTax = isTax && !isDelivery;
-  const cur = isBn ? "৳" : "AED";
-  const { sub, disc, vat, grand } = siCalcTotals(invoice.items||[], effectiveTax);
+  const cur = invoice.currency || (isBn ? "৳" : "AED");
+  const { sub, lineDisc, vat, grand, billDisc, adjustment, roundOff } = siCalcTotals(invoice.items||[], effectiveTax, siInvoiceExtras(invoice));
   const balance = grand - (invoice.amountPaid||0);
+  const extraRowsHTML = [
+    billDisc>0 ? `<div class="totals-row"><span class="tl">${isBn?"বিলের ছাড়":"Bill Discount"}${siN2(invoice.billDiscPerc)>0?` (${invoice.billDiscPerc}%)`:""}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(billDisc)}</span></div>` : "",
+    adjustment ? `<div class="totals-row"><span class="tl">${isBn?"সমন্বয়":"Adjustment"}</span><span class="tv">${adjustment>0?"+":"-"} ${cur} ${siFmt2(Math.abs(adjustment))}</span></div>` : "",
+    roundOff ? `<div class="totals-row"><span class="tl">Round Off</span><span class="tv">${roundOff>0?"+":"-"} ${cur} ${siFmt2(Math.abs(roundOff))}</span></div>` : "",
+  ].join("");
+  const metaHTML = [
+    invoice.refNo ? `Ref: ${invoice.refNo}` : "",
+    invoice.quotationNo ? `${isBn?"কোটেশন":"Quotation"}: ${invoice.quotationNo}` : "",
+    ps.printSalesman&&invoice.salesmanName ? `${isBn?"বিক্রেতা":"Salesman"}: ${invoice.salesmanName}` : "",
+    ps.printCreditPeriod&&siN2(invoice.creditDays)>0 ? `${isBn?"বাকির মেয়াদ":"Credit"}: ${invoice.creditDays} ${isBn?"দিন":"days"}` : "",
+  ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+  const hideVatCols = isTax && !isDelivery && ds.hideVatDiscCols;
+  const userNameHTML = ps.printUserName && invoice.createdByName ? invoice.createdByName : "";
+  const timeText = ps.printTime && invoice.createdAt
+    ? (()=>{ const d=new Date(invoice.createdAt); return Number.isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-GB",{ hour:"2-digit", minute:"2-digit" }); })()
+    : "";
+  const vatSummaryHTML = (()=>{
+    if (!ps.printVatSummary || !effectiveTax) return "";
+    const byRate = new Map();
+    const lineBase = sub - lineDisc;
+    const ratio = lineBase>0 ? (lineBase-billDisc)/lineBase : 1;
+    (invoice.items||[]).forEach(it=>{
+      const { gross:gr, disc:d, vat:v } = siCalcLine(it, true);
+      const rate = siN2(it.vatPerc);
+      const g = byRate.get(rate) || { base:0, vat:0 };
+      g.base += (gr - d)*ratio;
+      g.vat  += v*ratio;
+      byRate.set(rate, g);
+    });
+    if (!byRate.size) return "";
+    const rowsV = [...byRate.entries()].sort((a,b)=>a[0]-b[0]).map(([r,g])=>`<tr><td style="text-align:center">${r}%</td><td style="text-align:right">${siFmt2(g.base)}</td><td style="text-align:right">${siFmt2(g.vat)}</td><td style="text-align:right">${siFmt2(g.base+g.vat)}</td></tr>`).join("");
+    return `<div style="max-width:420px;margin:0 0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#374151;margin-bottom:4px">${isBn?"VAT সারাংশ":"VAT Summary"}</div><table style="margin:0"><thead><tr><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"করযোগ্য":"Taxable"}</th><th style="text-align:right">VAT</th><th style="text-align:right">${isBn?"মোট":"Total"}</th></tr></thead><tbody>${rowsV}</tbody></table></div>`;
+  })();
+  const custBalance = siN2(opts.customerBalance);
+  const custBalanceHTML = ps.printCustomerBalance && !isQuote && !isDelivery && invoice.customerName && custBalance>0.01
+    ? `<div class="bal-box" style="background:#fff7ed;border-color:#f59e0b"><span style="font-weight:700;color:#b45309">📒 ${isBn?"কাস্টমারের মোট বাকি (সব বিল)":"Customer's total balance (all bills)"}</span><span style="font-size:15px;font-weight:900;color:#b45309">${cur} ${siFmt2(custBalance)}</span></div>`
+    : "";
 
-  const title = isTax
+  const title = isQuote
+    ? (isBn?"কোটেশন":"QUOTATION")
+    : isTax
     ? (isBn?"কর ইনভয়েস":"TAX INVOICE")
     : isDelivery
       ? (isBn?"ডেলিভারি চালান":"DELIVERY CHALLAN")
       : (isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
+
+  const design = opts.design || loadPrintDesign();
+  const layout = design.layout.invoice;
+  if (!opts.noLayout && layoutAppliesTo(layout, invoice)) {
+    const items = (invoice.items||[]).map((it,i)=>{
+      const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
+      return {
+        sl:String(i+1), code:it.code||"", name:it.name||"", qty:String(it.qty??""), unit:it.unit||"", rate:siFmt2(it.unitPrice),
+        disc:siN2(it.discountPerc)>0?`${it.discountPerc}%`:d>0?siFmt2(d):"", excl:siFmt2(siN2(it.unitPrice)*siN2(it.qty)-d),
+        vatPerc:effectiveTax?`${siN2(it.vatPerc)}%`:"", vatAmt:effectiveTax?siFmt2(v):"", total:siFmt2(tot),
+      };
+    });
+    const noMoney = isQuote || isDelivery;
+    const fields = {
+      shopName:shop?.companyName||"", shopAddress:[shop?.area,shop?.countryName].filter(Boolean).join(", "), shopPhone:shop?.mobile||"",
+      shopTrn:isTax?(shop?.trnNumber||shop?.vatNumber||""):"", title, invoiceNo:invoice.invoiceNo||"", date:invoice.invoiceDate||"", time:timeText,
+      customerName:invoice.customerName||"", customerMobile:invoice.customerMobile||"", customerAddress:invoice.customerAddress||"",
+      customerTrn:isTax?(invoice.customerTrn||""):"", refNo:invoice.refNo||"", salesman:ps.printSalesman?(invoice.salesmanName||""):"",
+      payment:noMoney?"":(SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod||""), userName:userNameHTML,
+      deliveryNo:invoice.deliveryNoteNo||"", vehicleNo:invoice.vehicleNo||"", validUntil:isQuote?(invoice.validUntil||""):"",
+      totalQty:String((invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)), subtotal:siFmt2(sub),
+      discount:lineDisc+billDisc>0?siFmt2(lineDisc+billDisc):"", vat:effectiveTax?siFmt2(vat):"", grandTotal:`${cur} ${siFmt2(grand)}`,
+      paid:!noMoney&&invoice.amountPaid>0?siFmt2(invoice.amountPaid):"", balance:!noMoney&&balance>0.01?siFmt2(balance):"",
+      customerBalance:custBalanceHTML?siFmt2(custBalance):"", amountWords:amountInWords(grand, cur), note:ps.printNarration?(invoice.note||""):"",
+    };
+    return renderLayoutDocument(layout, "invoice", { fields, items, logo:design.style.invoice?.logo }, { copies:ds.copies, title:`${title} - ${invoice.invoiceNo}`, bn:isBn });
+  }
 
   // B&W vs Color — clearly distinct
   const headerColor  = colorPrint ? (isTax?"#1d4ed8": isDelivery?"#7c3aed":"#16a34a") : "#374151";
@@ -5732,44 +6010,50 @@ function generateSalesInvoiceHTML(invoice, shop, lang, showCode, colorPrint) {
 
   const rows = (invoice.items||[]).map((it,i)=>{
     const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
-    const codeHtml = showCode&&(it.code||it.brand)
+    const codeHtml = showCode&&!invoice.hideCodeInPrint&&(it.code||it.brand)
       ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>` : "";
     if (isDelivery) {
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800;color:#7c3aed">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+    } else if (hideVatCols) {
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     } else if (isTax) {
       const base = siN2(it.unitPrice)*siN2(it.qty) - d;
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right">${cur} ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${cur} ${siFmt2(v)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right">${cur} ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${cur} ${siFmt2(v)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     } else {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":"—"}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     }
   }).join("");
 
-  const tableHeaders = isDelivery
+  const tableHeaders = isDelivery || hideVatCols
     ? `<th style="width:36px">#</th><th>${isBn?"পণ্যের বিবরণ":"Item Description"}</th><th style="text-align:center;width:95px">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right;width:110px">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:right;width:120px">${isBn?"মোট":"Amount"}</th>`
     : isTax
       ? `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"VAT বাদে":"Excl.VAT"}</th><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
       : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
 
   const totalsHTML = isDelivery
-    ? `<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
+    ? `${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
     : isTax
-      ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">${cur} ${siFmt2(sub)}</span></div>${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(disc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ${cur} ${siFmt2(vat)}</span></div><div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
-    : `${disc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(disc)}</span></div>`:""}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`;
+      ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">${cur} ${siFmt2(sub)}</span></div>${lineDisc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(lineDisc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ${cur} ${siFmt2(vat)}</span></div>${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
+    : `${lineDisc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(lineDisc)}</span></div>`:""}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`;
 
   const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
 
-  const payInfoHTML = isDelivery
-    ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||"—"}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}<div class="info-sub">👤 ${invoice.createdByName}</div></div>`
+  const payInfoHTML = isQuote
+    ? `<div class="info-box"><div class="info-label">📅 ${isBn?"মেয়াদ":"Valid Until"}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">👤 ${invoice.createdByName||""}</div></div>`
+    : isDelivery
+    ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}<div class="info-sub">👤 ${invoice.createdByName}</div></div>`
     : `<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div>`;
 
   const deliveryHTML = !isDelivery&&(invoice.deliveryNoteNo||invoice.vehicleNo)
     ? `<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>` : "";
 
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  const thermal = ds.paper==="80mm" || ds.paper==="58mm";
+  const rawDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} - ${invoice.invoiceNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
+@page{size:${paperCss(ds.paper)};margin:${thermal?"3mm":"8mm"}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
 .invoice{max-width:820px;margin:0 auto;border:2px solid ${accentBorder};border-radius:${colorPrint?"12px":"4px"};overflow:hidden;box-shadow:${colorPrint?"0 4px 20px rgba(0,0,0,0.12)":"none"}}
@@ -5805,42 +6089,45 @@ ${isDelivery?`.recv-box{background:${colorPrint?"#f3e8ff":"#f8f9fa"};border:2px 
 .sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
 .footer{text-align:center;padding:11px 22px;background:${colorPrint?"#f9fafb":"#f0f0f0"};border-top:2px solid ${accentBorder};font-size:12px;color:${accentBorder};font-weight:700}
 @media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0;box-shadow:none}}
+${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr;gap:6px}.totals-box{width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
+${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
 </style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="padding:10px 28px;background:${grandBg};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
-<div class="invoice"><div class="hdr"><div><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${invoice.createdByName}</div></div></div>
-<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>
+<div class="invoice"><div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>
+<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>${metaHTML?`<div style="margin:-4px 0 12px;font-size:12px;color:#374151">${metaHTML}</div>`:""}
 ${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
 ${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
-${!isDelivery&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">${cur} ${siFmt2(invoice.amountPaid)}</span></div>`:""}
-${!isDelivery&&balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">${cur} ${siFmt2(balance)}</span></div>`:""}
+${vatSummaryHTML}
+${!isDelivery&&!isQuote&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">${cur} ${siFmt2(invoice.amountPaid)}</span></div>`:""}
+${!isDelivery&&!isQuote&&balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">${cur} ${siFmt2(balance)}</span></div>`:""}
 ${isDelivery?`<div class="recv-box"><div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">✅ ${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
-${invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
+${custBalanceHTML}
+${ps.printNarration&&invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
 ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
-</div><div class="footer">${isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
+</div><div class="footer">${isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ! 🙏`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you! 🙏`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
+  const doc = applyDesign(rawDoc, "invoice", opts.style || design.style.invoice);
+  const copies = Math.max(1, Math.min(10, parseInt(ds.copies, 10) || 1));
+  if (copies === 1) return doc;
+  const start = doc.indexOf('<div class="invoice">');
+  const end = doc.lastIndexOf("</body>");
+  const block = doc.slice(start, end);
+  const repeated = Array.from({ length:copies }, (_, i) =>
+    i ? block.replace('<div class="invoice">', '<div class="invoice" style="page-break-before:always;break-before:page;margin-top:20px">') : block).join("");
+  return doc.slice(0, start) + repeated + doc.slice(end);
 }
 
-function printSalesInvoice(invoice, shop, lang, showCode, colorPrint) {
-  const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false, colorPrint||false);
-  // Use Blob URL to properly handle UTF-8/Bengali encoding
-  const blob = new Blob([html], { type:"text/html;charset=utf-8" });
-  const url  = URL.createObjectURL(blob);
-  const w    = window.open(url, "_blank", "width=980,height=780");
-  if (!w) {
-    URL.revokeObjectURL(url);
-    alert(lang==="bn"?"Pop-up block করা আছে। Browser এ allow করুন।":"Popup blocked. Please allow popups.");
-    return;
-  }
-  w.addEventListener("load", () => {
-    setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
-  });
+function printSalesInvoice(invoice, shop, lang, showCode, colorPrint, opts={}) {
+  const settings = loadPrintSettings();
+  const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false, colorPrint||false, { ...opts, settings });
+  printHtmlDocument(html, { preview:settings.showPreview, lang, printer:settings.billPrinter });
 }
 
 // ── SI Status Badge ──
-function SiStatusBadge({ status, lang }) {
-  const st = SI_STATUSES[status]||SI_STATUSES.draft;
+function SiStatusBadge({ status, lang, statuses=SI_STATUSES }) {
+  const st = statuses[status]||statuses.draft;
   return <span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, color:st.color, background:st.bg, whiteSpace:"nowrap" }}>{st[lang]}</span>;
 }
 
@@ -5919,7 +6206,7 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
 
   const filtered = products.filter(p=>{
     if (!q) return true;
-    const hay = [p.name,p.code,p.shopPartNumber,p.originalPartKey,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
+    const hay = [p.name,p.code,p.brand,p.category,p.barcode,...(p.moreBarcodes||[])].filter(Boolean).join(" ");
     return nsmatch(hay, q);
   });
 
@@ -5955,7 +6242,7 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
         {/* Search */}
         <div style={{ padding:"10px 14px", borderBottom:`1px solid ${th.border}` }}>
           <input autoFocus style={{ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" }}
-            placeholder={lang==="bn"?"পণ্যের নাম, Shop Code, কোড বা ব্র্যান্ড...":"Search by name, shop code, code or brand..."}
+            placeholder={lang==="bn"?"পণ্যের নাম, কোড বা ব্র্যান্ড...":"Search by name, code or brand..."}
             value={q} onChange={e=>setQ(e.target.value)} />
         </div>
 
@@ -5967,7 +6254,6 @@ function SiQuickAddPicker({ products, onAddLine, onClose, t, th, lang }) {
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{p.name}</div>
                 <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8, flexWrap:"wrap" }}>
-                  {p.shopPartNumber&&<span style={{ color:"#38bdf8" }}>SP {p.shopPartNumber}</span>}
                   {p.code&&<span>📋 {p.code}</span>}
                   {p.brand&&<span>🏷️ {p.brand}</span>}
                   {p.vatExclusive&&<span style={{ color:"#22c55e", fontWeight:700 }}>{t.cur}{p.vatExclusive}</span>}
@@ -6056,8 +6342,10 @@ function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th, isTax
 }
 
 // ── SI Invoice Card ──
-function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
-  const bal = invoice.grandTotal - invoice.amountPaid;
+// isQuote: a document without payment (quotation or delivery note).
+function SiInvoiceCard({ invoice, onClick, t, th, lang, isQuote=false, statuses=SI_STATUSES }) {
+  const bal = isQuote ? 0 : invoice.grandTotal - invoice.amountPaid;
+  const expired = isQuote && qtIsExpired(invoice);
   return (
     <div onClick={onClick} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"12px 14px", marginBottom:8, cursor:"pointer" }}
       onMouseEnter={e=>e.currentTarget.style.borderColor="#22c55e"}
@@ -6067,27 +6355,77 @@ function SiInvoiceCard({ invoice, onClick, t, th, lang }) {
           <div style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{invoice.invoiceNo}</div>
           <div style={{ fontSize:12, color:th.txtMuted, marginTop:1 }}>📅 {invoice.invoiceDate} · {invoice.createdByName}</div>
         </div>
-        <SiStatusBadge status={invoice.status} lang={lang} />
+        <div style={{ display:"flex", gap:4, alignItems:"center" }}>
+          {expired&&<span style={{ padding:"3px 10px", borderRadius:20, fontSize:11, fontWeight:700, color:"#ef4444", background:"#450a0a" }}>{lang==="bn"?"মেয়াদ শেষ":"Expired"}</span>}
+          <SiStatusBadge status={invoice.status} lang={lang} statuses={statuses} />
+        </div>
       </div>
       <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>👤 {invoice.customerName||"—"}</div>
+      {isQuote&&(invoice.validUntil||invoice.convertedInvoiceNo)&&(
+        <div style={{ fontSize:11, color:th.txtMuted, marginBottom:4 }}>
+          {invoice.validUntil&&<span>⏳ {lang==="bn"?"মেয়াদ":"Valid until"}: {invoice.validUntil}</span>}
+          {invoice.convertedInvoiceNo&&<span style={{ marginLeft:8, color:"#22c55e", fontWeight:700 }}>→ {invoice.convertedInvoiceNo}</span>}
+        </div>
+      )}
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center" }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{invoice.items?.length||0} {lang==="bn"?"টি":""} items</span>
         <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {siFmt2(invoice.grandTotal)}</span>
-        {invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ {t.cur} {siFmt2(invoice.amountPaid)}</span>}
+        {!isQuote&&invoice.amountPaid>0&&<span style={{ fontSize:11, color:"#22c55e", fontWeight:700 }}>✅ {t.cur} {siFmt2(invoice.amountPaid)}</span>}
         {bal>0.01&&<span style={{ fontSize:11, color:"#ef4444", fontWeight:700 }}>⚠️ {t.cur} {siFmt2(bal)}</span>}
       </div>
     </div>
   );
 }
 
+// Delivery notes used to be saved inside salesInvoices; move them keeping the same id so their stock-ledger entries still match.
+const dnMigratedIds = new Set();
+async function migrateLegacyDeliveryNotes(rows) {
+  const legacy = (rows || []).filter(r => r?.id && r.invoiceType==="delivery" && r.docKind!=="delivery" && !dnMigratedIds.has(r.id));
+  const moved = [];
+  for (const inv of legacy) {
+    dnMigratedIds.add(inv.id);
+    try {
+      const createdAt = inv.createdAt instanceof Date ? inv.createdAt.toISOString() : inv.createdAt;
+      await offlineCreate("deliveryNotes", { ...inv, docKind:"delivery", createdAt });
+      await offlineRemove("salesInvoices", inv.id);
+      moved.push(inv.id);
+    } catch (err) {
+      dnMigratedIds.delete(inv.id);
+      console.warn("[S4 DN] legacy delivery note move failed", inv.id, err);
+    }
+  }
+  if (moved.length && navigator.onLine) {
+    window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] delivery note move sync failed", err));
+  }
+  return moved;
+}
+
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0 }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onQuoteConvertHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
+  const isQuote = kind==="quotation";
+  const isDN = kind==="delivery";
+  const COL = isQuote ? "quotations" : isDN ? "deliveryNotes" : "salesInvoices";
+  const DOC_PREFIX = isQuote ? QT_PREFIX : isDN ? DN_PREFIX : SI_PREFIX;
+  const STATUSES = isQuote ? QT_STATUSES : isDN ? DN_STATUSES : SI_STATUSES;
+  const serialRe = isQuote ? /QT-?(\d+)$/i : isDN ? /DN-?(\d+)$/i : /SI-?(\d+)$/i;
+  const serialField = isQuote ? "lastQTSerial" : isDN ? "lastDNSerial" : "lastSISerial";
+  // The quotation or delivery note this new sales invoice is being made from.
+  const [sourceQuote,setSourceQuote] = useState(null);
+  const [dnMigrateTick,setDnMigrateTick] = useState(0);
 
   const [invoices,setInvoices]     = useState([]);
   const [siLoading,setSiLoading]   = useState(true);
   const [siView,setSiView]         = useState("list");
+  const [siGroupMode,setSiGroupMode] = useState("folders");
+  const [siOpenParty,setSiOpenParty] = useState(null);
+  const siWin = useWindowState({ maximized:true });
+  useEffect(() => { if (siView!=="form") siWin.restore(); }, [siView]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEscapeKey(() => {
+    if (siView==="form") { if (siLeaveUnsavedOk()) setSiView("list"); }
+    else { setSiView("list"); setSelInv(null); }
+  }, { enabled: siView!=="list" && !siWin.min, level: siView==="form" ? 2 : 1 });
   const [selInv,setSelInv]         = useState(null);
   const [editInvId,setEditInvId]   = useState(null);
   const [siPrintModal,setSiPrintModal] = useState(null); // invoice to print after confirm
@@ -6095,15 +6433,50 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const [siForm,setSiForm]         = useState(siEmptyForm());
   const [siLines,setSiLines]       = useState([]);
   const [showCustPicker,setShowCustPicker]= useState(false);
-  const siEmptyCurrent = () => ({ productId:null, name:"", code:"", brand:"", qty:"1", unit:"Pcs", unitPrice:"", discountPerc:"0", vatPerc:"5" });
+  const siEmptyCurrent = () => ({ productId:null, name:"", code:"", brand:"", qty:"1", unit:"Pcs", unitPrice:"", discountPerc:"0", discountFlat:"", vatPerc:"5" });
   const [siCurrent,setSiCurrent]   = useState(siEmptyCurrent);
   const siNameRef = useRef(null);
   const siQtyRef = useRef(null);
 
   const [siSaving,setSiSaving]     = useState(false);
+  const siSaveLockRef = useRef(false);
   const [siSearch,setSiSearch]     = useState("");
   const [siStatusF,setSiStatusF]   = useState("ALL");
   const [siViewAll,setSiViewAll]   = useState(isOwner);
+
+  // Customer receipt vouchers (Receipts against Bill) — only the sales kind collects money.
+  const [receipts,setReceipts]         = useState([]);
+  const siLoadedPaidRef = useRef(0);
+  const [rcptSaving,setRcptSaving]     = useState(false);
+  const [receiptWin,setReceiptWin]     = useState(null); // null | {} | { partyId, partyName, invoiceId } | { viewId }
+  const [ledgerWin,setLedgerWin]       = useState(false);
+
+  useEffect(()=>{
+    if (!shopId || kind!=="sales") return;
+    let unsub1=()=>{};
+    let unsub2=null;
+    let cancelled=false;
+    const normalize = (d) => ({ ...d.data(), id:d.id, createdAt:d.data().createdAt?.toDate?.()?.toISOString?.() || d.data().createdAt || new Date().toISOString() });
+    const sortRows = (rows=[]) => [...rows].sort((a,b)=>new Date(b.createdAt||b.receiptDate||0)-new Date(a.createdAt||a.receiptDate||0));
+    const applyRows = (rows) => {
+      if (cancelled) return;
+      setReceipts(sortRows(rows));
+      offlineCacheCloudRecords("salesReceipts", rows).catch(err => console.warn("[S4 Offline] salesReceipts cache failed", err));
+    };
+    offlineList("salesReceipts").then(res => {
+      if (cancelled) return;
+      const rows = (Array.isArray(res) ? res : (res.records || [])).map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) })).filter(r => r.shopId===shopId);
+      if (rows.length) setReceipts(sortRows(rows));
+    }).catch(err => console.warn("[S4 Offline] salesReceipts offline load failed", err));
+    if (authSyncReady) {
+      const q=query(collection(db,"salesReceipts"),where("shopId","==",shopId),orderBy("createdAt","desc"));
+      unsub1=onSnapshot(q, snap=>applyRows(snap.docs.map(normalize)), ()=>{
+        const q2=query(collection(db,"salesReceipts"),where("shopId","==",shopId));
+        unsub2=onSnapshot(q2, snap=>applyRows(snap.docs.map(normalize)), err=>console.error(err));
+      });
+    }
+    return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
+  },[shopId, kind, authSyncReady, syncRefreshKey]);
 
   // Local-first list, then Firebase; SQLite cache stays in background
   useEffect(()=>{
@@ -6130,7 +6503,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
     const loadOfflineSiInvoices = async ({ cloudRows = null } = {}) => {
       const mergeSource = cloudRows ?? cloudRowsLatest;
-      const res = await offlineList("salesInvoices");
+      const res = await offlineList(COL);
       if (cancelled) return 0;
       const records = Array.isArray(res) ? res : (res.records || []);
       const localRows = filterSiRows(records
@@ -6163,21 +6536,21 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       loadOfflineSiInvoices({ cloudRows: rows }).catch(() => {
         if (!cancelled) setInvoices(sortSiInvoices(filterSiRows(rows)));
       });
-      offlineCacheCloudRecords("salesInvoices", rows)
+      offlineCacheCloudRecords(COL, rows)
         .catch(err => console.warn("[S4 Offline] salesInvoices cache failed", err));
     };
 
     if (authSyncReady) {
       const baseQ = isOwner
-        ? query(collection(db,"salesInvoices"),where("shopId","==",shopId),orderBy("createdAt","desc"))
-        : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
+        ? query(collection(db,COL),where("shopId","==",shopId),orderBy("createdAt","desc"))
+        : query(collection(db,COL),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
 
       u1=onSnapshot(baseQ,snap=>{
         applyCloudRows(snap.docs.map(normalizeSiInvoice));
       },()=>{
         const fbQ=isOwner
-          ? query(collection(db,"salesInvoices"),where("shopId","==",shopId))
-          : query(collection(db,"salesInvoices"),where("shopId","==",shopId),where("createdBy","==",user.uid));
+          ? query(collection(db,COL),where("shopId","==",shopId))
+          : query(collection(db,COL),where("shopId","==",shopId),where("createdBy","==",user.uid));
         u2=onSnapshot(fbQ,snap=>{
           applyCloudRows(sortSiInvoices(snap.docs.map(normalizeSiInvoice)));
         },err=>{
@@ -6187,79 +6560,155 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       });
     }
     return ()=>{ cancelled=true; u1(); u2&&u2(); };
-  },[shopId,isOwner,user.uid,syncRefreshKey,authSyncReady]);
+  },[shopId,isOwner,user.uid,syncRefreshKey,authSyncReady,COL,dnMigrateTick]);
+
+  useEffect(()=>{
+    if (kind!=="sales" || !invoices.some(inv=>inv.invoiceType==="delivery")) return;
+    migrateLegacyDeliveryNotes(invoices).then(moved=>{
+      if (moved.length) setInvoices(prev=>prev.filter(inv=>!moved.includes(inv.id)));
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[invoices]);
+
+  useEffect(()=>{
+    if (!isDN || !shopId) return;
+    let cancelled=false;
+    offlineList("salesInvoices").then(res=>{
+      const records = Array.isArray(res) ? res : (res.records || []);
+      const rows = records.map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) })).filter(r => r.shopId===shopId);
+      return migrateLegacyDeliveryNotes(rows);
+    }).then(moved=>{ if (!cancelled && moved?.length) setDnMigrateTick(n=>n+1); })
+      .catch(err=>console.warn("[S4 DN] legacy delivery note scan failed", err));
+    return ()=>{ cancelled=true; };
+  },[isDN, shopId]);
 
   const siMaxLocalSerial = () => invoices.reduce((mx, inv) => {
-    const m = String(inv.invoiceNo || "").match(/SI-?(\d+)$/i);
+    const m = String(inv.invoiceNo || "").match(serialRe);
     return m ? Math.max(mx, Number(m[1])) : mx;
-  }, Number(shop?.lastSISerial || 0));
+  }, Number(shop?.[serialField] || 0));
 
   const siFormatInvoiceNo = (serial) =>
-    `${SI_PREFIX}${String(serial).padStart(4, "0")}`;
+    `${DOC_PREFIX}${String(serial).padStart(4, "0")}`;
 
   const siPreviewNextInvoiceNo = () =>
     siFormatInvoiceNo(siMaxLocalSerial() + 1);
 
   const ensureNewSiInvoiceNo = () => {
     if (editInvId) return siInvoiceNo;
-    const no = siInvoiceNo || siPreviewNextInvoiceNo();
+    const taken = siInvoiceNo && invoices.some(inv => inv.invoiceNo === siInvoiceNo);
+    const no = (!taken && siInvoiceNo) || siPreviewNextInvoiceNo();
     if (no !== siInvoiceNo) setSiInvoiceNo(no);
     return no;
   };
 
   const bumpShopSiSerial = (invoiceNo) => {
-    const m = String(invoiceNo || "").match(/SI-?(\d+)$/i);
+    const m = String(invoiceNo || "").match(serialRe);
     if (!m || !navigator.onLine) return;
     const serial = Number(m[1]);
     if (!Number.isFinite(serial) || serial <= 0) return;
     runTransaction(db, async tx => {
       const shopRef = doc(db, "shops", shopId);
       const shopSnap = await tx.get(shopRef);
-      const current = Number(shopSnap.data()?.lastSISerial || 0);
-      if (serial > current) tx.update(shopRef, { lastSISerial: serial });
-    }).catch(err => console.warn("[S4 SI] lastSISerial background bump failed", err));
+      const current = Number(shopSnap.data()?.[serialField] || 0);
+      if (serial > current) tx.update(shopRef, { [serialField]: serial });
+    }).catch(err => console.warn(`[S4 SI] ${serialField} background bump failed`, err));
   };
 
   const siOpenNew = () => {
     setSiInvoiceNo(siPreviewNextInvoiceNo());
-    setSiForm(siEmptyForm());
+    setSiForm({ ...siEmptyForm(), ...(isDN?{ invoiceType:"delivery" }:{}), salesmanId:user?.uid||"", salesmanName:profile?.personName||"", validUntil:isQuote?siAddDays(siToday(), QT_VALID_DAYS):"" });
     setSiLines([]);
     setSiCurrent(siEmptyCurrent());
     setEditInvId(null);
+    setSourceQuote(null);
     setSiView("form");
   };
 
-  const siOpenEdit=(inv)=>{
-    setSiInvoiceNo(inv.invoiceNo);
+  const siLoadDoc=(inv)=>{
+    siLoadedPaidRef.current = inv.paymentMethod==="cash" ? 0 : siN2(inv.amountPaid);
     setSiForm({
       invoiceType:inv.invoiceType||"regular", invoiceDate:inv.invoiceDate,
       customerId:inv.customerId||"", customerName:inv.customerName||"",
       customerMobile:inv.customerMobile||"", customerAddress:inv.customerAddress||"",
       customerTrn:inv.customerTrn||"", paymentMethod:inv.paymentMethod||"cash",
+      customerType:(customers||[]).find(c=>c.id===inv.customerId)?.customerType||"",
       // Cash is always auto-paid — don't pre-fill amountPaid so switching to credit gives 0
       amountPaid: inv.paymentMethod==="cash" ? "" : (inv.amountPaid>0?String(inv.amountPaid):""),
       deliveryNoteNo:inv.deliveryNoteNo||"", vehicleNo:inv.vehicleNo||"", note:inv.note||"",
+      refNo:inv.refNo||"", salesmanId:inv.salesmanId||"", salesmanName:inv.salesmanName||"",
+      currency:inv.currency||"AED", stockLocation:inv.stockLocation||"main", stockLocationName:inv.stockLocationName||"Main",
+      billDiscPerc:siN2(inv.billDiscPerc)>0?String(inv.billDiscPerc):"",
+      billDiscAmt:siN2(inv.billDiscPerc)>0?"":(siN2(inv.billDiscAmt)>0?String(inv.billDiscAmt):""),
+      adjustment:siN2(inv.adjustment)?String(inv.adjustment):"", roundOff:siN2(inv.roundOff)?String(inv.roundOff):"",
+      creditDays:siN2(inv.creditDays)>0?String(inv.creditDays):"",
+      hideCodeInPrint:!!inv.hideCodeInPrint,
+      validUntil:inv.validUntil||"",
     });
-    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), vatPerc:String(it.vatPerc||"5") })));
+    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), discountFlat:siN2(it.discountFlat)>0?String(it.discountFlat):"", vatPerc:it.vatPerc!=null&&it.vatPerc!==""?String(it.vatPerc):"5" })));
     setSiCurrent(siEmptyCurrent());
+  };
+  const siOpenEdit=(inv)=>{
+    siLoadDoc(inv);
+    setSiInvoiceNo(inv.invoiceNo);
+    setSourceQuote(null);
     setEditInvId(inv.id); setSiView("form");
   };
+  // Quotation → new sales invoice: same customer, items and discounts, fresh invoice number and today's date.
+  useEffect(()=>{
+    if (isQuote || !quoteToConvert) return;
+    siLoadDoc(quoteToConvert);
+    setSiForm(p=>({ ...p, invoiceDate:siToday(), validUntil:"", refNo:p.refNo||quoteToConvert.invoiceNo||"",
+      invoiceType:quoteToConvert.invoiceType==="regular"?"regular":"tax",
+      ...(p.invoiceType==="delivery" ? { deliveryNoteNo:quoteToConvert.invoiceNo||"" } : {}) }));
+    setSiInvoiceNo(siPreviewNextInvoiceNo());
+    setEditInvId(null);
+    setSourceQuote(quoteToConvert);
+    setSiView("form");
+    onQuoteConvertHandled?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[quoteToConvert]);
+  // The invoice list may still be loading when a quotation arrives; keep the preview number current.
+  useEffect(()=>{
+    if (sourceQuote && !editInvId && siView==="form") setSiInvoiceNo(siPreviewNextInvoiceNo());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[invoices]);
 
   const siUpd=(k,v)=>setSiForm(p=>({...p,[k]:v}));
   const siAddLine=()=>setSiLines(p=>[...p,siEmptyLine()]);
-  const siUpdLine=(id,f,v)=>setSiLines(p=>p.map(it=>it.id===id?{...it,[f]:v}:it));
+  const siFindProduct = (productId) => productId ? products.find(p=>p.id===productId) : null;
+  // Re-price a line for a new unit; keep a hand-typed name unless it is the product's own/alternate name.
+  const siRepriceForUnit = (item, unit, customerType = siForm.customerType) => {
+    const prod = siFindProduct(item.productId);
+    if (!prod) return { ...item, unit };
+    const rate = siResolveRate(prod, unit, customerType);
+    const autoNames = new Set([prod.name, ...siProductRateRows(prod).map(r=>String(r.altName||"").trim())].filter(Boolean));
+    return {
+      ...item,
+      unit,
+      unitPrice: String(rate.unitPrice || item.unitPrice || ""),
+      name: autoNames.has(item.name) ? rate.name : item.name,
+    };
+  };
+  const siUpdLine=(id,f,v)=>setSiLines(p=>p.map(it=>{
+    if (it.id!==id) return it;
+    return f==="unit" ? siRepriceForUnit(it, v) : {...it,[f]:v};
+  }));
+  const siChangeCurrentUnit=(unit)=>setSiCurrent(p=>siRepriceForUnit(p, unit));
   const siDelLine=(id)=>setSiLines(p=>p.filter(it=>it.id!==id));
 
   // Quick add: adds product as new line directly from picker
   const siAddProductLine = (prod) => {
+    const unit = prod.unit||"Pcs";
+    const rate = siResolveRate(prod, unit, siForm.customerType);
     const newLine = {
       ...siEmptyLine(),
       productId:  prod.id,
-      name:       prod.name,
+      name:       rate.name,
       code:       prod.code||prod.barcode||"",
       brand:      prod.brand||"",
-      unit:       prod.unit||"Pcs",
-      unitPrice:  prod.vatExclusive||prod.landingCost||prod.mrp||"",
+      unit,
+      unitPrice:  rate.unitPrice,
+      discountPerc: String(prod.defaultDiscount||"0"),
       vatPerc:    prod.salesVat||"5",
       qty:        "1",
     };
@@ -6267,14 +6716,17 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   };
 
   const siSelectProduct=(prod)=>{
+    const unit = prod.unit||"Pcs";
+    const rate = siResolveRate(prod, unit, siForm.customerType);
     setSiCurrent(p=>({
       ...p,
       productId: prod.id,
-      name:      prod.name,
+      name:      rate.name,
       code:      prod.code||prod.barcode||"",
       brand:     prod.brand||"",
-      unit:      prod.unit||"Pcs",
-      unitPrice: prod.vatExclusive||prod.landingCost||prod.mrp||p.unitPrice,
+      unit,
+      unitPrice: rate.unitPrice||p.unitPrice,
+      discountPerc: String(prod.defaultDiscount||"0"),
       vatPerc:   prod.salesVat||"5",
     }));
     setTimeout(()=>siQtyRef.current?.focus(), 100);
@@ -6293,7 +6745,26 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     siUpd("customerMobile",c.mobileNumber||"");
     siUpd("customerAddress",[c.address,c.area,c.city].filter(Boolean).join(", ")||"");
     siUpd("customerTrn",c.trnNumber||"");
+    siUpd("customerType",c.customerType||"");
+    const termDays = parseInt(String(c.paymentTerms||"").replace(/[^\d]/g,""),10);
+    siUpd("creditDays", Number.isFinite(termDays)&&termDays>0 ? String(termDays) : "");
     setShowCustPicker(false);
+    const newType = c.customerType||"";
+    if (normCustomerType(newType) === normCustomerType(siForm.customerType)) return;
+    let changed = 0;
+    const reprice = (it) => {
+      if (!it.productId) return it;
+      const next = siRepriceForUnit(it, it.unit, newType);
+      if (String(next.unitPrice) !== String(it.unitPrice) || next.name !== it.name) changed += 1;
+      return next;
+    };
+    const repricedLines = siLines.map(reprice);
+    const repricedCurrent = reprice(siCurrent);
+    setSiLines(repricedLines);
+    setSiCurrent(repricedCurrent);
+    if (changed) toast(lang==="bn"
+      ? `${changed}টি item-এর দাম নতুন customer type অনুযায়ী বদলানো হয়েছে`
+      : `Prices of ${changed} item(s) updated for the new customer type`);
   };
 
   const siQuickAddCustomer = async (customerName) => {
@@ -6326,6 +6797,35 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     }
   };
 
+  useEffect(()=>{
+    if (productFromMaster?.product && siView==="form") siSelectProduct(productFromMaster.product);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[productFromMaster]);
+
+  const siLeaveUnsavedOk = () =>
+    editInvId || !siLines.length || window.confirm(lang==="bn"?"এই বিলের item গুলো সেভ হয়নি। তবুও চলে যাবেন?":"This bill is not saved. Leave anyway?");
+  // A minimized bill must be confirmed away before the list opens another one.
+  const siLeaveMinOk = () => {
+    if (!(siWin.min && siView==="form")) return true;
+    if (!siLeaveUnsavedOk()) return false;
+    siWin.restore();
+    return true;
+  };
+  const siPrint = (inv) => {
+    const nameKey = String(inv.customerName||"").trim().toLowerCase();
+    const customerBalance = invoices
+      .filter(x => x.status!=="cancelled" && x.status!=="draft" && x.docKind!=="quotation" && x.invoiceType!=="delivery"
+        && (inv.customerId ? x.customerId===inv.customerId : String(x.customerName||"").trim().toLowerCase()===nameKey))
+      .reduce((sum,x)=>sum+Math.max(0, siN2(x.balanceDue)), 0);
+    printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint, { customerBalance });
+  };
+
+  const siOpenFromDesktop = (inv) => {
+    if (!siLeaveUnsavedOk()) return;
+    if (["cancelled","converted","invoiced"].includes(inv.status)) { setSelInv(inv); setSiView("detail"); return; }
+    siOpenEdit(inv);
+  };
+
   const customerPickerProps = {
     customers,
     t,
@@ -6340,7 +6840,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siBuild=(status, invoiceNoOverride)=>{
     const valid=siLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.si_errItems,"err"); return null; }
-    const isDelivery = siForm.invoiceType==="delivery";
+    const isDelivery = isDN || (kind==="sales" && siForm.invoiceType==="delivery");
     const isTax      = siForm.invoiceType==="tax";
     for (const it of valid){
       if (!it.qty.toString().trim()||siN2(it.qty)<=0){ toast(t.si_errQty,"err"); return null; }
@@ -6348,20 +6848,66 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     }
     const effectiveIsTax = isTax && !isDelivery;
     const builtItems=valid.map(it=>{
-      const item = isDelivery ? {...it, discountPerc:"0", vatPerc:"0"} : it;
+      const item = isDelivery ? siDeliveryLines([it])[0] : it;
       const { disc, vat, total }=siCalcLine(item, effectiveIsTax);
-      return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitPrice:siN2(it.unitPrice), discountPerc:isDelivery?0:siN2(it.discountPerc), discountAmt:parseFloat(siFmt2(disc)), vatPerc:effectiveIsTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) };
+      return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(siFindProduct(it.productId), it.unit), unitPrice:siN2(it.unitPrice), discountPerc:isDelivery?0:siN2(it.discountPerc), discountFlat:isDelivery||siN2(it.discountPerc)>0?0:siN2(it.discountFlat), discountAmt:parseFloat(siFmt2(disc)), vatPerc:effectiveIsTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) };
     });
-    const { sub, disc, vat, grand } = siCalcTotals(siLines, effectiveIsTax);
+    const formTotals = isDelivery ? siCalcTotals(siDeliveryLines(valid), false) : siCalcTotals(valid, effectiveIsTax, siInvoiceExtras(siForm));
+    const { sub, disc, vat, grand } = formTotals;
+    if (grand < -0.001) { toast(lang==="bn"?"❌ সর্বমোট মাইনাস হতে পারে না — সমন্বয়/ছাড় ঠিক করুন":"❌ Grand total cannot be negative — check adjustment/discount","err"); return null; }
+    const priorDoc = editInvId ? invoices.find(inv=>inv.id===editInvId) : null;
+    if (status==="draft" && priorDoc && !isQuote && !isDN && priorDoc.status && priorDoc.status!=="draft") {
+      toast(lang==="bn"?"❌ সেভ করা বিলকে আবার Draft করা যাবে না":"❌ A saved invoice cannot be turned back into a draft","err"); return null;
+    }
     const isCash     = siForm.paymentMethod==="cash";
-    // cash invoice: auto fully paid | delivery: confirmed | credit: normal
-    const paid = isDelivery ? 0
+    // Receipts may have been posted since the form was opened: apply only the user's change on top of the latest paid amount.
+    const typedPaid  = siN2(siForm.amountPaid);
+    const creditPaid = priorDoc && priorDoc.paymentMethod!=="cash"
+      ? siN2(priorDoc.amountPaid) + (typedPaid - siLoadedPaidRef.current)
+      : typedPaid;
+    const receiptsOnBill = priorDoc ? (receipts||[]).filter(r=>r.status!=="cancelled")
+      .reduce((s,r)=>s+(r.allocations||[]).filter(a=>a.invoiceId===priorDoc.id).reduce((x,a)=>x+siN2(a.amount),0),0) : 0;
+    if (!isDelivery && !isQuote && !isCash && priorDoc && receiptsOnBill > grand + 0.01) {
+      toast(lang==="bn"?`❌ এই বিলে আগেই ${siFmt2(receiptsOnBill)} টাকা নেওয়া হয়েছে — সর্বমোট এর চেয়ে কম করা যাবে না`:`❌ ${siFmt2(receiptsOnBill)} has already been received on this bill — the total cannot go below it`,"err"); return null;
+    }
+    if (!isDelivery && !isQuote && isCash && receiptsOnBill > 0.01) {
+      toast(lang==="bn"?"❌ এই বিলে Receipt Voucher আছে — Cash করা যাবে না, আগে Receipt বাতিল করুন":"❌ This bill has receipt vouchers — it cannot be made cash; cancel the receipts first","err"); return null;
+    }
+    if (!isDelivery && !isQuote && !isCash && (typedPaid < 0 || creditPaid > grand + 0.01)) {
+      toast(lang==="bn"?"❌ পরিশোধিত টাকা মোট বিলের চেয়ে বেশি বা ঋণাত্মক হতে পারে না!":"❌ Amount paid cannot exceed the grand total or be negative!","err"); return null;
+    }
+    // cash invoice: auto fully paid | delivery: confirmed | credit: normal; receipts already posted on the bill always stay counted
+    const paid = isDelivery || isQuote ? 0
                : isCash     ? parseFloat(siFmt2(grand))
-               : siN2(siForm.amountPaid);
-    const bal  = isDelivery ? 0 : Math.max(0, grand - paid);
-    const derivedStatus = isDelivery ? "confirmed"
+               : Math.min(Math.max(creditPaid,receiptsOnBill,0), Math.max(grand,0));
+    const bal  = isDelivery || isQuote ? 0 : Math.max(0, grand - paid);
+    const derivedStatus = isQuote ? (status==="confirmed" ? "open" : status)
+                        : isDN ? status
+                        : isDelivery ? "confirmed"
                         : (status==="confirmed" ? (bal<0.01?"paid":paid>0?"partial":"confirmed") : status);
-    return { shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:siForm.invoiceType||"regular", invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:user.uid, createdByName:profile.personName };
+    const keepConverted = priorDoc?.convertedInvoiceNo ? { convertedInvoiceId:priorDoc.convertedInvoiceId||"", convertedInvoiceNo:priorDoc.convertedInvoiceNo } : {};
+    const sourceLink = (src) => src?.docKind==="delivery"
+      ? { deliveryNoteId:src.id, deliveryNoteNo:src.invoiceNo||"" }
+      : { quotationId:src.id, quotationNo:src.invoiceNo||"" };
+    const quoteFields = isQuote ? { docKind:"quotation", validUntil:siForm.validUntil||"", ...keepConverted }
+      : isDN ? { docKind:"delivery", ...keepConverted }
+      : sourceQuote ? sourceLink(sourceQuote)
+      : priorDoc?.deliveryNoteId ? { deliveryNoteId:priorDoc.deliveryNoteId, deliveryNoteNo:priorDoc.deliveryNoteNo||"" }
+      : priorDoc?.quotationId ? { quotationId:priorDoc.quotationId, quotationNo:priorDoc.quotationNo||"" } : {};
+    const docType = isDN ? "delivery" : isQuote ? (isTax ? "tax" : "regular") : (siForm.invoiceType||"tax");
+    return { ...quoteFields, shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:docType, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:priorDoc?.createdBy||user.uid, createdByName:priorDoc?.createdByName||profile.personName,
+      refNo:String(siForm.refNo||"").trim(),
+      salesmanId:siForm.salesmanId||"", salesmanName:String(siForm.salesmanName||"").trim(),
+      currency:siForm.currency||"AED",
+      stockLocation:siForm.stockLocation||"main", stockLocationName:siForm.stockLocationName||"Main",
+      billDiscPerc:isDelivery?0:Math.min(Math.max(siN2(siForm.billDiscPerc),0),100),
+      billDiscAmt:isDelivery?0:parseFloat(siFmt2(formTotals.billDisc)),
+      billDiscount:isDelivery?0:parseFloat(siFmt2(formTotals.billDisc)),
+      adjustment:isDelivery?0:siN2(siForm.adjustment),
+      roundOff:isDelivery?0:siN2(siForm.roundOff),
+      creditDays:Math.max(0, Math.round(siN2(siForm.creditDays))),
+      hideCodeInPrint:!!siForm.hideCodeInPrint,
+    };
   };
 
   const saveSalesInvoiceOffline = async (payload, successMessage, options = {}) => {
@@ -6370,7 +6916,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     let savedInvoice;
 
     if (editInvId) {
-      const result = await offlineUpdate("salesInvoices", editInvId, {
+      const result = await offlineUpdate(COL, editInvId, {
         ...payload,
         updatedAt: nowIso,
         updatedBy: user?.uid || "",
@@ -6381,7 +6927,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       setSelInv(prev => prev && prev.id === editInvId ? savedInvoice : prev);
       toast(successMessage || t.si_updated);
     } else {
-      const result = await offlineCreate("salesInvoices", {
+      const result = await offlineCreate(COL, {
         ...payload,
         createdAt: nowIso,
         updatedAt: nowIso,
@@ -6392,19 +6938,37 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       toast(successMessage);
     }
 
-    await applyInvoiceStockEffect({
+    // Goods on an invoice made from a delivery note already left stock with the delivery note.
+    if (!isQuote && !payload.deliveryNoteId) await applyInvoiceStockEffect({
       oldInvoice: priorInvoice,
       newInvoice: payload,
       invoiceId: savedInvoice.id,
       applyType: "sale",
       reverseType: "return",
-      referenceType: "sales_invoice",
+      referenceType: isDN ? "delivery_note" : "sales_invoice",
       unitCostKey: "unitPrice",
       shopId,
       actor: { uid: user?.uid, personName: profile?.personName },
     });
 
     if (!editInvId) bumpShopSiSerial(payload.invoiceNo);
+
+    if (kind==="sales" && !editInvId && sourceQuote?.id) {
+      const fromDN = sourceQuote.docKind==="delivery";
+      try {
+        await offlineUpdate(fromDN ? "deliveryNotes" : "quotations", sourceQuote.id, {
+          ...sourceQuote,
+          status: fromDN ? "invoiced" : "converted",
+          convertedInvoiceId: savedInvoice.id,
+          convertedInvoiceNo: payload.invoiceNo,
+          updatedAt: nowIso,
+          updatedBy: user?.uid || "",
+        });
+      } catch (err) {
+        console.warn("[S4 SI] mark source document converted failed", err);
+      }
+      setSourceQuote(null);
+    }
 
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice save sync failed", err));
@@ -6419,62 +6983,214 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     return savedInvoice;
   };
 
-  const siSaveDraft = async () => {
+  const siSaveRun = async (status, successMsg, options) => {
+    if (siSaveLockRef.current) return;
+    siSaveLockRef.current = true;
     setSiSaving(true);
     try {
+      if (kind==="sales" && !editInvId && sourceQuote?.id) {
+        const fromDN = sourceQuote.docKind==="delivery";
+        const latest = await offlineGetById(fromDN ? "deliveryNotes" : "quotations", sourceQuote.id).catch(() => null);
+        const src = latest?.data || null;
+        if (src && ["converted","invoiced"].includes(src.status)) {
+          const msg = lang==="bn"
+            ? `${sourceQuote.invoiceNo} আগেই ইনভয়েস ${src.convertedInvoiceNo||""} হয়ে গেছে। তবুও আরেকটা ইনভয়েস বানাবেন?`
+            : `${sourceQuote.invoiceNo} was already invoiced as ${src.convertedInvoiceNo||"another invoice"}. Create another invoice anyway?`;
+          if (!window.confirm(msg)) return;
+        }
+        if (src?.status==="cancelled") {
+          toast(lang==="bn" ? `${sourceQuote.invoiceNo} বাতিল করা হয়েছে` : `${sourceQuote.invoiceNo} has been cancelled`, "err");
+          return;
+        }
+      }
       const invoiceNo = editInvId ? siInvoiceNo : ensureNewSiInvoiceNo();
-      const p = siBuild("draft", invoiceNo);
+      const p = siBuild(status, invoiceNo);
       if (!p) return;
-      await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_saved);
+      if (status!=="draft" && kind!=="quotation" && !unlinkedStockOk(p.items, lang)) return;
+      await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : successMsg, options);
     } catch(e) {
       toast(e.message,"err");
     } finally {
+      siSaveLockRef.current = false;
       setSiSaving(false);
     }
   };
+  const siSaveDraft = () => siSaveRun("draft", t.si_saved);
+  const siConfirm = () => siSaveRun("confirmed", t.si_confirmed, { print:true });
 
-  const siConfirm = async () => {
-    setSiSaving(true);
+  // ── Receipts against Bill ──
+  const getCustomerOpenInvoices = (partyId, partyName) => invoices
+    .filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01
+      && (partyId ? inv.customerId===partyId : !inv.customerId && String(inv.customerName||"").trim()===String(partyName||"").trim()))
+    .sort((a,b) => String(a.invoiceDate||"").localeCompare(String(b.invoiceDate||"")));
+
+  const rcptMaxLocalSerial = () => receipts.reduce((mx, r) => {
+    const m = String(r.receiptNo || "").match(/RCT-?(\d+)$/i);
+    return m ? Math.max(mx, Number(m[1])) : mx;
+  }, Number(shop?.lastReceiptSerial || 0));
+  const rcptFormatNo = (serial) => `RCT-${String(serial).padStart(4, "0")}`;
+  const genReceiptNo = async () => {
     try {
-      const invoiceNo = editInvId ? siInvoiceNo : ensureNewSiInvoiceNo();
-      const p = siBuild("confirmed", invoiceNo);
-      if (!p) return;
-      await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : t.si_confirmed, { print:true });
-    } catch(e) {
-      toast(e.message,"err");
-    } finally {
-      setSiSaving(false);
+      const serial = await runTransaction(db, async tx => {
+        const shopRef = doc(db, "shops", shopId), snap = await tx.get(shopRef);
+        const next = Math.max(Number(snap.data()?.lastReceiptSerial || 0), rcptMaxLocalSerial()) + 1;
+        tx.update(shopRef, { lastReceiptSerial: next }); return next;
+      });
+      return rcptFormatNo(serial);
+    } catch (e1) {
+      console.warn("[S4 SI] genReceiptNo transaction failed, using local serial", e1);
+      return rcptFormatNo(rcptMaxLocalSerial() + 1);
     }
   };
 
-  const siMarkPaid = async (inv) => {
+  const applyInvoicePayments = async (changes, nowIso) => {
+    for (const { invoice, newAmountPaid } of changes) {
+      const grand = siN2(invoice.grandTotal);
+      const newBalance = Math.max(0, parseFloat(siFmt2(grand - newAmountPaid)));
+      const newStatus = newBalance < 0.01 ? "paid" : (newAmountPaid > 0 ? "partial" : "confirmed");
+      const result = await offlineUpdate("salesInvoices", invoice.id, { ...invoice, amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:nowIso, updatedBy:user?.uid || "" });
+      const updated = { ...result.data, id: invoice.id };
+      setInvoices(prev => prev.map(x => x.id === invoice.id ? updated : x));
+      setSelInv(prev => prev && prev.id === invoice.id ? updated : prev);
+    }
+  };
+
+  const siSaveReceipt = async (d) => {
+    const allocations = (d.allocations||[]).filter(a => siN2(a.amount) > 0);
+    if (!d.partyName || !allocations.length) return null;
+    setRcptSaving(true);
     try {
       const nowIso = new Date().toISOString();
-      const result = await offlineUpdate("salesInvoices", inv.id, {
-        ...inv,
-        amountPaid:inv.grandTotal,
-        balanceDue:0,
-        status:"paid",
-        updatedAt:nowIso,
-        updatedBy:user?.uid || "",
+      const changes = allocations.map(a => {
+        const cur = invoices.find(inv => inv.id === a.invoiceId);
+        if (!cur) throw new Error(lang==="bn" ? `বিল ${a.invoiceNo} পাওয়া যায়নি` : `Bill ${a.invoiceNo} not found`);
+        if (!["confirmed","partial"].includes(cur.status)) throw new Error(lang==="bn" ? `${a.invoiceNo}-এ টাকা নেওয়া যাবে না` : `${a.invoiceNo} cannot take a receipt`);
+        const balance = Math.max(0, siN2(cur.grandTotal) - siN2(cur.amountPaid));
+        if (siN2(a.amount) > balance + 0.01) throw new Error(lang==="bn" ? `${a.invoiceNo}-এর বাকির চেয়ে বেশি` : `Amount for ${a.invoiceNo} exceeds its balance`);
+        return { invoice: cur, newAmountPaid: parseFloat(siFmt2(siN2(cur.amountPaid) + siN2(a.amount))) };
       });
-
-      const updated = { ...result.data, id: inv.id };
-      setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
-      setSelInv(updated);
-      toast(t.si_paidMarked);
-
-      if (navigator.onLine) {
-        window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice mark paid sync failed", err));
-      }
-    } catch(e){ toast(e.message,"err"); }
+      const receiptNo = await genReceiptNo();
+      await applyInvoicePayments(changes, nowIso);
+      const payload = {
+        shopId, receiptNo,
+        customerId: d.partyId || null, customerName: d.partyName, customerMobile: d.partyMobile || "",
+        receiptDate: d.date || siToday(), method: d.method,
+        totalAmount: parseFloat(siFmt2(allocations.reduce((s,a)=>s+siN2(a.amount),0))),
+        chequeNo: d.chequeNo || "", chequeBank: d.chequeBank || "", chequeDate: d.chequeDate || "",
+        chequeStatus: d.method === "cheque" ? "pending" : null,
+        refNo: d.refNo || "", refBank: d.refBank || "", refDate: d.refDate || "",
+        collectedById: d.collectedById || "", collectedByName: d.collectedByName || "",
+        note: d.note || "",
+        allocations: allocations.map(a => ({ invoiceId:a.invoiceId, invoiceNo:a.invoiceNo, invoiceDate:a.invoiceDate||"", amount:parseFloat(siFmt2(a.amount)) })),
+        status: "active",
+        createdBy: user.uid, createdByName: profile.personName,
+        createdAt: nowIso, updatedAt: nowIso, updatedBy: user?.uid || "",
+      };
+      const result = await offlineCreate("salesReceipts", payload);
+      const created = { ...result.data, id: result.documentId, createdAt: nowIso };
+      setReceipts(prev => [created, ...prev]);
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales receipt save sync failed", err));
+      toast(lang==="bn" ? `✅ রিসিট ${receiptNo} সেভ হয়েছে` : `✅ Receipt ${receiptNo} saved`);
+      return created;
+    } catch (e) { toast(e.message, "err"); return null; }
+    finally { setRcptSaving(false); }
   };
+
+  const siReverseReceipt = async (receipt, patch) => {
+    const nowIso = new Date().toISOString();
+    const changes = (receipt.allocations||[]).map(a => {
+      const cur = invoices.find(inv => inv.id === a.invoiceId);
+      if (!cur || cur.status === "cancelled") return null;
+      return { invoice: cur, newAmountPaid: Math.max(0, parseFloat(siFmt2(siN2(cur.amountPaid) - siN2(a.amount)))) };
+    }).filter(Boolean);
+    await applyInvoicePayments(changes, nowIso);
+    const result = await offlineUpdate("salesReceipts", receipt.id, { ...receipt, status:"cancelled", cancelledAt:nowIso, cancelledBy:user?.uid || "", updatedAt:nowIso, updatedBy:user?.uid || "", ...patch });
+    const updated = { ...result.data, id: receipt.id };
+    setReceipts(prev => prev.map(r => r.id === receipt.id ? updated : r));
+    if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales receipt cancel sync failed", err));
+    return updated;
+  };
+
+  const siCancelReceipt = async (receipt) => {
+    if (receipt.status === "cancelled") return null;
+    if (!window.confirm(lang==="bn" ? "এই রিসিট বাতিল করবেন? বিলগুলোর বাকি আবার ফিরে আসবে।" : "Cancel this receipt? The bills' balances will be restored.")) return null;
+    try {
+      const updated = await siReverseReceipt(receipt, {});
+      toast(lang==="bn" ? "🚫 রিসিট বাতিল হয়েছে" : "🚫 Receipt cancelled", "err");
+      return updated;
+    } catch (e) { toast(e.message, "err"); return null; }
+  };
+
+  const siSetReceiptCheque = async (receipt, chequeStatus, extra = {}) => {
+    try {
+      if (chequeStatus === "bounced") {
+        if (!window.confirm(lang==="bn" ? "চেক বাউন্স? রিসিট বাতিল হবে আর বিলের বাকি ফিরে আসবে।" : "Cheque bounced? The receipt is cancelled and the bills' balances restored.")) return null;
+        const updated = await siReverseReceipt(receipt, { chequeStatus:"bounced", cancelReason:"cheque_bounced" });
+        toast(lang==="bn" ? "❌ চেক বাউন্স" : "❌ Cheque bounced", "err");
+        return updated;
+      }
+      const nowIso = new Date().toISOString();
+      const result = await offlineUpdate("salesReceipts", receipt.id, { ...receipt, chequeStatus, ...(chequeStatus==="cleared" ? { clearedAt:extra.clearedAt || nowIso, clearedBy:user?.uid || "" } : {}), updatedAt:nowIso, updatedBy:user?.uid || "" });
+      const updated = { ...result.data, id: receipt.id };
+      setReceipts(prev => prev.map(r => r.id === receipt.id ? updated : r));
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales receipt cheque sync failed", err));
+      toast(lang==="bn" ? "✅ চেক ক্লিয়ার" : "✅ Cheque cleared");
+      return updated;
+    } catch (e) { toast(e.message, "err"); return null; }
+  };
+
+  const receiptWindow = receiptWin && kind==="sales" ? (() => {
+    const openAll = invoices.filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01);
+    const salesmen = (team||[]).filter(m=>m && m.status!=="disabled" && m.active!==false)
+      .map(m=>({ id:m.uid||m.id, name:m.personName||m.name||m.email||"" })).filter(m=>m.id&&m.name);
+    return (
+      <AgainstInvoiceVoucherWindow
+        lang={lang} mode="receipt" cur={t.cur||"AED"}
+        voucherNo={rcptFormatNo(rcptMaxLocalSerial() + 1)}
+        parties={voucherParties(customers, openAll, "customerId", "customerName", c=>c.customerName, c=>c.mobileNumber)}
+        salesmen={salesmen}
+        banks={UAE_BANKS.map(b=>b.name)}
+        getOpenInvoices={(p)=>getCustomerOpenInvoices(p.id, p.name)}
+        vouchers={receipts.map(r=>toVoucherView(r,"receipt"))}
+        prefill={receiptWin.partyId||receiptWin.partyName ? receiptWin : null}
+        initialViewId={receiptWin.viewId||null}
+        saving={rcptSaving}
+        onSave={async (d)=>{ const c = await siSaveReceipt(d); return c ? toVoucherView(c,"receipt") : null; }}
+        onCancelVoucher={async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; }}
+        onSetChequeStatus={async (v,st)=>{ const u = await siSetReceiptCheque(v.raw, st); return u ? toVoucherView(u,"receipt") : null; }}
+        onPrint={(v)=>printPaymentVoucher(v.raw, shop, lang)}
+        onClose={()=>setReceiptWin(null)}
+      />
+    );
+  })() : null;
+
+  const ledgerWindow = ledgerWin && kind==="sales" ? (
+    <PartyLedgerWindow lang={lang} mode="customer" cur={t.cur||"AED"} shopName={shop?.companyName||""}
+      invoices={invoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.customerId||null, partyName:inv.customerName||"", partyMobile:inv.customerMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.deliveryNoteNo||"", method:inv.paymentMethod, raw:inv }))}
+      vouchers={(isOwner ? receipts : (()=>{
+        const visible = new Set(invoices.map(inv=>inv.id));
+        return receipts.map(r=>{
+          const allocations = (r.allocations||[]).filter(a=>visible.has(a.invoiceId));
+          return allocations.length ? { ...r, allocations, totalAmount:allocations.reduce((s,a)=>s+siN2(a.amount),0) } : null;
+        }).filter(Boolean);
+      })()).map(r=>({ id:r.id, no:r.receiptNo, date:String(r.receiptDate||"").slice(0,10), partyId:r.customerId||null, partyName:r.customerName||"", partyMobile:r.customerMobile||"", method:r.method, amount:r.totalAmount, status:r.status, allocations:r.allocations||[], raw:r }))}
+      onOpenInvoice={(inv)=>{ setLedgerWin(false); setSelInv(inv); setSiView("detail"); }}
+      onOpenVoucher={(r)=>{ setLedgerWin(false); setReceiptWin({ viewId:r.id }); }}
+      onNewVoucher={(p)=>{ setLedgerWin(false); setReceiptWin({ partyId:p.id||null, partyName:p.name }); }}
+      onClose={()=>setLedgerWin(false)} />
+  ) : null;
 
   const siCancel = async (inv) => {
-    if (!window.confirm(t.si_confirmCancel)) return;
+    const activeReceipts = receipts.filter(r => r.status !== "cancelled" && (r.allocations||[]).some(a => a.invoiceId === inv.id));
+    if (activeReceipts.length) {
+      const nos = activeReceipts.map(r => r.receiptNo).join(", ");
+      toast(lang==="bn" ? `আগে রিসিট বাতিল করুন: ${nos}` : `Cancel the receipt(s) first: ${nos}`, "err");
+      return false;
+    }
+    if (!window.confirm(t.si_confirmCancel)) return false;
     try {
       const nowIso = new Date().toISOString();
-      const result = await offlineUpdate("salesInvoices", inv.id, {
+      const result = await offlineUpdate(COL, inv.id, {
         ...inv,
         status:"cancelled",
         updatedAt:nowIso,
@@ -6485,13 +7201,42 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
       setSelInv(updated);
 
-      await applyInvoiceStockEffect({
+      if (inv.deliveryNoteId) {
+        // The goods are still out with the delivery note; it just becomes open for invoicing again.
+        try {
+          const res = await offlineList("deliveryNotes");
+          const records = Array.isArray(res) ? res : (res.records || []);
+          const rec = records.find(r => (r.data?.id || r.document_id || r.id) === inv.deliveryNoteId);
+          const dn = rec ? { ...(rec.data || rec), id: inv.deliveryNoteId } : null;
+          if (dn && dn.status==="invoiced") {
+            await offlineUpdate("deliveryNotes", dn.id, { ...dn, status:"confirmed", convertedInvoiceId:"", convertedInvoiceNo:"", updatedAt:nowIso, updatedBy:user?.uid || "" });
+          }
+        } catch (err) {
+          console.warn("[S4 SI] reopen delivery note failed", err);
+        }
+      }
+
+      if (inv.quotationId) {
+        try {
+          const res = await offlineList("quotations");
+          const records = Array.isArray(res) ? res : (res.records || []);
+          const rec = records.find(r => (r.data?.id || r.document_id || r.id) === inv.quotationId);
+          const qt = rec ? { ...(rec.data || rec), id: inv.quotationId } : null;
+          if (qt && qt.status==="converted") {
+            await offlineUpdate("quotations", qt.id, { ...qt, status:"open", convertedInvoiceId:"", convertedInvoiceNo:"", updatedAt:nowIso, updatedBy:user?.uid || "" });
+          }
+        } catch (err) {
+          console.warn("[S4 SI] reopen quotation failed", err);
+        }
+      }
+
+      if (!isQuote && !inv.deliveryNoteId) await applyInvoiceStockEffect({
         oldInvoice: inv,
         newInvoice: updated,
         invoiceId: inv.id,
         applyType: "sale",
         reverseType: "return",
-        referenceType: "sales_invoice",
+        referenceType: isDN ? "delivery_note" : "sales_invoice",
         unitCostKey: "unitPrice",
         shopId,
         actor: { uid: user?.uid, personName: profile?.personName },
@@ -6502,13 +7247,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice cancel sync failed", err));
       }
-    } catch(e){ toast(e.message,"err"); }
+      return true;
+    } catch(e){ toast(e.message,"err"); return false; }
   };
 
   const siDelete = async (inv) => {
     if (!window.confirm(t.si_confirmDelete)) return;
     try {
-      await offlineRemove("salesInvoices", inv.id);
+      await offlineRemove(COL, inv.id);
 
       setInvoices(prev => prev.filter(x => x.id !== inv.id));
       setSiView("list");
@@ -6528,22 +7274,37 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const hay=[inv.invoiceNo,inv.customerName,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
     return matchSt&&nsmatch(hay,q);
   });
-  const siKPIs=invoices.reduce((a,inv)=>{ a.total++; a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{total:0,amount:0,paid:0,due:0});
+  const siKPIs=invoices.reduce((a,inv)=>{ a.total++; if (inv.status!=="cancelled"&&inv.status!=="draft") { a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; } if (inv.status==="open") a.open++; if (inv.status==="converted") a.converted++; if (inv.status==="confirmed") a.delivered++; if (inv.status==="invoiced") a.invoiced++; return a; },{total:0,amount:0,paid:0,due:0,open:0,converted:0,delivered:0,invoiced:0});
+  const kpiCards = isDN
+    ? [{l:lang==="bn"?"মোট ডেলিভারি নোট":"Delivery Notes",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#a855f7",pre:t.cur+" "},{l:lang==="bn"?"ইনভয়েস বাকি":"Not Invoiced",v:siKPIs.delivered,c:"#06b6d4",pre:""},{l:DN_STATUSES.invoiced[lang],v:siKPIs.invoiced,c:"#22c55e",pre:""}]
+    : isQuote
+    ? [{l:lang==="bn"?"মোট কোটেশন":"Quotations",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#f59e0b",pre:t.cur+" "},{l:QT_STATUSES.open[lang],v:siKPIs.open,c:"#06b6d4",pre:""},{l:QT_STATUSES.converted[lang],v:siKPIs.converted,c:"#22c55e",pre:""}]
+    : [{l:t.si_totalInvoices,v:siKPIs.total,c:"#a1a1aa",pre:""},{l:t.si_totalSales,v:siFmt2(siKPIs.amount),c:"#22c55e",pre:t.cur+" "},{l:t.si_totalPaid,v:siFmt2(siKPIs.paid),c:"#06b6d4",pre:t.cur+" "},{l:t.si_totalDue,v:siFmt2(siKPIs.due),c:siKPIs.due>0?"#ef4444":"#22c55e",pre:t.cur+" "}];
 
   const panel=isDesktop?{maxWidth:900,margin:"0 auto",padding:"24px 28px 60px"}:{maxWidth:660,margin:"0 auto",padding:"18px 14px 60px"};
   const inp=(e={})=>({ padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", ...e });
   const secLbl={ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, padding:"8px 0 6px", borderBottom:`1px solid ${th.border}`, marginBottom:12 };
-  const formIsDelivery = siForm.invoiceType==="delivery";
+  const formIsDelivery = isDN || (kind==="sales" && siForm.invoiceType==="delivery");
+  const mobileTypeOptions = (isDN||isQuote) ? [] : [
+    ...(siForm.invoiceType==="regular" ? [["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"]] : []),
+    ["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"],
+    ...((kind==="sales"&&siForm.invoiceType==="delivery") ? [["delivery","🚚",t.si_delivery,t.si_deliveryDesc,"#a855f7"]] : []),
+  ];
   const formIsTax      = siForm.invoiceType==="tax";
   const formIsCash     = siForm.paymentMethod==="cash";
-  const totals=siCalcTotals(siLines, formIsTax&&!formIsDelivery);
+  const totals=formIsDelivery ? siCalcTotals(siDeliveryLines(siLines), false) : siCalcTotals(siLines, formIsTax, siInvoiceExtras(siForm));
   // cash: auto fully paid, delivery: 0
-  const formPaid = formIsDelivery ? 0 : formIsCash ? totals.grand : siN2(siForm.amountPaid);
+  const formPaid = formIsDelivery || isQuote ? 0 : formIsCash ? totals.grand : siN2(siForm.amountPaid);
   const balance  = Math.max(0, totals.grand - formPaid);
 
   // ══ LIST ══
-  if (siView==="list") return (
+  if (siView==="list" || (siView==="form" && siWin.min && wideDesktop)) return (
     <div style={panel}>
+      {siView==="form"&&siWin.min&&(
+        <MinimizedChip lang={lang} onRestore={siWin.restore}
+          title={`${isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"} ${siInvoiceNo||""}`}
+          onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
+      )}
       {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
 
       {/* ── Print Modal after Confirm ── */}
@@ -6552,7 +7313,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:16, padding:28, maxWidth:380, width:"100%", textAlign:"center" }}>
             <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
             <div style={{ fontSize:18, fontWeight:800, color:"#22c55e", marginBottom:6 }}>
-              {lang==="bn"?"ইনভয়েস সেভ হয়েছে!":"Invoice Saved!"}
+              {isQuote ? (lang==="bn"?"কোটেশন সেভ হয়েছে!":"Quotation Saved!") : isDN ? (lang==="bn"?"ডেলিভারি নোট সেভ হয়েছে!":"Delivery Note Saved!") : (lang==="bn"?"ইনভয়েস সেভ হয়েছে!":"Invoice Saved!")}
             </div>
             <div style={{ fontSize:14, fontWeight:700, color:th.txtMuted, marginBottom:4 }}>
               {siPrintModal.invoiceNo}
@@ -6561,7 +7322,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               {siPrintModal.customerName||"—"} · {t.cur} {siFmt2(siPrintModal.grandTotal)}
             </div>
             <button
-              onClick={()=>{ printSalesInvoice(siPrintModal, shop, lang, siShowCode, siColorPrint); setSiPrintModal(null); }}
+              onClick={()=>{ siPrint(siPrintModal); setSiPrintModal(null); }}
               style={{ width:"100%", padding:"14px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:15, fontWeight:800, cursor:"pointer", marginBottom:10 }}>
               🖨️ {lang==="bn"?"এখনই প্রিন্ট করুন":"Print Now"}
             </button>
@@ -6574,13 +7335,17 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         </div>
       )}
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-        <div style={{ fontSize:16, fontWeight:800, color:"#22c55e" }}>{t.si_title}</div>
-        <button onClick={siOpenNew} disabled={siSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_new}</button>
+        <div style={{ fontSize:16, fontWeight:800, color:isQuote?"#f59e0b":isDN?"#a855f7":"#22c55e" }}>{isQuote?t.tabQuotation:isDN?t.tabDelivery:t.si_title}</div>
+        {receiptWindow}
+        {ledgerWindow}
+        {kind==="sales"&&<button onClick={()=>setLedgerWin(true)} style={{ marginLeft:"auto", marginRight:8, padding:"9px 14px", borderRadius:10, border:"1px solid #2563eb", background:"transparent", color:"#2563eb", fontSize:13, fontWeight:700, cursor:"pointer" }}>📒 {lang==="bn"?"কাস্টমার লেজার":"Customer Ledger"}</button>}
+        {kind==="sales"&&<button onClick={()=>setReceiptWin({})} style={{ marginRight:8, padding:"9px 14px", borderRadius:10, border:"1px solid #16a34a", background:"transparent", color:"#16a34a", fontSize:13, fontWeight:700, cursor:"pointer" }}>💰 {lang==="bn"?"রিসিট (টাকা গ্রহণ)":"Receipts"}</button>}
+        <button onClick={()=>{ if (siLeaveMinOk()) siOpenNew(); }} disabled={siSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:isQuote?"linear-gradient(135deg,#f59e0b,#d97706)":isDN?"linear-gradient(135deg,#a855f7,#7c3aed)":"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{isQuote?(lang==="bn"?"+ নতুন কোটেশন":"+ New Quotation"):isDN?(lang==="bn"?"+ নতুন ডেলিভারি নোট":"+ New Delivery Note"):t.si_new}</button>
       </div>
 
       {invoices.length>0&&(
         <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:8, marginBottom:14 }}>
-          {[{l:t.si_totalInvoices,v:siKPIs.total,c:"#a1a1aa",pre:""},{l:t.si_totalSales,v:siFmt2(siKPIs.amount),c:"#22c55e",pre:t.cur+" "},{l:t.si_totalPaid,v:siFmt2(siKPIs.paid),c:"#06b6d4",pre:t.cur+" "},{l:t.si_totalDue,v:siFmt2(siKPIs.due),c:siKPIs.due>0?"#ef4444":"#22c55e",pre:t.cur+" "}].map((k,i)=>(
+          {kpiCards.map((k,i)=>(
             <div key={i} style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:10, padding:"10px 8px", textAlign:"center" }}>
               <div style={{ fontSize:14, fontWeight:900, color:k.c }}>{k.pre}{k.v}</div>
               <div style={{ fontSize:8, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginTop:2 }}>{k.l}</div>
@@ -6596,18 +7361,30 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       </div>
 
       <div style={{ display:"flex", gap:6, overflowX:"auto", paddingBottom:8, marginBottom:8 }}>
-        {["ALL",...Object.keys(SI_STATUSES)].map(st=>(
+        {["ALL",...Object.keys(STATUSES)].map(st=>(
           <button key={st} onClick={()=>setSiStatusF(st)} style={{ padding:"5px 13px", borderRadius:20, border:"1px solid", whiteSpace:"nowrap", cursor:"pointer", fontSize:11, fontWeight:700, fontFamily:"inherit", background:siStatusF===st?"#22c55e":"transparent", borderColor:siStatusF===st?"#22c55e":th.borderMid, color:siStatusF===st?"#fff":th.txtMuted }}>
-            {st==="ALL"?t.si_allStatus:SI_STATUSES[st]?.[lang]}
+            {st==="ALL"?t.si_allStatus:STATUSES[st]?.[lang]}
           </button>
         ))}
       </div>
 
       {siLoading&&<div style={{ textAlign:"center", padding:"50px", color:th.txtFaint }}><div style={{ fontSize:36 }}>⏳</div></div>}
-      {!siLoading&&invoices.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>🧾</div><div>{t.si_noInvoices}</div></div>}
+      {!siLoading&&invoices.length===0&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:46, marginBottom:10 }}>{isQuote?"📝":isDN?"🚚":"🧾"}</div><div>{isQuote?(lang==="bn"?"এখনো কোনো কোটেশন নেই":"No quotations yet"):isDN?(lang==="bn"?"এখনো কোনো ডেলিভারি নোট নেই":"No delivery notes yet"):t.si_noInvoices}</div></div>}
       {!siLoading&&invoices.length>0&&siFiltered.length===0&&<div style={{ textAlign:"center", padding:"40px", color:th.txtFaint }}><div style={{ fontSize:36 }}>🔍</div><div>{t.si_noResults}</div></div>}
-      {!siLoading&&siFiltered.map(inv=>(
-        <SiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang} onClick={()=>{ setSelInv(inv); setSiView("detail"); }} />
+      {!siLoading&&invoices.length>0&&(
+        <FolderToggle value={siGroupMode} onChange={(m)=>{ setSiGroupMode(m); setSiOpenParty(null); }} lang={lang} th={th} accent={isQuote?"#f59e0b":isDN?"#a855f7":"#22c55e"} />
+      )}
+      {!siLoading&&siGroupMode==="folders"&&siFiltered.length>0&&(
+        <PartyFolderList invoices={siFiltered} idField="customerId" nameField="customerName"
+          openKey={siOpenParty} onOpenKey={setSiOpenParty}
+          lang={lang} th={th} cur={t.cur||"AED"} accent={isQuote?"#f59e0b":isDN?"#a855f7":"#22c55e"}
+          partyWord={lang==="bn"?"কাস্টমার":"customers"}
+          renderCard={(inv)=>(
+            <SiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang} isQuote={isQuote||isDN} statuses={STATUSES} onClick={()=>{ if (!siLeaveMinOk()) return; setSelInv(inv); setSiView("detail"); }} />
+          )} />
+      )}
+      {!siLoading&&siGroupMode==="all"&&siFiltered.map(inv=>(
+        <SiInvoiceCard key={inv.id} invoice={inv} t={t} th={th} lang={lang} isQuote={isQuote||isDN} statuses={STATUSES} onClick={()=>{ if (!siLeaveMinOk()) return; setSelInv(inv); setSiView("detail"); }} />
       ))}
     </div>
   );
@@ -6618,11 +7395,12 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const isTax       = inv.invoiceType==="tax";
     const isInvCash   = inv.paymentMethod==="cash";
     const isInvDelivery = inv.invoiceType==="delivery";
-    const { sub, disc, vat, grand } = siCalcTotals(inv.items||[], isTax&&!isInvDelivery);
-    const bal=grand-inv.amountPaid;
-    const canEdit=["draft","confirmed","paid","partial"].includes(inv.status);
+    const { sub, disc, vat, grand, adjustment, roundOff } = siCalcTotals(inv.items||[], isTax&&!isInvDelivery, siInvoiceExtras(inv));
+    const bal=grand-siN2(inv.amountPaid);
+    const canEdit=(isQuote?["draft","open"]:isDN?["draft","confirmed"]:["draft","confirmed","paid","partial"]).includes(inv.status);
     // cash invoice is always fully paid → no mark paid button
-    const canPay=!isInvCash&&["confirmed","partial"].includes(inv.status);
+    const canPay=!isQuote&&!isInvCash&&["confirmed","partial"].includes(inv.status);
+    const canConvert=!!onConvertQuote&&((isQuote&&["draft","open"].includes(inv.status))||(isDN&&inv.status==="confirmed"));
     const dr={ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${th.border}` };
     return (
       <div style={panel}>
@@ -6634,8 +7412,12 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               <div style={{ fontSize:22, fontWeight:900, color:"#22c55e", letterSpacing:1 }}>{inv.invoiceNo}</div>
               <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📅 {inv.invoiceDate}</div>
             </div>
-            <SiStatusBadge status={inv.status} lang={lang} />
+            <SiStatusBadge status={inv.status} lang={lang} statuses={STATUSES} />
           </div>
+          {isQuote&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>⏳ {lang==="bn"?"মেয়াদ":"Valid until"}</span><span style={{ fontSize:13, fontWeight:700, color:qtIsExpired(inv)?"#ef4444":th.txtPrimary }}>{inv.validUntil||"—"}{qtIsExpired(inv)?(lang==="bn"?" (মেয়াদ শেষ)":" (Expired)"):""}</span></div>}
+          {!isQuote&&inv.deliveryNoteId&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🚚 {lang==="bn"?"ডেলিভারি নোট":"Delivery Note"}</span><span style={{ fontSize:13, fontWeight:700, color:"#a855f7" }}>{inv.deliveryNoteNo}</span></div>}
+          {(isQuote||isDN)&&inv.convertedInvoiceNo&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🧾 {lang==="bn"?"ইনভয়েস":"Invoice"}</span><span style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{inv.convertedInvoiceNo}</span></div>}
+          {!isQuote&&inv.quotationNo&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📝 {lang==="bn"?"কোটেশন":"Quotation"}</span><span style={{ fontSize:13, fontWeight:700, color:"#f59e0b" }}>{inv.quotationNo}</span></div>}
           <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>👤 {t.si_customer}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{inv.customerName||"—"}</span></div>
           {inv.customerMobile&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📱</span><span style={{ fontSize:13, color:th.txtPrimary }}>{inv.customerMobile}</span></div>}
           <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>👤 {t.si_createdBy}</span><span style={{ fontSize:12, color:th.txtMuted }}>{inv.createdByName}</span></div>
@@ -6669,27 +7451,51 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
         {/* Totals */}
         <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
-          {[[t.si_subtotal,siFmt2(sub),th.txtPrimary],...(disc>0?[[t.si_totalDiscount,`- ${siFmt2(disc)}`,"#ef4444"]]:[]),...(vat>0?[["VAT",`+ ${siFmt2(vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
+          {[[t.si_subtotal,siFmt2(sub),th.txtPrimary],...(disc>0?[[t.si_totalDiscount,`- ${siFmt2(disc)}`,"#ef4444"]]:[]),...(vat>0?[["VAT",`+ ${siFmt2(vat)}`,"#06b6d4"]]:[]),...(adjustment?[[lang==="bn"?"সমন্বয়":"Adjustment",`${adjustment>0?"+":"-"} ${siFmt2(Math.abs(adjustment))}`,th.txtPrimary]]:[]),...(roundOff?[["Round Off",`${roundOff>0?"+":"-"} ${siFmt2(Math.abs(roundOff))}`,th.txtPrimary]]:[])].map(([l,v,c],i)=>(
             <div key={i} style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>{t.cur} {v}</span></div>
           ))}
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
             <span style={{ fontSize:15, fontWeight:800, color:th.txtPrimary }}>{t.si_grandTotal}</span>
             <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {siFmt2(grand)}</span>
           </div>
+          {!isQuote&&!isDN&&<>
           <div style={{ height:1, background:th.border, margin:"10px 0" }} />
           <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.si_paymentMethod}</span><span style={{ fontSize:12, fontWeight:700, color:th.txtPrimary }}>{SI_PAY[inv.paymentMethod]?.icon} {SI_PAY[inv.paymentMethod]?.[lang]}</span></div>
           {!isInvDelivery&&<div style={dr}><span style={{ fontSize:12, color:"#22c55e", fontWeight:700 }}>✅ {t.si_amountPaid}</span><span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {siFmt2(inv.amountPaid)}</span></div>}
           {/* Balance due — only for non-cash, non-delivery */}
           {!isInvCash&&!isInvDelivery&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.si_balanceDue}</span><span style={{ fontSize:16, fontWeight:900, color:bal>0.01?"#ef4444":"#22c55e" }}>{t.cur} {siFmt2(Math.max(0,bal))}</span></div>}
           {isInvCash&&<div style={{ padding:"8px 0" }}><span style={{ fontSize:13, fontWeight:700, color:"#22c55e" }}>✅ {lang==="bn"?"নগদে সম্পূর্ণ পরিশোধিত":"Fully Paid (Cash)"}</span></div>}
+          </>}
         </div>
+
+        {kind==="sales"&&(()=>{
+          const related = receipts.filter(r=>(r.allocations||[]).some(a=>a.invoiceId===inv.id));
+          if (!related.length) return null;
+          return (
+            <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
+              <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>💰 {lang==="bn"?"রিসিট":"Receipts"}</div>
+              {related.map(r=>{
+                const amt=(r.allocations||[]).find(a=>a.invoiceId===inv.id)?.amount||0;
+                const off=r.status==="cancelled";
+                return (
+                  <div key={r.id} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}`, opacity:off?0.55:1 }}>
+                    <span style={{ fontSize:12, color:th.txtPrimary, fontWeight:700 }}>{r.receiptNo} · {r.receiptDate} · {PI_VOUCHER_METHODS[r.method]?.icon||"💵"}{off?(lang==="bn"?" (বাতিল)":" (cancelled)"):""}</span>
+                    <span style={{ fontSize:13, fontWeight:800, color:off?th.txtFaint:"#22c55e", textDecoration:off?"line-through":"none" }}>{t.cur} {siFmt2(amt)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+        {receiptWindow}
 
         {/* Actions */}
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button onClick={()=>printSalesInvoice(inv,shop,lang,siShowCode,siColorPrint)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
+          <button onClick={()=>siPrint(inv)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#7c3aed,#6d28d9)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_print}</button>
+          {canConvert&&<button onClick={()=>onConvertQuote(inv)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer" }}>🧾 {lang==="bn"?"সেলস ইনভয়েসে রূপান্তর করুন":"Convert to Sales Invoice"}</button>}
           {canEdit&&<button onClick={()=>siOpenEdit(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.si_edit}</button>}
-          {canPay&&<button onClick={()=>siMarkPaid(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_markPaid}</button>}
-          {["confirmed","partial","draft"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
+          {canPay&&kind==="sales"&&<button onClick={()=>setReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>💰 {lang==="bn"?"টাকা গ্রহণ (রিসিট)":"Receive Payment"}</button>}
+          {["confirmed","partial","paid","draft","open"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
           {inv.status==="draft"&&<button onClick={()=>siDelete(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_deleteBtn}</button>}
         </div>
       </div>
@@ -6697,20 +7503,51 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   }
 
   // ══ FORM ══
+  if (wideDesktop) return (
+    <div style={{ position:"fixed", inset:siWin.max?0:"28px 40px", zIndex:1500, background:"#c7d8ee", padding:siWin.max?6:"0 6px 6px", boxSizing:"border-box", overflowX:"auto", overflowY:"hidden", display:"flex", flexDirection:"column", border:siWin.max?"none":"1px solid #2854ad", boxShadow:siWin.max?"none":"0 18px 50px rgba(2,6,23,0.45)" }}>
+      <div onDoubleClick={siWin.toggleMax} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, margin:siWin.max?"-6px -6px 6px":"0 -6px 6px", padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", flexShrink:0, fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
+        <span>{isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"}{siInvoiceNo?` — ${siInvoiceNo}`:""}</span>
+        <WindowButtons win={siWin} lang={lang} onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
+      </div>
+      {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
+      <SalesInvoiceDesktopForm
+        lang={lang} t={t} shopId={shopId} products={products} customers={customers||[]} onSelectCustomer={siSelectCustomer} team={team} invoices={invoices}
+        form={siForm} setField={siUpd} lines={siLines} setLines={setSiLines} current={siCurrent} setCurrent={setSiCurrent}
+        totals={totals} formPaid={formPaid} balance={balance}
+        invoiceNo={siInvoiceNo} editInvId={editInvId} saving={siSaving} nameRef={siNameRef} qtyRef={siQtyRef}
+        helpers={{ siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES:STATUSES, emptyCurrent:siEmptyCurrent }}
+        kind={kind}
+        sourceQuoteNo={sourceQuote?.invoiceNo||""}
+        sourceIsDN={sourceQuote?.docKind==="delivery"}
+        onConvertQuote={(isQuote||isDN)&&onConvertQuote ? (inv)=>{ if (siLeaveUnsavedOk()) onConvertQuote(inv); } : undefined}
+        onSelectProduct={siSelectProduct} onChangeCurrentUnit={siChangeCurrentUnit} onAddCurrent={siAddCurrentItem} onDelLine={siDelLine}
+        onOpenCustomerPicker={()=>setShowCustPicker(true)}
+        onConfirm={siConfirm} onSaveDraft={siSaveDraft}
+        onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }}
+        onNew={()=>{ if (siLeaveUnsavedOk()) siOpenNew(); }}
+        onOpenInvoice={siOpenFromDesktop}
+        onCancelInvoice={async (inv)=>{ if (await siCancel(inv)) setSiView("detail"); }}
+        onPrintInvoice={(inv)=>siPrint(inv)}
+        onOpenProductMaster={onOpenProductMaster}
+        toast={toast}
+      />
+    </div>
+  );
+
   return (
     <div style={panel}>
       {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
 
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16 }}>
         <button onClick={()=>setSiView("list")} style={{ background:"transparent", border:"none", color:"#22c55e", cursor:"pointer", fontSize:13, fontWeight:700, padding:0, fontFamily:"inherit" }}>{t.si_backToList}</button>
-        <div style={{ fontSize:13, fontWeight:800, color:"#22c55e" }}>{editInvId?t.si_edit:t.si_new}</div>
+        <div style={{ fontSize:13, fontWeight:800, color:isQuote?"#f59e0b":isDN?"#a855f7":"#22c55e" }}>{isQuote?(editInvId?(lang==="bn"?"কোটেশন এডিট":"Edit Quotation"):(lang==="bn"?"নতুন কোটেশন":"New Quotation")):isDN?(editInvId?(lang==="bn"?"ডেলিভারি নোট এডিট":"Edit Delivery Note"):(lang==="bn"?"নতুন ডেলিভারি নোট":"New Delivery Note")):(editInvId?t.si_edit:t.si_new)}{sourceQuote?` (${sourceQuote.invoiceNo})`:""}</div>
       </div>
 
       {/* Invoice Type Toggle */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+      {mobileTypeOptions.length>1&&<div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:12 }}>📋 {t.si_invoiceType}</div>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8 }}>
-          {[["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"],["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"],["delivery","🚚",t.si_delivery,t.si_deliveryDesc,"#a855f7"]].map(([type,icon,label,desc,color])=>(
+        <div style={{ display:"grid", gridTemplateColumns:`repeat(${mobileTypeOptions.length},1fr)`, gap:8 }}>
+          {mobileTypeOptions.map(([type,icon,label,desc,color])=>(
             <button key={type} onClick={()=>siUpd("invoiceType",type)} style={{ padding:"14px 10px", borderRadius:12, cursor:"pointer", fontFamily:"inherit", border:`2px solid ${siForm.invoiceType===type?color:th.borderMid}`, background:siForm.invoiceType===type?`${color}18`:"transparent", display:"flex", flexDirection:"column", alignItems:"center", gap:4, transition:"all 0.15s" }}>
               <span style={{ fontSize:28 }}>{icon}</span>
               <span style={{ fontSize:13, fontWeight:800, color:siForm.invoiceType===type?color:th.txtMuted }}>{label}</span>
@@ -6719,7 +7556,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             </button>
           ))}
         </div>
-      </div>
+      </div>}
 
       {/* Invoice No + Date + Customer */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
@@ -6733,6 +7570,12 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{t.si_date}</div>
             <input type="date" style={inp()} value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />
           </div>
+          {isQuote&&(
+            <div style={{ gridColumn:"1 / -1" }}>
+              <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 }}>{lang==="bn"?"মেয়াদ (Valid Until)":"Valid Until"}</div>
+              <input type="date" style={inp()} value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />
+            </div>
+          )}
         </div>
 
         <div style={secLbl}>👤 {t.si_customer}</div>
@@ -6784,7 +7627,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               onChange={(value)=>setSiCurrent((p)=>({ ...p, code:value }))}
               onSelectProduct={siSelectProduct}
               field="code"
-              placeholder={lang==="bn"?"Code / Shop Code":"Code / Shop Code"}
+              placeholder={lang==="bn"?"Code / Model":"Code / Model"}
               th={th}
               lang={lang}
               onKeyDown={(e)=>e.key==="Enter"&&siAddCurrentItem()}
@@ -6792,6 +7635,11 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             />
             <input style={inp()} placeholder={t.si_brand} value={siCurrent.brand} onChange={e=>setSiCurrent(p=>({...p,brand:e.target.value}))} />
           </div>
+          {siCurrent.productId && !isQuote && (()=>{
+            const prod = siFindProduct(siCurrent.productId);
+            const inBill = [...siLines.filter(it=>it.productId===siCurrent.productId), siCurrent].reduce((sum,it)=>sum+itemBaseQty(it, prod),0);
+            return <StockBadge product={prod} products={products} shopId={shopId} refreshKey={invoices} lang={lang} extraQty={editInvId ? 0 : inBill} />;
+          })()}
           {/* Qty + Unit + Price + Disc + VAT + ADD — responsive layout */}
           {isDesktop ? (
             /* ── Desktop: single row ── */
@@ -6805,8 +7653,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               </div>
               <div style={{ flex:"0 0 70px" }}>
                 <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unit}</div>
-                <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>setSiCurrent(p=>({...p,unit:e.target.value}))}>
-                  {SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>siChangeCurrentUnit(e.target.value)}>
+                  {siUnitOptionsFor(siFindProduct(siCurrent.productId), siCurrent.unit).map(u=><option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div style={{ flex:1 }}>
@@ -6842,8 +7690,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                 </div>
                 <div>
                   <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_unit}</div>
-                  <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>setSiCurrent(p=>({...p,unit:e.target.value}))}>
-                    {SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}
+                  <select style={{ ...inp(), background:th.bgCard, padding:"10px 6px" }} value={siCurrent.unit} onChange={e=>siChangeCurrentUnit(e.target.value)}>
+                    {siUnitOptionsFor(siFindProduct(siCurrent.productId), siCurrent.unit).map(u=><option key={u} value={u}>{u}</option>)}
                   </select>
                 </div>
               </div>
@@ -6903,7 +7751,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               <span style={{ fontSize:14, fontWeight:800, color:formIsDelivery?"#a855f7":"#22c55e", flexShrink:0, paddingTop:2 }}>{t.cur}{siFmt2(total)}</span>
               {/* ✏️ Edit — loads item back into entry form */}
               <button title={lang==="bn"?"এডিট করুন":"Edit"} onClick={()=>{
-                setSiCurrent({ productId:item.productId||null, name:item.name, code:item.code||"", brand:item.brand||"", qty:String(item.qty), unit:item.unit||"Pcs", unitPrice:String(item.unitPrice||""), discountPerc:String(item.discountPerc||"0"), vatPerc:String(item.vatPerc||"5") });
+                setSiCurrent({ productId:item.productId||null, name:item.name, code:item.code||"", brand:item.brand||"", qty:String(item.qty), unit:item.unit||"Pcs", unitPrice:String(item.unitPrice||""), discountPerc:String(item.discountPerc||"0"), discountFlat:siN2(item.discountFlat)>0?String(item.discountFlat):"", vatPerc:item.vatPerc!=null&&item.vatPerc!==""?String(item.vatPerc):"5" });
                 setSiLines(p=>p.filter(x=>x.id!==item.id));
                 setTimeout(()=>siNameRef.current?.focus(), 80);
               }} style={{ width:26, height:26, borderRadius:6, border:"1px solid #1d4ed8", background:"rgba(29,78,216,0.08)", color:"#60a5fa", cursor:"pointer", fontSize:12, flexShrink:0 }}>✏️</button>
@@ -6918,7 +7766,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       {/* Summary */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
         <div style={{ fontSize:11, color:"#22c55e", fontWeight:700, textTransform:"uppercase", letterSpacing:0, marginBottom:10 }}>📊 {t.si_summary}</div>
-        {[[t.si_subtotal,siFmt2(totals.sub),th.txtPrimary],...(totals.disc>0?[[t.si_totalDiscount,`- ${siFmt2(totals.disc)}`,"#ef4444"]]:[]),...(totals.vat>0?[["VAT",`+ ${siFmt2(totals.vat)}`,"#06b6d4"]]:[])].map(([l,v,c],i)=>(
+        {[[t.si_subtotal,siFmt2(totals.sub),th.txtPrimary],...(totals.disc>0?[[t.si_totalDiscount,`- ${siFmt2(totals.disc)}`,"#ef4444"]]:[]),...(totals.vat>0?[["VAT",`+ ${siFmt2(totals.vat)}`,"#06b6d4"]]:[]),...(totals.adjustment?[[lang==="bn"?"সমন্বয়":"Adjustment",`${totals.adjustment>0?"+":"-"} ${siFmt2(Math.abs(totals.adjustment))}`,th.txtPrimary]]:[]),...(totals.roundOff?[["Round Off",`${totals.roundOff>0?"+":"-"} ${siFmt2(Math.abs(totals.roundOff))}`,th.txtPrimary]]:[])].map(([l,v,c],i)=>(
           <div key={i} style={{ display:"flex", justifyContent:"space-between", padding:"6px 0", borderBottom:`1px solid ${th.border}` }}><span style={{ fontSize:12, color:th.txtMuted }}>{l}</span><span style={{ fontSize:13, fontWeight:700, color:c }}>{t.cur} {v}</span></div>
         ))}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0 0" }}>
@@ -6928,7 +7776,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       </div>
 
       {/* Payment — hidden for delivery */}
-      {!formIsDelivery&&<div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+      {!formIsDelivery&&!isQuote&&<div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={secLbl}>💳 {t.si_payment}</div>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8, marginBottom:12 }}>
           {Object.entries(SI_PAY).map(([key,pm])=>(
@@ -6966,7 +7814,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       </div>}
 
       {/* Delivery Note */}
-      <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
+      {!isQuote&&<div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
         <div style={secLbl}>🚚 {t.si_deliverySection}</div>
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
           <div>
@@ -6978,7 +7826,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             <input style={inp()} placeholder="ABC-1234" value={siForm.vehicleNo} onChange={e=>siUpd("vehicleNo",e.target.value)} />
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Note */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:16 }}>
@@ -6988,7 +7836,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
       {/* Actions */}
       <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-        <button onClick={siConfirm} disabled={siSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:siSaving?"#14532d":"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:siSaving?"not-allowed":"pointer" }}>{siSaving?"...":t.si_confirm}</button>
+        <button onClick={siConfirm} disabled={siSaving} style={{ padding:"14px", borderRadius:12, border:"none", background:siSaving?"#14532d":"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:siSaving?"not-allowed":"pointer" }}>{siSaving?"...":(isQuote?(lang==="bn"?"✅ কোটেশন সেভ করুন":"✅ Save Quotation"):isDN?(lang==="bn"?"✅ ডেলিভারি নোট সেভ করুন":"✅ Save Delivery Note"):t.si_confirm)}</button>
         <button onClick={siSaveDraft} disabled={siSaving} style={{ padding:"12px", borderRadius:12, border:`1.5px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:14, fontWeight:700, cursor:"pointer" }}>{t.si_saveDraft}</button>
         <button onClick={()=>setSiView("list")} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelForm}</button>
       </div>
@@ -7448,7 +8296,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const [amount, setAmount]     = useState("");
   const [words, setWords]       = useState("");
   const [wordsManual, setWordsManual] = useState(false);
-  const [dateVal, setDateVal]   = useState(() => new Date().toISOString().split("T")[0]);
+  const [dateVal, setDateVal]   = useState(() => localIsoDate());
   const [showBankList, setShowBankList] = useState(false);
 
   // ── Per-field calibration offsets (mm) + page size ────────────────────────
@@ -7957,7 +8805,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
           <button
             onClick={() => {
               setPayee(""); setAmount(""); setWords("");
-              setDateVal(new Date().toISOString().split("T")[0]);
+              setDateVal(localIsoDate());
               setWordsManual(false);
             }}
             style={{ ...s.stBtn, width:"100%", padding:"11px", textAlign:"center", fontSize:13 }}
@@ -8397,12 +9245,19 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
 }
 
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, orderModuleEnabled }) {
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, orderModuleEnabled, finance, toast, onOpenMenu }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
-  const delivered  = myOrders.filter(o=>o.overall==="delivered").length;
-  const cancelled  = myOrders.filter(o=>o.overall==="cancelled").length;
+  // Open orders count whenever they were made; delivered/cancelled only count when they closed today.
+  const todayKey   = localIsoDate();
+  const closedToday = (o) => {
+    const raw = o.updatedAt || o.createdAt;
+    const d = raw?.toDate ? raw.toDate() : raw ? new Date(raw) : null;
+    return !!d && !Number.isNaN(d.getTime()) && localIsoDate(d) === todayKey;
+  };
+  const delivered  = myOrders.filter(o=>o.overall==="delivered"&&closedToday(o)).length;
+  const cancelled  = myOrders.filter(o=>o.overall==="cancelled"&&closedToday(o)).length;
   const inProgress = myOrders.filter(o=>!["pending","delivered","cancelled"].includes(o.overall)).length;
 
   const panelStyle = isDesktop
@@ -8432,7 +9287,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     letterSpacing:0.7,
   };
 
-  const dashRow = {
+  const dashRow = isDesktop ? {
     display:"flex",
     gap:10,
     marginBottom:14,
@@ -8440,6 +9295,17 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     flexWrap:"nowrap",
     scrollbarWidth:"none",
     WebkitOverflowScrolling:"touch",
+  } : {
+    display:"grid",
+    gridTemplateColumns:"repeat(4, minmax(0,1fr))",
+    gap:8,
+    marginBottom:14,
+  };
+  const moneyRow = isDesktop ? dashRow : {
+    display:"grid",
+    gridTemplateColumns:"repeat(2, minmax(0,1fr))",
+    gap:8,
+    marginBottom:14,
   };
 
   const glassCard = {
@@ -8459,6 +9325,9 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     { key:"vendors",  icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors",        badge:vendors.length },
     { key:"customers",icon:"👥", label:lang==="bn"?"কাস্টমার":"Customers",    badge:customers.length },
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
+    { key:"pdc",      icon:"📃", label:lang==="bn"?"PDC চেক":"PDC",           badge:null },
+    { key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses",          badge:null },
+    { key:"accounts", icon:"📊", label:lang==="bn"?"হিসাব নিকাশ":"Accounts",  badge:null },
     ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
@@ -8469,25 +9338,13 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
     { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
+    ...(staffQuickNavKeys.includes("pdc") ? [{ key:"pdc", icon:"📃", label:lang==="bn"?"PDC চেক":"PDC", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("expenses") ? [{ key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses", badge:null }] : []),
     ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
 
   const navItems = isOwner ? ownerNavItems : salesNavItems;
-
-  const miniTopItems = [
-    { key:"dashboard", icon:"🏠", label:lang==="bn"?"ড্যাশবোর্ড":"Dashboard" },
-    ...(orderModuleEnabled ? [{ key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" }] : []),
-    ...(isOwner || (orderModuleEnabled && staffQuickNavKeys.includes("sales"))
-      ? [{ key:isOwner?"purchase":"shop", icon:"＋", label:lang==="bn"?(isOwner?"ক্রয়":"অর্ডার"):(isOwner?"Purchase":"Order") }]
-      : [{ key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয়":"Purchase" }]),
-    ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
-    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch":"Branch" }] : []),
-    ...(isOwner || staffQuickNavKeys.includes("products")
-      ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products" }]
-      : []),
-    { key:"settings", icon:"•••", label:lang==="bn"?"আরও":"More" },
-  ];
 
   const statusCards = [
     { label:t.dashPending,    value:pending,    icon:"⏳", color:"#f59e0b", glow:"rgba(245,158,11,0.26)" },
@@ -8496,12 +9353,85 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     { label:t.dashCancelled,  value:cancelled,  icon:"✖", color:"#ef4444", glow:"rgba(239,68,68,0.24)" },
   ];
 
-  const shopCards = [
-    { label:t.dashProducts,  value:products.length,  icon:"📦", color:"#a855f7" },
-    { label:t.dashTeam,      value:team.length,      icon:"👥", color:"#3b82f6" },
-    { label:t.dashCustomers, value:customers.length, icon:"👥", color:"#22c55e" },
-    { label:t.dashVendors,   value:vendors.length,   icon:"🏭", color:"#06b6d4" },
+  const bn = lang==="bn";
+  const cur = t.cur || "AED";
+  const money = (v) => (Math.round((parseFloat(v)||0)*100)/100).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
+  const salesCards = [
+    { key:"st", tab:"sales",    icon:"🧾", color:"#22c55e", label:bn?"আজকের বিক্রি":"Today's sales",
+      value:money(finance.salesToday), sub:bn?`${finance.salesTodayCount}টি ইনভয়েস`:`${finance.salesTodayCount} invoices` },
+    { key:"sm", tab:"sales",    icon:"📈", color:"#3b82f6", label:bn?"এই মাসের বিক্রি":"This month's sales",
+      value:money(finance.salesMonth), sub:bn?`${finance.salesMonthCount}টি ইনভয়েস`:`${finance.salesMonthCount} invoices` },
+    { key:"ct", tab:"sales",    icon:"💵", color:"#10b981", label:bn?"আজ টাকা আদায়":"Collected today",
+      value:money(finance.collectedToday), sub:bn?"নগদ + রিসিট":"Cash + receipts" },
+    { key:"pt", tab:"purchase", icon:"🛒", color:"#8b5cf6", label:bn?"আজকের ক্রয়":"Today's purchase",
+      value:money(finance.purchaseToday), sub:bn?`${finance.purchaseTodayCount}টি ইনভয়েস`:`${finance.purchaseTodayCount} invoices` },
+    { key:"pm", tab:"purchase", icon:"📦", color:"#a855f7", label:bn?"এই মাসের ক্রয়":"This month's purchase",
+      value:money(finance.purchaseMonth), sub:bn?`${finance.purchaseMonthCount}টি ইনভয়েস`:`${finance.purchaseMonthCount} invoices` },
   ];
+  const creditCards = [
+    { key:"rc", tab:"sales",    icon:"🙋", color:"#f59e0b", label:bn?"কাস্টমারের কাছে পাওনা":"Customers owe you",
+      value:money(finance.receivable.amount), sub:bn?`${finance.receivable.parties} জন কাস্টমার`:`${finance.receivable.parties} customers` },
+    { key:"py", tab:"purchase", icon:"🏭", color:"#ef4444", label:bn?"সাপ্লায়ারকে দেনা":"You owe suppliers",
+      value:money(finance.payable.amount), sub:bn?`${finance.payable.parties} জন সাপ্লায়ার`:`${finance.payable.parties} suppliers` },
+    { key:"cr", tab:"pdc",      icon:"📥", color:"#06b6d4", label:bn?"হাতে থাকা চেক (পাওয়া)":"Cheques received (pending)",
+      value:money(finance.chequesReceived.amount),
+      sub:finance.chequesReceived.dueNow>0
+        ? (bn?`${finance.chequesReceived.count}টি · ${finance.chequesReceived.dueNow}টি জমার সময় হয়েছে`:`${finance.chequesReceived.count} · ${finance.chequesReceived.dueNow} due now`)
+        : (bn?`${finance.chequesReceived.count}টি চেক`:`${finance.chequesReceived.count} cheques`),
+      extra:{ label:bn?"এই মাসে":"This month", value:money(finance.chequesReceived.monthAmount), count:finance.chequesReceived.monthCount },
+      alert:finance.chequesReceived.dueNow>0 },
+    { key:"ci", tab:"pdc",      icon:"📤", color:"#ec4899", label:bn?"দেওয়া চেক (বাকি)":"Cheques issued (pending)",
+      value:money(finance.chequesIssued.amount),
+      sub:finance.chequesIssued.dueNow>0
+        ? (bn?`${finance.chequesIssued.count}টি · ${finance.chequesIssued.dueNow}টি পাস হওয়ার সময়`:`${finance.chequesIssued.count} · ${finance.chequesIssued.dueNow} due now`)
+        : (bn?`${finance.chequesIssued.count}টি চেক`:`${finance.chequesIssued.count} cheques`),
+      extra:{ label:bn?"এই মাসে":"This month", value:money(finance.chequesIssued.monthAmount), count:finance.chequesIssued.monthCount },
+      alert:finance.chequesIssued.dueNow>0 },
+  ];
+
+  const moneyCard = (item, idx, list) => (
+    <button
+      key={item.key}
+      onClick={()=>setTab(item.tab)}
+      style={{
+        ...glassCard,
+        borderRadius:14,
+        padding:isDesktop?"10px 12px":"9px 10px",
+        minHeight:86,
+        boxSizing:"border-box",
+        display:"flex",
+        flexDirection:"column",
+        alignItems:"flex-start",
+        justifyContent:"space-between",
+        gap:4,
+        borderBottom:`3px solid ${item.color}`,
+        flex:isDesktop?"1 1 0":undefined,
+        minWidth:0,
+        width:"100%",
+        overflow:"hidden",
+        gridColumn:!isDesktop && list.length%2===1 && idx===list.length-1 ? "1 / -1" : undefined,
+        cursor:"pointer",
+        fontFamily:"inherit",
+        textAlign:"left",
+        color:th.txtPrimary,
+      }}
+    >
+      <div style={{ display:"flex", alignItems:"center", gap:7, width:"100%" }}>
+        <span style={{ width:24, height:24, borderRadius:12, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, flexShrink:0 }}>{item.icon}</span>
+        <span style={{ color:th.txtSecondary, fontSize:11, fontWeight:800, lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.label}</span>
+      </div>
+      <div style={{ fontSize:isDesktop?19:16, fontWeight:900, lineHeight:1.1, letterSpacing:-0.3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>
+        <span style={{ fontSize:11, fontWeight:800, color:th.txtMuted, marginRight:4 }}>{cur}</span>{item.value}
+      </div>
+      <div style={{ fontSize:10, fontWeight:700, color:item.alert?"#f59e0b":th.txtMuted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>{item.sub}</div>
+      {item.extra&&(
+        <div style={{ width:"100%", boxSizing:"border-box", marginTop:2, padding:"4px 7px", borderRadius:8, background:`${item.color}1f`, border:`1px solid ${item.color}44`, display:"flex", flexWrap:"wrap", justifyContent:"space-between", alignItems:"baseline", columnGap:6, rowGap:1, whiteSpace:"nowrap" }}>
+          <span style={{ fontSize:10, fontWeight:800, color:th.txtSecondary }}>📅 {item.extra.label} ({item.extra.count})</span>
+          <span style={{ fontSize:12, fontWeight:900, color:th.txtPrimary }}>{item.extra.value}</span>
+        </div>
+      )}
+    </button>
+  );
 
   const statCard = (item) => (
     <div
@@ -8520,7 +9450,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
         flexDirection:"column",
         justifyContent:"space-between",
         flex:"1 1 0",
-        minWidth:isDesktop?0:74,
+        minWidth:0,
       }}
     >
       <div style={{ position:"absolute", inset:"auto -28px -32px auto", width:72, height:72, borderRadius:"50%", background:item.glow||`${item.color}22`, filter:"blur(4px)" }} />
@@ -8531,34 +9461,6 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
         <div style={{ color:th.txtPrimary, fontSize:isDesktop?22:20, lineHeight:1, fontWeight:900, letterSpacing:-0.5 }}>{item.value}</div>
       </div>
       <div style={{ color:th.txtSecondary, fontSize:isDesktop?11:10, fontWeight:700, marginTop:6, lineHeight:1.2, position:"relative", zIndex:1 }}>{item.label}</div>
-    </div>
-  );
-
-  const shopCard = (item) => (
-    <div
-      key={item.label}
-      style={{
-        ...glassCard,
-        borderRadius:14,
-        padding:isDesktop?"10px 8px":"8px 6px",
-        minHeight:72,
-        height:72,
-        boxSizing:"border-box",
-        display:"flex",
-        flexDirection:"column",
-        alignItems:"center",
-        justifyContent:"center",
-        gap:4,
-        borderBottom:`3px solid ${item.color}`,
-        flex:isDesktop?"1 1 0":"0 0 92px",
-        minWidth:isDesktop?0:92,
-      }}
-    >
-      <div style={{ width:28, height:28, borderRadius:14, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, boxShadow:`0 6px 14px ${item.color}44`, flexShrink:0 }}>
-        {item.icon}
-      </div>
-      <div style={{ color:th.txtPrimary, fontSize:isDesktop?18:17, lineHeight:1, fontWeight:900 }}>{item.value}</div>
-      <div style={{ color:th.txtSecondary, fontSize:10, fontWeight:700, lineHeight:1.15, textAlign:"center", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%", paddingInline:2 }}>{item.label}</div>
     </div>
   );
 
@@ -8594,55 +9496,6 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
 
   return (
     <div style={panelStyle}>
-      {!isDesktop && (
-        <div style={{ display:"flex", gap:12, overflowX:"auto", padding:"2px 0 16px", margin:"0 -2px 2px", scrollbarWidth:"none" }}>
-          {miniTopItems.map((item, idx)=>(
-            <button
-              key={item.key}
-              onClick={()=>setTab(item.key)}
-              style={{
-                minWidth:idx===0?84:78,
-                height:78,
-                borderRadius:17,
-                border:idx===0?"1px solid rgba(96,165,250,0.95)":"1px solid rgba(148,163,184,0.22)",
-                background:idx===0?"linear-gradient(135deg,#3b82f6,#60a5fa)":"linear-gradient(145deg,rgba(30,41,59,0.92),rgba(15,23,42,0.88))",
-                color:"#fff",
-                boxShadow:idx===0?"0 12px 28px rgba(59,130,246,0.34)":"0 10px 22px rgba(2,6,23,0.22)",
-                fontFamily:"inherit",
-                display:"flex",
-                flexDirection:"column",
-                alignItems:"center",
-                justifyContent:"center",
-                gap:7,
-                flexShrink:0,
-              }}
-            >
-              <span style={{ fontSize:24 }}>{item.icon}</span>
-              <span style={{ fontSize:12, fontWeight:850, whiteSpace:"nowrap" }}>{item.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div style={{ ...glassCard, borderRadius:22, padding:isDesktop?"22px 24px":"16px 14px", marginBottom:16, display:"flex", alignItems:"center", gap:isDesktop?18:12, position:"relative", overflow:"hidden", border:"1px solid rgba(96,165,250,0.28)" }}>
-        <div style={{ position:"absolute", inset:"-60px -70px auto auto", width:170, height:170, borderRadius:"50%", background:"rgba(59,130,246,0.22)", filter:"blur(12px)" }} />
-        <div style={{ fontSize:isDesktop?48:42, flexShrink:0, filter:"drop-shadow(0 12px 22px rgba(96,165,250,0.25))" }}>{isOwner?"🏢":"👨‍💼"}</div>
-        <div style={{ minWidth:0, flex:1, position:"relative", zIndex:1 }}>
-          <div style={{ fontSize:isDesktop?22:18, fontWeight:900, color:th.txtPrimary, lineHeight:1.15, letterSpacing:-0.4 }}>
-            {lang==="bn"?"স্বাগতম":"Welcome"}, <span style={{ color:"#60a5fa" }}>{(profile.personName||"").toUpperCase()}</span>! 👋
-          </div>
-          <div style={{ fontSize:isDesktop?15:13, color:th.txtSecondary, marginTop:8, lineHeight:1.35, fontWeight:650 }}>
-            🏪 {localShop?.companyName||""}
-            {!isOwner && profile.position && <span style={{ color:"#60a5fa", fontWeight:800 }}> · {profile.position}</span>}
-          </div>
-        </div>
-        {!isDesktop && orderModuleEnabled && (
-          <button onClick={()=>setTab(isOwner?"owner":"shop")} style={{ width:46, height:46, borderRadius:23, border:"1px solid rgba(96,165,250,0.30)", background:"rgba(59,130,246,0.16)", color:"#60a5fa", fontSize:24, fontWeight:900, flexShrink:0 }}>
-            ›
-          </button>
-        )}
-      </div>
-
       {orderModuleEnabled && (
         <>
           <div style={sectionTitle}>
@@ -8658,10 +9511,19 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
       )}
 
       {isOwner && (
+        <ChequeDueAlert lang={lang} th={th} cur={cur} cheques={finance.dueCheques} upcoming={finance.upcomingCheques} today={finance.today}
+          userId={userUid} toast={toast} onOpenPdc={()=>setTab("pdc")} />
+      )}
+
+      {isOwner && (
         <>
-          <div style={sectionTitle}><span>{lang==="bn"?"দোকানের সংক্ষিপ্ত তথ্য":"Shop Overview"}</span></div>
-          <div style={dashRow}>
-            {shopCards.map(c=>shopCard(c))}
+          <div style={sectionTitle}><span>{bn?"💰 বিক্রির হিসাব":"💰 Sales"}</span></div>
+          <div style={moneyRow}>
+            {salesCards.map(moneyCard)}
+          </div>
+          <div style={sectionTitle}><span>{bn?"📒 বাকির হিসাব":"📒 Credit"}</span></div>
+          <div style={moneyRow}>
+            {creditCards.map(moneyCard)}
           </div>
         </>
       )}
@@ -8683,9 +9545,9 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
               main:true,
             },
             ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
-            { key:"settings", icon:"⚙️", label:lang==="bn"?"আরও":"More" },
+            { key:"more", icon:"☰", label:lang==="bn"?"আরও":"More" },
           ].map(item=>(
-            <button key={item.key} onClick={()=>setTab(item.key)}
+            <button key={item.key} onClick={()=>item.key==="more" ? (onOpenMenu ? onOpenMenu() : setTab("settings")) : setTab(item.key)}
               style={{ border:0, background:"transparent", color:item.main?"#fff":th.txtSecondary, fontFamily:"inherit", display:"flex", flexDirection:"column", alignItems:"center", gap:3, fontSize:10, fontWeight:800 }}>
               <span style={{ width:item.main?50:30, height:item.main?50:30, marginTop:item.main?-24:0, borderRadius:999, background:item.main?"linear-gradient(135deg,#2563eb,#60a5fa)":"transparent", boxShadow:item.main?"0 12px 28px rgba(59,130,246,0.46)":"none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:item.main?34:22 }}>
                 {item.icon}
@@ -8971,12 +9833,13 @@ function SyncSettingsPanel({
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────
-function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s, th, theme, setTheme, onLogout, onProfileUpdate }) {
+function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBase, th:thBase, theme, setTheme, onLogout, onProfileUpdate }) {
   const isOwner = profile.role==="owner";
   const isSalesman = !isOwner;
   const shopId  = profile.shopId;
   const perms   = { ...DEFAULT_PERMISSIONS, ...(profile.permissions || {}) };
   const can     = (key) => isOwner||perms[key]===true;
+  const canManageProducts = can("manageProducts");
   const isOrderManager = !isOwner&&(can("setStatus")||can("setPrices")||can("markDelivery")||can("deleteOrder"));
 
   const [orders,setOrders]=useState([]);
@@ -9054,6 +9917,15 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;
+  const erpSkin = !isDesktop && tab !== "dashboard";
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [printSettingsOpen, setPrintSettingsOpen] = useState(false);
+  const [pageMax, setPageMax] = useState(false);
+  const [minTab, setMinTab] = useState(null);
+  useEffect(() => { if (minTab && tab === minTab) setMinTab(null); }, [tab, minTab]);
+  const erpDark = erpSkin && theme === "dark";
+  const th = erpSkin ? (erpDark ? THEMES.erpDark : THEMES.erp) : thBase;
+  const s = erpSkin ? (erpDark ? _erpDarkS : _erpS) : sBase;
   const [licenseAccess, setLicenseAccess] = useState(null);
   const [syncRefreshKey, setSyncRefreshKey] = useState(0);
   const [clearingProducts, setClearingProducts] = useState(false);
@@ -9061,10 +9933,10 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [licenseAccessLoading, setLicenseAccessLoading] = useState(true);
   const [syncDashboard, setSyncDashboard] = useState(null);
   const [cloudPullBusy, setCloudPullBusy] = useState(false);
+  const cloudPullRunRef = useRef(null);
   const [cloudUploadBusy, setCloudUploadBusy] = useState(false);
   const [lastCloudPullAt, setLastCloudPullAt] = useState(null);
   const [settingsPage,setSettingsPage]=useState(null);
-  const [showShopPartFormatSettings,setShowShopPartFormatSettings]=useState(false);
   const [orderSettingsSaving,setOrderSettingsSaving]=useState(false);
   const [orderModuleOverride,setOrderModuleOverride]=useState(null);
   const hasOrderModuleSetting = Object.prototype.hasOwnProperty.call(localShop || {}, "orderModuleEnabled");
@@ -9257,7 +10129,15 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     setSyncState(typeof navigator !== "undefined" && navigator.onLine ? "connected" : "offline");
   };
 
-  const runCloudDownload = async ({ silent = false } = {}) => {
+  const runCloudDownload = ({ silent = false } = {}) => {
+    if (cloudPullRunRef.current) return cloudPullRunRef.current;
+    const run = runCloudDownloadOnce({ silent });
+    cloudPullRunRef.current = run;
+    run.finally(() => { if (cloudPullRunRef.current === run) cloudPullRunRef.current = null; });
+    return run;
+  };
+
+  const runCloudDownloadOnce = async ({ silent = false } = {}) => {
     if (!shopId) return null;
     const blockReason = getCloudSyncBlockReason();
     if (blockReason === "FIREBASE_AUTH_REQUIRED") {
@@ -9287,10 +10167,13 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
       if (!silent) {
         const productCount = result?.data?.products?.length || 0;
-        const msg = lang==="bn"
-          ? `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`
-          : `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`;
-        toast(result.partial ? `${msg} ⚠️` : msg, result.partial ? "err" : "ok");
+        const msg = `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`;
+        const failedNames = (result.results || []).filter((r) => !r.ok).map((r) => r.collection);
+        const failedNote = failedNames.length
+          ? (lang==="bn" ? ` ⚠️ আসেনি: ${failedNames.join(", ")}` : ` ⚠️ Not downloaded: ${failedNames.join(", ")}`)
+          : "";
+        toast(`${msg}${failedNote}`, failedNames.length ? "err" : "ok");
+        if (failedNames.length) console.warn("[S4 Sync] cloud download failed for", (result.results || []).filter((r) => !r.ok));
       }
 
       await refreshSyncDashboard();
@@ -9472,10 +10355,10 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           force ||
           (typeof sessionStorage !== "undefined" && sessionStorage.getItem(forceKey) === "1");
         if (!forced && !(await shouldAutoPullShop(shopId))) return;
-        const result = await runCloudDownload({ silent: !forced });
         if (forced && typeof sessionStorage !== "undefined") {
           try { sessionStorage.removeItem(forceKey); } catch {}
         }
+        const result = await runCloudDownload({ silent: !forced });
         if (!cancelled && result?.ok && !forced) {
           toast(t.syncAutoPullOk);
         }
@@ -9490,6 +10373,21 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       cancelled = true;
     };
   }, [shopId, isOwner, isOrderManager, user?.uid, authSyncReady]);
+
+  const finance = useShopFinance(shopId, { enabled: isOwner, live: !!authSyncReady });
+  useChequeDueNotifications({
+    shopId, enabled: isOwner, cheques: finance.dueCheques, upcoming: finance.upcomingCheques, pending: finance.pendingCheques, today: finance.today,
+    lang, toast, cur: t.cur || "AED", onOpen: () => setTab("dashboard"),
+  });
+
+  useEffect(() => {
+    if (!shopId || !isOwner || !authSyncReady) return;
+    return startAutoBackup(shopId, {
+      onReminder: () => toast(lang==="bn"
+        ? "💾 অনেকদিন ব্যাকআপ নেওয়া হয়নি — সেটিংস › ব্যাকআপ ও রিস্টোর থেকে Google Drive-এ ব্যাকআপ নিন"
+        : "💾 No recent backup — go to Settings › Backup & restore to save one to Google Drive"),
+    });
+  }, [shopId, isOwner, authSyncReady]);
 
   // ── Background real-time sync for collections that don't have their own
   // always-mounted listener above (purchaseInvoices/purchasePayments/
@@ -9535,12 +10433,10 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         const forced = typeof sessionStorage !== "undefined" && sessionStorage.getItem(forceKey) === "1";
         (forced ? Promise.resolve(true) : shouldAutoPullShop(shopId)).then((shouldPull) => {
           if (!shouldPull) return null;
-          return runCloudDownload({ silent: !forced }).then((result) => {
-            if (forced && result?.ok && typeof sessionStorage !== "undefined") {
-              try { sessionStorage.removeItem(forceKey); } catch {}
-            }
-            return result;
-          });
+          if (forced && typeof sessionStorage !== "undefined") {
+            try { sessionStorage.removeItem(forceKey); } catch {}
+          }
+          return runCloudDownload({ silent: !forced });
         }).catch((err) => console.warn("[S4 Sync] auth restore cloud pull failed", err));
       }
     });
@@ -10059,8 +10955,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   // ── PRODUCT MASTER STATE ──
   const createEmptyPmForm = () => ({
-    name:"", code:"", shopPartNumber:"", shopPartSerial:0, shopPartFormatKey:"",
-    originalPartKey:"", shopPartGroupKey:"",
+    name:"", code:"",
     barcode:"", ean:"", moreBarcodes:[],
     brand:"", company:"", productGroup:"", category:"", subcategory:"",
     commodityCode:"", productType:"Goods", arabicName:"", weightBarcode:false, rateBarcode:false,
@@ -10068,441 +10963,41 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     landingCost:"", marginPerc:"", marginAmount:"",
     vatExclusive:"", vatInclusive:"", vatOnMrp:false, mrp:"", averageCost:"",
     openingStock:"", openingRate:"", openingWarehouse:"", unit:"Pcs", customUnits:[], unitDefinitions:[],
-    customerTypes:[], unitPrices:[], multiCustomerRatesEnabled:false,
+    customerTypes:[], unitPrices:[], multiCustomerRatesEnabled:true,
     defaultDiscount:"", reorderMin:"", reorderMax:"", reorderQty:"", rackLocation:"",
     specificationText:"", photoUrl:"", description:""
   });
   const [pmSearch,setPmSearch]=useState("");
   const [pmCatFilter,setPmCatFilter]=useState("ALL");
   const [pmShowAdd,setPmShowAdd]=useState(false);
+  // Product Master opened over the Sales Invoice (F9); a product saved there is handed back to the invoice.
+  const [pmOverSales,setPmOverSales]=useState(false);
+  const [pmPickForSales,setPmPickForSales]=useState(null);
+  const [quoteToConvert,setQuoteToConvert]=useState(null);
+  useEffect(()=>{ if (!["sales","quotation","delivery","purchase"].includes(tab)) setPmOverSales(false); },[tab]);
   const [pmEditId,setPmEditId]=useState(null);
   const [pmForm,setPmForm]=useState(createEmptyPmForm);
   const [savingProduct,setSavingProduct]=useState(false);
-  const [shopPartFormat,setShopPartFormat]=useState(() => {
-    try {
-      return normalizeShopPartFormat(JSON.parse(localStorage.getItem(`s4-shop-part-format-${shopId}`) || "{}"));
-    } catch {
-      return { ...DEFAULT_SHOP_PART_FORMAT };
-    }
-  });
-  const [shopPartEnabled,setShopPartEnabled]=useState(() => {
-    const saved = localStorage.getItem(`s4-shop-part-enabled-${shopId}`);
-    return saved === null ? true : saved === "true";
-  });
-  const [shopPartSettingsSaving,setShopPartSettingsSaving]=useState(false);
-  const shopPartFormatRef = useRef(shopPartFormat);
-  const shopPartEnabledRef = useRef(shopPartEnabled);
-  const shopPartSerialRef = useRef(0);
-  const shopPartAllocationRef = useRef(new Map());
-  const shopPartNumberOwnersRef = useRef(new Map());
-  const shopPartBackfillRef = useRef("");
-  const shopPartAlignRef = useRef("");
   const pmReset = () => setPmForm(createEmptyPmForm());
 
-  const rebuildShopPartIndex = (rows = products) => {
-    const allocations = new Map();
-    const numberOwners = new Map();
-    let highest = 0;
-    rows.forEach((product) => {
-      const serial = Number(product.shopPartSerial) || shopPartSerial(product.shopPartNumber);
-      if (serial > highest) highest = serial;
-      const groupKey = productPartGroupKey(product);
-      if (!groupKey || !product.shopPartNumber) return;
-      const existing = allocations.get(groupKey);
-      const assignment = {
-        shopPartNumber: product.shopPartNumber,
-        shopPartSerial: serial,
-        originalPartKey: coreOriginalPartKey(product.code),
-        shopPartGroupKey: groupKey,
-      };
-      if (!existing || (!existing.shopPartSerial && serial) || existing.shopPartSerial > serial) {
-        allocations.set(groupKey, assignment);
-      }
-      numberOwners.set(String(product.shopPartNumber).toLowerCase(), groupKey);
-    });
-    shopPartSerialRef.current = highest;
-    shopPartAllocationRef.current = allocations;
-    shopPartNumberOwnersRef.current = numberOwners;
-  };
-
-  const reserveShopPartNumber = (productLike, { reuse = "", previousGroupKey = "" } = {}) => {
-    const originalPartKey = coreOriginalPartKey(productLike?.code);
-    const groupKey = productPartGroupKey({ ...productLike, originalPartKey });
-    if (!groupKey) {
-      return { shopPartNumber: "", originalPartKey: "", shopPartGroupKey: "" };
-    }
-
-    const existing = shopPartAllocationRef.current.get(groupKey);
-    if (existing) {
-      return { ...existing, originalPartKey, shopPartGroupKey: groupKey };
-    }
-
-    const reuseOwner = reuse
-      ? shopPartNumberOwnersRef.current.get(String(reuse).toLowerCase())
-      : "";
-    const canReuse = reuse && (!reuseOwner || reuseOwner === groupKey) && (
-      !previousGroupKey ||
-      previousGroupKey === groupKey ||
-      String(previousGroupKey).startsWith("PRODUCT:")
-    );
-    if (canReuse) {
-      const serial = Number(productLike.shopPartSerial) || shopPartSerial(reuse) || ++shopPartSerialRef.current;
-      const assignment = {
-        shopPartNumber: reuse,
-        shopPartSerial: serial,
-        originalPartKey,
-        shopPartGroupKey: groupKey,
-      };
-      shopPartAllocationRef.current.set(groupKey, assignment);
-      shopPartNumberOwnersRef.current.set(String(reuse).toLowerCase(), groupKey);
-      shopPartSerialRef.current = Math.max(shopPartSerialRef.current, serial);
-      return assignment;
-    }
-
-    shopPartSerialRef.current = Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1;
-    const serial = shopPartSerialRef.current;
-    const candidate = formatShopPartNumber(serial, productLike.code, shopPartFormatRef.current, {
-      brand: productLike.company || productLike.brand,
-      company: productLike.company || productLike.brand,
-      name: productLike.name,
-      code: productLike.code,
-    });
-    const shopPartNumber = uniqueShopPartNumber(
-      candidate,
-      new Set(shopPartNumberOwnersRef.current.keys()),
-      shopPartFormatRef.current.collisionSeparator
-    );
-    const assignment = {
-      shopPartNumber,
-      shopPartSerial: serial,
-      originalPartKey,
-      shopPartGroupKey: groupKey,
-    };
-    shopPartAllocationRef.current.set(groupKey, assignment);
-    shopPartNumberOwnersRef.current.set(shopPartNumber.toLowerCase(), groupKey);
-    return assignment;
-  };
-
+  // Every menu opens at its start screen; sub-pages left open are not restored.
+  const lastTabRef = useRef(tab);
   useEffect(() => {
-    shopPartFormatRef.current = shopPartFormat;
-    localStorage.setItem(`s4-shop-part-format-${shopId}`, JSON.stringify(shopPartFormat));
-  }, [shopId, shopPartFormat]);
-
-  useEffect(() => {
-    shopPartEnabledRef.current = shopPartEnabled;
-    localStorage.setItem(`s4-shop-part-enabled-${shopId}`, String(shopPartEnabled));
-  }, [shopId, shopPartEnabled]);
-
-  useEffect(() => {
-    if (!shopId) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const settingsId = `shop-part-format-${shopId}`;
-        const localRecord = await offlineGetById("settings", settingsId);
-        let data = localRecord?.data || null;
-        if (navigator.onLine && db) {
-          const cloudSnap = await getDoc(doc(db, "settings", settingsId));
-          if (cloudSnap.exists()) {
-            data = cloudSnap.data();
-            offlineCacheCloudRecords("settings", [{ id: settingsId, ...data }]).catch(() => {});
-          }
-        }
-        if (cancelled || !data) return;
-        if (data.format) setShopPartFormat(normalizeShopPartFormat(data.format));
-        if (typeof data.enabled === "boolean") setShopPartEnabled(data.enabled);
-      } catch (err) {
-        console.warn("[S4 ShopPart] format load failed", err);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [shopId]);
-
-  const persistShopPartUpdates = async (updates) => {
-    const updateMap = new Map(updates.map((patch) => [patch.id, patch]));
-    setProducts((previous) => previous.map((product) => (
-      updateMap.has(product.id) ? { ...product, ...updateMap.get(product.id) } : product
-    )));
-    if (pmEditId && updateMap.has(pmEditId)) {
-      setPmForm((previous) => ({ ...previous, ...updateMap.get(pmEditId) }));
-    }
-
-    const chunkSize = 25;
-    for (let index = 0; index < updates.length; index += chunkSize) {
-      const chunk = updates.slice(index, index + chunkSize);
-      await Promise.all(chunk.map((patch) => offlineUpdate("products", patch.id, {
-        productCatalogEpoch:productMaintenanceRef.current.catalogEpoch || 0,
-        shopPartNumber: patch.shopPartNumber,
-        shopPartSerial: patch.shopPartSerial,
-        shopPartFormatKey: patch.shopPartFormatKey,
-        originalPartKey: patch.originalPartKey,
-        shopPartGroupKey: patch.shopPartGroupKey,
-        updatedAt: new Date().toISOString(),
-      })));
-    }
-  };
-
-  const applyShopPartFormatToProducts = async (format) => {
-    if (!products.length) return;
-    const normalizedFormat = normalizeShopPartFormat(format);
-    const formatKey = shopPartFormatKey(normalizedFormat);
-    const groups = new Map();
-    products.forEach((product) => {
-      const groupKey = productPartGroupKey(product);
-      if (!groupKey) return;
-      if (!groups.has(groupKey)) groups.set(groupKey, []);
-      groups.get(groupKey).push(product);
-    });
-
-    const orderedGroups = [...groups.entries()].sort(([, left], [, right]) => {
-      const leftSerial = Math.min(...left.map((item) => Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER));
-      const rightSerial = Math.min(...right.map((item) => Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber) || Number.MAX_SAFE_INTEGER));
-      return leftSerial - rightSerial || String(left[0]?.code || left[0]?.id).localeCompare(String(right[0]?.code || right[0]?.id));
-    });
-
-    const usedNumbers = new Set();
-    const usedSerials = new Set();
-    let nextSerial = 0;
-    const updates = [];
-    orderedGroups.forEach(([groupKey, groupProducts]) => {
-      let serial = Math.min(...groupProducts
-        .map((item) => Number(item.shopPartSerial) || shopPartSerial(item.shopPartNumber))
-        .filter(Boolean));
-      if (!Number.isFinite(serial) || serial < 1 || usedSerials.has(serial)) {
-        do { nextSerial += 1; } while (usedSerials.has(nextSerial));
-        serial = nextSerial;
-      }
-      usedSerials.add(serial);
-      nextSerial = Math.max(nextSerial, serial);
-
-      const representative = groupProducts[0];
-      const candidate = formatShopPartNumber(serial, representative.code, normalizedFormat, {
-        brand: representative.company || representative.brand,
-        company: representative.company || representative.brand,
-        name: representative.name,
-        code: representative.code,
-      });
-      const shopPartNumber = uniqueShopPartNumber(candidate, usedNumbers, normalizedFormat.collisionSeparator);
-      usedNumbers.add(shopPartNumber.toLowerCase());
-      const originalPartKey = coreOriginalPartKey(representative.code);
-      groupProducts.forEach((product) => updates.push({
-        id: product.id,
-        shopPartNumber,
-        shopPartSerial: serial,
-        shopPartFormatKey: formatKey,
-        originalPartKey,
-        shopPartGroupKey: groupKey,
-      }));
-    });
-
-    await persistShopPartUpdates(updates);
-    const updateMap = new Map(updates.map((patch) => [patch.id, patch]));
-    rebuildShopPartIndex(products.map((product) => (
-      updateMap.has(product.id) ? { ...product, ...updateMap.get(product.id) } : product
-    )));
-  };
-
-  const saveShopPartFormat = async (format, { applyToExisting = false } = {}) => {
-    if (shopPartSettingsSaving) return;
-    setShopPartSettingsSaving(true);
-    try {
-      const normalized = normalizeShopPartFormat(format);
-      setShopPartFormat(normalized);
-      shopPartFormatRef.current = normalized;
-      localStorage.setItem(`s4-shop-part-format-${shopId}`, JSON.stringify(normalized));
-      await offlineUpsert("settings", `shop-part-format-${shopId}`, {
-        shopId,
-        type: "shopPartNumberFormat",
-        enabled: shopPartEnabledRef.current,
-        format: normalized,
-        updatedBy: user.uid,
-        updatedAt: new Date().toISOString(),
-      });
-      if (applyToExisting && shopPartEnabledRef.current) await applyShopPartFormatToProducts(normalized);
-      toast(lang==="bn"?"✅ Shop Part Number format সংরক্ষণ হয়েছে":"✅ Shop Part Number format saved");
-      if (navigator.onLine) {
-        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part format sync failed", err));
-      }
-    } catch (err) {
-      hErr(err);
-      throw err;
-    } finally {
-      setShopPartSettingsSaving(false);
-    }
-  };
-
-  const saveShopPartEnabled = async (enabled) => {
-    if (shopPartSettingsSaving) return;
-    setShopPartSettingsSaving(true);
-    try {
-      setShopPartEnabled(enabled);
-      shopPartEnabledRef.current = enabled;
-      localStorage.setItem(`s4-shop-part-enabled-${shopId}`, String(enabled));
-      await offlineUpsert("settings", `shop-part-format-${shopId}`, {
-        shopId,
-        type: "shopPartNumberFormat",
-        enabled,
-        format: normalizeShopPartFormat(shopPartFormatRef.current),
-        updatedBy: user.uid,
-        updatedAt: new Date().toISOString(),
-      });
-      if (enabled) {
-        shopPartBackfillRef.current = "";
-        await applyShopPartFormatToProducts(shopPartFormatRef.current);
-      }
-      toast(enabled
-        ? (lang==="bn" ? "✅ Shop Part Number চালু হয়েছে" : "✅ Shop Part Number enabled")
-        : (lang==="bn" ? "✅ Shop Part Number বন্ধ হয়েছে; আগের নম্বর সংরক্ষিত আছে" : "✅ Shop Part Number disabled; existing numbers are retained")
-      );
-      if (navigator.onLine) {
-        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part toggle sync failed", err));
-      }
-    } catch (err) {
-      hErr(err);
-    } finally {
-      setShopPartSettingsSaving(false);
-    }
-  };
-
-  useEffect(() => {
-    rebuildShopPartIndex(products);
-  }, [products]);
-
-  useEffect(() => {
-    if (!shopPartEnabled || !shopId || !products.length) return;
-    const missingCount = products.filter((product) => !String(product.shopPartNumber || "").trim()).length;
-    const signature = `${shopId}:${products.length}:${missingCount}`;
-    if (shopPartBackfillRef.current === signature || !missingCount) {
-      shopPartBackfillRef.current = signature;
-      return;
-    }
-
-    let cancelled = false;
-    (async () => {
-      const localRes = await offlineList("products").catch(() => ({ records: [] }));
-      if (cancelled) return;
-      const localById = new Map(
-        (localRes.records || [])
-          .map((row) => ({ id: row.document_id, ...(row.data || {}) }))
-          .filter((row) => row.id)
-          .map((row) => [row.id, row])
-      );
-
-      const restoredProducts = products.map((product) => {
-        if (String(product.shopPartNumber || "").trim()) return product;
-        const local = localById.get(product.id);
-        if (!String(local?.shopPartNumber || "").trim()) return product;
-        return {
-          ...product,
-          shopPartNumber: local.shopPartNumber,
-          shopPartSerial: local.shopPartSerial,
-          shopPartFormatKey: local.shopPartFormatKey || product.shopPartFormatKey,
-          originalPartKey: local.originalPartKey || product.originalPartKey,
-          shopPartGroupKey: local.shopPartGroupKey || product.shopPartGroupKey,
-        };
-      });
-
-      rebuildShopPartIndex(restoredProducts);
-      const updates = [];
-      for (const product of restoredProducts) {
-        if (cancelled) return;
-        if (String(product.shopPartNumber || "").trim()) {
-          const local = localById.get(product.id);
-          if (!String(local?.shopPartNumber || "").trim() || local.shopPartNumber !== product.shopPartNumber) {
-            updates.push({
-              id: product.id,
-              shopPartNumber: product.shopPartNumber,
-              shopPartSerial: product.shopPartSerial,
-              shopPartFormatKey: product.shopPartFormatKey,
-              originalPartKey: product.originalPartKey,
-              shopPartGroupKey: product.shopPartGroupKey,
-            });
-          }
-          continue;
-        }
-        const assigned = reserveShopPartNumber(product);
-        if (!assigned.shopPartNumber) continue;
-        updates.push({
-          id: product.id,
-          shopPartNumber: assigned.shopPartNumber,
-          shopPartSerial: assigned.shopPartSerial,
-          shopPartFormatKey: shopPartFormatKey(shopPartFormatRef.current),
-          originalPartKey: assigned.originalPartKey,
-          shopPartGroupKey: assigned.shopPartGroupKey,
-        });
-      }
-      if (!updates.length) {
-        setProducts(restoredProducts);
-        shopPartBackfillRef.current = `${shopId}:${restoredProducts.filter((p) => String(p.shopPartNumber || "").trim()).length}:0`;
-        return;
-      }
-
-      setProducts(restoredProducts.map((product) => {
-        const patch = updates.find((entry) => entry.id === product.id);
-        return patch ? { ...product, ...patch } : product;
-      }));
-
-      for (const patch of updates) {
-        try {
-          await offlineUpdate("products", patch.id, {
-            productCatalogEpoch:productMaintenanceRef.current.catalogEpoch || 0,
-            shopPartNumber: patch.shopPartNumber,
-            shopPartSerial: patch.shopPartSerial,
-            shopPartFormatKey: patch.shopPartFormatKey,
-            originalPartKey: patch.originalPartKey,
-            shopPartGroupKey: patch.shopPartGroupKey,
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn("[S4 ShopPart] backfill failed", patch.id, err);
-        }
-      }
-
-      shopPartBackfillRef.current = `${shopId}:${products.length + updates.length}:0`;
-      if (navigator.onLine) {
-        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part backfill sync failed", err));
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [shopId, products, shopPartEnabled]);
-
-  useEffect(() => {
-    if (!shopPartEnabled || !shopId || !products.length) return;
-    const signature = `${shopId}:${products.length}:core-correct-v2`;
-    if (shopPartAlignRef.current === signature) return;
-    const patches = shopPartCorrectionPatches(products, shopPartFormatRef.current);
-    if (!patches.length) {
-      shopPartAlignRef.current = signature;
-      return;
-    }
-
-    shopPartAlignRef.current = signature;
-    let cancelled = false;
-    (async () => {
-      await persistShopPartUpdates(patches);
-      if (cancelled) return;
-      rebuildShopPartIndex(products.map((product) => {
-        const patch = patches.find((entry) => entry.id === product.id);
-        return patch ? { ...product, ...patch } : product;
-      }));
-      if (navigator.onLine) {
-        window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] shop part align sync failed", err));
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [shopId, products, shopPartEnabled]);
+    if (lastTabRef.current === tab) return;
+    lastTabRef.current = tab;
+    setSettingsPage(null);
+    setOwnerOrderView("menu");
+    setSelOrder(null);
+    setPmShowAdd(false);
+    setPmEditId(null);
+    setPmForm(createEmptyPmForm());
+  }, [tab]);
 
   const pmFormFromProduct = (p) => ({
     ...createEmptyPmForm(),
     ...p,
     name:p.name||"",
     code:p.code||"",
-    shopPartNumber:p.shopPartNumber||"",
-    shopPartSerial:Number(p.shopPartSerial)||shopPartSerial(p.shopPartNumber),
-    shopPartFormatKey:p.shopPartFormatKey||"",
-    originalPartKey:p.originalPartKey||coreOriginalPartKey(p.code),
-    shopPartGroupKey:p.shopPartGroupKey||productPartGroupKey(p),
     barcode:p.barcode||"",
     ean:p.ean||"",
     moreBarcodes:Array.isArray(p.moreBarcodes)?p.moreBarcodes:[],
@@ -10526,6 +11021,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     unitDefinitions:Array.isArray(p.unitDefinitions)?p.unitDefinitions:[],
     customerTypes:Array.isArray(p.customerTypes)?p.customerTypes:[],
     unitPrices:Array.isArray(p.unitPrices)?p.unitPrices:[],
+    multiCustomerRatesEnabled:productRatesEnabled(p),
   });
 
   const startProductEdit = (p) => {
@@ -10571,34 +11067,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const buildProductPayload = (created=false, productId=null) => {
     const now = new Date().toISOString();
     const cleanName = pmForm.name.trim();
-    const assigned = shopPartEnabledRef.current
-      ? reserveShopPartNumber({
-          id: productId || pmEditId || undefined,
-          code: pmForm.code,
-          shopPartSerial: pmForm.shopPartSerial,
-          shopPartGroupKey: pmForm.shopPartGroupKey,
-          originalPartKey: pmForm.originalPartKey,
-        }, {
-          reuse: created ? "" : (pmForm.shopPartNumber || ""),
-          previousGroupKey: created ? "" : (pmForm.shopPartGroupKey || productPartGroupKey(pmForm)),
-        })
-      : {
-          shopPartNumber: created ? "" : (pmForm.shopPartNumber || ""),
-          shopPartSerial: created ? 0 : (Number(pmForm.shopPartSerial) || 0),
-          originalPartKey: created ? "" : (pmForm.originalPartKey || ""),
-          shopPartGroupKey: created ? "" : (pmForm.shopPartGroupKey || ""),
-        };
     return {
       ...pmForm,
       shopId,
       productCatalogEpoch: productMaintenanceRef.current.catalogEpoch || 0,
       name: cleanName,
       code: String(pmForm.code || "").trim(),
-      shopPartNumber: assigned.shopPartNumber,
-      shopPartSerial: assigned.shopPartSerial,
-      shopPartFormatKey: shopPartFormatKey(shopPartFormatRef.current),
-      originalPartKey: assigned.originalPartKey,
-      shopPartGroupKey: assigned.shopPartGroupKey,
       brand: pmForm.brand || pmForm.company || "",
       company: pmForm.company || pmForm.brand || "",
       averageCost: pmForm.averageCost || pmForm.landingCost || "",
@@ -10626,15 +11100,15 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
   const getFilteredProducts = () => products.filter(p=>{
     const refs = collectProductBarcodes(p).join(' ');
-    const hay = [p.name,p.code,p.shopPartNumber,p.originalPartKey,p.barcode,p.ean,p.brand,p.company,p.category,p.subcategory,p.productGroup,refs].filter(Boolean).join(' ');
+    const hay = [p.name,p.code,p.barcode,p.ean,p.brand,p.company,p.category,p.subcategory,p.productGroup,refs].filter(Boolean).join(' ');
     const matchQ = nsmatch(hay, pmSearch);
     const matchCat = pmCatFilter==="ALL"||!pmCatFilter||p.category===pmCatFilter;
     return matchQ && matchCat;
   });
 
   const exportProductsCsv = (rows=getFilteredProducts()) => {
-    const headers = ["ProductId","ProductName","ShopPartNumber","ShopPartSerial","ShopPartFormatKey","OriginalPartKey","ShopPartGroupKey","CodeModel","Barcode","EAN","ProductGroup","Company","Category","SubCategory","CommodityCode","BaseUnit","ProductType","ArabicName","SalesVAT","PurchaseVAT","LandingCost","AverageCost","Margin%","MarginAmount","VATExclusive","VATInclusive","VATOnMrp","MRP","OpeningStock","OpeningRate","Warehouse","Rack","DefaultDiscount","ReorderMin","ReorderMax","ReorderQty","WeightBarcode","RateBarcode","MoreBarcodes","UnitPricesJson","CustomUnitsJson","UnitDefinitionsJson","CustomerTypesJson","MultiCustomerRatesEnabled","SpecificationText","PhotoUrl","Description"];
-    const body = rows.map(p => [p.id,p.name,p.shopPartNumber,p.shopPartSerial,p.shopPartFormatKey,p.originalPartKey,p.shopPartGroupKey,p.code,p.barcode,p.ean,p.productGroup,p.company||p.brand,p.category,p.subcategory,p.commodityCode,p.unit,p.productType,p.arabicName,p.salesVat,p.purchaseVat,p.landingCost,p.averageCost,p.marginPerc,p.marginAmount,p.vatExclusive,p.vatInclusive,p.vatOnMrp,p.mrp,p.openingStock,p.openingRate,p.openingWarehouse,p.rackLocation,p.defaultDiscount,p.reorderMin,p.reorderMax,p.reorderQty,p.weightBarcode?"TRUE":"",p.rateBarcode?"TRUE":"",Array.isArray(p.moreBarcodes)?p.moreBarcodes.join(";"):"",Array.isArray(p.unitPrices)?JSON.stringify(p.unitPrices):"",Array.isArray(p.customUnits)?JSON.stringify(p.customUnits):"",Array.isArray(p.unitDefinitions)?JSON.stringify(p.unitDefinitions):"",Array.isArray(p.customerTypes)?JSON.stringify(p.customerTypes):"",p.multiCustomerRatesEnabled?"TRUE":"",p.specificationText,p.photoUrl,p.description].map(csvCell).join(","));
+    const headers = ["ProductId","ProductName","CodeModel","Barcode","EAN","ProductGroup","Company","Category","SubCategory","CommodityCode","BaseUnit","ProductType","ArabicName","SalesVAT","PurchaseVAT","LandingCost","AverageCost","Margin%","MarginAmount","VATExclusive","VATInclusive","VATOnMrp","MRP","OpeningStock","OpeningRate","Warehouse","Rack","DefaultDiscount","ReorderMin","ReorderMax","ReorderQty","WeightBarcode","RateBarcode","MoreBarcodes","UnitPricesJson","CustomUnitsJson","UnitDefinitionsJson","CustomerTypesJson","MultiCustomerRatesEnabled","SpecificationText","PhotoUrl","Description"];
+    const body = rows.map(p => [p.id,p.name,p.code,p.barcode,p.ean,p.productGroup,p.company||p.brand,p.category,p.subcategory,p.commodityCode,p.unit,p.productType,p.arabicName,p.salesVat,p.purchaseVat,p.landingCost,p.averageCost,p.marginPerc,p.marginAmount,p.vatExclusive,p.vatInclusive,p.vatOnMrp,p.mrp,p.openingStock,p.openingRate,p.openingWarehouse,p.rackLocation,p.defaultDiscount,p.reorderMin,p.reorderMax,p.reorderQty,p.weightBarcode?"TRUE":"",p.rateBarcode?"TRUE":"",Array.isArray(p.moreBarcodes)?p.moreBarcodes.join(";"):"",Array.isArray(p.unitPrices)?JSON.stringify(p.unitPrices):"",Array.isArray(p.customUnits)?JSON.stringify(p.customUnits):"",Array.isArray(p.unitDefinitions)?JSON.stringify(p.unitDefinitions):"",Array.isArray(p.customerTypes)?JSON.stringify(p.customerTypes):"",p.multiCustomerRatesEnabled?"TRUE":"",p.specificationText,p.photoUrl,p.description].map(csvCell).join(","));
     downloadTextFile(`product-master-${new Date().toISOString().slice(0,10)}.csv`, [headers.map(csvCell).join(","), ...body].join("\n"));
     toast(lang==="bn"?"✅ Product export হয়েছে":"✅ Products exported");
   };
@@ -10642,7 +11116,16 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   // Receives rows already mapped to Product Master fields by the Import window
   // (src/product-master/modals/ImportModal.jsx). Rows are created one by one so a
   // single bad row is reported instead of aborting the whole file.
+  const productEditDeniedMessage = () => lang==="bn"
+    ? "পণ্য যোগ / এডিট / Import করার অনুমতি নেই। Owner-এর কাছে 'পণ্য যোগ / এডিট / Import' permission চান।"
+    : "You don't have permission to add, edit or import products. Ask the Owner for 'Add / Edit / Import Products'.";
+
   const importProductRecords = async (records) => {
+    if (!canManageProducts) {
+      const message = productEditDeniedMessage();
+      toast(message, "err");
+      return { created:0, skipped:records.length, errors:[{ row:"-", reason:message }] };
+    }
     if (clearingProducts || productBulkDeleteRef.current) {
       const message = lang==="bn"
         ? "Product clear শেষ হওয়ার আগে import করা যাবে না। একটু অপেক্ষা করুন।"
@@ -10664,7 +11147,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setProductReplacementActive(true);
     }
     const summary = { created:0, skipped:0, errors:[] };
-    rebuildShopPartIndex(products);
     const existingIds = new Set(products.map((product) => String(product.id || "").trim()).filter(Boolean));
     const existingCodes = new Set(products.flatMap(product => [
       product.barcode,
@@ -10729,18 +11211,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       const now = new Date().toISOString();
       try {
         const draftId = requestedId || globalThis.crypto?.randomUUID?.() || `import-${Date.now()}-${i}`;
-        const assigned = record.shopPartNumber || shopPartEnabledRef.current
-          ? reserveShopPartNumber({
-              id:draftId,
-              code:record.code,
-              shopPartSerial:Number(record.shopPartSerial)||shopPartSerial(record.shopPartNumber),
-              originalPartKey:record.originalPartKey,
-              shopPartGroupKey:record.shopPartGroupKey,
-            }, {
-              reuse:String(record.shopPartNumber||"").trim(),
-              previousGroupKey:record.shopPartGroupKey,
-            })
-          : { shopPartNumber: "", shopPartSerial: 0, originalPartKey: "", shopPartGroupKey: "" };
         const payload = {
           ...createEmptyPmForm(), ...record, shopId, name,
           id: draftId,
@@ -10748,11 +11218,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           ean,
           productCatalogEpoch: productMaintenanceRef.current.catalogEpoch || 0,
           code: String(record.code || "").trim(),
-          shopPartNumber: assigned.shopPartNumber,
-          shopPartSerial: assigned.shopPartSerial,
-          shopPartFormatKey: record.shopPartFormatKey || shopPartFormatKey(shopPartFormatRef.current),
-          originalPartKey: assigned.originalPartKey,
-          shopPartGroupKey: assigned.shopPartGroupKey,
           brand: record.company || "",
           unit: record.unit || "Pcs",
           productType: record.productType || "Goods",
@@ -10768,8 +11233,29 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           rateBarcode: ["true","1","yes","y"].includes(String(record.rateBarcode || "").trim().toLowerCase()),
           createdBy:user.uid, createdAt:now, updatedAt:now,
         };
+        const openingQty = Math.max(parseFloat(payload.openingStock) || 0, 0);
+        payload.openingStockPosted = openingQty;
         const result = await offlineCreate("products", payload);
-        const created = { ...result.data, id: result.documentId };
+        let created = { ...result.data, id: result.documentId };
+        if (openingQty > 0) {
+          try {
+            await createStockLedgerEntry({
+              productId: created.id,
+              shopId,
+              quantity: openingQty,
+              movementType: "opening",
+              referenceType: "opening_stock",
+              referenceId: created.id,
+              unitCost: parseFloat(payload.openingRate || payload.landingCost) || 0,
+              actor: { uid:user.uid, personName:profile.personName },
+            });
+          } catch (ledgerErr) {
+            console.warn("[S4 Stock] import opening stock ledger entry failed", created.id, ledgerErr);
+            const retry = await offlineUpdate("products", created.id, { ...created, openingStockPosted:0 }).catch(() => null);
+            if (retry?.data) created = { ...created, ...retry.data, id: created.id };
+            summary.errors.push({ row:rowNo, reason:"Imported, but opening stock was not posted to the ledger — open and Save this product once" });
+          }
+        }
         setProducts(prev => [created, ...prev.filter(p=>p.id!==created.id)].sort((a,b)=>(a.name||"").localeCompare(b.name||"")));
         rowCodes.forEach(code=>existingCodes.add(code.toLowerCase()));
         existingIds.add(draftId);
@@ -10805,10 +11291,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       return `<div class="label"><div class="name">${String(p.name||"").replace(/[<>&]/g,"")}</div>${barcodeSvg}<div class="price">MRP ${String(p.mrp||p.vatInclusive||"").replace(/[<>&]/g,"")}</div></div>`;
     }).filter(Boolean).join("");
     if (!labels) return toast(lang==="bn"?"CODE128 print করার মতো barcode নেই":"No CODE128-compatible barcode to print", "err");
-    const win = window.open("", "_blank", "width=900,height=700");
-    if (!win) return toast(lang==="bn"?"Popup allow করুন":"Allow popup to print", "err");
-    win.document.write(`<html><head><title>Product Barcodes</title><style>body{font-family:Arial,sans-serif;margin:16px}.sheet{display:flex;flex-wrap:wrap;gap:10px}.label{width:190px;border:1px solid #111;padding:8px;text-align:center;page-break-inside:avoid}.name{font-size:12px;font-weight:700;height:30px;overflow:hidden}.label svg{max-width:100%;height:auto;margin:4px 0}.price{font-size:11px;margin-top:3px}.skip{font-size:11px;color:#b91c1c;margin-bottom:10px}@media print{button,.skip{display:none}.label{break-inside:avoid}}</style></head><body><button onclick="window.print()">Print</button>${skipped.length?`<div class="skip">Skipped ${skipped.length} unsupported barcode(s): ${skipped.slice(0,10).map(x=>String(x).replace(/[<>&]/g,"")).join(", ")}${skipped.length>10?"...":""}</div>`:""}<div class="sheet">${labels}</div></body></html>`);
-    win.document.close();
+    if (skipped.length) toast(`Skipped ${skipped.length} unsupported barcode(s): ${skipped.slice(0,5).join(", ")}${skipped.length>5?"...":""}`, "err");
+    printWithSettings(`<html><head><meta charset="UTF-8"><title>Product Barcodes</title><style>body{font-family:Arial,sans-serif;margin:16px}.sheet{display:flex;flex-wrap:wrap;gap:10px}.label{width:190px;border:1px solid #111;padding:8px;text-align:center;page-break-inside:avoid}.name{font-size:12px;font-weight:700;height:30px;overflow:hidden}.label svg{max-width:100%;height:auto;margin:4px 0}.price{font-size:11px;margin-top:3px}@media print{.label{break-inside:avoid}}</style></head><body><div class="sheet">${labels}</div></body></html>`, { lang, kind:"barcode" });
   };
 
   // Smart pmUpd — triggers auto-calculations
@@ -10826,7 +11310,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
 
         if (field==="landingCost"||field==="marginPerc") {
           // LC or MP changed → recalc MA and VE
-          ma = lc>0 && mp>0 ? parseFloat((lc*mp/100).toFixed(4)) : ma;
+          if (field==="marginPerc" && lc>0) ma = parseFloat((lc*mp/100).toFixed(4));
+          else ma = lc>0 && mp>0 ? parseFloat((lc*mp/100).toFixed(4)) : ma;
           ve = lc>0 ? parseFloat((lc+ma).toFixed(4)) : ve;
           next.marginAmount = ma||ma===0 ? String(ma) : "";
           next.vatExclusive = ve ? String(ve) : "";
@@ -10837,11 +11322,13 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
           next.marginPerc = mp ? String(mp) : "";
           next.vatExclusive = ve ? String(ve) : "";
         } else if (field==="vatExclusive") {
-          // VE changed manually → recalc MA and MP
-          ma = parseFloat((ve-lc).toFixed(4));
-          mp = lc>0 ? parseFloat((ma/lc*100).toFixed(4)) : 0;
-          next.marginAmount = ma ? String(ma) : "";
-          next.marginPerc = mp ? String(mp) : "";
+          // VE changed manually → recalc MA and MP (no landing cost means margin is unknown)
+          if (lc>0) {
+            ma = parseFloat((ve-lc).toFixed(4));
+            mp = parseFloat((ma/lc*100).toFixed(4));
+            next.marginAmount = ma ? String(ma) : "";
+            next.marginPerc = mp ? String(mp) : "";
+          }
         }
 
         // Always recalc VAT Inclusive from current VE
@@ -10855,9 +11342,21 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         }
       }
 
-      // vatInclusive manually typed
+      // vatInclusive typed → back-calculate VE, margin and MRP; VI itself stays as typed
       if (field==="vatInclusive") {
-        // keep as typed, don't override
+        const vi = n(val);
+        const sv = n(next.salesVat);
+        const lc = n(next.landingCost);
+        if (vi>0) {
+          const ve = parseFloat((vi/(1+sv/100)).toFixed(4));
+          next.vatExclusive = String(ve);
+          if (lc>0) {
+            const ma = parseFloat((ve-lc).toFixed(4));
+            next.marginAmount = ma ? String(ma) : "";
+            next.marginPerc = ma ? String(parseFloat((ma/lc*100).toFixed(4))) : "";
+          }
+          next.mrp = next.vatOnMrp ? String(vi) : String(ve);
+        }
       }
 
       // vatOnMrp toggled → update MRP
@@ -10867,30 +11366,42 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         next.mrp = val ? (vi?String(vi):"") : (ve?String(ve):"");
       }
 
-      if (field==="code" && shopPartEnabledRef.current) {
-        const originalPartKey = coreOriginalPartKey(val);
-        const groupKey = originalPartKey ? `PART:${originalPartKey}` : "";
-        const assigned = groupKey ? shopPartAllocationRef.current.get(groupKey) : null;
-        next.originalPartKey = originalPartKey;
-        next.shopPartGroupKey = groupKey;
-        next.shopPartNumber = assigned?.shopPartNumber || (
-          originalPartKey
-            ? formatShopPartNumber(
-                Math.max(shopPartSerialRef.current, nextLocalShopPartSerial(products) - 1) + 1,
-                val,
-                shopPartFormatRef.current,
-                { brand: next.company || next.brand, company: next.company || next.brand, name: next.name, code: val }
-              )
-            : ""
-        );
-        next.shopPartSerial = assigned?.shopPartSerial || 0;
-      }
-
       return next;
     });
   };
 
+  // Posts only the change since the last posting, so re-saving a product never double-counts opening stock.
+  const postOpeningStockDelta = async (product) => {
+    const wanted = parseFloat(product?.openingStock) || 0;
+    const posted = parseFloat(product?.openingStockPosted) || 0;
+    const delta = parseFloat((wanted - posted).toFixed(4));
+    if (!product?.id || !delta) return;
+    try {
+      await createStockLedgerEntry({
+        productId: product.id,
+        shopId,
+        quantity: Math.abs(delta),
+        movementType: delta > 0 ? "opening" : "adjustment",
+        referenceType: "opening_stock",
+        referenceId: product.id,
+        unitCost: parseFloat(product.openingRate || product.landingCost) || 0,
+        actor: { uid:user.uid, personName:profile.personName },
+      });
+      const result = await offlineUpdate("products", product.id, {
+        ...product,
+        openingStockPosted: wanted,
+        productCatalogEpoch: productMaintenanceRef.current.catalogEpoch || 0,
+        updatedAt: new Date().toISOString(),
+      });
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, ...result.data, id: product.id } : p));
+    } catch (err) {
+      console.warn("[S4 Stock] opening stock ledger entry failed", product.id, err);
+      toast(lang==="bn"?"⚠️ Opening stock ledger-এ যোগ হয়নি, আবার Save করুন":"⚠️ Opening stock was not posted to the ledger. Save again.", "err");
+    }
+  };
+
   const addProduct = async () => {
+    if (!canManageProducts) return toast(productEditDeniedMessage(), "err");
     if (productMaintenanceRef.current.active) {
       return toast("Product Master replacement is in progress. Saving is temporarily locked.", "err");
     }
@@ -10913,6 +11424,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       pmReset();
       setPmShowAdd(false);
       toast(t.pmAdded);
+      if (pmOverSales) {
+        setPmPickForSales({ product: created, at: Date.now() });
+        setPmEditId(null);
+        setPmOverSales(false);
+      }
+      await postOpeningStockDelta(created);
 
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product sync failed", err));
@@ -10925,6 +11442,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   };
 
   const editProduct = async (id) => {
+    if (!canManageProducts) return toast(productEditDeniedMessage(), "err");
     if (productMaintenanceRef.current.active) {
       return toast("Product Master replacement is in progress. Saving is temporarily locked.", "err");
     }
@@ -10948,6 +11466,11 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       setPmEditId(null);
       setPmShowAdd(false);
       toast(t.pmUpdated);
+      if (pmOverSales) {
+        setPmPickForSales({ product: updated, at: Date.now() });
+        setPmOverSales(false);
+      }
+      await postOpeningStockDelta(updated);
 
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product update sync failed", err));
@@ -10994,6 +11517,53 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product delete sync failed", err));
       }
     } catch(e) {
+      hErr(e);
+    }
+  };
+
+  const removeBlankProducts = async () => {
+    if (!isOwner) return toast(lang==="bn"?"শুধু Owner এটা করতে পারবে":"Only the Shop Owner can do this","err");
+    if (!navigator.onLine || !db || !shopId) return toast(t.syncNeedInternet,"err");
+    try {
+      const snap = await getDocs(query(collection(db, "products"), where("shopId", "==", shopId)));
+      const cloudBlank = snap.docs.filter((d) => isBlankProduct(d.data()) && d.data().isDeleted !== true);
+      const local = await offlineList("products");
+      const localBlank = local.records.filter((r) => {
+        const data = r.data || {};
+        return (!data.shopId || data.shopId === shopId) && isBlankProduct(data) && data.isDeleted !== true;
+      });
+      const ids = new Set([...cloudBlank.map((d) => d.id), ...localBlank.map((r) => r.document_id)]);
+      if (!ids.size) {
+        toast(lang==="bn"?"✅ কোনো খালি প্রোডাক্ট নেই":"✅ No blank products found");
+        return;
+      }
+      const msg = lang==="bn"
+        ? `নাম, কোড আর বারকোড ছাড়া ${ids.size}টা খালি প্রোডাক্ট পাওয়া গেছে (cloud: ${cloudBlank.length}, এই ডিভাইস: ${localBlank.length})। এগুলো মুছে ফেলবেন? আসল প্রোডাক্টে হাত দেওয়া হবে না।`
+        : `Found ${ids.size} blank products with no name, code or barcode (cloud: ${cloudBlank.length}, this device: ${localBlank.length}). Delete them? Real products are not touched.`;
+      if (!window.confirm(msg)) return;
+      const cloudIds = cloudBlank.map((d) => d.id);
+      const now = new Date().toISOString();
+      const tombstone = {
+        isDeleted:true, deletedAt:now, updatedAt:now, updatedBy:user.uid,
+        productCatalogEpoch:productMaintenanceRef.current.catalogEpoch || 0,
+      };
+      for (let i = 0; i < cloudIds.length; i += 400) {
+        const chunk = cloudIds.slice(i, i + 400);
+        try {
+          const batch = writeBatch(db);
+          chunk.forEach((id) => batch.delete(doc(db, "products", id)));
+          await batch.commit();
+        } catch (err) {
+          if (!String(err?.code || err?.message || "").includes("permission")) throw err;
+          const batch = writeBatch(db);
+          chunk.forEach((id) => batch.set(doc(db, "products", id), tombstone, { merge:true }));
+          await batch.commit();
+        }
+      }
+      for (const id of ids) await offlinePurgeLocal("products", id);
+      setProducts((prev) => prev.filter((p) => !ids.has(p.id)));
+      toast(lang==="bn"?`🗑️ ${ids.size}টা খালি প্রোডাক্ট মুছে ফেলা হয়েছে`:`🗑️ Removed ${ids.size} blank products`);
+    } catch (e) {
       hErr(e);
     }
   };
@@ -11329,8 +11899,15 @@ const startEditOrder = (order) => {
         const qty = Number(item.qty || 0) || 0;
         const unitCost = Number(item.price || 0) || 0;
         const lineTotal = Number((qty * unitCost).toFixed(2));
+        // Link to the product master by code (+ brand when several share the code) so the purchase adds stock.
+        const codeKey = nsq(item.code);
+        const brandKey = String(item.brand || "").trim().toLowerCase();
+        const byCode = codeKey ? (products || []).filter(p => !p.isDeleted && [p.code, p.barcode, p.ean].some(c => c && nsq(c) === codeKey)) : [];
+        const byBrand = byCode.length > 1 && brandKey ? byCode.filter(p => String(p.brand || "").trim().toLowerCase() === brandKey) : byCode;
+        const linked = byBrand.length === 1 ? byBrand[0] : null;
         return {
-          productId:null,
+          productId:item.productId || linked?.id || null,
+          unitFactor:linked ? unitFactorFor(linked, item.unit || "Pcs") : 1,
           name:String(item.name || "").trim(),
           code:String(item.code || "").trim(),
           brand:String(item.brand || "").trim(),
@@ -11351,7 +11928,7 @@ const startEditOrder = (order) => {
         shopId,
         invoiceNo:`PI-${orderNo}-${String(seq).padStart(2,"0")}`,
         supplierInvoiceNo:`ORDER-${orderNo}`,
-        invoiceDate:nowIso.slice(0, 10),
+        invoiceDate:localIsoDate(),
         vendorId:String(supplierKey).startsWith("vendor:") ? String(supplierKey).slice(7) : null,
         vendorName:supplier.name || order.createdByName || "Order Supplier",
         vendorMobile:supplier.phone || "",
@@ -11878,6 +12455,94 @@ const startEditOrder = (order) => {
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
 
+  const notificationItems = [
+    ...(isOwner ? finance.dueCheques.map(c => ({
+      key:`chq-${c.key}`,
+      icon:chequeTypeIcon(c.type),
+      tone:c.daysLate>0?"danger":undefined,
+      title:lang==="bn"
+        ? `${chequeTypeLabel(c.type,true)} ক্লিয়ার করুন · ${t.cur||"AED"} ${(Math.round(c.amount*100)/100).toLocaleString("en-US",{minimumFractionDigits:2})}`
+        : `Clear ${chequeTypeLabel(c.type,false).toLowerCase()} · ${t.cur||"AED"} ${(Math.round(c.amount*100)/100).toLocaleString("en-US",{minimumFractionDigits:2})}`,
+      sub:`${c.party||"—"} · ${lang==="bn"?"চেক":"Cheque"} ${c.chequeNo||c.no} · ${c.daysLate>0?(lang==="bn"?`${c.daysLate} দিন পার`:`${c.daysLate} day(s) late`):(lang==="bn"?"আজ":"today")}`,
+      onClick:()=>{ setSettingsPage(null); setTab("dashboard"); },
+    })) : []),
+    ...(isOwner ? finance.upcomingCheques.map(c => ({
+      key:`chq-up-${c.key}`,
+      icon:"⏳",
+      title:lang==="bn"
+        ? `${-c.daysLate} দিন পর ${chequeTypeLabel(c.type,true)} · ${t.cur||"AED"} ${(Math.round(c.amount*100)/100).toLocaleString("en-US",{minimumFractionDigits:2})}`
+        : `${chequeTypeLabel(c.type,false)} in ${-c.daysLate} day(s) · ${t.cur||"AED"} ${(Math.round(c.amount*100)/100).toLocaleString("en-US",{minimumFractionDigits:2})}`,
+      sub:`${c.party||"—"} · ${lang==="bn"?"চেক":"Cheque"} ${c.chequeNo||c.no} · 📅 ${c.chequeDate.split("-").reverse().join("/")}`,
+      onClick:()=>{ setSettingsPage(null); setTab("dashboard"); },
+    })) : []),
+    ...(orderModuleEnabled && unread>0 ? [{
+      key:"orders", icon:"📋", count:unread,
+      title:lang==="bn"?`${unread}টি নতুন অর্ডার`:`${unread} new order(s)`,
+      sub:lang==="bn"?"অর্ডার পাতায় দেখুন":"Open orders",
+      onClick:()=>{ setSettingsPage(null); setTab(isOwner?"owner":"shop"); },
+    }] : []),
+  ];
+
+  // Phone/browser back button and the header Back button: sub-page → settings
+  // list → dashboard, instead of leaving the app.
+  const navHistRef = useRef({ pushed:false, ignorePop:false });
+  const navStateRef = useRef({ tab, settingsPage });
+  navStateRef.current = { tab, settingsPage };
+  useEffect(() => {
+    const h = navHistRef.current;
+    const away = tab !== "dashboard";
+    if (away && !h.pushed) { window.history.pushState({ s4nav:true }, ""); h.pushed = true; }
+    else if (!away && h.pushed) { h.pushed = false; h.ignorePop = true; window.history.back(); }
+  }, [tab, settingsPage]);
+  useEffect(() => {
+    const onPop = () => {
+      const h = navHistRef.current;
+      if (h.ignorePop) { h.ignorePop = false; return; }
+      if (!h.pushed) return;
+      h.pushed = false;
+      const { tab:curTab, settingsPage:curPage } = navStateRef.current;
+      if (curTab === "settings" && curPage) setSettingsPage(null);
+      else setTab("dashboard");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  const menuHistRef = useRef(false);
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    window.history.pushState({ s4menu:true }, "");
+    menuHistRef.current = true;
+    const onPop = () => {
+      if (!menuHistRef.current) return;
+      menuHistRef.current = false;
+      setMenuOpen(false);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [menuOpen]);
+  const closeMenu = () => {
+    if (menuHistRef.current) {
+      menuHistRef.current = false;
+      navHistRef.current.ignorePop = true;
+      window.history.back();
+    }
+    setMenuOpen(false);
+  };
+  const selectFromMenu = (k) => {
+    if (menuHistRef.current) {
+      menuHistRef.current = false;
+      if (k !== "dashboard" && !navHistRef.current.pushed) navHistRef.current.pushed = true;
+      else { navHistRef.current.ignorePop = true; window.history.back(); }
+    }
+    setMenuOpen(false);
+    setSettingsPage(null);
+    setTab(k);
+  };
+  const goBack = () => {
+    if (tab === "settings" && settingsPage) setSettingsPage(null);
+    else { setSettingsPage(null); setTab("dashboard"); }
+  };
+
   // ── SEARCH FILTER ──
   const filterOrders = (list) => {
     const q = searchQ.trim();
@@ -11956,19 +12621,23 @@ const startEditOrder = (order) => {
         ...(can("manageSales") ? ["sales"] : []),
         "purchase",
         "cheque",
+        ...(can("managePdc") ? ["pdc"] : []),
+        ...(can("manageExpenses") ? ["expenses"] : []),
         "settings",
       ];
 
   const visibleTabs = isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["delivery",t.tabDelivery],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
-        ...(can("manageSales")?[["sales", t.tabSales]]:[]),
+        ...(can("manageSales")?[["sales", t.tabSales],["quotation", t.tabQuotation],["delivery", t.tabDelivery]]:[]),
         ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
         ...(can("viewVendors")?[["vendors",t.tabVendor]]:[]),
         ["cheque",t.tabCheque],
+        ...(can("managePdc")?[["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"]]:[]),
+        ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"]]:[]),
         ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),
         ["settings",t.tabSettings],
       ];
@@ -11980,6 +12649,13 @@ const startEditOrder = (order) => {
   useEffect(() => {
     if (!validTabs.some(([k]) => k === tab)) setTab("dashboard");
   }, [tab, validTabs]);
+
+  const tabLabelOf = (k) => (validTabs.find(([key]) => key === k) || [])[1] || k;
+  const currentTabLabel = tabLabelOf(tab);
+  useEscapeKey(() => {
+    if (settingsPage) setSettingsPage(null);
+    else if (tab !== "dashboard") setTab("dashboard");
+  }, { enabled: isDesktop && (tab !== "dashboard" || !!settingsPage), level: 0 });
 
   // ── ORDER STATUS FLOW (overall) ──
   const setOrderStatus = async (oId, newStatus) => {
@@ -12291,6 +12967,16 @@ const startEditOrder = (order) => {
           staffQuickNavKeys={staffQuickNavKeys}
           canUseBranchTransfer={canUseBranchTransfer}
           orderModuleEnabled={orderModuleEnabled}
+          finance={finance}
+          toast={toast}
+          onOpenMenu={()=>setMenuOpen(true)}
+        />
+      )}
+      {tab==="dashboard"&&(isOwner||can("viewProducts"))&&(
+        <ReorderAlertCard
+          products={products} shopId={shopId} lang={lang} s={s}
+          wrapStyle={isDesktop?s.desktopPanel:s.panel}
+          onOpenProducts={()=>setTab("products")}
         />
       )}
       {!isOwner&&orderModuleEnabled&&tab==="shop"&&(
@@ -12323,7 +13009,7 @@ const startEditOrder = (order) => {
                     onChange={(value)=>updCurrentItem("code", value)}
                     onSelectProduct={selectProductToOrder}
                     field="code"
-                    placeholder={lang==="bn"?"Code / Shop Code":"Code / Shop Code"}
+                    placeholder={lang==="bn"?"Code / Model":"Code / Model"}
                     th={th}
                     lang={lang}
                     onKeyDown={handleEnterAdd}
@@ -12530,8 +13216,8 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {(isOwner||can("viewProducts"))&&tab==="products"&&(
-        <div style={{
+      {(isOwner||can("viewProducts"))&&(tab==="products"||(pmOverSales&&["sales","quotation","delivery","purchase"].includes(tab)))&&(
+        <div data-si-modal-open={pmOverSales ? "" : undefined} style={{
           position:"fixed",
           inset:0,
           zIndex:2000,
@@ -12558,14 +13244,19 @@ const startEditOrder = (order) => {
             category={pmCatFilter}
             onCategoryChange={setPmCatFilter}
             canDelete={isOwner}
+            canEdit={canManageProducts}
             saving={savingProduct}
             onNew={()=>{ pmReset(); setPmEditId(null); setPmShowAdd(true); }}
             onSave={()=>{ if (pmEditId) editProduct(pmEditId); else addProduct(); }}
             onDelete={()=>{ if (pmEditId) deleteProduct(pmEditId); }}
-            onClose={()=>{ setPmShowAdd(false); setPmEditId(null); pmReset(); setTab("dashboard"); }}
+            onClose={()=>{
+              setPmShowAdd(false); setPmEditId(null); pmReset();
+              if (pmOverSales) setPmOverSales(false); else setTab("dashboard");
+            }}
             onSelectProduct={startProductEdit}
             onRefresh={fetchProducts}
             onClearAll={clearAllShopProducts}
+            onRemoveBlank={isOwner ? removeBlankProducts : undefined}
             replacementActive={productReplacementActive}
             onFinishReplacement={finishProductReplacement}
             productMaintenanceActive={productMaintenance.active}
@@ -12573,7 +13264,6 @@ const startEditOrder = (order) => {
             onImportRecords={importProductRecords}
             onGenerateWeighingFile={()=>exportWeighingBarcodeCsv(getFilteredProducts())}
             onPrintBarcodes={printProductBarcodes}
-            shopPartEnabled={shopPartEnabled}
             notify={(message,kind)=>toast(message, kind==="err"?"err":"ok")}
           />
         </div>
@@ -13146,8 +13836,13 @@ const startEditOrder = (order) => {
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
           vendors={vendors} products={products}
-          shop={localShop} toast={toast} isDesktop={isDesktop}
+          shop={localShop} toast={toast} isDesktop={isDesktop} wideDesktop={windowWidth >= 1100}
           syncRefreshKey={syncRefreshKey}
+          onOpenProductMaster={(isOwner||can("viewProducts")) ? (name) => {
+            setPmForm({ ...createEmptyPmForm(), ...(name ? { name } : {}) });
+            setPmEditId(null); setPmShowAdd(true); setPmOverSales(true);
+          } : undefined}
+          productFromMaster={pmPickForSales}
         />
       )}
 
@@ -13157,15 +13852,26 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {(isOwner || can("manageSales")) && tab==="sales"&&(
+      {(isOwner || can("manageSales")) && ["sales","quotation","delivery"].includes(tab)&&(
         <SalesInvoiceTab
+          key={tab}
+          kind={tab}
+          quoteToConvert={tab==="sales" ? quoteToConvert : null}
+          onConvertQuote={(q)=>{ setQuoteToConvert(q); setTab("sales"); }}
+          onQuoteConvertHandled={()=>setQuoteToConvert(null)}
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
           customers={customers} products={products}
-          shop={localShop} toast={toast} isDesktop={isDesktop}
+          shop={localShop} toast={toast} isDesktop={isDesktop} wideDesktop={windowWidth >= 1100}
           siShowCode={siShowCode} siColorPrint={siColorPrint}
           canManageCustomers={can("manageCustomers")}
           syncRefreshKey={syncRefreshKey}
+          team={team}
+          onOpenProductMaster={(isOwner||can("viewProducts")) ? (name) => {
+            setPmForm({ ...createEmptyPmForm(), ...(name ? { name } : {}) });
+            setPmEditId(null); setPmShowAdd(true); setPmOverSales(true);
+          } : undefined}
+          productFromMaster={pmPickForSales}
           onCustomerCreated={(created) => setCustomers((prev) => [...prev, created].sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||"")))}
         />
       )}
@@ -13177,6 +13883,22 @@ const startEditOrder = (order) => {
           isDesktop={isDesktop}
           shopName={localShop?.companyName||""}
         />
+      )}
+
+      {tab==="pdc"&&(isOwner||can("managePdc"))&&(
+        <PdcWindow inline lang={lang} cur={t.cur||"AED"} shopId={shopId} userId={user?.uid||""}
+          shopName={localShop?.companyName||""}
+          onOpenVoucher={(raw)=>printPaymentVoucher(raw, localShop, lang)} />
+      )}
+
+      {tab==="expenses"&&(isOwner||can("manageExpenses"))&&(
+        <ExpensesTab lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
+          cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} />
+      )}
+
+      {tab==="accounts"&&isOwner&&(
+        <ProfitLossReport lang={lang} th={th} s={s} shopId={shopId} products={products}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} />
       )}
 
       {tab==="branchTransfer"&&canUseBranchTransfer&&(
@@ -13223,22 +13945,6 @@ const startEditOrder = (order) => {
                 </button>
               )}
 
-              {/* Utilities (owner only) */}
-              {isOwner&&(
-                <button style={s.settingsRow} onClick={()=>setSettingsPage("utilities")}>
-                  <span style={s.settingsRowIcon}>🧰</span>
-                  <div style={{ flex:1 }}>
-                    <div style={s.settingsRowLabel}>{lang==="bn"?"ইউটিলিটিস":"Utilities"}</div>
-                    <div style={s.settingsRowSub}>
-                      {lang==="bn"
-                        ? `Shop Part Number: ${shopPartEnabled?"চালু":"বন্ধ"}`
-                        : `Shop Part Number: ${shopPartEnabled?"Enabled":"Disabled"}`}
-                    </div>
-                  </div>
-                  <span style={s.settingsArrow}>›</span>
-                </button>
-              )}
-
               {/* Invite codes (owner only) */}
               {isOwner&&(
                 <button style={s.settingsRow} onClick={()=>setSettingsPage("invite")}>
@@ -13274,16 +13980,6 @@ const startEditOrder = (order) => {
                   <span style={s.settingsArrow}>›</span>
                 </button>
               )}
-
-              {/* Invoice settings */}
-              <button style={s.settingsRow} onClick={()=>setSettingsPage("invoice")}>
-                <span style={s.settingsRowIcon}>📄</span>
-                <div style={{ flex:1 }}>
-                  <div style={s.settingsRowLabel}>{t.si_invoiceSettings}</div>
-                  <div style={s.settingsRowSub}>{siShowCode?(lang==="bn"?"কোড/মডেল দেখানো চালু":"Show code: ON"):(lang==="bn"?"শুধু পণ্যের নাম":"Product name only")}</div>
-                </div>
-                <span style={s.settingsArrow}>›</span>
-              </button>
 
               {/* Order module - optional for single-shop users */}
               {isOwner&&(
@@ -13334,6 +14030,26 @@ const startEditOrder = (order) => {
                 <span style={s.settingsArrow}>›</span>
               </button>
 
+              {/* Language */}
+              <button style={s.settingsRow} onClick={()=>setSettingsPage("language")}>
+                <span style={s.settingsRowIcon}>🌐</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{lang==="bn"?"ভাষা":"Language"}</div>
+                  <div style={s.settingsRowSub}>{lang==="bn"?"বাংলা":"English"}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
+              {/* Print settings */}
+              <button style={s.settingsRow} onClick={()=>setPrintSettingsOpen(true)}>
+                <span style={s.settingsRowIcon}>🖨️</span>
+                <div style={{ flex:1 }}>
+                  <div style={s.settingsRowLabel}>{lang==="bn"?"প্রিন্ট সেটিংস":"Print Settings"}</div>
+                  <div style={s.settingsRowSub}>{lang==="bn"?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview"}</div>
+                </div>
+                <span style={s.settingsArrow}>›</span>
+              </button>
+
               {/* Sync status */}
               <button style={s.settingsRow} onClick={()=>setSettingsPage("sync")}>
                 <span style={s.settingsRowIcon}>{syncState==="connected"?"🟢":syncState==="offline"?"🔴":syncState==="reconnecting"?"🟠":"🟡"}</span>
@@ -13342,6 +14058,17 @@ const startEditOrder = (order) => {
                   <div style={s.settingsRowSub}>{syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..."}</div>
                 </div>
               </button>
+
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setSettingsPage("backup")}>
+                  <span style={s.settingsRowIcon}>💾</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{lang==="bn"?"ব্যাকআপ ও রিস্টোর":"Backup & restore"}</div>
+                    <div style={s.settingsRowSub}>{lang==="bn"?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
 
               {/* License activation - optional/non-blocking */}
               <button style={s.settingsRow} onClick={()=>setSettingsPage("license")}>
@@ -13595,81 +14322,6 @@ const startEditOrder = (order) => {
             />
           )}
 
-          {settingsPage==="utilities"&&isOwner&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"🧰 ইউটিলিটিস":"🧰 Utilities"}</div>
-              <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.6, marginBottom:14 }}>
-                {lang==="bn"
-                  ? "বিশেষ software option শুধু Owner এখান থেকে চালু, বন্ধ বা configure করতে পারবেন।"
-                  : "Only the Owner can enable, disable, or configure special software options here."}
-              </div>
-
-              <div style={{ padding:"14px 0", borderTop:`1px solid ${th.border}`, borderBottom:`1px solid ${th.border}` }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:14, fontWeight:800, color:th.txtPrimary }}>
-                      {lang==="bn"?"Shop Part Number Settings":"Shop Part Number Settings"}
-                    </div>
-                    <div style={{ fontSize:12, color:th.txtMuted, marginTop:4, lineHeight:1.5 }}>
-                      {shopPartEnabled
-                        ? (lang==="bn"
-                            ? "চালু আছে—Product Master ও Search-এ Shop Part Number দেখা যাবে।"
-                            : "Enabled—Shop Part Number is visible in Product Master and Search.")
-                        : (lang==="bn"
-                            ? "বন্ধ আছে—field লুকানো থাকবে এবং নতুন নম্বর তৈরি হবে না। আগের নম্বর মুছবে না।"
-                            : "Disabled—the field stays hidden and no new number is generated. Existing numbers are retained.")}
-                    </div>
-                  </div>
-                  <PermToggle
-                    isOn={shopPartEnabled}
-                    disabled={shopPartSettingsSaving}
-                    onToggle={()=>{
-                      const next = !shopPartEnabled;
-                      if (!next && !window.confirm(
-                        lang==="bn"
-                          ? "Shop Part Number বন্ধ করবেন? আগের নম্বর সংরক্ষিত থাকবে, কিন্তু Product Master থেকে লুকানো হবে।"
-                          : "Disable Shop Part Number? Existing numbers will be retained but hidden from Product Master."
-                      )) return;
-                      saveShopPartEnabled(next);
-                    }}
-                  />
-                </div>
-
-                <div style={{ marginTop:14, display:"flex", alignItems:"center", gap:10, flexWrap:"wrap" }}>
-                  <button
-                    type="button"
-                    style={s.addCoBtn}
-                    disabled={shopPartSettingsSaving}
-                    onClick={()=>setShowShopPartFormatSettings(true)}
-                  >
-                    {lang==="bn"?"⚙️ Format Configure করুন":"⚙️ Configure Format"}
-                  </button>
-                  <span style={{ fontSize:11, color:th.txtMuted, fontFamily:"monospace" }}>
-                    {shopPartFormat.pattern}
-                  </span>
-                </div>
-                {shopPartSettingsSaving&&(
-                  <div style={{ fontSize:12, color:"#f97316", marginTop:10 }}>
-                    {lang==="bn"?"Shop Part Number update হচ্ছে...":"Updating Shop Part Numbers..."}
-                  </div>
-                )}
-              </div>
-
-              {showShopPartFormatSettings&&(
-                <>
-                  <style>{PM_CSS}</style>
-                  <ShopPartFormatModal
-                    value={shopPartFormat}
-                    featureEnabled={shopPartEnabled}
-                    onSave={saveShopPartFormat}
-                    notify={(message,kind)=>toast(message, kind==="err"?"err":"ok")}
-                    onClose={()=>setShowShopPartFormatSettings(false)}
-                  />
-                </>
-              )}
-            </div>
-          )}
-
           {settingsPage==="orderModule"&&isOwner&&(
             <div style={s.card}>
               <div style={s.settingsLbl}>{lang==="bn"?"📋 Order Option":"📋 Order Option"}</div>
@@ -13690,55 +14342,6 @@ const startEditOrder = (order) => {
               {orderSettingsSaving&&(
                 <div style={{ fontSize:12, color:"#f97316", marginTop:10 }}>{lang==="bn"?"সেভ হচ্ছে...":"Saving..."}</div>
               )}
-            </div>
-          )}
-
-          {settingsPage==="invoice"&&(
-            <div style={s.card}>
-              <div style={s.settingsLbl}>{t.si_invoiceSettings}</div>
-
-              {/* Show Code Toggle */}
-              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, padding:"14px 0", borderBottom:`1px solid ${th.border}` }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>{t.si_showCodeLabel}</div>
-                  <div style={{ fontSize:12, color:th.txtMuted }}>{t.si_showCodeDesc}</div>
-                  <div style={{ marginTop:8, padding:"8px 12px", background:siShowCode?"rgba(34,197,94,0.08)":"rgba(113,113,122,0.06)", borderRadius:8, fontSize:12, fontWeight:700, color:siShowCode?"#22c55e":th.txtMuted }}>
-                    {siShowCode
-                      ? (lang==="bn"?"✅ চালু — কোড/মডেল দেখাবে":"✅ ON — Code/Model shows")
-                      : (lang==="bn"?"⬜ বন্ধ — শুধু পণ্যের নাম":"⬜ OFF — Product name only")}
-                  </div>
-                </div>
-                <button onClick={()=>{ const nv=!siShowCode; setSiShowCode(nv); saveSiShowCode(nv); }} style={{ width:52, height:30, borderRadius:15, border:"none", cursor:"pointer", background:siShowCode?"#22c55e":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s", marginTop:4 }}>
-                  <span style={{ position:"absolute", top:3, left:siShowCode?25:3, width:24, height:24, borderRadius:"50%", background:"#fff", transition:"left 0.15s", display:"block" }} />
-                </button>
-              </div>
-
-              {/* Color Print Toggle */}
-              <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, padding:"14px 0", borderBottom:`1px solid ${th.border}` }}>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>{t.si_colorLabel}</div>
-                  <div style={{ fontSize:12, color:th.txtMuted }}>{t.si_colorDesc}</div>
-                  <div style={{ marginTop:8, padding:"8px 12px", background:siColorPrint?"rgba(99,102,241,0.08)":"rgba(113,113,122,0.06)", borderRadius:8, fontSize:12, fontWeight:700, color:siColorPrint?"#818cf8":th.txtMuted }}>
-                    {siColorPrint
-                      ? (lang==="bn"?"🎨 চালু — রঙিন ইনভয়েস প্রিন্ট হবে":"🎨 ON — Color invoice print")
-                      : (lang==="bn"?"🖤 বন্ধ — সাদা-কালো প্রিন্ট (Default)":"🖤 OFF — Black & White print (Default)")}
-                  </div>
-                </div>
-                <button onClick={()=>{ const nv=!siColorPrint; setSiColorPrint(nv); saveSiColor(nv); }} style={{ width:52, height:30, borderRadius:15, border:"none", cursor:"pointer", background:siColorPrint?"#6366f1":"#3f3f46", position:"relative", flexShrink:0, transition:"background 0.2s", marginTop:4 }}>
-                  <span style={{ position:"absolute", top:3, left:siColorPrint?25:3, width:24, height:24, borderRadius:"50%", background:"#fff", transition:"left 0.15s", display:"block" }} />
-                </button>
-              </div>
-
-              {/* Preview */}
-              <div style={{ marginTop:16, padding:"12px 14px", background:th.bgInp, borderRadius:10, border:`1px solid ${th.border}` }}>
-                <div style={{ fontSize:11, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", marginBottom:8 }}>{lang==="bn"?"উদাহরণ":"Preview"}</div>
-                <div style={{ fontSize:13, color:th.txtPrimary, fontWeight:700 }}>Brake Pad</div>
-                {siShowCode&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📋 BP-123  🏷️ Toyota</div>}
-                <div style={{ marginTop:8, fontSize:11, display:"flex", gap:6, alignItems:"center" }}>
-                  <div style={{ width:40, height:14, borderRadius:3, background:siColorPrint?"#16a34a":"#1a1a1a" }} />
-                  <span style={{ color:th.txtMuted }}>{siColorPrint?(lang==="bn"?"রঙিন হেডার":"Color header"):(lang==="bn"?"সাদা-কালো হেডার":"B&W header")}</span>
-                </div>
-              </div>
             </div>
           )}
 
@@ -13806,6 +14409,10 @@ const startEditOrder = (order) => {
                 </button>
               </div>
             </div>
+          )}
+
+          {settingsPage==="backup"&&isOwner&&shopId&&(
+            <BackupPanel lang={lang} th={th} s={s} toast={toast} shopId={shopId} userId={user?.uid} />
           )}
 
           {settingsPage==="sync"&&(
@@ -13910,22 +14517,14 @@ const startEditOrder = (order) => {
 
   return (
     <div style={s.root}>
-      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}>
-        {tab !== "dashboard" && (
-          <div style={s.tabs}>
-            {visibleTabs.map(([k,label])=>(
-              <button key={k} style={{ ...s.tab, ...(tab===k?s.tabA:{}) }} onClick={()=>setTab(k)}>
-                {label}
-                {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.badge}>{unread}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-      </Header>
+      <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}
+        shopName={localShop?.companyName||""} personName={profile.personName||""}
+        rightSlot={<NotificationBell lang={lang} theme={theme} items={notificationItems} />}
+        onBack={!isDesktop && tab!=="dashboard" ? goBack : null} />
 
       {isDesktop ? (
         <div style={s.desktopLayout}>
-          <div style={s.sidebar}>
+          {!(pageMax && tab!=="dashboard") && <div style={s.sidebar}>
             <div style={s.sideProfile}>
               <div style={{ fontSize:28, marginBottom:6 }}>{isOwner?"🏢":"👨‍💼"}</div>
               <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:2 }}>{profile.personName}</div>
@@ -13945,10 +14544,54 @@ const startEditOrder = (order) => {
               {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":syncState==="reconnecting"?"🟠 Reconnecting...":"🟡 Connecting..."}
             </div>
             <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
+          </div>}
+          <div style={s.desktopContent}>
+            {tab!=="dashboard"&&(
+              <div onDoubleClick={()=>setPageMax(m=>!m)}
+                style={{ position:"sticky", top:0, zIndex:8, display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
+                <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentTabLabel}</span>
+                <WindowButtons lang={lang}
+                  win={{ max:pageMax, minimize:()=>{ setMinTab(tab); setTab("dashboard"); }, toggleMax:()=>setPageMax(m=>!m) }}
+                  onClose={()=>setTab("dashboard")} />
+              </div>
+            )}
+            {tabContent}
           </div>
-          <div style={s.desktopContent}>{tabContent}</div>
+        </div>
+      ) : erpSkin ? (
+        <div className={erpDark ? "erp-m erp-m-dark" : "erp-m"}>
+          <style>{ERP_MOBILE_CSS}</style>
+          {tab!=="products"&&!pmOverSales&&(
+            <div className="erp-m-title">
+              <strong>{String((visibleTabs.find(([k])=>k===tab)||[])[1]||tab).replace(/^[^\p{L}\p{N}]+/u,"")}</strong>
+              <span>{new Date().toLocaleDateString(lang==="bn"?"bn-BD":"en-GB",{ day:"numeric", month:"short", year:"numeric" })}</span>
+            </div>
+          )}
+          {tabContent}
         </div>
       ) : tabContent}
+
+      {printSettingsOpen && (
+        <PrintSettingsWindow lang={lang} isDesktop={isDesktop} toast={toast}
+          onClose={()=>setPrintSettingsOpen(false)}
+          showCode={siShowCode} setShowCode={(v)=>{ setSiShowCode(v); saveSiShowCode(v); }}
+          colorPrint={siColorPrint} setColorPrint={(v)=>{ setSiColorPrint(v); saveSiColor(v); }}
+          previewHtml={(kind, style)=>designPreviewHtml(kind, style, localShop, lang, siShowCode, siColorPrint)} />
+      )}
+
+      {isDesktop && minTab && tab !== minTab && (
+        <MinimizedChip title={tabLabelOf(minTab)} lang={lang} slot={2}
+          onRestore={()=>setTab(minTab)} onClose={()=>setMinTab(null)} />
+      )}
+
+      {!isDesktop && (
+        <MobileMenuDrawer open={menuOpen} onClose={closeMenu}
+          items={visibleTabs} activeKey={tab} onSelect={selectFromMenu}
+          unreadKey={isOwner?"owner":"shop"} unread={unread}
+          lang={lang} theme={theme}
+          personName={profile.personName||""} roleLabel={isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}
+          shopName={localShop?.companyName||""} syncState={syncState} onLogout={handleLogout} />
+      )}
 
       {supplierPickerTarget&&(
         <div
@@ -14087,7 +14730,7 @@ export default function App() {
     saveCachedProfile(result.user.uid, result.profile);
 
     const resolvedShopId = result.shop?.id || result.profile?.shopId || "";
-    if (resolvedShopId && typeof sessionStorage !== "undefined") {
+    if (resolvedShopId && typeof sessionStorage !== "undefined" && !getShopCloudPulledAt(resolvedShopId)) {
       try { sessionStorage.setItem(`s4-force-cloud-pull:${resolvedShopId}`, "1"); } catch {}
     }
 
@@ -14337,7 +14980,7 @@ export default function App() {
 // ─── STYLES FUNCTION ─────────────────────────────────────────
 function getStyles(th) { return {
   root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:       { position:"fixed", top:16, right:16, zIndex:999, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:20000, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
   hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
   hLeft:       { display:"flex", alignItems:"center", gap:10 },
   title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
@@ -14523,3 +15166,5 @@ vendorFooter: {
 
 // Fallback styles (dark) used by components before theme prop arrives
 const _globalS = getStyles(THEMES.dark);
+const _erpS = getStyles(THEMES.erp);
+const _erpDarkS = getStyles(THEMES.erpDark);

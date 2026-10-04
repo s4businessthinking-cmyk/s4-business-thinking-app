@@ -1,5 +1,5 @@
-import { collection, onSnapshot, query, where } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { collection, onSnapshot, query, where } from "../backend/firestore";
+import { onAuthStateChanged } from "../backend/auth";
 import { db, auth } from "../firebase-config";
 import { offlineCacheCloudRecords, offlineList } from "./offlineRepository";
 

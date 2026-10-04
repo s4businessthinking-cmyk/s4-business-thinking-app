@@ -1,4 +1,4 @@
-import { offlineUpsert, offlineGetById, offlineList } from "../offline/offlineRepository";
+import { offlineUpsert, offlineList } from "../offline/offlineRepository";
 
 /**
  * Collection names for stock management
@@ -16,7 +16,7 @@ export async function createStockLedgerEntry({
   productId,
   shopId,
   quantity,
-  movementType, // 'purchase', 'sale', 'adjustment', 'transfer_in', 'transfer_out', 'damage', 'return'
+  movementType, // 'opening', 'purchase', 'sale', 'adjustment', 'transfer_in', 'transfer_out', 'damage', 'return'
   referenceType, // 'purchase_invoice', 'sales_invoice', 'branch_transfer', 'stock_adjustment'
   referenceId,
   unitCost = 0,
@@ -32,6 +32,7 @@ export async function createStockLedgerEntry({
 
   // Determine sign based on movement type
   const signedQuantity = [
+    "opening",
     "purchase",
     "transfer_in",
     "return",
@@ -72,9 +73,6 @@ export async function createStockLedgerEntry({
       `[S4 Stock] Ledger entry created: ${movementType} +${signedQuantity} of product ${productId}`
     );
 
-    // Update stock balance
-    await updateStockBalance(productId, shopId, signedQuantity, unitCost);
-
     return {
       ok: true,
       entryId,
@@ -91,67 +89,50 @@ export async function createStockLedgerEntry({
 }
 
 /**
- * Updates stock balance for a product in a shop
- * This is the running total of quantity on hand
+ * Balances are always derived from the ledger. The ledger syncs across devices
+ * (append-only, one document per movement), while a stored running balance would
+ * be overwritten by whichever device wrote last.
  */
-async function updateStockBalance(
-  productId,
-  shopId,
-  quantityChange,
-  unitCost = 0
-) {
-  if (!productId || !shopId) return;
-
-  const balanceId = `balance-${productId}-${shopId}`;
-
-  try {
-    const existing = await offlineGetById(
-      STOCK_COLLECTIONS.STOCK_BALANCES,
-      balanceId
-    );
-
-    const currentQty = existing?.data?.quantity || 0;
-    const currentValue = existing?.data?.totalValue || 0;
-    const newQty = currentQty + quantityChange;
-    const qtyAbsChange = Math.abs(quantityChange);
-
-    // Calculate weighted average cost
-    let waAccost = existing?.data?.weightedAverageCost || 0;
-    if (newQty > 0) {
-      if (quantityChange > 0) {
-        // Inbound: update weighted average
-        const inboundValue = qtyAbsChange * unitCost;
-        waAccost =
-          (currentValue + inboundValue) / (currentQty + quantityChange);
-      } else if (currentQty > 0) {
-        // Outbound: use existing WAC
-        waAccost = existing?.data?.weightedAverageCost || 0;
+function summarizeLedger(entries) {
+  const byProduct = new Map();
+  [...entries]
+    .sort((a, b) => String(a.createdAt || "").localeCompare(String(b.createdAt || "")))
+    .forEach((entry) => {
+      const qty = Number(entry.quantity) || 0;
+      if (!entry.productId || !qty) return;
+      const cur = byProduct.get(entry.productId) || {
+        productId: entry.productId,
+        shopId: entry.shopId,
+        quantity: 0,
+        weightedAverageCost: 0,
+      };
+      const isPurchaseReversal = qty < 0 && entry.movementType === "adjustment" && entry.referenceType === "purchase_invoice";
+      if (qty > 0 && Number(entry.unitCost) > 0 && entry.movementType !== "return") {
+        const held = Math.max(cur.quantity, 0);
+        cur.weightedAverageCost =
+          (held * cur.weightedAverageCost + qty * Number(entry.unitCost)) / (held + qty);
+      } else if (isPurchaseReversal && Number(entry.unitCost) > 0) {
+        const held = Math.max(cur.quantity, 0);
+        const left = held + qty;
+        if (left > 1e-9) {
+          cur.weightedAverageCost = Math.max(0, (held * cur.weightedAverageCost + qty * Number(entry.unitCost)) / left);
+        }
       }
-    }
+      cur.quantity += qty;
+      byProduct.set(entry.productId, cur);
+    });
+  byProduct.forEach((b) => {
+    b.quantity = parseFloat(b.quantity.toFixed(4));
+    b.totalValue = Math.max(0, b.quantity) * b.weightedAverageCost;
+  });
+  return byProduct;
+}
 
-    const newBalance = {
-      id: balanceId,
-      productId,
-      shopId,
-      quantity: Math.max(0, newQty),
-      weightedAverageCost: waAccost,
-      totalValue: Math.max(0, newQty) * waAccost,
-      lastUpdated: new Date().toISOString(),
-      _stock_computed: true,
-    };
-
-    await offlineUpsert(STOCK_COLLECTIONS.STOCK_BALANCES, balanceId, newBalance);
-
-    console.log(
-      `[S4 Stock] Balance updated: product ${productId}, qty: ${Math.max(0, newQty)}`
-    );
-  } catch (err) {
-    console.warn(
-      "[S4 Stock] Failed to update stock balance",
-      productId,
-      err
-    );
-  }
+async function listShopLedger(shopId) {
+  const result = await offlineList(STOCK_COLLECTIONS.STOCK_LEDGER);
+  return (result.records || [])
+    .map((rec) => ({ ...rec.data, id: rec.document_id }))
+    .filter((entry) => entry.shopId === shopId);
 }
 
 /**
@@ -160,31 +141,20 @@ async function updateStockBalance(
 export async function getStockBalance(productId, shopId) {
   if (!productId || !shopId) return null;
 
-  const balanceId = `balance-${productId}-${shopId}`;
-
   try {
-    const result = await offlineGetById(
-      STOCK_COLLECTIONS.STOCK_BALANCES,
-      balanceId
-    );
-
-    if (!result?.data) {
-      return {
-        productId,
-        shopId,
-        quantity: 0,
-        weightedAverageCost: 0,
-        totalValue: 0,
-      };
-    }
-
-    return { ...result.data, id: balanceId };
-  } catch (err) {
-    console.error(
-      "[S4 Stock] Failed to get stock balance",
+    const entries = (await listShopLedger(shopId)).filter((e) => e.productId === productId);
+    const balance = summarizeLedger(entries).get(productId);
+    return {
       productId,
-      err
-    );
+      shopId,
+      quantity: 0,
+      weightedAverageCost: 0,
+      totalValue: 0,
+      ...(balance || {}),
+      id: `balance-${productId}-${shopId}`,
+    };
+  } catch (err) {
+    console.error("[S4 Stock] Failed to get stock balance", productId, err);
     return null;
   }
 }
@@ -196,23 +166,16 @@ export async function getShopStockBalances(shopId) {
   if (!shopId) return [];
 
   try {
-    const result = await offlineList(STOCK_COLLECTIONS.STOCK_BALANCES);
-
-    const balances = (result.records || [])
-      .filter((rec) => rec.data?.shopId === shopId)
-      .map((rec) => ({ ...rec.data, id: rec.document_id }))
-      .filter((b) => b.quantity > 0);
-
-    return balances;
+    const balances = summarizeLedger(await listShopLedger(shopId));
+    return [...balances.values()]
+      .filter((b) => b.quantity > 0)
+      .map((b) => ({ ...b, id: `balance-${b.productId}-${shopId}` }));
   } catch (err) {
-    console.error(
-      "[S4 Stock] Failed to get shop stock balances",
-      shopId,
-      err
-    );
+    console.error("[S4 Stock] Failed to get shop stock balances", shopId, err);
     return [];
   }
 }
+
 
 /**
  * Gets stock ledger history for a product

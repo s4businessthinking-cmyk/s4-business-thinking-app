@@ -1,20 +1,30 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Modal from "../Modal";
 
 export default function MoreBarcodesModal({ form, products, currentProductId, upd, onClose, notify, onDuplicate }) {
   const rows = Array.isArray(form.moreBarcodes) ? form.moreBarcodes.map(String) : [];
   const [barcode, setBarcode] = useState("");
   const [selectedBarcode, setSelectedBarcode] = useState("");
+  const listRef = useRef(null);
+  const inputRef = useRef(null);
+  const prevCount = useRef(rows.length);
+  useEffect(() => {
+    if (rows.length > prevCount.current && listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+    prevCount.current = rows.length;
+  }, [rows.length]);
 
   function add() {
     const code = barcode.trim();
     const normalized = code.toLowerCase();
     if (!code) return notify("Barcode is required", "err");
-    const inCurrentProduct = [form.barcode, form.ean, ...rows]
+    const unitBarcodes = (product) => (Array.isArray(product?.unitPrices) ? product.unitPrices.map((row) => row?.barcode) : []);
+    const inCurrentProduct = [form.barcode, form.ean, ...rows, ...unitBarcodes(form)]
       .map((value) => String(value || "").trim().toLowerCase())
       .filter(Boolean);
     if (inCurrentProduct.includes(normalized)) {
-      const message = `The number "${code}" is already entered in this product. The same number cannot be used in Barcode, EAN Code, or More Barcodes.`;
+      const message = `The number "${code}" is already entered in this product. The same number cannot be used in Barcode, EAN Code, More Barcodes, or an alternate unit barcode.`;
       onDuplicate?.(message);
       return notify(message, "err");
     }
@@ -22,6 +32,7 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
       product.barcode,
       product.ean,
       ...(Array.isArray(product.moreBarcodes) ? product.moreBarcodes : []),
+      ...unitBarcodes(product),
     ].map((value) => String(value || "").trim().toLowerCase()).includes(normalized));
     if (owner) {
       const message = `The number "${code}" already belongs to product "${owner.name}".`;
@@ -30,6 +41,7 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
     }
     upd("moreBarcodes", [...rows, code]);
     setBarcode("");
+    inputRef.current?.focus();
   }
 
   function remove(code) {
@@ -50,14 +62,16 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
           <div className="pm-field pm-additional-barcodes__input">
             <label className="pm-label">Barcode</label>
             <input
+              ref={inputRef}
               className="pm-input"
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
               autoFocus
             />
           </div>
-          <div className="pm-additional-barcodes__list" role="listbox" aria-label="Additional barcodes">
+          {rows.length > 0 && <div className="pm-additional-barcodes__count">{rows.length} barcode{rows.length === 1 ? "" : "s"}</div>}
+          <div ref={listRef} className="pm-additional-barcodes__list" role="listbox" aria-label="Additional barcodes">
             <div className="pm-additional-barcodes__head">
               <span>Sl.No.</span>
               <span>Barcode</span>
@@ -91,6 +105,7 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
           <button type="button" className="pm-btn" onClick={onClose}>Close</button>
         </div>
       </div>
+      <div className="pm-hint">Press Save on Product Master to store these barcodes.</div>
     </Modal>
   );
 }

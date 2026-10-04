@@ -8,6 +8,10 @@ export default function OpeningStockModal({ form, upd, onClose, notify }) {
 
   function save() {
     if (!String(quantity).trim()) return notify("Quantity is required", "err");
+    const qty = Number(String(quantity).trim());
+    if (!Number.isFinite(qty) || qty < 0) return notify("Quantity must be a number of 0 or more", "err");
+    const rateNum = Number(String(rate).trim() || 0);
+    if (!Number.isFinite(rateNum) || rateNum < 0) return notify("Rate must be a number of 0 or more", "err");
     upd("openingStock", String(quantity).trim());
     upd("openingRate", String(rate).trim());
     upd("openingWarehouse", warehouse.trim());

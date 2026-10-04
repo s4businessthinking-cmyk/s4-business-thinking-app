@@ -12,7 +12,6 @@ export default function ProductDetailsForm({
   onOpenNewUnit,
   onPickSuggestion,
   onValidateIdentityCode,
-  shopPartEnabled,
 }) {
   const [lang, setLang] = useState("EN");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -72,19 +71,6 @@ export default function ProductDetailsForm({
           <label className="pm-label">Code / Model</label>
           <input className="pm-input pm-nav-control" enterKeyHint="next" value={form.code || ""} onChange={(e) => upd("code", e.target.value)} />
         </div>
-
-        {shopPartEnabled && (
-          <div className="pm-form-row">
-            <label className="pm-label">Shop Part No</label>
-            <input
-              className="pm-input"
-              value={form.shopPartNumber || ""}
-              readOnly
-              title="Configured in Settings → Utilities → Shop Part Number Settings."
-              placeholder="Auto on Save"
-            />
-          </div>
-        )}
 
         <div className="pm-form-row pm-barcode-row">
           <label className="pm-label">Barcode</label>

@@ -7,6 +7,10 @@ export default function ReorderLevelModal({ form, upd, onClose, notify }) {
   const [reorderQty, setReorderQty] = useState(form.reorderQty || "");
 
   function save() {
+    const parse = (v) => (String(v).trim() === "" ? 0 : Number(String(v).trim()));
+    const min = parse(minLevel), max = parse(maxLevel), qty = parse(reorderQty);
+    if ([min, max, qty].some((n) => !Number.isFinite(n) || n < 0)) return notify("Enter numbers of 0 or more", "err");
+    if (max > 0 && min > max) return notify("Min Stock Level cannot be more than Max Stock Level", "err");
     upd("reorderMin", String(minLevel).trim());
     upd("reorderMax", String(maxLevel).trim());
     upd("reorderQty", String(reorderQty).trim());

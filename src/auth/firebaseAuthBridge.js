@@ -1,23 +1,13 @@
-import { initializeApp, getApps } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
-  getAuth,
+  getSecondaryAuth,
   sendEmailVerification,
   signInWithEmailAndPassword,
-} from "firebase/auth";
-import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+} from "../backend/auth";
+import { deleteDoc, doc, getDoc, setDoc, serverTimestamp } from "../backend/firestore";
 import { auth, db } from "../firebase-config";
 
 const LOCAL_EMAIL_DOMAIN = "s4local.app";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDceMFkkUFUz8tnFvZIe-pt9v5mDd0Hn4o",
-  authDomain: "s4-business-thinking-31213.firebaseapp.com",
-  projectId: "s4-business-thinking-31213",
-  storageBucket: "s4-business-thinking-31213.firebasestorage.app",
-  messagingSenderId: "914122331076",
-  appId: "1:914122331076:web:56c00d69c5d8f467038a91",
-};
 
 const PROVISIONER_APP_NAME = "s4-staff-provisioner";
 
@@ -59,9 +49,7 @@ export function isOnline() {
 }
 
 function getProvisionerAuth() {
-  const existing = getApps().find((app) => app.name === PROVISIONER_APP_NAME);
-  const app = existing || initializeApp(firebaseConfig, PROVISIONER_APP_NAME);
-  return getAuth(app);
+  return getSecondaryAuth(PROVISIONER_APP_NAME);
 }
 
 export function assertFirebaseReady(requireNetwork = true) {

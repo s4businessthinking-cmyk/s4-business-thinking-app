@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { filterProducts, findExactProductMatch } from "../utils/productSearch";
-
 export function ProductTypeaheadInput({
   products = [],
   value = "",
@@ -49,8 +48,8 @@ export function ProductTypeaheadInput({
         setOpen(false);
         const exact = findExactProductMatch(
           products,
-          field === "code" || field === "shopPart"
-            ? { code: value, shopPartNumber: value }
+          field === "code"
+            ? { code: value }
             : { name: value }
         );
         if (exact && value.trim()) pickProduct(exact);
@@ -158,7 +157,7 @@ export function ProductTypeaheadInput({
                 {product.name}
               </div>
               <div style={{ fontSize: 11, color: th?.txtMuted || "#71717a", marginTop: 2 }}>
-                {[product.shopPartNumber, product.code, product.brand, product.category].filter(Boolean).join(" · ")}
+                {[product.code, product.brand, product.category].filter(Boolean).join(" · ")}
               </div>
             </button>
           ))}

@@ -5,23 +5,31 @@ export default function ProductListGrid({
   selectedId,
   onSelect,
   loading,
-  shopPartEnabled,
+  search = "",
+  onSearchChange,
 }) {
-  const columnCount = shopPartEnabled ? 3 : 2;
   return (
-    <div className={`pm-list${shopPartEnabled ? " pm-list--shop-parts" : ""}`}>
+    <div className="pm-list">
+      {onSearchChange && (
+        <input
+          className="pm-input"
+          style={{ marginBottom: 4 }}
+          placeholder="Filter list: name / code / barcode..."
+          value={search}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+      )}
       <div className="pm-list-scroll">
         <table className="pm-table">
           <thead>
             <tr>
               <th>Product Name</th>
-              {shopPartEnabled && <th>Shop Part</th>}
               <th>Code Model</th>
             </tr>
           </thead>
           <tbody>
-            {loading && <tr><td colSpan={columnCount} className="pm-empty">Loading...</td></tr>}
-            {!loading && rows.length === 0 && <tr><td colSpan={columnCount} className="pm-empty">No products found</td></tr>}
+            {loading && <tr><td colSpan={2} className="pm-empty">Loading...</td></tr>}
+            {!loading && rows.length === 0 && <tr><td colSpan={2} className="pm-empty">No products found</td></tr>}
             {!loading && rows.map((p) => (
               <tr
                 key={p.id}
@@ -29,7 +37,6 @@ export default function ProductListGrid({
                 onClick={() => onSelect(p)}
               >
                 <td>{p.name}</td>
-                {shopPartEnabled && <td style={{ whiteSpace: "nowrap" }} title={p.shopPartNumber || ""}>{p.shopPartNumber || "-"}</td>}
                 <td style={{ whiteSpace: "nowrap" }} title={p.code || p.barcode || ""}>{p.code || p.barcode || "-"}</td>
               </tr>
             ))}

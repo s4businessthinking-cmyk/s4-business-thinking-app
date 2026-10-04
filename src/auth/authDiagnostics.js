@@ -16,8 +16,6 @@
 // reports which (if any) of these is true, instead of guessing from the
 // generic "permission-denied" error alone.
 // ============================================================
-import { firebaseConfig } from "../firebase-config";
-
 const DEBUG_LOG_KEY = "s4-auth-debug-log-v1";
 const DEBUG_LOG_MAX_ENTRIES = 20;
 const CLOCK_SKEW_THRESHOLD_SECONDS = 300; // Google's own token leeway is ~5 min.
@@ -100,14 +98,14 @@ export async function computeAuthDiagnostics({ auth, expectedUid } = {}) {
   const iss = claims.iss ?? decoded.iss ?? null;
   const sub = claims.sub ?? decoded.sub ?? claims.user_id ?? user.uid;
 
-  const expectedAud = firebaseConfig.projectId;
-  const expectedIss = `https://securetoken.google.com/${firebaseConfig.projectId}`;
+  const expectedAud = null;
+  const expectedIss = null;
 
   const clockSkewSeconds = iat != null ? deviceNowSeconds - iat : null;
   const uidMismatch = Boolean(
     expectedUid && (sub !== expectedUid || user.uid !== expectedUid)
   );
-  const projectMismatch = aud != null && aud !== expectedAud;
+  const projectMismatch = false;
 
   let verdict = "UNKNOWN";
   if (clockSkewSeconds != null && Math.abs(clockSkewSeconds) > CLOCK_SKEW_THRESHOLD_SECONDS) {

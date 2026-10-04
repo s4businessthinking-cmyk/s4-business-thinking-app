@@ -88,10 +88,24 @@ export function receivedQuantityForLine(transfer, lineId) {
   }, 0);
 }
 
+// Damaged units have arrived too, so they are no longer waiting to be received.
+function lineHandledQty(line) {
+  if (!line) return 0;
+  if (line.receivedQty !== undefined && line.receivedQty !== null) return numberValue(line.receivedQty);
+  return numberValue(line.acceptedQty) + numberValue(line.damagedQty);
+}
+
+export function handledQuantityForLine(transfer, lineId) {
+  return (transfer?.receipts || []).reduce((total, receipt) => {
+    const line = (receipt.lines || []).find((entry) => entry.lineId === lineId);
+    return total + lineHandledQty(line);
+  }, 0);
+}
+
 export function remainingQuantityForLine(transfer, item) {
   return Math.max(
     0,
-    numberValue(item?.quantity) - receivedQuantityForLine(transfer, item?.lineId)
+    numberValue(item?.quantity) - handledQuantityForLine(transfer, item?.lineId)
   );
 }
 
@@ -100,7 +114,7 @@ export function buildReceiptLines(transfer, inputLines = []) {
 
   return (transfer?.items || []).map((item) => {
     const input = byLineId.get(item.lineId) || {};
-    const previouslyReceivedQty = receivedQuantityForLine(transfer, item.lineId);
+    const previouslyReceivedQty = handledQuantityForLine(transfer, item.lineId);
     const remainingBefore = Math.max(0, numberValue(item.quantity) - previouslyReceivedQty);
     const receivedQty = numberValue(input.receivedQty);
     const damagedQty = numberValue(input.damagedQty);
@@ -127,7 +141,7 @@ export function buildReceiptLines(transfer, inputLines = []) {
       receivedQty,
       damagedQty,
       acceptedQty,
-      remainingQtyAfter: Math.max(0, remainingBefore - acceptedQty),
+      remainingQtyAfter: Math.max(0, remainingBefore - receivedQty),
       issueNote: String(input.issueNote || "").trim(),
     };
   });
@@ -136,10 +150,10 @@ export function buildReceiptLines(transfer, inputLines = []) {
 export function deriveTransferStatus(transfer, receiptLines = []) {
   const existingAccepted = (transfer?.receipts || []).reduce(
     (sum, receipt) =>
-      sum + (receipt.lines || []).reduce((lineSum, line) => lineSum + numberValue(line.acceptedQty), 0),
+      sum + (receipt.lines || []).reduce((lineSum, line) => lineSum + lineHandledQty(line), 0),
     0
   );
-  const newAccepted = receiptLines.reduce((sum, line) => sum + numberValue(line.acceptedQty), 0);
+  const newAccepted = receiptLines.reduce((sum, line) => sum + lineHandledQty(line), 0);
   const totalSent = (transfer?.items || []).reduce(
     (sum, item) => sum + numberValue(item.quantity),
     0

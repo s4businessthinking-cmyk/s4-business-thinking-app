@@ -1,0 +1,279 @@
+// Access rules for every collection (originally ported from Firestore rules). Each collection exposes
+// read/create/update/delete(ctx, args) where `res` is the stored document
+// (Firestore `resource.data`) and `req` the document after the write
+// (`request.resource.data`). Unknown collections are denied, as in Firestore.
+import { deepEqual } from "./util.js";
+
+export async function makeRuleContext(uid, loadDoc) {
+  const cache = new Map();
+  const get = async (collection, id) => {
+    if (id === undefined || id === null || id === "") return null;
+    const key = `${collection}/${id}`;
+    if (!cache.has(key)) cache.set(key, await loadDoc(collection, String(id)));
+    return cache.get(key);
+  };
+  const user = uid ? await get("users", uid) : null;
+  return { uid: uid || null, user, get };
+}
+
+const has = (v) => v !== undefined && v !== null;
+
+function changedKeys(before = {}, after = {}) {
+  const keys = new Set([...Object.keys(before || {}), ...Object.keys(after || {})]);
+  return [...keys].filter((k) => !deepEqual(before?.[k], after?.[k]));
+}
+const onlyChanged = (before, after, allowed) => changedKeys(before, after).every((k) => allowed.includes(k));
+
+const isAuthenticated = (c) => !!c.uid;
+const userExists = (c) => !!c.user;
+const shopIdOf = (c) => (c.user ? c.user.shopId ?? null : null);
+
+const isShopMember = (c, shopId) => isAuthenticated(c) && userExists(c) && has(shopId) && shopIdOf(c) === shopId;
+
+export async function isOwnerOfShop(c, shopId) {
+  if (!isShopMember(c, shopId)) return false;
+  if (c.user.role === "owner") return true;
+  const shop = await c.get("shops", shopId);
+  return !!shop && (shop.ownerUid === c.uid || shop.ownerId === c.uid);
+}
+
+const hasShopPermission = (c, shopId, perm) => isShopMember(c, shopId) && c.user.permissions?.[perm] === true;
+
+const canSendBranchTransfer = async (c, shopId) => (await isOwnerOfShop(c, shopId)) || hasShopPermission(c, shopId, "sendBranchTransfer");
+const canReceiveBranchTransfer = async (c, shopId) => (await isOwnerOfShop(c, shopId)) || hasShopPermission(c, shopId, "receiveBranchTransfer");
+
+async function productCatalogWriteAllowed(c, shopId, req) {
+  const m = await c.get("productMaintenance", shopId);
+  return !m || (m.active !== true && req?.productCatalogEpoch === m.catalogEpoch);
+}
+
+async function legacyOrMaintenanceDeleteAllowed(c, shopId) {
+  const m = await c.get("productMaintenance", shopId);
+  return !m || m.active === true;
+}
+
+function isBranchTransferReceiver(c, d) {
+  if (!isAuthenticated(c) || !userExists(c) || !d) return false;
+  const u = c.user;
+  return d.receiverUserId === c.uid
+    || d.receiverFirebaseUid === c.uid
+    || (has(u.localUserId) && d.receiverLocalUserId === u.localUserId)
+    || (has(u.username) && d.receiverUsername === u.username)
+    || (has(u.email) && d.receiverEmail === u.email);
+}
+
+const sameShopByResource = (c, res) => isAuthenticated(c) && userExists(c) && has(res?.shopId) && res.shopId === shopIdOf(c);
+const sameShopByRequest = (c, req) => isAuthenticated(c) && userExists(c) && has(req?.shopId) && req.shopId === shopIdOf(c);
+
+const memberConversionUpdate = (c, res, req) =>
+  isShopMember(c, res?.shopId)
+  && req.shopId === res.shopId
+  && onlyChanged(res, req, ["status", "convertedInvoiceId", "convertedInvoiceNo", "updatedAt", "updatedBy"])
+  && ["open", "confirmed", "converted", "invoiced"].includes(req.status);
+
+const VOUCHER_MEMBER_FIELDS = ["status", "chequeStatus", "cancelledAt", "cancelledBy", "cancelReason", "clearedAt", "clearedBy", "bouncedAt", "bouncedBy", "updatedAt", "updatedBy"];
+const PAYMENT_FIELDS = ["amountPaid", "balanceDue", "status", "updatedAt", "updatedBy"];
+const VOUCHER_METHODS = ["cash", "cheque", "bank_transfer", "card"];
+
+const validVoucher = (req, noField, partyField) =>
+  typeof req[noField] === "string"
+  && typeof req[partyField] === "string"
+  && VOUCHER_METHODS.includes(req.method)
+  && typeof req.totalAmount === "number"
+  && req.totalAmount > 0
+  && Array.isArray(req.allocations)
+  && req.allocations.length > 0
+  && req.status === "active";
+
+const voucherMemberUpdate = (c, res, req) =>
+  isShopMember(c, res.shopId)
+  && res.shopId === shopIdOf(c)
+  && req.shopId === res.shopId
+  && onlyChanged(res, req, VOUCHER_MEMBER_FIELDS);
+
+const deny = async () => false;
+
+// Generic shop-scoped collection: members read/create/update, owner deletes.
+const shopScoped = ({ create, update, del } = {}) => ({
+  read: async (c, { res }) => sameShopByResource(c, res),
+  create: async (c, { req }) => sameShopByRequest(c, req) && (create ? await create(c, req) : true),
+  update: async (c, { res, req }) => sameShopByResource(c, res) && (update ? await update(c, res, req) : true),
+  delete: async (c, { res }) => sameShopByResource(c, res) && (del ? await del(c, res) : isOwnerOfShop(c, res.shopId)),
+});
+const appendOnly = () => ({ ...shopScoped(), update: deny, delete: deny });
+const ownerDelete = (c, res) => isOwnerOfShop(c, res.shopId);
+const ownerOrCreator = async (c, res) => (await isOwnerOfShop(c, res.shopId)) || res.createdBy === c.uid;
+
+export const RULES = {
+  users: {
+    read: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && shopIdOf(c) === res.shopId)),
+    create: async (c, { id, req }) => isAuthenticated(c) && (c.uid === id || (has(req?.shopId) && (await isOwnerOfShop(c, req.shopId)))),
+    update: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)))),
+    delete: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)))),
+  },
+
+  shops: {
+    read: async () => true,
+    create: async (c, { req }) => isAuthenticated(c) && req.ownerUid === c.uid,
+    update: async (c, { id, res, req }) => isAuthenticated(c) && (
+      res.ownerUid === c.uid
+      || res.ownerId === c.uid
+      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial"]))
+    ),
+    delete: async (c, { res }) => isAuthenticated(c) && (res.ownerUid === c.uid || res.ownerId === c.uid),
+  },
+
+  inviteCodes: {
+    read: async () => true,
+    create: async (c, { req }) => isAuthenticated(c) && (await isOwnerOfShop(c, req.shopId)),
+    update: async (c, { res, req }) => isAuthenticated(c)
+      && res.used === false
+      && req.shopId === res.shopId
+      && req.used === true
+      && req.usedBy === c.uid,
+    delete: async (c, { res }) => isAuthenticated(c) && (await isOwnerOfShop(c, res.shopId)),
+  },
+
+  staffLoginIndex: {
+    read: async () => true,
+    create: async (c, { req }) => isAuthenticated(c) && ((await isOwnerOfShop(c, req.shopId)) || c.uid === req.firebaseUid),
+    update: async (c, { req, res }) =>
+      isAuthenticated(c) &&
+      (((await isOwnerOfShop(c, res.shopId)) && (await isOwnerOfShop(c, req.shopId))) ||
+        (c.uid === res.firebaseUid && c.uid === req.firebaseUid)),
+    delete: async (c, { res }) => isAuthenticated(c) && (await isOwnerOfShop(c, res.shopId)),
+  },
+
+  orders: shopScoped({ create: async (c, req) => req.createdBy === c.uid }),
+  companies: shopScoped(),
+
+  products: shopScoped({
+    create: async (c, req) => productCatalogWriteAllowed(c, req.shopId, req),
+    update: async (c, res, req) => productCatalogWriteAllowed(c, res.shopId, req),
+    del: async (c, res) => (await isOwnerOfShop(c, res.shopId)) && (await legacyOrMaintenanceDeleteAllowed(c, res.shopId)),
+  }),
+
+  productMaintenance: {
+    read: async (c, { id }) => isShopMember(c, id),
+    create: async (c, { id, req }) => (await isOwnerOfShop(c, id)) && req.shopId === id,
+    update: async (c, { id, req }) => (await isOwnerOfShop(c, id)) && req.shopId === id,
+    delete: deny,
+  },
+
+  inventory: shopScoped(),
+  stockMovements: appendOnly(),
+  stockBalances: shopScoped(),
+  inventory_movements: appendOnly(),
+  stock_balances: shopScoped(),
+  stock_ledger: appendOnly(),
+  purchases: shopScoped(),
+  sales: shopScoped(),
+  customers: shopScoped({ del: async () => true }),
+  suppliers: shopScoped({ del: async () => true }),
+  vendors: shopScoped(),
+
+  purchaseInvoices: shopScoped({
+    create: async (c, req) => (await isOwnerOfShop(c, req.shopId)) || req.createdBy === c.uid,
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
+      || (isShopMember(c, res.shopId) && req.shopId === res.shopId && onlyChanged(res, req, PAYMENT_FIELDS)),
+  }),
+
+  purchasePayments: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid && validVoucher(req, "paymentNo", "vendorName"),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId)) || voucherMemberUpdate(c, res, req),
+  }),
+
+  salesReceipts: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid && validVoucher(req, "receiptNo", "customerName"),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId)) || voucherMemberUpdate(c, res, req),
+  }),
+
+  supplierPayments: shopScoped(),
+
+  salesInvoices: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid,
+    update: async (c, res, req) => (await ownerOrCreator(c, res))
+      || (isShopMember(c, res.shopId) && req.shopId === res.shopId && onlyChanged(res, req, PAYMENT_FIELDS)),
+    del: ownerOrCreator,
+  }),
+
+  quotations: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid,
+    update: async (c, res, req) => (await ownerOrCreator(c, res)) || memberConversionUpdate(c, res, req),
+    del: ownerOrCreator,
+  }),
+
+  deliveryNotes: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid || (await isOwnerOfShop(c, req.shopId)),
+    update: async (c, res, req) => (await ownerOrCreator(c, res)) || memberConversionUpdate(c, res, req),
+    del: ownerOrCreator,
+  }),
+
+  expenses: shopScoped(),
+  settings: { ...shopScoped(), delete: deny },
+
+  branchTransferSettings: shopScoped({
+    create: async (c, req) => isOwnerOfShop(c, req.shopId),
+    update: async (c, res) => isOwnerOfShop(c, res.shopId),
+    del: deny,
+  }),
+
+  branches: shopScoped({
+    create: async (c, req) => isOwnerOfShop(c, req.shopId),
+    update: async (c, res) => isOwnerOfShop(c, res.shopId),
+    del: ownerDelete,
+  }),
+
+  branchTransfers: shopScoped({
+    create: async (c, req) => canSendBranchTransfer(c, req.shopId),
+    update: async (c, res, req) => (await canSendBranchTransfer(c, res.shopId)) || (
+      (await canReceiveBranchTransfer(c, res.shopId))
+      && isBranchTransferReceiver(c, res)
+      && req.shopId === res.shopId
+      && req.branchId === res.branchId
+      && onlyChanged(res, req, [
+        "status", "receipts", "purchaseInvoiceIds", "invoiceStatus", "receiptSummary", "receivedAt", "receivedBy",
+        "receivedByName", "updatedAt", "updatedBy", "updatedByName", "_offline_updated_at", "_cloud_collection",
+        "_cloud_document_id", "_cloud_synced_at", "_cloud_sync_status",
+      ])
+    ),
+    del: async (c, res) => (await isOwnerOfShop(c, res.shopId)) && ["draft", "cancelled"].includes(res.status),
+  }),
+
+  branchTransferReceipts: shopScoped({
+    create: async (c, req) => (await isOwnerOfShop(c, req.shopId)) || req.createdBy === c.uid,
+    update: ownerOrCreator,
+    del: deny,
+  }),
+
+  branchStockBalances: shopScoped({
+    create: async (c, req) => (await isOwnerOfShop(c, req.shopId)) || ((await canReceiveBranchTransfer(c, req.shopId)) && isBranchTransferReceiver(c, req)),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId)) || ((await canReceiveBranchTransfer(c, res.shopId)) && isBranchTransferReceiver(c, req)),
+  }),
+
+  branchStockMovements: shopScoped({
+    create: async (c, req) => (await isOwnerOfShop(c, req.shopId)) || req.createdBy === c.uid,
+    update: ownerOrCreator,
+    del: deny,
+  }),
+
+  purchaseOrders: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid,
+    update: ownerOrCreator,
+    del: ownerOrCreator,
+  }),
+};
+
+export async function allowed(ctx, op, collection, args) {
+  const rule = RULES[collection]?.[op];
+  if (!rule) return false;
+  try {
+    return (await rule(ctx, args)) === true;
+  } catch {
+    return false;
+  }
+}
+
+// Collections whose read rule does not depend on shop membership; listing
+// them without a shopId filter is allowed (results are still rule-filtered).
+export const UNSCOPED_LIST_COLLECTIONS = new Set(["shops", "inviteCodes", "staffLoginIndex", "users", "productMaintenance"]);

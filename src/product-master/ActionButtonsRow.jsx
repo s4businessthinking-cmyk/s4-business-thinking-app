@@ -4,6 +4,7 @@ export default function ActionButtonsRow({
   form,
   upd,
   canDelete,
+  canEdit = true,
   hasProduct,
   busy,
   onNew,
@@ -19,6 +20,7 @@ export default function ActionButtonsRow({
   onExport,
   onClearAndImport,
   canClearAll,
+  onRemoveBlank,
   productMaintenanceActive,
   onSpecification,
   onPhotoSetting,
@@ -31,18 +33,26 @@ export default function ActionButtonsRow({
       <div className="pm-actions-left">
         <label className="pm-check pm-multi-rate-check">
           <input type="checkbox" checked={!!form.multiCustomerRatesEnabled}
-            onChange={(e) => upd("multiCustomerRatesEnabled", e.target.checked)} />
+            onChange={(e) => {
+              upd("multiCustomerRatesEnabled", e.target.checked);
+              upd("multiCustomerRatesChosen", true);
+            }} />
           Enable Selling rate settings for multiple customer types
         </label>
         <div className="pm-master-tools">
           <button type="button" className="pm-btn-secondary" onClick={onDefaultDiscount}>Default Discount</button>
           <button type="button" className="pm-btn-secondary" onClick={onSetReorderLevel}>Set Reorder Level</button>
           <button type="button" className="pm-btn-secondary" onClick={onSetRack}>Set Rack</button>
-          <button type="button" className="pm-btn-secondary" onClick={onImport}>Import</button>
+          <button type="button" className="pm-btn-secondary" onClick={onImport} disabled={!canEdit}>Import</button>
           <button type="button" className="pm-btn-secondary" onClick={onExport}>Export</button>
           {canClearAll && (
             <button type="button" className="pm-btn-danger" onClick={onClearAndImport} disabled={busy}>
               Clear &amp; Import
+            </button>
+          )}
+          {onRemoveBlank && (
+            <button type="button" className="pm-btn-secondary" onClick={onRemoveBlank} disabled={busy || productMaintenanceActive}>
+              Remove Blank Products
             </button>
           )}
           <button type="button" className="pm-btn-secondary pm-tool-wide" onClick={onSpecification}>Product Specification</button>
@@ -60,7 +70,7 @@ export default function ActionButtonsRow({
         </button>
         <div className="pm-primary-actions">
           <button type="button" className="pm-btn" onClick={onNew}>New</button>
-          <button type="button" className="pm-btn" onClick={onSave} disabled={busy || productMaintenanceActive}>{busy ? "Saving..." : "Save"}</button>
+          <button type="button" className="pm-btn" onClick={onSave} disabled={!canEdit || busy || productMaintenanceActive}>{busy ? "Saving..." : "Save"}</button>
           <button type="button" className="pm-btn" onClick={onDelete} disabled={!hasProduct || !canDelete}>Delete</button>
           <button type="button" className="pm-btn" onClick={onPrintBarcode}>Print<br />Barcode</button>
           <button type="button" className="pm-btn" onClick={onSearch}>Search<br />(F10)</button>

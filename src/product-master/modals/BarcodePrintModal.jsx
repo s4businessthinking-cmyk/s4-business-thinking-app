@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import { code128Bars, code128SvgMarkup } from "../code128";
+import { loadPrintSettings, canPickPrinter, printWithSettings } from "../../print/printSettings.js";
 
 const MODULE_WIDTH = 2;
 const BAR_HEIGHT = 52;
@@ -16,16 +17,17 @@ export default function BarcodePrintModal({ productName, barcode, mrp, onClose, 
     const labels = Array.from({ length: copies })
       .map(() => `<div class="label"><div class="pname">${safe(productName)}</div>${markup}<div class="mrp">MRP: ${safe(mrp)}</div></div>`)
       .join("");
-    const win = window.open("", "_blank", "width=520,height=640");
-    if (!win) return notify("Allow popups to print barcodes", "err");
-    win.document.write(`<html><head><title>Print Barcode</title><style>
+    const head = `<html><head><meta charset="UTF-8"><title>Print Barcode</title><style>
       body{font-family:Arial,sans-serif;margin:10px}
       .label{text-align:center;border:1px dashed #999;padding:6px;margin:6px;display:inline-block}
       .pname{font-size:11px;font-weight:600;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       .mrp{font-size:11px}
       @media print{.label{break-inside:avoid}}
-    </style></head><body onload="window.print()">${labels}</body></html>`);
-    win.document.close();
+    </style></head>`;
+    const { barcodePrinter } = loadPrintSettings();
+    const direct = !!barcodePrinter && canPickPrinter();
+    printWithSettings(`${head}<body>${labels}</body></html>`, { kind: "barcode" });
+    if (direct) notify(`Sent to ${barcodePrinter}`);
   }
 
   return (
@@ -62,7 +64,7 @@ export default function BarcodePrintModal({ productName, barcode, mrp, onClose, 
           style={{ width: 80 }}
           inputMode="numeric"
           value={copies}
-          onChange={(e) => setCopies(Math.max(1, parseInt(e.target.value, 10) || 1))}
+          onChange={(e) => setCopies(Math.min(500, Math.max(1, parseInt(e.target.value, 10) || 1)))}
         />
       </div>
       <div className="pm-window-foot">

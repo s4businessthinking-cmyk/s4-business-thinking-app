@@ -21,6 +21,27 @@ import {
   remainingQuantityForLine,
   statusLabel,
 } from "./branchTransferDomain.js";
+import { unitFactorFor, itemBaseQty } from "../inventory/unitConversion.js";
+import { loadInvoiceRows } from "../inventory/stockFromInvoices.js";
+
+// Base-unit quantity sold from each branch, keyed "branchId|productId".
+function branchSalesMap(products, salesInvoices, deliveryNotes, shopId) {
+  const productById = new Map((products || []).map((p) => [p.id, p]));
+  const out = new Map();
+  const add = (doc, statuses) => {
+    if (!doc || doc.isDeleted || doc.deleted || (shopId && doc.shopId && doc.shopId !== shopId)) return;
+    const loc = doc.stockLocation;
+    if (!loc || loc === "main" || !statuses.includes(doc.status) || doc.internalTransfer) return;
+    (doc.items || []).forEach((it) => {
+      if (!it?.productId) return;
+      const key = `${loc}|${it.productId}`;
+      out.set(key, (out.get(key) || 0) + itemBaseQty(it, productById.get(it.productId)));
+    });
+  };
+  (salesInvoices || []).forEach((inv) => { if (!inv?.deliveryNoteId) add(inv, ["confirmed", "paid", "partial"]); });
+  (deliveryNotes || []).forEach((dn) => add(dn, ["confirmed", "invoiced"]));
+  return out;
+}
 
 const COPY = {
   bn: {
@@ -806,6 +827,8 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
       );
     }
 
+    // Transfer lines are kept in the product's base unit, so a Box/Dz entry is converted with its factor.
+    const factor = unitFactorFor(product, current.unit);
     setItems((prev) => [...prev, {
       lineId: `line-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       productId: product.id,
@@ -813,7 +836,7 @@ function NewTransfer({ lang, s, th, branches, team, products, vendors = [], shop
       code: product.code || product.barcode || product.ean || current.code || "",
       brand: product.brand || current.brand || "",
       unit: product.unit || current.unit || "Pcs",
-      quantity: numberValue(current.quantity),
+      quantity: parseFloat((numberValue(current.quantity) * factor).toFixed(4)),
       unitCost: numberValue(current.unitCost),
     }]);
     resetCurrent();
@@ -1219,7 +1242,20 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   const canReceiveTransfer = canReceiveBranchTransferActor(actor);
   const [branches, setBranches] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, shopId);
   const [transfers, setTransfers] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.TRANSFERS, shopId);
-  const [stockRows] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.STOCK_BALANCES, shopId);
+  const [receivedRows] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.STOCK_BALANCES, shopId);
+  const [soldAtBranch, setSoldAtBranch] = useState(() => new Map());
+  useEffect(() => {
+    let cancelled = false;
+    loadInvoiceRows()
+      .then(({ salesInvoices, deliveryNotes }) => { if (!cancelled) setSoldAtBranch(branchSalesMap(products, salesInvoices, deliveryNotes, shopId)); })
+      .catch((err) => console.warn("[S4 Branch] branch sales load failed", err));
+    return () => { cancelled = true; };
+  }, [products, shopId, receivedRows]);
+  // Received balances only ever grow, so sales made from a branch are taken off here.
+  const stockRows = useMemo(() => receivedRows.map((row) => {
+    const sold = soldAtBranch.get(`${row.branchId}|${row.productId}`) || 0;
+    return sold ? { ...row, quantity: parseFloat((numberValue(row.quantity) - sold).toFixed(4)) } : row;
+  }), [receivedRows, soldAtBranch]);
   const [tab, setTab] = useState(canSendTransfer ? "overview" : "incoming");
   const [busy, setBusy] = useState(false);
   const [receiving, setReceiving] = useState(null);
@@ -1304,7 +1340,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
   };
 
   const tabs = canSendTransfer
-    ? [["overview", t.overview], ["new", t.newTransfer], ...(!isOwner ? [["incoming", t.incoming], ["stock", t.stock]] : []), ["transfers", t.transfers]]
+    ? [["overview", t.overview], ["new", t.newTransfer], ...(!isOwner ? [["incoming", t.incoming]] : []), ["stock", t.stock], ["transfers", t.transfers]]
     : [["incoming", t.incoming], ["transfers", t.transfers], ["stock", t.stock]];
   const waiting = filteredTransfers.filter((transfer) => TransferRemaining(transfer) > 0 && !["draft", "packed", "cancelled"].includes(transfer.status)).length;
   const completed = filteredTransfers.filter((transfer) => transfer.status === "received").length;
@@ -1367,7 +1403,7 @@ export function BranchTransferWorkspace({ lang, th, s, shopId, user, profile, te
       )}
 
       {tab === "transfers" && <TransferList lang={lang} s={s} th={th} transfers={filteredTransfers} isOwner={isOwner} canManageTransferStatus={canSendTransfer} actor={actor} busy={busy} isDesktop={isDesktop} onStatus={(transfer, status) => run(() => updateTransferStatus({ transfer, status, actor }), t.statusUpdated)} onReceive={setReceiving} />}
-      {tab === "stock" && !isOwner && <StockList lang={lang} s={s} th={th} stockRows={stockRows} branchIds={assignedIds} />}
+      {tab === "stock" && <StockList lang={lang} s={s} th={th} stockRows={stockRows} branchIds={isOwner || canSendTransfer ? branches.map((b) => b.id) : assignedIds} />}
 
       {receiving && (
         <ReceiveModal lang={lang} s={s} th={th} transfer={receiving} busy={busy} isDesktop={isDesktop} onClose={() => setReceiving(null)} onConfirm={(inputLines) => run(async () => {

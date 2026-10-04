@@ -15,8 +15,11 @@ function getWasmPath() {
   return `${base}sql-wasm.wasm`;
 }
 
+let idbPromise = null;
+
 function openIndexedDb() {
-  return new Promise((resolve, reject) => {
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
 
     request.onupgradeneeded = () => {
@@ -26,9 +29,18 @@ function openIndexedDb() {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      database.onclose = () => { idbPromise = null; };
+      database.onversionchange = () => { database.close(); idbPromise = null; };
+      resolve(database);
+    };
+    request.onerror = () => {
+      idbPromise = null;
+      reject(request.error);
+    };
   });
+  return idbPromise;
 }
 
 async function readDbBytes() {
@@ -89,11 +101,53 @@ function query(sql, params = []) {
   return rows;
 }
 
+// db.export() serializes the whole database, so concurrent callers share one
+// in-flight write plus at most one follow-up write that covers their changes.
+let persistRunning = null;
+let persistAgain = false;
+let persistTimer = null;
+
 async function persist() {
   if (!db) return false;
-  const bytes = db.export();
-  await writeDbBytes(bytes);
-  return true;
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  if (persistRunning) {
+    persistAgain = true;
+    return persistRunning;
+  }
+  persistRunning = (async () => {
+    try {
+      do {
+        persistAgain = false;
+        await writeDbBytes(db.export());
+      } while (persistAgain);
+      return true;
+    } finally {
+      persistRunning = null;
+    }
+  })();
+  return persistRunning;
+}
+
+// For re-downloadable cloud cache only; user edits must keep calling persist().
+function schedulePersist(delayMs = 1500) {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persist().catch((error) => console.warn("[S4 Offline] deferred persist failed", error));
+  }, delayMs);
+}
+
+if (typeof window !== "undefined") {
+  const flush = () => {
+    if (persistTimer) persist().catch(() => {});
+  };
+  window.addEventListener("pagehide", flush);
+  document.addEventListener?.("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flush();
+  });
 }
 
 export function executeSql(sql, params = []) {
@@ -254,7 +308,7 @@ export async function cacheCloudRecord(collectionName, documentId, data, options
   const id = `${collectionName}:${documentId}`;
 
   const existing = query(
-    `SELECT dirty
+    `SELECT dirty, deleted, data_json
      FROM local_records
      WHERE collection_name = ? AND document_id = ?`,
     [collectionName, documentId]
@@ -268,6 +322,17 @@ export async function cacheCloudRecord(collectionName, documentId, data, options
       collectionName,
       documentId,
     };
+  }
+
+  if (existing?.[0] && Number(existing[0].deleted || 0) === 0) {
+    try {
+      const { _cloud_cached_at: _ignored, ...stored } = JSON.parse(existing[0].data_json || "{}");
+      if (JSON.stringify(stored) === JSON.stringify({ ...(data || {}), id: documentId })) {
+        return { ok: true, skipped: true, reason: "UNCHANGED", collectionName, documentId };
+      }
+    } catch {
+      // unreadable cache row: overwrite below
+    }
   }
 
   const dataJson = JSON.stringify({
@@ -315,7 +380,7 @@ export async function cacheCloudRecords(collectionName, records = []) {
     else cached += 1;
   }
 
-  if (cached > 0) await persist();
+  if (cached > 0) schedulePersist();
 
   return { ok: true, collectionName, cached, skipped };
 }
@@ -476,8 +541,12 @@ export async function enqueueSync(collectionName, documentId, operation, payload
 
   await persist();
 
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUED_EVENT));
+
   return { ok: true, queueId: id };
 }
+
+export const SYNC_QUEUED_EVENT = "s4-sync-queued";
 
 export async function getPendingSyncQueue() {
   await bootOfflineSqlite();

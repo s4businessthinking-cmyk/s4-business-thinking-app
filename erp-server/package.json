@@ -1,0 +1,19 @@
+{
+  "name": "s4-erp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted replacement for Firebase Auth + Firestore used by S4 Business Thinking.",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0",
+    "ws": "^8.18.0"
+  }
+}

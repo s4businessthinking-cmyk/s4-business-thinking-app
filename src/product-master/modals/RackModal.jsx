@@ -8,7 +8,9 @@ export default function RackModal({ form, upd, onClose, notify }) {
   const [bin, setBin] = useState(parts[2] || "");
 
   function save() {
-    const value = [rack.trim(), shelf.trim(), bin.trim()].filter(Boolean).join(" / ");
+    const vals = [rack.trim(), shelf.trim(), bin.trim()];
+    while (vals.length && !vals[vals.length - 1]) vals.pop();
+    const value = vals.join(" / ");
     upd("rackLocation", value);
     notify("Rack location set — press Save to store it");
     onClose();

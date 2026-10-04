@@ -1,44 +1,13 @@
 // ============================================================
-// 🔥 FIREBASE CONFIG — S4 Business Thinking
+// ☁️ CLOUD CONFIG — S4 Business Thinking (own ERP server on the VPS)
 // ============================================================
-import { initializeApp } from "firebase/app";
-import { browserLocalPersistence, getAuth, setPersistence } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
-
-export const firebaseConfig = {
-  apiKey: "AIzaSyDceMFkkUFUz8tnFvZIe-pt9v5mDd0Hn4o",
-  authDomain: "s4-business-thinking-31213.firebaseapp.com",
-  projectId: "s4-business-thinking-31213",
-  storageBucket: "s4-business-thinking-31213.firebasestorage.app",
-  messagingSenderId: "914122331076",
-  appId: "1:914122331076:web:56c00d69c5d8f467038a91",
-  measurementId: "G-5NFNKEZWQX"
-};
+import { getAuth } from "./backend/auth";
+import { getFirestore } from "./backend/firestore";
 
 export const FIREBASE_READY = true;
 
-let _auth = null, _db = null;
-try {
-  const app = initializeApp(firebaseConfig);
-  _auth = getAuth(app);
-  // Android WebView (Capacitor) can't reliably hold Firestore's default
-  // streaming (WebChannel) connection open — it intermittently drops and
-  // resurfaces as a misleading "permission-denied" right after login.
-  // Auto-detecting long-polling makes the mobile build fall back to a
-  // connection type the WebView handles correctly.
-  _db = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-    useFetchStreams: false,
-  });
-  setPersistence(_auth, browserLocalPersistence).catch((err) => {
-    console.warn("[S4 Auth] Firebase persistence setup failed", err);
-  });
-} catch (e) {
-  console.error("Firebase init failed:", e);
-}
-
-export const auth = _auth;
-export const db = _db;
+export const auth = getAuth();
+export const db = getFirestore();
 
 // ============================================================
 // COUNTRIES — for sign up form
@@ -71,6 +40,9 @@ export const friendlyAuthError = (e) => {
     "auth/weak-password": "পাসওয়ার্ড দুর্বল (৬ অক্ষরের বেশি দিন)",
     "auth/too-many-requests": "অনেকবার চেষ্টা করেছেন, কিছুক্ষণ পর আবার চেষ্টা করুন",
     "auth/network-request-failed": "ইন্টারনেট সংযোগ চেক করুন",
+    "auth/session-expired": "লগইন সেশন শেষ হয়েছে, আবার লগইন করুন",
+    "auth/user-disabled": "এই অ্যাকাউন্ট বন্ধ করা আছে",
+    "auth/password-reset-unavailable": "ইমেইলে পাসওয়ার্ড রিসেট এখন নেই — দোকান মালিক বা S4 সাপোর্টের সাথে যোগাযোগ করুন",
   };
   return map[e.code] || e.message || String(e);
 };

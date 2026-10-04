@@ -1,0 +1,13 @@
+services:
+  s4erp:
+    build: .
+    container_name: s4erp
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    mem_limit: 300m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,5 +1,5 @@
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, signOut } from "../backend/auth";
+import { doc, getDoc, updateDoc } from "../backend/firestore";
 import { bootOfflineSqlite } from "../offline/sqliteDb";
 import { auth, db, generateInviteCode } from "../firebase-config";
 import { computeAuthDiagnostics, logAuthDiagnostic, summarizeDiagnostic } from "./authDiagnostics";
@@ -857,6 +857,16 @@ async function markInviteCodeUsed(inviteInfo, usedBy, usedByName) {
   }
 }
 
+const USERNAME_TAKEN = {
+  ok: false,
+  code: "auth/username-taken",
+  message: "❌ এই ইউজারনেম আগেই নেওয়া হয়েছে, অন্য একটি দিন / Username already taken, choose another",
+};
+
+async function isUsernameTaken(username) {
+  return Boolean(await lookupStaffLoginIndex(username));
+}
+
 export async function registerLocalOwnerAccount({
   username,
   password,
@@ -870,6 +880,8 @@ export async function registerLocalOwnerAccount({
 } = {}) {
   await bootOfflineSqlite();
   assertFirebaseReady(true);
+
+  if (await isUsernameTaken(username)) return USERNAME_TAKEN;
 
   const shopId = createId();
   const authEmail = buildLocalAuthEmail(username, shopId, email);
@@ -930,6 +942,14 @@ export async function registerLocalOwnerAccount({
     localUserId: localUser.id,
   });
 
+  await writeStaffLoginIndex({
+    username,
+    shopId,
+    authEmail: authEmail.email,
+    firebaseUid: fbUser.uid,
+    personName,
+  });
+
   await saveShopRecord(shopId, shop, {
     ownerUid: fbUser.uid,
     profile: buildProfileFromLocal(localUser, profileExtras),
@@ -984,6 +1004,7 @@ export async function registerLocalSalesmanAccount({
   assertFirebaseReady(true);
 
   const inviteInfo = await resolveInviteCode(inviteCode);
+  if (await isUsernameTaken(username)) return USERNAME_TAKEN;
   const authEmail = buildLocalAuthEmail(username, inviteInfo.shopId, email);
   const fbUser = await createFirebaseAccount(authEmail.email, password);
   const verificationSent = await sendVerificationEmailIfNeeded(fbUser);

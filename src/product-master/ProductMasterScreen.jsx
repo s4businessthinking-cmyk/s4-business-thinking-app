@@ -61,6 +61,15 @@ const DEFAULT_CUSTOMER_TYPE_RECORDS = [
   { id: 4, name: "Dealer" },
 ];
 
+function productBarcodes(product) {
+  return [
+    product?.barcode,
+    product?.ean,
+    ...(Array.isArray(product?.moreBarcodes) ? product.moreBarcodes : []),
+    ...(Array.isArray(product?.unitPrices) ? product.unitPrices.map((row) => row?.barcode) : []),
+  ].map((entry) => String(entry || "").trim().toLowerCase()).filter(Boolean);
+}
+
 function loadMasterRecords(key, defaults, legacyValues, valueField, definitions = []) {
   let saved = [];
   try {
@@ -113,6 +122,7 @@ export default function ProductMasterScreen({
   upd,
   selectedId,
   canDelete,
+  canEdit = true,
   saving,
   onNew,
   onSave,
@@ -122,6 +132,7 @@ export default function ProductMasterScreen({
   onExport,
   onImportRecords,
   onClearAll,
+  onRemoveBlank,
   clearingProducts,
   replacementActive,
   onFinishReplacement,
@@ -129,9 +140,40 @@ export default function ProductMasterScreen({
   onGenerateWeighingFile,
   onPrintBarcodes,
   notify,
-  shopPartEnabled,
+  search = "",
+  onSearchChange,
 }) {
   const [activeModal, setActiveModal] = useState(null);
+  const mobileQuery = "(max-width: 759px)";
+  const [isMobile, setIsMobile] = useState(() => !!window.matchMedia?.(mobileQuery).matches);
+  const embeddedSearchRef = useRef(null);
+  const formGridRef = useRef(null);
+  useEffect(() => {
+    const mq = window.matchMedia?.(mobileQuery);
+    if (!mq) return undefined;
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  // Mobile shows one section at a time inside a fixed full-screen frame; Search swaps into the same frame.
+  const [mobileTab, setMobileTab] = useState("details");
+  const openSearch = () => {
+    if (!isMobile) {
+      setActiveModal("search");
+      return;
+    }
+    setMobileTab("search");
+    setTimeout(() => embeddedSearchRef.current?.querySelector("input")?.focus(), 50);
+  };
+  const selectFromEmbeddedSearch = (product) => {
+    onSelectProduct(product);
+    setMobileTab("details");
+    formGridRef.current?.scrollTo?.(0, 0);
+  };
+  const startNew = () => {
+    onNew();
+    if (isMobile) setMobileTab("details");
+  };
   const [unitRecords, setUnitRecords] = useState(() => loadMasterRecords(
     `s4-product-master-units-${shopId || "default"}`,
     DEFAULT_UNIT_RECORDS,
@@ -150,6 +192,10 @@ export default function ProductMasterScreen({
   const modalRef = useRef(activeModal);
   const screenRef = useRef(null);
 
+  const openSearchRef = useRef(openSearch);
+  useEffect(() => { openSearchRef.current = openSearch; });
+  const canEditRef = useRef(canEdit);
+  useEffect(() => { canEditRef.current = canEdit; }, [canEdit]);
   useEffect(() => { saveRef.current = onSave; }, [onSave]);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => { modalRef.current = activeModal; }, [activeModal]);
@@ -166,17 +212,22 @@ export default function ProductMasterScreen({
       const typing = tag === "input" || tag === "textarea" || tag === "select" || e.target?.isContentEditable;
       if (e.key === "Escape" && !modalRef.current) {
         e.preventDefault();
+        // First Escape only leaves the field, so a stray key press cannot discard unsaved input.
+        if (typing) {
+          e.target.blur();
+          return;
+        }
         closeRef.current();
         return;
       }
       if (e.key === "F10") {
         e.preventDefault();
-        setActiveModal("search");
+        openSearchRef.current();
         return;
       }
-      if (!modalRef.current && !typing && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      if (!modalRef.current && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        saveRef.current();
+        if (canEditRef.current) saveRef.current();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -197,18 +248,15 @@ export default function ProductMasterScreen({
       ...(field === "barcode" ? [] : [form.barcode]),
       ...(field === "ean" ? [] : [form.ean]),
       ...(Array.isArray(form.moreBarcodes) ? form.moreBarcodes : []),
+      ...(Array.isArray(form.unitPrices) ? form.unitPrices.map((row) => row.barcode) : []),
     ].map((entry) => String(entry || "").trim().toLowerCase()).filter(Boolean);
 
     if (otherCurrentValues.includes(normalized)) {
-      showDuplicateBarcode(`The number "${value}" is already entered in this product. The same number cannot be used in Barcode, EAN Code, or More Barcodes.`);
+      showDuplicateBarcode(`The number "${value}" is already entered in this product. The same number cannot be used in Barcode, EAN Code, More Barcodes, or an alternate unit barcode.`);
       return false;
     }
 
-    const owner = products.find((product) => product.id !== selectedId && [
-      product.barcode,
-      product.ean,
-      ...(Array.isArray(product.moreBarcodes) ? product.moreBarcodes : []),
-    ].map((entry) => String(entry || "").trim().toLowerCase()).includes(normalized));
+    const owner = products.find((product) => product.id !== selectedId && productBarcodes(product).includes(normalized));
     if (owner) {
       showDuplicateBarcode(`The number "${value}" already belongs to product "${owner.name}".`);
       return false;
@@ -230,12 +278,7 @@ export default function ProductMasterScreen({
       showDuplicateBarcode(`The number "${value}" is already entered in this product. The same number cannot be used again as an alternate unit barcode.`);
       return false;
     }
-    const owner = products.find((product) => product.id !== selectedId && [
-      product.barcode,
-      product.ean,
-      ...(Array.isArray(product.moreBarcodes) ? product.moreBarcodes : []),
-      ...(Array.isArray(product.unitPrices) ? product.unitPrices.map((row) => row.barcode) : []),
-    ].map((entry) => String(entry || "").trim().toLowerCase()).includes(normalized));
+    const owner = products.find((product) => product.id !== selectedId && productBarcodes(product).includes(normalized));
     if (owner) {
       showDuplicateBarcode(`The number "${value}" already belongs to product "${owner.name}".`);
       return false;
@@ -257,6 +300,23 @@ export default function ProductMasterScreen({
       return;
     }
     onPrintBarcodes(rows);
+  }
+
+  // One label per opening-stock unit, capped so a typo like 50000 cannot freeze the print window.
+  function printOpeningStockBarcodes() {
+    const MAX_LABELS = 1000;
+    const labels = [];
+    for (const product of filteredProducts) {
+      const qty = Math.floor(parseFloat(product.openingStock || 0));
+      for (let i = 0; i < qty && labels.length < MAX_LABELS; i += 1) labels.push(product);
+      if (labels.length >= MAX_LABELS) break;
+    }
+    if (!labels.length) {
+      notify("No product has an opening stock quantity", "err");
+      return;
+    }
+    if (labels.length >= MAX_LABELS) notify(`Only the first ${MAX_LABELS} labels will be printed`, "err");
+    onPrintBarcodes(labels);
   }
 
   async function clearAndOpenImport() {
@@ -294,7 +354,7 @@ export default function ProductMasterScreen({
   }
 
   return (
-    <div ref={screenRef} className="pm-root" onKeyDown={moveToNextField}>
+    <div ref={screenRef} className={`pm-root${isMobile ? " pm-mobile-merged" : ""}`} onKeyDown={moveToNextField}>
       <style>{PM_CSS}</style>
 
       <div className="pm-reference-title">
@@ -302,17 +362,41 @@ export default function ProductMasterScreen({
         <span>
           {products.length} products
           {productMaintenanceActive ? " · Replacement lock active" : ""}
+          {!canEdit ? " · View only" : ""}
         </span>
       </div>
 
       <div className="pm-quick-bar">
-        <button type="button" className="pm-btn" onClick={onNew}>New</button>
-        <button type="button" className="pm-btn" onClick={onSave} disabled={saving || productMaintenanceActive}>{saving ? "Saving..." : "Save"}</button>
-        <button type="button" className="pm-btn-secondary" onClick={() => setActiveModal("search")}>Search</button>
+        <button type="button" className="pm-btn" onClick={startNew}>New</button>
+        <button type="button" className="pm-btn" onClick={onSave} disabled={!canEdit || saving || productMaintenanceActive}>{saving ? "Saving..." : "Save"}</button>
+        <button type="button" className={`pm-btn-secondary${mobileTab === "search" ? " is-active" : ""}`} onClick={openSearch}>Search</button>
         <button type="button" className="pm-btn-secondary" onClick={onClose}>Close</button>
       </div>
 
-      <div className="pm-reference-grid">
+      {isMobile && mobileTab !== "search" && (
+        <div className="pm-mtabs" role="tablist">
+          {[["details", "Details"], ["price", "Price"], ["rates", "Unit Rates"], ["options", "More"]].map(([key, label]) => (
+            <button key={key} type="button" role="tab" aria-selected={mobileTab === key}
+              className={mobileTab === key ? "is-active" : ""} onClick={() => setMobileTab(key)}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isMobile && (
+        <div ref={embeddedSearchRef} className="pm-embedded-search-slot" hidden={mobileTab !== "search"}>
+          <GlobalSearchModal
+            embedded
+            products={products}
+            selectedProductId={selectedId}
+            onSelect={selectFromEmbeddedSearch}
+            onClose={() => setMobileTab("details")}
+          />
+        </div>
+      )}
+
+      <div ref={formGridRef} className={`pm-reference-grid${isMobile ? ` pm-mtab-${mobileTab}` : ""}`}>
         <div className="pm-reference-left">
           <ProductDetailsForm
             form={form}
@@ -324,12 +408,21 @@ export default function ProductMasterScreen({
             onOpenNewUnit={() => setActiveModal("newUnit")}
             onPickSuggestion={onSelectProduct}
             onValidateIdentityCode={validateIdentityCode}
-            shopPartEnabled={shopPartEnabled}
           />
         </div>
 
         <div className="pm-reference-middle">
           <PricingPanel form={form} upd={upd} />
+          {isMobile && (
+            <label className="pm-check pm-mobile-rate-check">
+              <input type="checkbox" checked={!!form.multiCustomerRatesEnabled}
+                onChange={(e) => {
+                  upd("multiCustomerRatesEnabled", e.target.checked);
+                  upd("multiCustomerRatesChosen", true);
+                }} />
+              Enable Selling rate settings for multiple customer types
+            </label>
+          )}
           <SellingRatesPanel
             form={form}
             upd={upd}
@@ -346,11 +439,12 @@ export default function ProductMasterScreen({
 
         <div className="pm-reference-right">
           <ProductListGrid
+            search={search}
+            onSearchChange={onSearchChange}
             rows={filteredProducts}
             selectedId={selectedId}
             onSelect={onSelectProduct}
             loading={productsLoading}
-            shopPartEnabled={shopPartEnabled}
           />
         </div>
 
@@ -358,15 +452,16 @@ export default function ProductMasterScreen({
           form={form}
           upd={upd}
           canDelete={canDelete}
+          canEdit={canEdit}
           hasProduct={!!selectedId}
           busy={saving}
           productMaintenanceActive={productMaintenanceActive}
-          onNew={onNew}
+          onNew={startNew}
           onSave={onSave}
           onDelete={onDelete}
           onClose={onClose}
           onPrintBarcode={() => setActiveModal("printBarcode")}
-          onSearch={() => setActiveModal("search")}
+          onSearch={openSearch}
           onDefaultDiscount={() => setActiveModal("defaultDiscount")}
           onSetReorderLevel={() => setActiveModal("reorderLevel")}
           onSetRack={() => setActiveModal("rack")}
@@ -374,10 +469,11 @@ export default function ProductMasterScreen({
           onExport={onExport}
           onClearAndImport={() => setActiveModal("clearProducts")}
           canClearAll={canDelete}
+          onRemoveBlank={onRemoveBlank}
           onSpecification={() => setActiveModal("specification")}
           onPhotoSetting={() => setActiveModal("photo")}
           onOpeningStockEntry={() => setActiveModal("openingStock")}
-          onPrintOpeningStockBarcodes={() => onPrintBarcodes(filteredProducts.filter((p) => parseFloat(p.openingStock || 0) > 0))}
+          onPrintOpeningStockBarcodes={printOpeningStockBarcodes}
           onGenerateWeighingFile={onGenerateWeighingFile}
         />
       </div>
@@ -426,7 +522,7 @@ export default function ProductMasterScreen({
       {activeModal === "openingStock" && <OpeningStockModal form={form} upd={upd} notify={notify} onClose={close} />}
       {activeModal === "reorderLevel" && <ReorderLevelModal form={form} upd={upd} notify={notify} onClose={close} />}
       {activeModal === "rack" && <RackModal form={form} upd={upd} notify={notify} onClose={close} />}
-      {activeModal === "defaultDiscount" && <DefaultDiscountModal form={form} upd={upd} onClose={close} />}
+      {activeModal === "defaultDiscount" && <DefaultDiscountModal form={form} upd={upd} notify={notify} onClose={close} />}
       {activeModal === "specification" && <SpecificationModal form={form} upd={upd} notify={notify} onClose={close} />}
       {activeModal === "photo" && <PhotoModal form={form} upd={upd} notify={notify} onClose={close} />}
       {activeModal === "printBarcode" && (
@@ -454,10 +550,9 @@ export default function ProductMasterScreen({
           onClose={closeImport}
         />
       )}
-      {activeModal === "search" && (
+      {activeModal === "search" && !isMobile && (
         <GlobalSearchModal
           products={products}
-          shopPartEnabled={shopPartEnabled}
           onSelect={onSelectProduct}
           onClose={close}
         />

@@ -5,7 +5,7 @@ import {
   getDocs,
   query,
   where,
-} from "firebase/firestore";
+} from "../backend/firestore";
 import { db, auth } from "../firebase-config";
 import { offlineCacheCloudRecords } from "./offlineRepository";
 import { saveCachedShop } from "./shopService";
@@ -33,8 +33,14 @@ export const SHOP_PULL_COLLECTIONS = [
   "purchasePayments",
   "supplierPayments",
   "salesInvoices",
+  "quotations",
+  "deliveryNotes",
+  "salesReceipts",
+  "expenses",
   "users",
 ];
+
+export const SHOP_PULL_ONLY_COLLECTIONS = ["stock_ledger"];
 
 function isOnline() {
   return typeof navigator !== "undefined" ? navigator.onLine : false;
@@ -56,6 +62,29 @@ function assertCloudSyncReady() {
   throw error;
 }
 
+// A partial local row (e.g. a patch applied to a record that was never cached
+// on this device) must not be uploaded as a whole new nameless document.
+const IDENTITY_FIELDS = {
+  products: ["name", "code", "barcode"],
+  customers: ["customerName"],
+  vendors: ["vendorName"],
+  companies: ["name"],
+  purchaseInvoices: ["invoiceNo"],
+  salesInvoices: ["invoiceNo"],
+  quotations: ["invoiceNo"],
+  deliveryNotes: ["invoiceNo"],
+  purchasePayments: ["paymentNo"],
+  salesReceipts: ["receiptNo"],
+  expenses: ["expenseNo"],
+};
+
+export function hasRecordIdentity(collectionName, data) {
+  const fields = IDENTITY_FIELDS[collectionName];
+  if (!fields) return true;
+  if (data?.isDeleted === true || data?.deleted === true) return true;
+  return fields.some((field) => String(data?.[field] ?? "").trim() !== "");
+}
+
 function filterRecordsForShop(collectionName, shopId, rows = []) {
   if (!shopId) return [];
   if (collectionName === "shops") {
@@ -63,6 +92,7 @@ function filterRecordsForShop(collectionName, shopId, rows = []) {
   }
 
   return rows
+    .filter((row) => hasRecordIdentity(collectionName, row.data))
     .filter((row) => {
       const recordShopId = String(row.data?.shopId || "").trim();
       // A local record with NO shopId tag at all is not "some other shop's
@@ -265,10 +295,25 @@ export async function pullShopFromCloud(shopId, options = {}) {
     }
   }
 
+  // Pulled only, never bulk re-uploaded: ledger documents are create-only in the
+  // rules, so each device pushes its own new entries through the sync queue.
+  // Optional so a project whose rules predate the ledger still finishes its pull.
+  for (const collectionName of SHOP_PULL_ONLY_COLLECTIONS) {
+    try {
+      const docs = await pullCollectionByShopId(collectionName, shopId);
+      results.push({ collection: collectionName, count: docs.length, ok: true, optional: true });
+    } catch (error) {
+      console.warn(`[S4 Pull] optional ${collectionName} pull failed`, error);
+      results.push({ collection: collectionName, count: 0, ok: true, optional: true, error: error?.message || String(error) });
+    }
+  }
+
   const totalDocs = results.reduce((sum, row) => sum + Number(row.count || 0), 0);
   const failed = results.filter((row) => !row.ok).length;
 
-  if (failed === 0) {
+  // One denied collection (e.g. rules not deployed yet) must not re-trigger the
+  // full auto-pull on every reload; the product catalog is what it keeps warm.
+  if (results.some((row) => row.collection === "products" && row.ok)) {
     markShopCloudPulled(shopId);
   }
 
