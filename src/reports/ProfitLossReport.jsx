@@ -89,7 +89,9 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     const cashOnSales = salesIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(receipts, inv.id)), 0);
     const receiptsIn = receipts.filter((r) => inRange(dayOf(r.receiptDate || r.createdAt), from, to)).reduce((t, r) => t + n(r.totalAmount), 0);
     const cashOnPurch = purchIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(payments, inv.id)), 0);
-    const paymentsOut = payments.filter((p) => inRange(dayOf(p.paymentDate || p.createdAt), from, to)).reduce((t, p) => t + n(p.totalAmount), 0);
+    const paymentsIn = payments.filter((p) => inRange(dayOf(p.paymentDate || p.createdAt), from, to));
+    const paymentsOut = paymentsIn.reduce((t, p) => t + n(p.chequeAmount ?? p.totalAmount), 0);
+    const vendorDiscount = paymentsIn.reduce((t, p) => t + n(p.discountAmount), 0);
 
     const expensesIn = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && inRange(dayOf(e.expenseDate), from, to));
     const expenseTotal = expensesIn.reduce((t, e) => t + n(e.amount), 0);
@@ -110,7 +112,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
       moneyIn: cashOnSales + receiptsIn, cashOnSales, receiptsIn,
       moneyOut: cashOnPurch + paymentsOut + expenseTotal, cashOnPurch, paymentsOut,
       receivable, payable, stockValue,
-      expenseTotal, expenseByCat, expenseCount: expensesIn.length, netProfit: grossProfit - expenseTotal,
+      expenseTotal, expenseByCat, expenseCount: expensesIn.length, vendorDiscount, netProfit: grossProfit + vendorDiscount - expenseTotal,
     };
   }, [data, products, shopId, from, to, bn]);
 
@@ -125,6 +127,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     ]],
     [L("খরচ ও নিট লাভ", "Expenses & Net Profit"), [
       [L("মোট লাভ", "Gross profit"), report.grossProfit],
+      ...(report.vendorDiscount > 0 ? [[L("সাপ্লায়ারের দেওয়া ছাড় (চেকে)", "Discount received from suppliers"), report.vendorDiscount]] : []),
       ...report.expenseByCat.map(([label, amt]) => [`   ${label}`, -amt]),
       [L(`মোট খরচ (${report.expenseCount}টি)`, `Total expenses (${report.expenseCount})`), -report.expenseTotal, true],
       [report.netProfit >= 0 ? L("নিট লাভ", "Net profit") : L("নিট ক্ষতি", "Net loss"), report.netProfit, true, report.netProfit >= 0 ? "#16a34a" : "#dc2626"],

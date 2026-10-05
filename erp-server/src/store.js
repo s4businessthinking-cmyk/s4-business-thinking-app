@@ -99,8 +99,8 @@ export function createStore({ db }) {
   const loadDoc = async (collection, id) => (await db.getDoc(collection, id))?.data ?? null;
   const ctxFor = (uid) => makeRuleContext(uid, loadDoc);
 
-  async function canRead(ctx, collection, id, data) {
-    return allowed(ctx, "read", collection, { id, res: data });
+  async function canRead(ctx, collection, id, data, list = false) {
+    return allowed(ctx, "read", collection, { id, res: data, list });
   }
 
   async function getDocument(uid, collection, id) {
@@ -124,7 +124,7 @@ export function createStore({ db }) {
     const rows = await candidateRows(q);
     const visible = [];
     for (const row of rows) {
-      if (matchesQuery(q, row.id, row.data) && (await canRead(context, q.collection, row.id, row.data))) visible.push(toWire(row));
+      if (matchesQuery(q, row.id, row.data) && (await canRead(context, q.collection, row.id, row.data, true))) visible.push(toWire(row));
     }
     const sorted = sortDocs(q, visible);
     return q.limit ? sorted.slice(0, q.limit) : sorted;

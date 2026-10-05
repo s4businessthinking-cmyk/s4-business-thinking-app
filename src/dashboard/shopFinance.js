@@ -35,6 +35,10 @@ function sumDue(bills, idField, nameField) {
   return { amount, parties: parties.size };
 }
 
+// A vendor cheque can be written for less than the invoices it settles (the
+// gap is booked as a discount), so the bank sees chequeAmount, not the total.
+export const chequeAmountOf = (v) => n2(v?.chequeAmount ?? v?.totalAmount);
+
 function sumCheques(vouchers, dateField, today) {
   const month = today.slice(0, 7);
   let amount = 0;
@@ -44,12 +48,12 @@ function sumCheques(vouchers, dateField, today) {
   let monthCount = 0;
   for (const v of vouchers) {
     if (!isPendingCheque(v)) continue;
-    amount += n2(v.totalAmount);
+    amount += chequeAmountOf(v);
     count += 1;
     const chequeDay = day(v.chequeDate || v[dateField]);
     if (chequeDay && chequeDay <= today) dueNow += 1;
     if (chequeDay.startsWith(month)) {
-      monthAmount += n2(v.totalAmount);
+      monthAmount += chequeAmountOf(v);
       monthCount += 1;
     }
   }
@@ -70,7 +74,7 @@ export function listPendingCheques({ salesReceipts = [], purchasePayments = [], 
       if (!chequeDate) continue;
       rows.push({
         key: `${type}:${v.id}`, type, id: v.id, no: v[noField] || "", party: partyOf(v) || "",
-        chequeNo: v.chequeNo || "", bank: v.chequeBank || "", amount: n2(v[amountField]),
+        chequeNo: v.chequeNo || "", bank: v.chequeBank || "", amount: amountField === "totalAmount" ? chequeAmountOf(v) : n2(v[amountField]),
         chequeDate, daysLate: daysBetween(chequeDate, today), raw: v,
       });
     }

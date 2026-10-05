@@ -71,7 +71,7 @@ const memberConversionUpdate = (c, res, req) =>
   && onlyChanged(res, req, ["status", "convertedInvoiceId", "convertedInvoiceNo", "updatedAt", "updatedBy"])
   && ["open", "confirmed", "converted", "invoiced"].includes(req.status);
 
-const VOUCHER_MEMBER_FIELDS = ["status", "chequeStatus", "cancelledAt", "cancelledBy", "cancelReason", "clearedAt", "clearedBy", "bouncedAt", "bouncedBy", "updatedAt", "updatedBy"];
+const VOUCHER_MEMBER_FIELDS = ["status", "chequeStatus", "cancelledAt", "cancelledBy", "cancelReason", "clearedAt", "clearedBy", "bouncedAt", "bouncedBy", "updatedAt", "updatedBy", "handover", "chequeReceivedBy", "chequePrintedAt", "chequePrintCount"];
 const PAYMENT_FIELDS = ["amountPaid", "balanceDue", "status", "updatedAt", "updatedBy"];
 const VOUCHER_METHODS = ["cash", "cheque", "bank_transfer", "card"];
 
@@ -104,16 +104,47 @@ const appendOnly = () => ({ ...shopScoped(), update: deny, delete: deny });
 const ownerDelete = (c, res) => isOwnerOfShop(c, res.shopId);
 const ownerOrCreator = async (c, res) => (await isOwnerOfShop(c, res.shopId)) || res.createdBy === c.uid;
 
+// Permissions a salesman may hold right after joining with an invite code; the owner grants the rest.
+const SIGNUP_PERMISSIONS = ["sendOrder", "viewProducts", "manageSales", "manageCustomers"];
+const PROTECTED_PROFILE_FIELDS = ["role", "shopId", "permissions", "status", "isDeleted", "disabled"];
+
+async function selfProfileCreateAllowed(c, req) {
+  if (!req || typeof req !== "object") return false;
+  if (req.role === "owner") {
+    if (!has(req.shopId)) return false;
+    const shop = await c.get("shops", req.shopId);
+    return !shop || shop.ownerUid === c.uid || shop.ownerId === c.uid;
+  }
+  if (!["salesman", "staff"].includes(req.role)) return false;
+  if (has(req.permissions)) {
+    if (typeof req.permissions !== "object") return false;
+    if (Object.entries(req.permissions).some(([k, v]) => v === true && !SIGNUP_PERMISSIONS.includes(k))) return false;
+  }
+  if (!has(req.shopId)) return true;
+  if (typeof req.inviteCode !== "string" || !req.inviteCode) return false;
+  const invite = await c.get("inviteCodes", req.inviteCode);
+  return !!invite && invite.shopId === req.shopId && invite.used === true && invite.usedBy === c.uid;
+}
+
+const selfProfileUpdateAllowed = (res, req) =>
+  PROTECTED_PROFILE_FIELDS.every((k) => deepEqual(res?.[k] ?? null, req?.[k] ?? null));
+
 export const RULES = {
   users: {
     read: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && shopIdOf(c) === res.shopId)),
-    create: async (c, { id, req }) => isAuthenticated(c) && (c.uid === id || (has(req?.shopId) && (await isOwnerOfShop(c, req.shopId)))),
-    update: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)))),
+    create: async (c, { id, req }) => isAuthenticated(c) && (
+      (has(req?.shopId) && (await isOwnerOfShop(c, req.shopId)))
+      || (c.uid === id && (await selfProfileCreateAllowed(c, req)))
+    ),
+    update: async (c, { id, res, req }) => isAuthenticated(c) && (
+      (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)) && (!has(req?.shopId) || req.shopId === res.shopId))
+      || (c.uid === id && selfProfileUpdateAllowed(res, req))
+    ),
     delete: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)))),
   },
 
   shops: {
-    read: async () => true,
+    read: async (c, { id, list }) => !list || isShopMember(c, id),
     create: async (c, { req }) => isAuthenticated(c) && req.ownerUid === c.uid,
     update: async (c, { id, res, req }) => isAuthenticated(c) && (
       res.ownerUid === c.uid
@@ -123,8 +154,9 @@ export const RULES = {
     delete: async (c, { res }) => isAuthenticated(c) && (res.ownerUid === c.uid || res.ownerId === c.uid),
   },
 
+  // Single codes / usernames are looked up before sign-in; listing them is owner-only.
   inviteCodes: {
-    read: async () => true,
+    read: async (c, { list, res }) => !list || (await isOwnerOfShop(c, res?.shopId)),
     create: async (c, { req }) => isAuthenticated(c) && (await isOwnerOfShop(c, req.shopId)),
     update: async (c, { res, req }) => isAuthenticated(c)
       && res.used === false
@@ -135,7 +167,7 @@ export const RULES = {
   },
 
   staffLoginIndex: {
-    read: async () => true,
+    read: async (c, { list, res }) => !list || (await isOwnerOfShop(c, res?.shopId)),
     create: async (c, { req }) => isAuthenticated(c) && ((await isOwnerOfShop(c, req.shopId)) || c.uid === req.firebaseUid),
     update: async (c, { req, res }) =>
       isAuthenticated(c) &&
@@ -189,6 +221,7 @@ export const RULES = {
   }),
 
   supplierPayments: shopScoped(),
+  chequeHandovers: shopScoped({ del: ownerDelete }),
 
   salesInvoices: shopScoped({
     create: async (c, req) => req.createdBy === c.uid,

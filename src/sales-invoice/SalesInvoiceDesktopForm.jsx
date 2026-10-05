@@ -150,7 +150,7 @@ export default function SalesInvoiceDesktopForm({
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine,
   onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, toast,
-  kind = "sales", sourceQuoteNo = "", sourceIsDN = false, onConvertQuote,
+  kind = "sales", sourceQuoteNo = "", sourceIsDN = false, onConvertQuote, canDiscount = true,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
@@ -500,18 +500,18 @@ export default function SalesInvoiceDesktopForm({
             <input ref={rateRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.unitPrice}
               onChange={(e) => setCurrent((p) => ({ ...p, unitPrice: e.target.value }))}
               onFocus={(e) => e.target.select()}
-              onKeyDown={(e) => enterTo(e, isDelivery ? null : disPRef)} />
+              onKeyDown={(e) => enterTo(e, isDelivery ? null : !canDiscount ? (isTax ? vatRef : null) : disPRef)} />
           </div>
           <div>
             <div style={lbl}>Dis %</div>
-            <input ref={disPRef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : current.discountPerc}
+            <input ref={disPRef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : current.discountPerc}
               onChange={(e) => setCurrent((p) => ({ ...p, discountPerc: e.target.value, ...(siN2(e.target.value) > 0 ? { discountFlat: "" } : {}) }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, disARef)} />
           </div>
           <div>
             <div style={lbl}>Dis Amt</div>
-            <input ref={disARef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : current.discountFlat}
+            <input ref={disARef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : current.discountFlat}
               onChange={(e) => setCurrent((p) => ({ ...p, discountFlat: e.target.value, ...(siN2(e.target.value) > 0 ? { discountPerc: "0" } : {}) }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, isTax ? vatRef : null)} />
@@ -629,11 +629,11 @@ export default function SalesInvoiceDesktopForm({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14, padding: "6px 12px", background: C.panel, flexShrink: 0 }}>
         <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
           {field("Disc %", (
-            <input style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : form.billDiscPerc}
+            <input style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.billDiscPerc}
               onChange={(e) => { setField("billDiscPerc", e.target.value); if (siN2(e.target.value) > 0) setField("billDiscAmt", ""); }} />
           ))}
           {field("Disc Amount", (
-            <input style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery}
+            <input style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount}
               value={isDelivery ? "" : (siN2(form.billDiscPerc) > 0 ? siFmt2(totals.billDisc) : form.billDiscAmt)}
               readOnly={siN2(form.billDiscPerc) > 0}
               onChange={(e) => setField("billDiscAmt", e.target.value)} />
@@ -669,7 +669,7 @@ export default function SalesInvoiceDesktopForm({
             <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700 }}><span>{l}</span><span>{v}</span></div>
           ))}
           {field(<span>Adjustments <span style={{ color: "#4b5f86", fontWeight: 600 }}>[Insert]</span></span>, (
-            <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : form.adjustment}
+            <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
               placeholder="+ / -" onChange={(e) => setField("adjustment", e.target.value)} />
           ), 128)}
           {field("Round Off", (

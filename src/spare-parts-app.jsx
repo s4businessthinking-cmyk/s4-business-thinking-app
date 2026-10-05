@@ -93,6 +93,11 @@ import PrintSettingsWindow from "./print/PrintSettingsWindow.jsx";
 import { loadPrintSettings, docSettingsFor, paperCss, printHtmlDocument, printWithSettings } from "./print/printSettings.js";
 import { applyDesign, loadPrintDesign, layoutAppliesTo, renderLayoutDocument, amountInWords, generateStatementHTML, SAMPLE_DATA } from "./print/printDesign.js";
 import { useChequeDueNotifications } from "./dashboard/chequeNotifications.js";
+import VendorChequeWizard from "./vouchers/VendorChequeWizard.jsx";
+import OwnerPinModal from "./auth/OwnerPinModal.jsx";
+import ChequeHandoverModal from "./vouchers/ChequeHandoverModal.jsx";
+import { chequeVoucherHtml, chequeHandoverHtml, chequeAmountOfVoucher } from "./vouchers/chequeDocs.js";
+import { saveHandoverDocs, loadHandoverDocs, handoverSummary } from "./vouchers/chequeHandoverStore.js";
 import { startAutoBackup } from "./backup/backupService.js";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
 import SalesInvoiceDesktopForm from "./sales-invoice/SalesInvoiceDesktopForm.jsx";
@@ -292,6 +297,10 @@ const PERMISSIONS_LIST = [
   { key: "manageExpenses",   bn: "দোকানের খরচ লেখা",           en: "Record Shop Expenses" },
   { key: "sendBranchTransfer", bn: "Branch-এ পণ্য পাঠানো",      en: "Send Branch Products" },
   { key: "receiveBranchTransfer", bn: "Branch Transfer Receive", en: "Receive Branch Products" },
+  { key: "printCheques",     bn: "চেক প্রিন্টার ব্যবহার",       en: "Use Cheque Printer" },
+  { key: "viewCustomerBalance", bn: "কাস্টমারের বাকি / লেজার দেখা", en: "View Customer Balance / Ledger" },
+  { key: "giveDiscount",     bn: "বিক্রয়ে ডিসকাউন্ট দেওয়া",     en: "Give Discount on Sales" },
+  { key: "cancelInvoices",   bn: "ইনভয়েস / রিসিট বাতিল ও ডিলিট", en: "Cancel / Delete Invoices & Receipts" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -314,6 +323,10 @@ const DEFAULT_PERMISSIONS = {
   manageExpenses: false,
   sendBranchTransfer: false,
   receiveBranchTransfer: false,
+  printCheques: false,
+  viewCustomerBalance: false,
+  giveDiscount: false,
+  cancelInvoices: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -2369,8 +2382,8 @@ function PiDetailView({ invoice, onEdit, onCancel, onDelete, onBack, t, th, lang
       {isOwner&&(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
           {canEdit&&<button onClick={onEdit} style={{ padding:"12px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.pi_editBtn}</button>}
-          {canCancel&&<button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelBtn}</button>}
-          {invoice.status==="draft"&&<button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_deleteBtn}</button>}
+          {canCancel&&onCancel&&<button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelBtn}</button>}
+          {invoice.status==="draft"&&onDelete&&<button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_deleteBtn}</button>}
         </div>
       )}
     </div>
@@ -3967,6 +3980,7 @@ function PiVoucherCard({ voucher, t, th, lang, onClick }) {
       <div style={{ display:"flex", gap:12, flexWrap:"wrap", alignItems:"center", marginTop:6 }}>
         <span style={{ fontSize:11, color:th.txtMuted }}>{(voucher.allocations||[]).length}{lang==="bn"?"টি ইনভয়েস":" invoices"}</span>
         <span style={{ fontSize:15, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span>
+        {piN2(voucher.discountAmount)>0&&<span style={{ fontSize:11, fontWeight:700, color:"#3b82f6" }}>🖋️ {lang==="bn"?"চেক":"Cheque"} {piFmt2(voucher.chequeAmount)} · {lang==="bn"?"ছাড়":"disc"} {piFmt2(voucher.discountAmount)}</span>}
       </div>
     </div>
   );
@@ -4207,7 +4221,7 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
 }
 
 // ─── PI: VOUCHER DETAIL VIEW ────────────────────────────────────
-function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onSetChequeStatus, onPrint, onViewInvoice }) {
+function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onSetChequeStatus, onPrint, onViewInvoice, onPrintCheque, onPrintChequeVoucher, onHandover }) {
   const isCheque = voucher.method==="cheque";
   const isCancelled = voucher.status==="cancelled";
   const chequeSt = PI_CHEQUE_STATUSES[voucher.chequeStatus]||PI_CHEQUE_STATUSES.pending;
@@ -4244,8 +4258,27 @@ function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, 
           </>
         )}
         <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span><span style={{ fontSize:18, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span></div>
+        {isCheque&&piN2(voucher.discountAmount)>0&&(
+          <>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏷️ {lang==="bn"?"ছাড়":"Discount"}</span><span style={{ fontSize:13, fontWeight:700, color:"#f59e0b" }}>{t.cur} {piFmt2(voucher.discountAmount)}</span></div>
+            <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>🖋️ {lang==="bn"?"চেকের পরিমাণ":"Cheque Amount"}</span><span style={{ fontSize:15, fontWeight:900, color:"#3b82f6" }}>{t.cur} {piFmt2(voucher.chequeAmount)}</span></div>
+          </>
+        )}
         {voucher.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #f97316" }}>📝 {voucher.note}</div>}
       </div>
+
+      {isCheque&&!isCancelled&&(onPrintCheque||onPrintChequeVoucher||onHandover)&&(
+        <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10, display:"flex", flexDirection:"column", gap:8 }}>
+          <div style={{ fontSize:11, color:"#3b82f6", fontWeight:700, textTransform:"uppercase" }}>🖨️ {lang==="bn"?"চেক ও ডকুমেন্ট":"Cheque & documents"}</div>
+          {voucher.chequePrintedAt&&<div style={{ fontSize:11, color:th.txtMuted }}>✅ {lang==="bn"?"চেক প্রিন্ট হয়েছে":"Cheque printed"}: {String(voucher.chequePrintedAt).slice(0,10)}{voucher.chequePrintCount>1?` (×${voucher.chequePrintCount})`:""}</div>}
+          {voucher.handover?.receiverName&&<div style={{ fontSize:11, color:th.txtMuted }}>🪪 {lang==="bn"?"হস্তান্তর":"Handed over to"}: <b style={{ color:th.txtPrimary }}>{voucher.handover.receiverName}</b>{voucher.handover.receivedAt?` · ${voucher.handover.receivedAt}`:""}</div>}
+          <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+            {onPrintCheque&&<button onClick={onPrintCheque} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>🖨️ {lang==="bn"?"চেক প্রিন্ট":"Print Cheque"}</button>}
+            {onPrintChequeVoucher&&<button onClick={onPrintChequeVoucher} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"1px solid #3b82f6", background:"rgba(59,130,246,0.08)", color:"#3b82f6", fontSize:13, fontWeight:700, cursor:"pointer" }}>📄 {lang==="bn"?"চেক পেমেন্ট ভাউচার":"Cheque Payment Voucher"}</button>}
+            {onHandover&&<button onClick={onHandover} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>🪪 {voucher.handover?(lang==="bn"?"হস্তান্তর ডকুমেন্ট দেখুন":"View Handover"):(lang==="bn"?"হস্তান্তর ডকুমেন্ট":"Handover Document")}</button>}
+          </div>
+        </div>
+      )}
 
       {/* Allocations table */}
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10 }}>
@@ -4367,6 +4400,8 @@ body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;fon
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📃 ${isBn?"চেক নম্বর":"Cheque No."}</span><span style="font-weight:700">${voucher.chequeNo||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${voucher.chequeBank||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📅 ${isBn?"চেকের তারিখ":"Cheque Date"}</span><span style="font-weight:700">${voucher.chequeDate||"—"}</span></div>
+      ${piN2(voucher.discountAmount)>0?`<div class="cheque-row"><span style="color:#b45309;font-weight:700">🏷️ ${isBn?"ছাড়":"Discount"}</span><span style="font-weight:700">${cur} ${piFmt2(voucher.discountAmount)}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🖋️ ${isBn?"চেকের পরিমাণ":"Cheque Amount"}</span><span style="font-weight:900">${cur} ${piFmt2(voucher.chequeAmount)}</span></div>`:""}
       ${voucher.chequeReceivedBy?`<div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🙋 ${isBn?"চেক গ্রহণকারী":"Cheque Received By"}</span><span style="font-weight:700">${voucher.chequeReceivedBy}</span></div>`:""}
     </div>`:""}
     ${voucher.vendorReceiptNo?`<div class="cheque-box"><div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🧾 ${isBn?"ভেন্ডরের রিসিট নম্বর":"Vendor Receipt No."}</span><span style="font-weight:700">${voucher.vendorReceiptNo}</span></div></div>`:""}
@@ -4452,7 +4487,7 @@ function voucherParties(masters, openInvoices, idKey, nameKey, masterName, maste
 }
 
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
@@ -4486,6 +4521,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [pmtPrefillVendorId,setPmtPrefillVendorId] = useState(null);
   const [pmtPrefillInvoiceId,setPmtPrefillInvoiceId] = useState(null);
   const [pmtSaving,setPmtSaving]       = useState(false);
+  const [chqWizard,setChqWizard]       = useState(null);     // null | { vendorId }
+  const [chqHandover,setChqHandover]   = useState(null);     // voucher being documented
+  const [chqHandoverSaving,setChqHandoverSaving] = useState(false);
 
   // ── Form state ──
   const [piInvoiceNo,setPiInvoiceNo] = useState("");
@@ -4739,6 +4777,53 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     .filter(inv => ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01 && (vendorId ? inv.vendorId===vendorId : inv.vendorName===vendorName))
     .sort((a,b) => new Date(a.invoiceDate||0) - new Date(b.invoiceDate||0));
 
+  // ── Vendor cheque documents ──
+  const chequeDocVoucher = (v) => {
+    const withRefs = withSupRefs(v);
+    return { ...withRefs, allocations: withRefs.allocations.map(a => ({ ...a, invoiceAmount: a.invoiceAmount ?? invoices.find(i=>i.id===a.invoiceId)?.grandTotal })) };
+  };
+  const chequeDocOpts = (v) => ({ cur: t.cur||"AED", amountWords: `${amountToWordsAED(chequeAmountOfVoucher(v))} Only` });
+  const printChequePaymentVoucher = (v) => printWithSettings(chequeVoucherHtml(chequeDocVoucher(v), shop, chequeDocOpts(v)), { lang });
+  const printChequeHandover = (v, handover) => printWithSettings(chequeHandoverHtml(chequeDocVoucher(v), shop, handover || v.handover || {}, chequeDocOpts(v)), { lang });
+  const openVoucherInChequePrinter = (v) => onOpenChequePrinter?.({
+    voucher: v, payee: v.vendorName || "", amount: chequeAmountOfVoucher(v), date: v.chequeDate || v.paymentDate || "", bankName: v.chequeBank || "",
+  });
+  const openChequeHandover = async (v) => {
+    const base = payments.find(p=>p.id===v.id) || v;
+    setChqHandover({ ...base, handover: await loadHandoverDocs(base) });
+  };
+  const piSaveChequeHandover = async (v, handover) => {
+    setChqHandoverSaving(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const { handover: _full, ...rest } = v;
+      const base = payments.find(p=>p.id===v.id) || rest;
+      await saveHandoverDocs(base, handover, user?.uid || "");
+      const result = await offlineUpdate("purchasePayments", v.id, {
+        ...base,
+        chequeReceivedBy: base.chequeReceivedBy || handover.receiverName,
+        handover: { ...handoverSummary(handover), savedAt: nowIso, savedBy: user?.uid || "" },
+        updatedAt: nowIso, updatedBy: user?.uid || "",
+      });
+      const updated = { ...result.data, id: v.id };
+      setPayments(prev => prev.map(p => p.id===v.id ? updated : p));
+      setSelVoucher(prev => prev && prev.id===v.id ? updated : prev);
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] handover sync failed", err));
+      toast(lang==="bn" ? "✅ হস্তান্তর ডকুমেন্ট সেভ হয়েছে" : "✅ Handover document saved");
+      setChqHandover(null);
+      return updated;
+    } catch (e) { toast(e.message, "err"); return null; }
+    finally { setChqHandoverSaving(false); }
+  };
+
+  useEffect(() => {
+    if (!chequeHandoverRequest?.id) return;
+    const { at, ...requested } = chequeHandoverRequest;
+    setPiView("list"); setPiSubTab("payments"); openChequeHandover(requested);
+    onChequeHandoverHandled?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chequeHandoverRequest]);
+
   // ── Active (non-cancelled) voucher allocations that touch a given invoice — for the read-only trail on Invoice Detail ──
   const getRelatedPayments = (invoiceId) => payments
     .filter(p => (p.allocations||[]).some(a=>a.invoiceId===invoiceId))
@@ -4752,6 +4837,13 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const allocations = (payload.allocations||[]).filter(a=>piN2(a.amount)>0);
     if (!allocations.length) { toast(t.pi_amountRequired,"err"); return null; }
     if (payload.method==="cheque" && !String(payload.chequeNo||"").trim()) { toast(t.pi_errChequeNo,"err"); return null; }
+    if (payload.chequeAmount != null) {
+      const allocTotal = allocations.reduce((s,a)=>s+piN2(a.amount),0);
+      if (piN2(payload.chequeAmount) <= 0 || piN2(payload.chequeAmount) > allocTotal + 0.001) {
+        toast(lang==="bn"?"চেকের অঙ্ক শূন্য বা মোটের চেয়ে বেশি হতে পারবে না":"Cheque amount must be above zero and not more than the total","err");
+        return null;
+      }
+    }
 
     setPmtSaving(true);
     try {
@@ -4804,6 +4896,10 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         chequeStatus: payload.method === "cheque" ? "pending" : null,
         chequeReceivedBy: payload.method === "cheque" ? (payload.chequeReceivedBy || "").trim() : "",
         vendorReceiptNo: (payload.vendorReceiptNo || "").trim(),
+        ...(payload.method === "cheque" && payload.chequeAmount != null ? {
+          chequeAmount: parseFloat(piFmt2(payload.chequeAmount)),
+          discountAmount: parseFloat(piFmt2(Math.max(0, totalAmount - piN2(payload.chequeAmount)))),
+        } : {}),
         refNo: (payload.refNo || "").trim(),
         refBank: (payload.refBank || "").trim(),
         refDate: payload.refDate || "",
@@ -4813,6 +4909,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           invoiceNo: a.invoiceNo,
           supplierInvoiceNo: a.supplierInvoiceNo || invoices.find((i) => i.id === a.invoiceId)?.supplierInvoiceNo || "",
           invoiceDate: a.invoiceDate || "",
+          invoiceAmount: piN2(invoices.find((i) => i.id === a.invoiceId)?.grandTotal),
           amount: parseFloat(piFmt2(a.amount)),
         })),
         status: "active",
@@ -5306,6 +5403,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
         <div style={{ fontSize:16, fontWeight:800, color:"#f97316" }}>{t.pi_title}</div>
         {canManagePurchase&&piSubTab==="invoices"&&<button onClick={()=>{ if (piLeaveMinOk()) piOpenNew(); }} disabled={piSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:piSaving?"#7c2d12":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:piSaving?"not-allowed":"pointer", opacity:piSaving?0.7:1 }}>{piSaving?"...":(lang==="bn"?"+ নতুন ইনভয়েস":"+ New Invoice")}</button>}
+        {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&<button onClick={()=>setChqWizard({ vendorId:null })} style={{ padding:"9px 14px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{lang==="bn"?"🖨️ ভেন্ডর চেক":"🖨️ Vendor Cheque"}</button>}
         {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&<button onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_newPayment}</button>}
       </div>
 
@@ -5373,7 +5471,36 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           onCancel={()=>piCancelPaymentVoucher(selVoucher)}
           onSetChequeStatus={(st)=>piSetVoucherChequeStatus(selVoucher,st)}
           onPrint={()=>printPaymentVoucher(withSupRefs(selVoucher), shop, lang)}
+          onPrintCheque={onOpenChequePrinter ? ()=>openVoucherInChequePrinter(selVoucher) : undefined}
+          onPrintChequeVoucher={()=>printChequePaymentVoucher(selVoucher)}
+          onHandover={()=>openChequeHandover(selVoucher)}
           onViewInvoice={(invoiceId)=>{ const inv=invoices.find(i=>i.id===invoiceId); if(inv){ setSelInvoice(inv); setPiSubTab("invoices"); setPiView("detail"); } }}
+        />
+      )}
+      {chqWizard&&canVendorPayments&&(
+        <VendorChequeWizard
+          lang={lang} cur={t.cur||"AED"}
+          vendors={voucherParties(vendors, invoices.filter(inv => ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01), "vendorId", "vendorName", v=>v.vendorName, v=>v.mobileNumber||v.whatsappNumber)}
+          banks={UAE_BANKS.map(b=>b.name)}
+          getOpenInvoices={(p)=>getVendorOpenInvoices(p.id, p.name)}
+          amountWords={(n)=>`${amountToWordsAED(n)} Only`}
+          initialVendorId={chqWizard.vendorId}
+          saving={pmtSaving}
+          onSave={(payload)=>piSavePaymentVoucher(payload, { stayOpen:true })}
+          onPrintCheque={onOpenChequePrinter ? (v)=>{ setChqWizard(null); openVoucherInChequePrinter(v); } : undefined}
+          onPrintVoucher={(v)=>printChequePaymentVoucher(v)}
+          onHandover={(v)=>openChequeHandover(v)}
+          onClose={()=>setChqWizard(null)}
+        />
+      )}
+      {chqHandover&&(
+        <ChequeHandoverModal
+          lang={lang} cur={t.cur||"AED"}
+          voucher={chqHandover}
+          saving={chqHandoverSaving}
+          onSave={(h)=>piSaveChequeHandover(chqHandover, h)}
+          onPrint={(h)=>printChequeHandover(chqHandover, h)}
+          onClose={()=>setChqHandover(null)}
         />
       )}
 
@@ -5438,8 +5565,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       <PiDetailView invoice={selInvoice} t={t} th={th} lang={lang} isOwner={isOwner} canVendorPayments={canVendorPayments}
         onBack={()=>{ setPiView("list"); setSelInvoice(null); }}
         onEdit={()=>piOpenEdit(selInvoice)}
-        onCancel={()=>piCancelInv(selInvoice)}
-        onDelete={()=>piDelete(selInvoice)}
+        onCancel={can("cancelInvoices") ? ()=>piCancelInv(selInvoice) : undefined}
+        onDelete={can("cancelInvoices") ? ()=>piDelete(selInvoice) : undefined}
         relatedPayments={getRelatedPayments(selInvoice.id)}
         onMakePayment={()=>piGoToMakePayment(selInvoice)}
         onViewVoucher={(voucher)=>{ setSelVoucher(voucher); setPmtView("detail"); setPiSubTab("payments"); setPiView("list"); }}
@@ -6424,6 +6551,10 @@ async function migrateLegacyDeliveryNotes(rows) {
 function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onQuoteConvertHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
+  const siPerm = (key) => isOwner || { ...DEFAULT_PERMISSIONS, ...(profile?.permissions||{}) }[key] === true;
+  const canDiscount = siPerm("giveDiscount");
+  const canCancelInv = siPerm("cancelInvoices");
+  const canCustBalance = siPerm("viewCustomerBalance");
   const isQuote = kind==="quotation";
   const isDN = kind==="delivery";
   const COL = isQuote ? "quotations" : isDN ? "deliveryNotes" : "salesInvoices";
@@ -6876,6 +7007,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const { sub, disc, vat, grand } = formTotals;
     if (grand < -0.001) { toast(lang==="bn"?"❌ সর্বমোট মাইনাস হতে পারে না — সমন্বয়/ছাড় ঠিক করুন":"❌ Grand total cannot be negative — check adjustment/discount","err"); return null; }
     const priorDoc = editInvId ? invoices.find(inv=>inv.id===editInvId) : null;
+    if (!canDiscount && !isDelivery) {
+      const reduction = (d, adj) => siN2(d) + Math.max(0, -siN2(adj));
+      const baseDoc = priorDoc || sourceQuote;
+      const allowed = baseDoc ? reduction(baseDoc.totalDiscount, baseDoc.adjustment) : 0;
+      if (reduction(disc, formTotals.adjustment) > allowed + 0.01) {
+        toast(lang==="bn"?"❌ ডিসকাউন্ট দেওয়ার অনুমতি নেই — মালিকের কাছে পারমিশন নিন":"❌ You are not allowed to give discounts — ask the owner for permission","err"); return null;
+      }
+    }
     if (status==="draft" && priorDoc && !isQuote && !isDN && priorDoc.status && priorDoc.status!=="draft") {
       toast(lang==="bn"?"❌ সেভ করা বিলকে আবার Draft করা যাবে না":"❌ A saved invoice cannot be turned back into a draft","err"); return null;
     }
@@ -7176,7 +7315,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         initialViewId={receiptWin.viewId||null}
         saving={rcptSaving}
         onSave={async (d)=>{ const c = await siSaveReceipt(d); return c ? toVoucherView(c,"receipt") : null; }}
-        onCancelVoucher={async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; }}
+        onCancelVoucher={canCancelInv ? async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; } : undefined}
         onSetChequeStatus={async (v,st)=>{ const u = await siSetReceiptCheque(v.raw, st); return u ? toVoucherView(u,"receipt") : null; }}
         onPrint={(v)=>printPaymentVoucher(v.raw, shop, lang)}
         onClose={()=>setReceiptWin(null)}
@@ -7358,7 +7497,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         <div style={{ fontSize:16, fontWeight:800, color:isQuote?"#f59e0b":isDN?"#a855f7":"#22c55e" }}>{isQuote?t.tabQuotation:isDN?t.tabDelivery:t.si_title}</div>
         {receiptWindow}
         {ledgerWindow}
-        {kind==="sales"&&<button onClick={()=>setLedgerWin(true)} style={{ marginLeft:"auto", marginRight:8, padding:"9px 14px", borderRadius:10, border:"1px solid #2563eb", background:"transparent", color:"#2563eb", fontSize:13, fontWeight:700, cursor:"pointer" }}>📒 {lang==="bn"?"কাস্টমার লেজার":"Customer Ledger"}</button>}
+        {kind==="sales"&&canCustBalance&&<button onClick={()=>setLedgerWin(true)} style={{ marginLeft:"auto", marginRight:8, padding:"9px 14px", borderRadius:10, border:"1px solid #2563eb", background:"transparent", color:"#2563eb", fontSize:13, fontWeight:700, cursor:"pointer" }}>📒 {lang==="bn"?"কাস্টমার লেজার":"Customer Ledger"}</button>}
         {kind==="sales"&&<button onClick={()=>setReceiptWin({})} style={{ marginRight:8, padding:"9px 14px", borderRadius:10, border:"1px solid #16a34a", background:"transparent", color:"#16a34a", fontSize:13, fontWeight:700, cursor:"pointer" }}>💰 {lang==="bn"?"রিসিট (টাকা গ্রহণ)":"Receipts"}</button>}
         <button onClick={()=>{ if (siLeaveMinOk()) siOpenNew(); }} disabled={siSaving} style={{ padding:"9px 16px", borderRadius:10, border:"none", background:isQuote?"linear-gradient(135deg,#f59e0b,#d97706)":isDN?"linear-gradient(135deg,#a855f7,#7c3aed)":"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>{isQuote?(lang==="bn"?"+ নতুন কোটেশন":"+ New Quotation"):isDN?(lang==="bn"?"+ নতুন ডেলিভারি নোট":"+ New Delivery Note"):t.si_new}</button>
       </div>
@@ -7515,8 +7654,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           {canConvert&&<button onClick={()=>onConvertQuote(inv)} style={{ padding:"13px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer" }}>🧾 {lang==="bn"?"সেলস ইনভয়েসে রূপান্তর করুন":"Convert to Sales Invoice"}</button>}
           {canEdit&&<button onClick={()=>siOpenEdit(inv)} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#1d4ed8,#2563eb)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>✏️ {t.si_edit}</button>}
           {canPay&&kind==="sales"&&<button onClick={()=>setReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })} style={{ padding:"12px", borderRadius:12, border:"none", background:"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>💰 {lang==="bn"?"টাকা গ্রহণ (রিসিট)":"Receive Payment"}</button>}
-          {["confirmed","partial","paid","draft","open"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
-          {inv.status==="draft"&&<button onClick={()=>siDelete(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_deleteBtn}</button>}
+          {canCancelInv&&["confirmed","partial","paid","draft","open"].includes(inv.status)&&<button onClick={()=>siCancel(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #713f12", background:"transparent", color:"#f59e0b", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_cancelBtn}</button>}
+          {canCancelInv&&inv.status==="draft"&&<button onClick={()=>siDelete(inv)} style={{ padding:"11px", borderRadius:12, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.si_deleteBtn}</button>}
         </div>
       </div>
     );
@@ -7546,7 +7685,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }}
         onNew={()=>{ if (siLeaveUnsavedOk()) siOpenNew(); }}
         onOpenInvoice={siOpenFromDesktop}
-        onCancelInvoice={async (inv)=>{ if (await siCancel(inv)) setSiView("detail"); }}
+        onCancelInvoice={canCancelInv ? async (inv)=>{ if (await siCancel(inv)) setSiView("detail"); } : undefined}
+        canDiscount={canDiscount}
         onPrintInvoice={(inv)=>siPrint(inv)}
         onOpenProductMaster={onOpenProductMaster}
         toast={toast}
@@ -7683,7 +7823,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                   onChange={e=>setSiCurrent(p=>({...p,unitPrice:e.target.value}))}
                   onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
               </div>
-              {!formIsDelivery&&<div style={{ flex:"0 0 62px" }}>
+              {!formIsDelivery&&canDiscount&&<div style={{ flex:"0 0 62px" }}>
                 <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_discPerc}</div>
                 <input style={inp()} inputMode="decimal" placeholder="0" value={siCurrent.discountPerc} onChange={e=>setSiCurrent(p=>({...p,discountPerc:e.target.value}))} />
               </div>}
@@ -7725,7 +7865,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                     onChange={e=>setSiCurrent(p=>({...p,unitPrice:e.target.value}))}
                     onKeyDown={e=>e.key==="Enter"&&siAddCurrentItem()} />
                 </div>
-                {!formIsDelivery&&<div>
+                {!formIsDelivery&&canDiscount&&<div>
                   <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:3 }}>{t.si_discPerc}</div>
                   <input style={inp()} inputMode="decimal" placeholder="0" value={siCurrent.discountPerc} onChange={e=>setSiCurrent(p=>({...p,discountPerc:e.target.value}))} />
                 </div>}
@@ -8310,8 +8450,13 @@ const getChequeTemplateDefault = (bankId) => ({
 });
 
 // ─── CHEQUE PRINTER TAB ───────────────────────────────────────────────────────
-function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban }) {
+function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban, shopId, user, shop, prefill=null, onPrefillDone, onOpenHandover, syncRefreshKey=0, foldersVisible=false, onUnlockFolders, onLockFolders }) {
   const [bank, setBank]         = useState(UAE_BANKS[0]);
+  const [linkedVoucher, setLinkedVoucher] = useState(null);
+  const [vendorCheques, setVendorCheques] = useState([]);
+  const [openFolder, setOpenFolder]       = useState(null);
+  const [folderSearch, setFolderSearch]   = useState("");
+  const authSyncReady = useFirebaseAuthReady();
   const [payee, setPayee]       = useState("");
   const [amount, setAmount]     = useState("");
   const [words, setWords]       = useState("");
@@ -8453,6 +8598,104 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
   const chequeDateText = selectedDateFormat.id === "box"
     ? ""
     : `${dd}${selectedDateFormat.sep}${mm}${selectedDateFormat.sep}${yyyy}`;
+
+  // ── Vendor-voucher cheques (only cheques printed from a payment voucher are listed) ──
+  const mergeVendorCheques = (rows) => setVendorCheques(
+    rows.filter(v => v && v.shopId === shopId && v.method === "cheque" && v.chequePrintedAt && v.status !== "cancelled")
+      .sort((a,b) => String(b.chequePrintedAt).localeCompare(String(a.chequePrintedAt)))
+  );
+  useEffect(() => {
+    if (!shopId || !foldersVisible) return undefined;
+    let alive = true;
+    offlineList("purchasePayments").then(res => {
+      if (!alive) return;
+      const rows = (Array.isArray(res) ? res : (res.records || [])).map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }));
+      mergeVendorCheques(rows);
+    }).catch(() => {});
+    let unsub = null;
+    if (authSyncReady) {
+      unsub = onSnapshot(query(collection(db,"purchasePayments"), where("shopId","==",shopId)),
+        snap => { if (alive) mergeVendorCheques(snap.docs.map(d => ({ ...d.data(), id:d.id }))); },
+        err => console.warn("[Cheque] vendor cheque list failed", err));
+    }
+    return () => { alive = false; unsub?.(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId, authSyncReady, syncRefreshKey, foldersVisible]);
+
+  const loadVoucherIntoForm = (v, { payee:p, amount:a, date, bankName } = {}) => {
+    setPayee(p ?? v.vendorName ?? "");
+    const amt = Number(a ?? (v.chequeAmount ?? v.totalAmount)) || 0;
+    setAmount(amt > 0 ? amt.toFixed(2) : "");
+    setWords(amt > 0 ? amountToWordsAED(amt) : "");
+    setWordsManual(false);
+    const d = date ?? v.chequeDate ?? v.paymentDate;
+    if (d) setDateVal(String(d).slice(0,10));
+    const bn = String(bankName ?? v.chequeBank ?? "").trim().toLowerCase();
+    const matched = bn && UAE_BANKS.find(b => b.name.toLowerCase() === bn || b.short?.toLowerCase() === bn);
+    if (matched) setBank(matched);
+    setLinkedVoucher(v);
+  };
+  useEffect(() => {
+    if (!prefill?.voucher) return;
+    loadVoucherIntoForm(prefill.voucher, prefill);
+    onPrefillDone?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
+
+  const markLinkedPrinted = async () => {
+    if (!linkedVoucher?.id) return;
+    try {
+      const nowIso = new Date().toISOString();
+      const local = await offlineGetById("purchasePayments", linkedVoucher.id);
+      const base = local?.data || vendorCheques.find(v => v.id === linkedVoucher.id) || linkedVoucher;
+      const patch = {
+        chequePrintedAt: nowIso,
+        chequePrintCount: (Number(base.chequePrintCount) || 0) + 1,
+        updatedAt: nowIso, updatedBy: user?.uid || "",
+      };
+      const result = await offlineUpdate("purchasePayments", linkedVoucher.id, local?.data ? patch : { ...base, ...patch });
+      const updated = { ...result.data, id: linkedVoucher.id };
+      setLinkedVoucher(updated);
+      setVendorCheques(prev => [updated, ...prev.filter(v => v.id !== updated.id)]);
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] cheque print mark failed", err));
+    } catch (e) { console.warn("[Cheque] mark printed failed", e); }
+  };
+
+  const chequeDocOpts = (v) => ({ cur: t.cur || "AED", amountWords: `${amountToWordsAED(chequeAmountOfVoucher(v))} Only` });
+
+  // Printed from an isolated frame: printing the app window lets the hidden app
+  // layout spill onto extra pages and makes the browser shrink the cheque to fit.
+  const printCheque = () => {
+    const area = document.getElementById("cheque-print-area");
+    if (!area) return;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cheque</title><style>
+@page{size:${pageW}mm ${pageH}mm;margin:0}
+html,body{margin:0;padding:0;background:transparent}
+#cheque{position:relative;width:${pageW}mm;height:${pageH}mm;overflow:hidden}
+#cheque>div{position:absolute}
+</style></head><body><div id="cheque">${area.innerHTML}</div></body></html>`;
+    markLinkedPrinted();
+    if (window.Capacitor?.isNativePlatform?.()) { printHtmlDocument(html, { preview:true, lang }); return; }
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const cleanup = () => setTimeout(() => frame.remove(), 1000);
+    frame.contentWindow.addEventListener("afterprint", cleanup, { once:true });
+    setTimeout(() => {
+      try {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+      } catch (e) {
+        console.error("[Cheque] print failed", e);
+        frame.remove();
+      }
+    }, 150);
+  };
 
   const previewDateBoxes = () => {
     if (dateMode === "box") {
@@ -8815,9 +9058,19 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
             );
           })()}
 
+          {linkedVoucher&&(
+            <div style={{ marginBottom:10, padding:"9px 12px", borderRadius:10, border:"1px solid #2563eb", background:"rgba(37,99,235,0.08)", display:"flex", alignItems:"center", gap:8 }}>
+              <div style={{ flex:1, minWidth:0, fontSize:12, color:th.txtPrimary }}>
+                🔗 <b>{linkedVoucher.paymentNo}</b> · {linkedVoucher.vendorName}
+                <div style={{ fontSize:10, color:th.txtMuted }}>{lang==="bn"?"ভেন্ডর ভাউচারের চেক — প্রিন্ট করলে ভেন্ডরের ফোল্ডারে জমা হবে":"Vendor voucher cheque — saved to the vendor's folder when printed"}</div>
+              </div>
+              <button onClick={()=>setLinkedVoucher(null)} title={lang==="bn"?"লিংক সরান":"Unlink"} style={{ border:"none", background:"transparent", color:th.txtMuted, fontSize:16, cursor:"pointer" }}>✕</button>
+            </div>
+          )}
+
           {/* ── Print + Clear buttons ── */}
           <button
-            onClick={() => window.print()}
+            onClick={printCheque}
             style={{ ...s.sendBtn, marginBottom:10, fontSize:15, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
           >
             🖨️ {lang==="bn" ? "চেক প্রিন্ট করুন" : "Print Cheque"}
@@ -8827,6 +9080,7 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
               setPayee(""); setAmount(""); setWords("");
               setDateVal(localIsoDate());
               setWordsManual(false);
+              setLinkedVoucher(null);
             }}
             style={{ ...s.stBtn, width:"100%", padding:"11px", textAlign:"center", fontSize:13 }}
           >
@@ -9062,6 +9316,76 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
         </div>
       </div>
 
+      {/* ── Vendor cheque folders ── */}
+      {!foldersVisible&&onUnlockFolders&&(
+        <button onClick={onUnlockFolders} style={{ ...s.card, marginTop:16, width:"100%", display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontFamily:"inherit", textAlign:"left", border:`1px solid ${th.border}` }}>
+          <span style={{ fontSize:24 }}>🔒</span>
+          <span style={{ flex:1, fontSize:13, fontWeight:800, color:th.txtPrimary }}>{lang==="bn"?"ভেন্ডর চেক ফোল্ডার লক করা — দেখতে পিন দিন":"Vendor cheque folders are locked — enter PIN to view"}</span>
+          <span style={{ fontSize:13, fontWeight:800, color:"#2563eb" }}>🔓</span>
+        </button>
+      )}
+      {foldersVisible&&(()=>{
+        const bn = lang==="bn";
+        const cur = t.cur || "AED";
+        const folders = new Map();
+        vendorCheques.forEach(v => {
+          const k = v.vendorId || `n:${v.vendorName||""}`;
+          const f = folders.get(k) || { key:k, name:v.vendorName||"—", items:[], total:0 };
+          f.items.push(v); f.total += chequeAmountOfVoucher(v);
+          folders.set(k, f);
+        });
+        const q = folderSearch.trim().toLowerCase();
+        const list = [...folders.values()].filter(f => !q || f.name.toLowerCase().includes(q)).sort((a,b)=>a.name.localeCompare(b.name));
+        const open = openFolder && folders.get(openFolder);
+        const btn = (bg, col, bd) => ({ padding:"7px 10px", borderRadius:8, border:bd||"none", background:bg, color:col, fontSize:12, fontWeight:700, cursor:"pointer", fontFamily:"inherit" });
+        return (
+          <div style={{ ...s.card, marginTop:16 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:10 }}>
+              <div style={{ fontSize:13, fontWeight:800, color:th.accent, flex:1 }}>
+                {open
+                  ? <><button onClick={()=>setOpenFolder(null)} style={{ ...btn("transparent", th.accent), padding:"0 8px 0 0" }}>←</button>📂 {open.name}</>
+                  : <>📁 {bn?"ভেন্ডর চেক ফোল্ডার":"Vendor cheque folders"} <span style={{ fontSize:11, color:th.txtMuted, fontWeight:600 }}>({vendorCheques.length})</span></>}
+              </div>
+              {!open&&<input value={folderSearch} onChange={e=>setFolderSearch(e.target.value)} placeholder={bn?"ভেন্ডর খুঁজুন…":"Search vendor…"} style={{ ...inp, width:isDesktop?220:"100%", padding:"7px 10px", fontSize:13 }} />}
+              {onLockFolders&&<button onClick={()=>{ setOpenFolder(null); onLockFolders(); }} style={btn("transparent", th.txtSecondary, `1px solid ${th.borderMid}`)}>🔒 {bn?"লক":"Lock"}</button>}
+            </div>
+            {!open&&(list.length===0
+              ? <div style={{ fontSize:12, color:th.txtMuted, padding:"12px 0" }}>{bn?"এখনো কোনো ভেন্ডর ভাউচারের চেক প্রিন্ট হয়নি। পারচেজ → পেমেন্ট → 🖨️ ভেন্ডর চেক থেকে শুরু করুন।":"No vendor voucher cheques printed yet. Start from Purchase → Payments → 🖨️ Vendor Cheque."}</div>
+              : <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(auto-fill,minmax(220px,1fr))":"1fr", gap:8 }}>
+                  {list.map(f=>(
+                    <button key={f.key} onClick={()=>setOpenFolder(f.key)} style={{ textAlign:"left", padding:"10px 12px", borderRadius:10, border:`1px solid ${th.border}`, background:th.bgInp, cursor:"pointer", fontFamily:"inherit" }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>📁 {f.name}</div>
+                      <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>{f.items.length} {bn?"টি চেক":"cheques"} · {cur} {f.total.toFixed(2)}</div>
+                    </button>
+                  ))}
+                </div>)}
+            {open&&(
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {open.items.map(v=>(
+                  <div key={v.id} style={{ padding:"10px 12px", borderRadius:10, border:`1px solid ${th.border}`, background:th.bgInp }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
+                      <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>{v.paymentNo} · 📃 {v.chequeNo||"—"}</div>
+                      <div style={{ fontSize:14, fontWeight:900, color:"#22c55e" }}>{cur} {chequeAmountOfVoucher(v).toFixed(2)}</div>
+                    </div>
+                    <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>
+                      🏦 {v.chequeBank||"—"} · 📅 {v.chequeDate||"—"} · 🖨️ {String(v.chequePrintedAt).slice(0,10)}{v.chequePrintCount>1?` ×${v.chequePrintCount}`:""}
+                      {v.handover?.receiverName?` · 🪪 ${v.handover.receiverName}`:""}
+                    </div>
+                    <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
+                      <button onClick={()=>{ loadVoucherIntoForm(v); window.scrollTo?.({ top:0, behavior:"smooth" }); }} style={btn("linear-gradient(135deg,#f97316,#ea580c)", "#fff")}>🖨️ {bn?"আবার প্রিন্ট":"Reprint"}</button>
+                      <button onClick={()=>printWithSettings(chequeVoucherHtml(v, shop, chequeDocOpts(v)), { lang })} style={btn("rgba(59,130,246,0.08)", "#3b82f6", "1px solid #3b82f6")}>📄 {bn?"ভাউচার":"Voucher"}</button>
+                      {v.handover
+                        ? <button onClick={async ()=>printWithSettings(chequeHandoverHtml(v, shop, await loadHandoverDocs(v), chequeDocOpts(v)), { lang })} style={btn("rgba(34,197,94,0.08)", "#22c55e", "1px solid #22c55e")}>🪪 {bn?"হস্তান্তর প্রিন্ট":"Print Handover"}</button>
+                        : onOpenHandover&&<button onClick={()=>onOpenHandover(v)} style={btn("rgba(34,197,94,0.08)", "#22c55e", "1px solid #22c55e")}>🪪 {bn?"হস্তান্তর ডকুমেন্ট":"Handover"}</button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ════════════════════════════════════════
           PRINT-ONLY AREA
           Hidden on screen. When window.print() is called,
@@ -9174,51 +9498,9 @@ function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, sh
 
       {/* ── PRINT STYLES ── */}
       <style>{`
-        /* Screen: hide the print layer completely */
+        /* The print layer is only a template; printCheque() prints a copy of it */
         #cheque-print-area {
           display: none;
-        }
-
-        @media print {
-          /* 1. visibility:hidden hides all content but lets children
-                override with visibility:visible — unlike display:none
-                which also hides all descendants and can't be overridden */
-          body {
-            visibility: hidden !important;
-            margin: 0 !important;
-            padding: 0 !important;
-          }
-
-          /* 2. Show ONLY the cheque print area and its children */
-          #cheque-print-area,
-          #cheque-print-area * {
-            visibility: visible !important;
-          }
-
-          /* 3. Position the print area at the top-left of the page */
-          #cheque-print-area {
-            display: block !important;
-            position: fixed !important;
-            top:    0 !important;
-            left:   0 !important;
-            width:  ${pageW}mm !important;
-            height: ${pageH}mm !important;
-            background: transparent !important;
-            margin:  0 !important;
-            padding: 0 !important;
-            overflow: visible !important;
-          }
-
-          /* 4. Each child text field is absolutely positioned in mm */
-          #cheque-print-area > div {
-            position: absolute !important;
-          }
-
-          /* 5. Page = physical cheque size from user measurement */
-          @page {
-            size: ${pageW}mm ${pageH}mm;
-            margin: 0mm;
-          }
         }
       `}</style>
     </div>
@@ -9265,7 +9547,7 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
 }
 
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, orderModuleEnabled, finance, toast, onOpenMenu }) {
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
@@ -9357,7 +9639,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     ...(staffQuickNavKeys.includes("products") ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products", badge:null }] : []),
     ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
     { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
-    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
+    ...(staffQuickNavKeys.includes("cheque") ? [{ key:"cheque", icon:"🖨️", label:lang==="bn"?"চেক":"Cheque", badge:null }] : []),
     ...(staffQuickNavKeys.includes("pdc") ? [{ key:"pdc", icon:"📃", label:lang==="bn"?"PDC চেক":"PDC", badge:null }] : []),
     ...(staffQuickNavKeys.includes("expenses") ? [{ key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses", badge:null }] : []),
     ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:null }] : []),
@@ -9530,14 +9812,31 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
         </>
       )}
 
-      {isOwner && (
+      {isOwner && !moneyLocked && (
         <ChequeDueAlert lang={lang} th={th} cur={cur} cheques={finance.dueCheques} upcoming={finance.upcomingCheques} today={finance.today}
           userId={userUid} toast={toast} onOpenPdc={()=>setTab("pdc")} />
       )}
 
-      {isOwner && (
+      {isOwner && moneyLocked && (
+        <button onClick={onUnlockMoney} style={{ ...glassCard, width:"100%", borderRadius:14, padding:"16px 14px", marginTop:6, marginBottom:6, display:"flex", alignItems:"center", gap:12, cursor:"pointer", fontFamily:"inherit", textAlign:"left", color:th.txtPrimary, borderBottom:"3px solid #2563eb" }}>
+          <span style={{ fontSize:28 }}>🔒</span>
+          <span style={{ flex:1, minWidth:0 }}>
+            <span style={{ display:"block", fontSize:14, fontWeight:900 }}>{bn?"টাকার হিসাব লুকানো আছে":"Money figures are hidden"}</span>
+            <span style={{ display:"block", fontSize:11, color:th.txtMuted, marginTop:2 }}>
+              {bn?"বিক্রি, ক্রয়, পাওনা, দেনা ও চেকের হিসাব দেখতে পিন দিন":"Enter your PIN to see sales, purchase, receivables, payables and cheques"}
+              {(finance.dueCheques?.length||0)>0 ? (bn?` · ⏰ ${finance.dueCheques.length}টি চেকের তারিখ এসেছে`:` · ⏰ ${finance.dueCheques.length} cheques due`) : ""}
+            </span>
+          </span>
+          <span style={{ padding:"8px 14px", borderRadius:10, background:"linear-gradient(135deg,#2563eb,#1d4ed8)", color:"#fff", fontSize:13, fontWeight:800, whiteSpace:"nowrap" }}>🔓 {bn?"দেখুন":"Show"}</span>
+        </button>
+      )}
+
+      {isOwner && !moneyLocked && (
         <>
-          <div style={sectionTitle}><span>{bn?"💰 বিক্রির হিসাব":"💰 Sales"}</span></div>
+          <div style={{ ...sectionTitle, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <span>{bn?"💰 বিক্রির হিসাব":"💰 Sales"}</span>
+            {onLockMoney&&<button onClick={onLockMoney} title={bn?"আবার লুকান":"Hide again"} style={{ padding:"4px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtSecondary, fontSize:11, fontWeight:800, cursor:"pointer", fontFamily:"inherit" }}>🔒 {bn?"লক":"Lock"}</button>}
+          </div>
           <div style={moneyRow}>
             {salesCards.map(moneyCard)}
           </div>
@@ -10957,13 +11256,15 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   // ── Generate a new single-use invite code ──
   const generateNewCode = async () => {
     try {
-      const code = generateInviteCode();
-      addLocalInviteCode(shopId, code);
-      if (navigator.onLine && db) {
-        await setDoc(doc(db,"inviteCodes",code),{
-          shopId, used:false, createdAt:serverTimestamp(),
-        });
+      if (!navigator.onLine || !db) {
+        toast(lang==="bn"?"❌ Invite Code বানাতে ইন্টারনেট লাগবে":"❌ Internet is required to create an invite code","err");
+        return;
       }
+      const code = generateInviteCode();
+      await setDoc(doc(db,"inviteCodes",code),{
+        shopId, used:false, createdAt:serverTimestamp(),
+      });
+      addLocalInviteCode(shopId, code);
       toast(lang==="bn"?"✅ নতুন Invite Code তৈরি হয়েছে!":"✅ New invite code created!");
     } catch(e) { hErr(e); }
   };
@@ -10994,6 +11295,10 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [pmOverSales,setPmOverSales]=useState(false);
   const [pmPickForSales,setPmPickForSales]=useState(null);
   const [quoteToConvert,setQuoteToConvert]=useState(null);
+  const [chequePrefill,setChequePrefill]=useState(null);
+  const [ownerUnlocked,setOwnerUnlocked]=useState(false);
+  const [pinModal,setPinModal]=useState(null);   // null | "unlock" | "reset"
+  const [chequeHandoverReq,setChequeHandoverReq]=useState(null);
   useEffect(()=>{ if (!["sales","quotation","delivery","purchase"].includes(tab)) setPmOverSales(false); },[tab]);
   const [pmEditId,setPmEditId]=useState(null);
   const [pmForm,setPmForm]=useState(createEmptyPmForm);
@@ -12640,7 +12945,7 @@ const startEditOrder = (order) => {
         ...(can("viewProducts") ? ["products"] : []),
         ...(can("manageSales") ? ["sales"] : []),
         "purchase",
-        "cheque",
+        ...(can("printCheques") ? ["cheque"] : []),
         ...(can("managePdc") ? ["pdc"] : []),
         ...(can("manageExpenses") ? ["expenses"] : []),
         "settings",
@@ -12655,7 +12960,7 @@ const startEditOrder = (order) => {
         ...(can("manageSales")?[["sales", t.tabSales],["quotation", t.tabQuotation],["delivery", t.tabDelivery]]:[]),
         ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
         ...(can("viewVendors")?[["vendors",t.tabVendor]]:[]),
-        ["cheque",t.tabCheque],
+        ...(can("printCheques")?[["cheque",t.tabCheque]]:[]),
         ...(can("managePdc")?[["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"]]:[]),
         ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"]]:[]),
         ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang)]]:[]),
@@ -12974,8 +13279,24 @@ const startEditOrder = (order) => {
   };
 
   // ── TAB CONTENT ──
+  const ownerLockedPanel = (what) => (
+    <div style={isDesktop?s.desktopPanel:s.panel}>
+      <div style={{ ...s.card, textAlign:"center", padding:"36px 18px" }}>
+        <div style={{ fontSize:42, marginBottom:8 }}>🔒</div>
+        <div style={{ fontSize:16, fontWeight:800, color:th.txtPrimary, marginBottom:6 }}>{what}</div>
+        <div style={{ fontSize:13, color:th.txtMuted, marginBottom:16 }}>{lang==="bn"?"দেখতে মালিকের পিন দিন":"Enter the owner PIN to view"}</div>
+        <button onClick={()=>setPinModal("unlock")} style={{ padding:"11px 22px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#2563eb,#1d4ed8)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"inherit" }}>🔓 {lang==="bn"?"পিন দিয়ে খুলুন":"Unlock with PIN"}</button>
+      </div>
+    </div>
+  );
+
   const tabContent = (
     <>
+      {pinModal&&isOwner&&(
+        <OwnerPinModal lang={lang} uid={user.uid} localUserId={profile.localUserId} initialMode={pinModal}
+          onUnlocked={()=>{ setOwnerUnlocked(true); setPinModal(null); toast(lang==="bn"?"🔓 খোলা হয়েছে":"🔓 Unlocked"); }}
+          onClose={()=>setPinModal(null)} />
+      )}
       {tab==="dashboard"&&(
         <DashboardTab
           t={t} lang={lang} th={th} s={s}
@@ -12988,6 +13309,9 @@ const startEditOrder = (order) => {
           canUseBranchTransfer={canUseBranchTransfer}
           orderModuleEnabled={orderModuleEnabled}
           finance={finance}
+          moneyLocked={isOwner&&!ownerUnlocked}
+          onUnlockMoney={()=>setPinModal("unlock")}
+          onLockMoney={()=>setOwnerUnlocked(false)}
           toast={toast}
           onOpenMenu={()=>setMenuOpen(true)}
         />
@@ -13863,6 +14187,9 @@ const startEditOrder = (order) => {
             setPmEditId(null); setPmShowAdd(true); setPmOverSales(true);
           } : undefined}
           productFromMaster={pmPickForSales}
+          onOpenChequePrinter={(isOwner||can("printCheques")) ? (p)=>{ setChequePrefill({ ...p, at:Date.now() }); setTab("cheque"); } : undefined}
+          chequeHandoverRequest={chequeHandoverReq}
+          onChequeHandoverHandled={()=>setChequeHandoverReq(null)}
         />
       )}
 
@@ -13897,11 +14224,19 @@ const startEditOrder = (order) => {
       )}
 
 
-      {tab==="cheque"&&(
+      {tab==="cheque"&&(isOwner||can("printCheques"))&&(
         <ChequePrinterTab
           t={t} lang={lang} th={th} s={s}
           isDesktop={isDesktop}
           shopName={localShop?.companyName||""}
+          shopId={shopId} user={user} shop={localShop}
+          syncRefreshKey={syncRefreshKey}
+          prefill={chequePrefill}
+          onPrefillDone={()=>setChequePrefill(null)}
+          onOpenHandover={canStaffSupplierArea&&(isOwner||can("vendorPayments")) ? (v)=>{ setChequeHandoverReq({ ...v, at:Date.now() }); setTab("purchase"); } : undefined}
+          foldersVisible={isOwner&&ownerUnlocked}
+          onUnlockFolders={isOwner ? ()=>setPinModal("unlock") : undefined}
+          onLockFolders={isOwner ? ()=>setOwnerUnlocked(false) : undefined}
         />
       )}
 
@@ -13916,10 +14251,11 @@ const startEditOrder = (order) => {
           cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} />
       )}
 
-      {tab==="accounts"&&isOwner&&(
+      {tab==="accounts"&&isOwner&&ownerUnlocked&&(
         <ProfitLossReport lang={lang} th={th} s={s} shopId={shopId} products={products}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} />
       )}
+      {tab==="accounts"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব নিকাশ (Accounts) লক করা":"Accounts are locked")}
 
       {tab==="branchTransfer"&&canUseBranchTransfer&&(
         <div style={isDesktop?s.desktopPanel:s.panel}>
@@ -13949,6 +14285,17 @@ const startEditOrder = (order) => {
                 </div>
                 <span style={s.settingsArrow}>›</span>
               </button>
+
+              {isOwner&&(
+                <button style={s.settingsRow} onClick={()=>setPinModal("reset")}>
+                  <span style={s.settingsRowIcon}>🔒</span>
+                  <div style={{ flex:1 }}>
+                    <div style={s.settingsRowLabel}>{lang==="bn"?"মালিকের পিন":"Owner PIN"}</div>
+                    <div style={s.settingsRowSub}>{lang==="bn"?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN"}</div>
+                  </div>
+                  <span style={s.settingsArrow}>›</span>
+                </button>
+              )}
 
               {/* Shop info row */}
               {localShop&&(

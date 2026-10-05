@@ -127,11 +127,18 @@ export function attachRealtime({ server, store, auth, path = "/v1/realtime" }) {
       } catch {
         continue;
       }
-      const readable = evt.after ? await store.canRead(ctx, evt.collection, evt.id, evt.after) : false;
+      const readable = {};
+      const canReadAs = async (list) => {
+        if (!evt.after) return false;
+        if (!(list in readable)) readable[list] = await store.canRead(ctx, evt.collection, evt.id, evt.after, list);
+        return readable[list];
+      };
       for (const [subId, sub] of relevant) {
         if (conn.subs.get(subId) !== sub) continue;
         const was = sub.ids.has(evt.id);
-        const now = readable && (sub.kind === "doc" || matchesQuery(sub.q, evt.id, evt.after));
+        const now = sub.kind === "doc"
+          ? await canReadAs(false)
+          : matchesQuery(sub.q, evt.id, evt.after) && (await canReadAs(true));
         let change = null;
         if (now) {
           change = { type: was ? "modified" : "added", id: evt.id, data: evt.after, version: evt.version, updateTime: evt.updateTime };

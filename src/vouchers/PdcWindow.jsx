@@ -26,7 +26,7 @@ const toRow = (type, v) => {
   return {
     id: v.id, type, no: v[m.no] || "", date: day(v[m.date] || v.createdAt), party: v[m.party] || "",
     chequeNo: v.chequeNo || "", chequeDate: day(v.chequeDate), bank: v.chequeBank || "",
-    amount: n2(v.totalAmount), chequeStatus: v.chequeStatus || "pending", clearedAt: day(v.clearedAt || v.bouncedAt),
+    amount: n2(v.chequeAmount ?? v.totalAmount), chequeStatus: v.chequeStatus || "pending", clearedAt: day(v.clearedAt || v.bouncedAt),
     raw: v,
   };
 };

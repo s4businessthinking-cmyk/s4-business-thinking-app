@@ -420,6 +420,17 @@ async function ensureFirebaseSignedInAfterLocalLogin(localUser, password) {
       email: authEmail,
     });
 
+    // The server accepts an owner profile only once the shop names this account as owner.
+    if (currentUser.role === "owner" && currentUser.shopId) {
+      const cachedShop = readLegacyCachedShop(currentUser.shopId);
+      if (cachedShop) {
+        await writeCloudShop(currentUser.shopId, {
+          ...cachedShop,
+          ownerUid: fbUser.uid,
+        });
+      }
+    }
+
     await writeCloudUserProfile(fbUser.uid, {
       role: currentUser.role,
       shopId: currentUser.shopId,
@@ -430,16 +441,6 @@ async function ensureFirebaseSignedInAfterLocalLogin(localUser, password) {
       permissions: currentUser.permissions,
       localUserId: currentUser.id,
     });
-
-    if (currentUser.role === "owner" && currentUser.shopId) {
-      const cachedShop = readLegacyCachedShop(currentUser.shopId);
-      if (cachedShop) {
-        await writeCloudShop(currentUser.shopId, {
-          ...cachedShop,
-          ownerUid: fbUser.uid,
-        });
-      }
-    }
 
     currentUser = await getLocalUserById(currentUser.id);
     return currentUser;
@@ -814,25 +815,9 @@ async function resolveInviteCode(inviteCode) {
   const code = String(inviteCode || "").trim().toUpperCase();
   if (!code) throw { code: "invite/required" };
 
-  const localMap = loadLocalInviteCodesMap();
-  const localEntry = localMap[code];
-
-  if (localEntry) {
-    if (localEntry.used) throw { code: "invite/already-used" };
-
-    const shopData = readLegacyCachedShop(localEntry.shopId);
-    if (!shopData) throw { code: "invite/not-found" };
-
-    return {
-      code,
-      shopId: localEntry.shopId,
-      shopData,
-      source: "local",
-    };
-  }
-
+  // The cloud copy is the only one the server accepts; a local copy may be stale or deleted.
   const online = typeof navigator !== "undefined" ? navigator.onLine : false;
-  if (!online || !db) throw { code: "invite/not-found" };
+  if (!online || !db) throw { code: "OFFLINE_REQUIRED" };
 
   const codeRef = doc(db, "inviteCodes", code);
   const codeSnap = await getDoc(codeRef);
@@ -852,33 +837,25 @@ async function resolveInviteCode(inviteCode) {
 }
 
 async function markInviteCodeUsed(inviteInfo, usedBy, usedByName) {
-  if (inviteInfo.source === "local") {
-    const map = loadLocalInviteCodesMap();
-    if (map[inviteInfo.code]) {
-      map[inviteInfo.code] = {
-        ...map[inviteInfo.code],
-        used: true,
-        usedBy,
-        usedByName,
-        usedAt: new Date().toISOString(),
-      };
-      saveLocalInviteCodesMap(map);
-    }
-    return;
-  }
+  if (!db) throw new Error("Invite code could not be marked used in cloud. Check internet and try again.");
 
-  if (!db) return;
-
+  const usedAt = new Date().toISOString();
   try {
     await updateDoc(doc(db, "inviteCodes", inviteInfo.code), {
       used: true,
       usedBy,
       usedByName,
-      usedAt: new Date().toISOString(),
+      usedAt,
     });
   } catch (error) {
     console.warn("[S4 Auth] Could not mark cloud invite code used", error);
     throw new Error("Invite code could not be marked used in cloud. Check internet and try again.");
+  }
+
+  const map = loadLocalInviteCodesMap();
+  if (map[inviteInfo.code]) {
+    map[inviteInfo.code] = { ...map[inviteInfo.code], used: true, usedBy, usedByName, usedAt };
+    saveLocalInviteCodesMap(map);
   }
 }
 
@@ -941,7 +918,6 @@ export async function registerLocalOwnerAccount({
   };
 
   const inviteCodes = createLocalInviteCodesForShop(shopId, 3);
-  await seedCloudInviteCodesForShop(shopId, inviteCodes);
 
   const profileExtras = {
     mobile: shop.mobile,
@@ -966,6 +942,8 @@ export async function registerLocalOwnerAccount({
     position: "মালিক",
     localUserId: localUser.id,
   });
+  // The server only accepts invite codes from an existing shop owner profile.
+  await seedCloudInviteCodesForShop(shopId, inviteCodes);
 
   await writeStaffLoginIndex({
     username,
@@ -1032,6 +1010,7 @@ export async function registerLocalSalesmanAccount({
   if (await isUsernameTaken(username)) return USERNAME_TAKEN;
   const authEmail = buildLocalAuthEmail(username, inviteInfo.shopId, email);
   const fbUser = await createFirebaseAccount(authEmail.email, password);
+  await markInviteCodeUsed(inviteInfo, fbUser.uid, personName);
   const verificationSent = await sendVerificationEmailIfNeeded(fbUser);
 
   const localUser = await createLocalUser({
@@ -1046,8 +1025,6 @@ export async function registerLocalSalesmanAccount({
     mustChangePassword: false,
     isEmergencyBootstrap: false,
   });
-
-  await markInviteCodeUsed(inviteInfo, fbUser.uid, personName);
 
   const shop = {
     id: inviteInfo.shopId,
@@ -1076,6 +1053,7 @@ export async function registerLocalSalesmanAccount({
     joinedShopName: profileExtras.joinedShopName,
     position: "Salesman",
     permissions,
+    inviteCode: inviteInfo.code,
     localUserId: localUser.id,
   });
 

@@ -48,7 +48,9 @@ before(async () => {
     set("users", owner.uid, { shopId: "shop1", role: "owner", personName: "Owner" }),
     set("shops", "shop1", { ownerUid: owner.uid, companyName: "S4 Parts" }),
   ])).status, 200);
-  assert.equal((await commit(sales.idToken, [set("users", sales.uid, { shopId: "shop1", role: "salesman" })])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("inviteCodes", "JOIN1", { shopId: "shop1", used: false })])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("inviteCodes", "JOIN1", { shopId: "shop1", used: true, usedBy: sales.uid })])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("users", sales.uid, { shopId: "shop1", role: "salesman", inviteCode: "JOIN1" })])).status, 200);
   assert.equal((await commit(outsider.idToken, [set("users", outsider.uid, { shopId: "shop2", role: "owner" })])).status, 200);
 });
 
@@ -74,6 +76,23 @@ test("auth: login, wrong password, refresh, duplicate email", async () => {
 
   const noToken = await commit(undefined, [set("products", "p0", { shopId: "shop1", name: "x" })]);
   assert.equal(noToken.status, 401);
+});
+
+test("users: no self-promotion, no joining a shop without an invite", async () => {
+  const promote = await commit(sales.idToken, [set("users", sales.uid, { role: "owner" }, true)]);
+  assert.equal(promote.status, 403);
+  const grant = await commit(sales.idToken, [set("users", sales.uid, { permissions: { printCheques: true } }, true)]);
+  assert.equal(grant.status, 403);
+  assert.equal((await commit(sales.idToken, [set("users", sales.uid, { personName: "Ali" }, true)])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { printCheques: true } }, true)])).status, 200);
+
+  const intruder = await api("/v1/auth/signup", { email: "intruder@x.com", password: "secret4" });
+  const join = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "salesman" })]);
+  assert.equal(join.status, 403);
+  const reuse = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "salesman", inviteCode: "JOIN1" })]);
+  assert.equal(reuse.status, 403);
+  const hijack = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "owner" })]);
+  assert.equal(hijack.status, 403);
 });
 
 test("products: shop members write and read; other shop cannot", async () => {
