@@ -481,6 +481,40 @@ export async function clearLocalCollectionForShop(collectionName, shopId) {
   };
 }
 
+// Queue items written for a shop this account no longer belongs to can never
+// be accepted by the server, so they are dropped instead of retried forever.
+export async function dropSyncQueueForShop(shopId) {
+  await bootOfflineSqlite();
+  if (!shopId) return 0;
+  const shopOf = (json) => {
+    try { return JSON.parse(json || "{}").shopId; }
+    catch { return undefined; }
+  };
+  const ids = query(
+    `SELECT q.id, q.payload_json, r.data_json
+       FROM sync_queue q
+       LEFT JOIN local_records r ON r.collection_name = q.collection_name AND r.document_id = q.document_id`
+  )
+    .filter((row) => {
+      let payloadShop;
+      try { payloadShop = JSON.parse(row.payload_json || "{}").data?.shopId; }
+      catch { payloadShop = undefined; }
+      return (payloadShop ?? shopOf(row.data_json)) === shopId;
+    })
+    .map((row) => row.id);
+  if (!ids.length) return 0;
+  db.run("BEGIN");
+  try {
+    ids.forEach((id) => db.run(`DELETE FROM sync_queue WHERE id = ?`, [id]));
+    db.run("COMMIT");
+  } catch (error) {
+    db.run("ROLLBACK");
+    throw error;
+  }
+  await persist();
+  return ids.length;
+}
+
 export async function purgeLocalRecord(collectionName, documentId) {
   await bootOfflineSqlite();
 

@@ -3984,6 +3984,8 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
   const [note,setNote]             = useState("");
   const [chequeNo,setChequeNo]     = useState("");
   const [chequeBank,setChequeBank] = useState("");
+  const [chequeReceivedBy,setChequeReceivedBy] = useState("");
+  const [vendorReceiptNo,setVendorReceiptNo] = useState("");
   const [refNo,setRefNo] = useState("");
   const [refBank,setRefBank] = useState("");
   const [chequeDate,setChequeDate] = useState(piToday());
@@ -4039,6 +4041,8 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
       chequeNo: method==="cheque"?chequeNo:"",
       chequeBank: method==="cheque"?chequeBank:"",
       chequeDate: method==="cheque"?chequeDate:"",
+      chequeReceivedBy: method==="cheque"?chequeReceivedBy:"",
+      vendorReceiptNo,
       refNo: (method==="bank_transfer"||method==="card")?refNo:"",
       refBank: (method==="bank_transfer"||method==="card")?refBank:"",
       refDate: (method==="bank_transfer"||method==="card")?paymentDate:"",
@@ -4121,8 +4125,17 @@ function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, sav
                   <input type="date" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
                 </div>
               </div>
+              <div style={{ marginTop:8 }}>
+                <div style={lbl}>{lang==="bn"?"চেক গ্রহণকারীর নাম (ঐচ্ছিক)":"Cheque Received By (optional)"}</div>
+                <input style={inp()} placeholder={lang==="bn"?"যিনি চেক নিয়েছেন":"Person who took the cheque"} value={chequeReceivedBy} onChange={e=>setChequeReceivedBy(e.target.value)} />
+              </div>
             </div>
           )}
+
+          <div style={{ marginBottom:14 }}>
+            <div style={lbl}>{lang==="bn"?"ভেন্ডরের রিসিট নম্বর (ঐচ্ছিক)":"Vendor Receipt No. (optional)"}</div>
+            <input style={{ ...inp(), fontFamily:"monospace" }} placeholder={lang==="bn"?"ভেন্ডর যে রিসিট দিয়েছে":"Receipt number given by the vendor"} value={vendorReceiptNo} onChange={e=>setVendorReceiptNo(e.target.value)} />
+          </div>
 
           {(method==="bank_transfer"||method==="card")&&(
             <div style={{ background:"rgba(14,165,233,0.06)", border:"1px solid #0ea5e9", borderRadius:10, padding:12, marginBottom:14 }}>
@@ -4220,8 +4233,10 @@ function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, 
             <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📃 {t.pi_chequeNo}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeNo||"—"}</span></div>
             <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏦 {t.pi_chequeBank}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeBank||"—"}</span></div>
             <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📅 {t.pi_chequeDate}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeDate||"—"}</span></div>
+            {voucher.chequeReceivedBy&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🙋 {lang==="bn"?"চেক গ্রহণকারী":"Cheque Received By"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeReceivedBy}</span></div>}
           </>
         )}
+        {voucher.vendorReceiptNo&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🧾 {lang==="bn"?"ভেন্ডরের রিসিট নম্বর":"Vendor Receipt No."}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorReceiptNo}</span></div>}
         {(voucher.method==="bank_transfer"||voucher.method==="card")&&(
           <>
             <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🔖 {voucher.method==="card"?(lang==="bn"?"অনুমোদন / রেফ নং":"Approval / Ref No"):(lang==="bn"?"রেফারেন্স নং":"Reference No")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refNo||"—"}</span></div>
@@ -4352,7 +4367,9 @@ body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;fon
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📃 ${isBn?"চেক নম্বর":"Cheque No."}</span><span style="font-weight:700">${voucher.chequeNo||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${voucher.chequeBank||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📅 ${isBn?"চেকের তারিখ":"Cheque Date"}</span><span style="font-weight:700">${voucher.chequeDate||"—"}</span></div>
+      ${voucher.chequeReceivedBy?`<div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🙋 ${isBn?"চেক গ্রহণকারী":"Cheque Received By"}</span><span style="font-weight:700">${voucher.chequeReceivedBy}</span></div>`:""}
     </div>`:""}
+    ${voucher.vendorReceiptNo?`<div class="cheque-box"><div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🧾 ${isBn?"ভেন্ডরের রিসিট নম্বর":"Vendor Receipt No."}</span><span style="font-weight:700">${voucher.vendorReceiptNo}</span></div></div>`:""}
     ${(voucher.method==="bank_transfer"||voucher.method==="card")&&(voucher.refNo||voucher.refBank)?`<div class="cheque-box">
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🔖 ${voucher.method==="card"?(isBn?"অনুমোদন / রেফ নং":"Approval / Ref No."):(isBn?"রেফারেন্স নং":"Reference No.")}</span><span style="font-weight:700">${voucher.refNo||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">${voucher.method==="card"?(isBn?"💳 কার্ডের ধরন":"💳 Card Type"):(isBn?"🏦 ব্যাংক":"🏦 Bank")}</span><span style="font-weight:700">${voucher.refBank||"—"}</span></div>
@@ -4411,6 +4428,7 @@ const toVoucherView = (v, kind) => ({
   partyName:kind==="receipt" ? v.customerName : v.vendorName, method:v.method, totalAmount:v.totalAmount, status:v.status,
   chequeNo:v.chequeNo, chequeBank:v.chequeBank, chequeDate:v.chequeDate, chequeStatus:v.chequeStatus, note:v.note,
   refNo:v.refNo, refBank:v.refBank, refDate:v.refDate,
+  chequeReceivedBy:v.chequeReceivedBy, vendorReceiptNo:v.vendorReceiptNo,
   collectedByName:v.collectedByName, allocations:v.allocations||[], raw:v,
 });
 // Party list for the voucher window: master records plus names that only appear on open bills.
@@ -4784,6 +4802,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         chequeBank: payload.method === "cheque" ? (payload.chequeBank || "").trim() : "",
         chequeDate: payload.method === "cheque" ? (payload.chequeDate || "") : "",
         chequeStatus: payload.method === "cheque" ? "pending" : null,
+        chequeReceivedBy: payload.method === "cheque" ? (payload.chequeReceivedBy || "").trim() : "",
+        vendorReceiptNo: (payload.vendorReceiptNo || "").trim(),
         refNo: (payload.refNo || "").trim(),
         refBank: (payload.refBank || "").trim(),
         refDate: payload.refDate || "",
@@ -5331,7 +5351,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
             prefill={prefParty ? { ...prefParty, invoiceId:pmtPrefillInvoiceId } : null}
             saving={pmtSaving}
             onSave={async (d)=>{
-              const created = await piSavePaymentVoucher({ vendorId:d.partyId, vendorName:d.partyName, vendorMobile:d.partyMobile, method:d.method, paymentDate:d.date, note:d.note, chequeNo:d.chequeNo, chequeBank:d.chequeBank, chequeDate:d.chequeDate, refNo:d.refNo, refBank:d.refBank, refDate:d.refDate, allocations:d.allocations }, { stayOpen:true });
+              const created = await piSavePaymentVoucher({ vendorId:d.partyId, vendorName:d.partyName, vendorMobile:d.partyMobile, method:d.method, paymentDate:d.date, note:d.note, chequeNo:d.chequeNo, chequeBank:d.chequeBank, chequeDate:d.chequeDate, chequeReceivedBy:d.chequeReceivedBy, vendorReceiptNo:d.vendorReceiptNo, refNo:d.refNo, refBank:d.refBank, refDate:d.refDate, allocations:d.allocations }, { stayOpen:true });
               return created ? toVoucherView(withSupRefs(created),"payment") : null;
             }}
             onCancelVoucher={isOwner ? async (v)=>{ const u = await piCancelPaymentVoucher(v.raw); return u ? toVoucherView(u,"payment") : null; } : undefined}

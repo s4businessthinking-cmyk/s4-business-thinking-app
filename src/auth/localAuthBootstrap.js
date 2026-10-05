@@ -1,6 +1,6 @@
 import { signInWithEmailAndPassword, signOut } from "../backend/auth";
 import { doc, getDoc, updateDoc } from "../backend/firestore";
-import { bootOfflineSqlite } from "../offline/sqliteDb";
+import { bootOfflineSqlite, dropSyncQueueForShop } from "../offline/sqliteDb";
 import { auth, db, generateInviteCode } from "../firebase-config";
 import { computeAuthDiagnostics, logAuthDiagnostic, summarizeDiagnostic } from "./authDiagnostics";
 import {
@@ -65,9 +65,34 @@ async function resolveShopForLogin(shopId) {
   return null;
 }
 
+// A local user created by an older install can still point at a shop that the
+// server account no longer belongs to; the server profile decides the shop.
+async function syncOwnerShopFromServer(localUser) {
+  const uid = auth?.currentUser?.uid;
+  if (!isOnline() || !db || !uid) return localUser;
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    const serverShopId = String(snap.exists() ? snap.data()?.shopId || "" : "").trim();
+    const localShopId = String(localUser.shopId || "").trim();
+    if (!serverShopId || serverShopId === localShopId) return localUser;
+    await updateLocalUserProfile(localUser.id, { shopId: serverShopId, firebaseUid: uid });
+    if (localShopId) {
+      const dropped = await dropSyncQueueForShop(localShopId);
+      console.warn(`[S4 Auth] shop changed ${localShopId} -> ${serverShopId}; dropped ${dropped} stale sync item(s)`);
+    }
+    return (await getLocalUserById(localUser.id)) || localUser;
+  } catch (error) {
+    console.warn("[S4 Auth] server shop check failed", error);
+    return localUser;
+  }
+}
+
 async function finalizeStaffLocalLogin(localUser) {
-  if (!localUser || localUser.role === "owner") {
+  if (!localUser) {
     return { ok: true, localUser, profileExtras: {} };
+  }
+  if (localUser.role === "owner") {
+    return { ok: true, localUser: await syncOwnerShopFromServer(localUser), profileExtras: {} };
   }
 
   const cloudUid =
@@ -131,10 +156,10 @@ async function finalizeStaffLocalLogin(localUser) {
   }
 
   const resolvedShopId =
-    localShopId ||
-    String(memberData?.shopId || "").trim();
+    String(memberData?.shopId || "").trim() ||
+    localShopId;
 
-  if (!localShopId && resolvedShopId) {
+  if (resolvedShopId && resolvedShopId !== localShopId) {
     updates.shopId = resolvedShopId;
   }
 

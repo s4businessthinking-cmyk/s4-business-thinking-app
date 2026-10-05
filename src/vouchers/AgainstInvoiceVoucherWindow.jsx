@@ -78,6 +78,8 @@ export default function AgainstInvoiceVoucherWindow({
   const [chequeNo, setChequeNo] = useState("");
   const [chequeDate, setChequeDate] = useState(todayIso);
   const [chequeBank, setChequeBank] = useState("");
+  const [chequeReceivedBy, setChequeReceivedBy] = useState("");
+  const [vendorReceiptNo, setVendorReceiptNo] = useState("");
   const [refNo, setRefNo] = useState("");
   const [refBank, setRefBank] = useState("");
   const [refDate, setRefDate] = useState(todayIso);
@@ -117,6 +119,7 @@ export default function AgainstInvoiceVoucherWindow({
     setViewingId(null); setViewSnapshot(null);
     setDate(todayIso()); setParty(null); setCollector(""); setRows([]); setSelInvId(""); setCurAmt("");
     setMethod("cash"); setChequeNo(""); setChequeDate(todayIso()); setChequeBank(""); setNote("");
+    setChequeReceivedBy(""); setVendorReceiptNo("");
     setRefNo(""); setRefBank(""); setRefDate(todayIso());
     setTimeout(() => partyRef.current?.focus(), 60);
   };
@@ -155,6 +158,7 @@ export default function AgainstInvoiceVoucherWindow({
       date, method, note: note.trim(),
       chequeNo: method === "cheque" ? chequeNo.trim() : "", chequeBank: method === "cheque" ? chequeBank : "", chequeDate: method === "cheque" ? chequeDate : "",
       refNo: hasRef ? refNo.trim() : "", refBank: hasRef ? refBank : "", refDate: hasRef ? refDate : "",
+      ...(isReceipt ? {} : { chequeReceivedBy: method === "cheque" ? chequeReceivedBy.trim() : "", vendorReceiptNo: vendorReceiptNo.trim() }),
       collectedById: isReceipt ? (collector || "") : "", collectedByName: isReceipt ? (sm?.name || "") : "",
       allocations: rows.map((r) => ({ invoiceId: r.invoiceId, invoiceNo: r.invoiceNo, ...(isReceipt ? {} : { supplierInvoiceNo: r.supplierInvoiceNo || "" }), invoiceDate: r.invoiceDate, amount: parseFloat(f2(r.amount)) })),
     });
@@ -368,9 +372,22 @@ export default function AgainstInvoiceVoucherWindow({
                     </select>
                   )}
               </div>
+              {!isReceipt && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+                  <span style={{ ...lbl, width: 100 }}>Received By</span>
+                  <input style={inp(ro ? { background: "#f4f7fc" } : {})} readOnly={ro} disabled={!ro && shownMethod !== "cheque"} placeholder={bn ? "চেক গ্রহণকারীর নাম (ঐচ্ছিক)" : "Who took the cheque (optional)"} value={ro ? (viewing.chequeReceivedBy || "") : chequeReceivedBy} onChange={(e) => setChequeReceivedBy(e.target.value)} />
+                </div>
+              )}
             </fieldset>
             )}
           </div>
+
+          {!isReceipt && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ ...lbl, width: 88 }}>Vendor Rcpt No</span>
+              <input style={inp(ro ? { background: "#f4f7fc" } : {})} readOnly={ro} placeholder={bn ? "ভেন্ডরের রিসিট নম্বর (ঐচ্ছিক)" : "Receipt number given by the vendor (optional)"} value={ro ? (viewing.vendorReceiptNo || "") : vendorReceiptNo} onChange={(e) => setVendorReceiptNo(e.target.value)} />
+            </div>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ ...lbl, width: 88 }}>Narration</span>
