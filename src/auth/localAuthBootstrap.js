@@ -879,6 +879,7 @@ export async function registerLocalOwnerAccount({
   area = "",
   mobile = "",
   email = "",
+  emailCode = "",
 } = {}) {
   await bootOfflineSqlite();
   assertFirebaseReady(true);
@@ -887,7 +888,7 @@ export async function registerLocalOwnerAccount({
 
   const shopId = createId();
   const authEmail = buildLocalAuthEmail(username, shopId, email);
-  const fbUser = await createFirebaseAccount(authEmail.email, password);
+  const fbUser = await createFirebaseAccount(authEmail.email, password, { emailCode });
   const verificationSent = await sendVerificationEmailIfNeeded(fbUser);
 
   const localUser = await createLocalUser({
@@ -1001,6 +1002,7 @@ export async function registerLocalSalesmanAccount({
   area = "",
   mobile = "",
   email = "",
+  emailCode = "",
   permissions = null,
 } = {}) {
   await bootOfflineSqlite();
@@ -1009,7 +1011,7 @@ export async function registerLocalSalesmanAccount({
   const inviteInfo = await resolveInviteCode(inviteCode);
   if (await isUsernameTaken(username)) return USERNAME_TAKEN;
   const authEmail = buildLocalAuthEmail(username, inviteInfo.shopId, email);
-  const fbUser = await createFirebaseAccount(authEmail.email, password);
+  const fbUser = await createFirebaseAccount(authEmail.email, password, { emailCode });
   await markInviteCodeUsed(inviteInfo, fbUser.uid, personName);
   const verificationSent = await sendVerificationEmailIfNeeded(fbUser);
 

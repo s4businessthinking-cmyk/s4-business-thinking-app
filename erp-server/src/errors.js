@@ -8,6 +8,7 @@ const STATUS = {
   aborted: 409,
   "resource-exhausted": 429,
   internal: 500,
+  unavailable: 503,
 };
 
 export class ApiError extends Error {

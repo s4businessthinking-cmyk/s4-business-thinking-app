@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, where } from "../backend/firestore.js";
 import { db } from "../firebase-config";
 import { offlineList } from "../offline/offlineRepository";
 import { SYNC_QUEUED_EVENT } from "../offline/sqliteDb";
+import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
 
 export const FINANCE_COLLECTIONS = ["salesInvoices", "salesReceipts", "purchaseInvoices", "purchasePayments", "expenses"];
 
@@ -93,7 +94,7 @@ export function listDueCheques(data, today = localDateString()) {
 export function computeShopFinance({ salesInvoices = [], salesReceipts = [], purchaseInvoices = [], purchasePayments = [], expenses = [] }, today = localDateString()) {
   const month = today.slice(0, 7);
   const sales = salesInvoices.filter(isLiveBill);
-  const purchases = purchaseInvoices.filter(isLiveBill);
+  const purchases = purchaseInvoices.filter((inv) => isLiveBill(inv) && !isBranchTransferBill(inv));
   const receipts = salesReceipts.filter(isLiveVoucher);
 
   const allocatedByInvoice = new Map();
@@ -113,6 +114,7 @@ export function computeShopFinance({ salesInvoices = [], salesReceipts = [], pur
     purchaseMonthCount: 0,
   };
   for (const inv of sales) {
+    if (inv.source === "openingBalance") continue;
     const d = day(inv.invoiceDate);
     if (d === today) {
       out.salesToday += n2(inv.grandTotal);
@@ -128,6 +130,7 @@ export function computeShopFinance({ salesInvoices = [], salesReceipts = [], pur
     if (day(r.receiptDate) === today && !isPendingCheque(r)) out.collectedToday += n2(r.totalAmount);
   }
   for (const inv of purchases) {
+    if (inv.source === "openingBalance") continue;
     if (day(inv.invoiceDate) === today) {
       out.purchaseToday += n2(inv.grandTotal);
       out.purchaseTodayCount += 1;

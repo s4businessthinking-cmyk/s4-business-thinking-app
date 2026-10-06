@@ -65,6 +65,12 @@ const PUT_DOC = `
   ON DUPLICATE KEY UPDATE shop_id = VALUES(shop_id), data = VALUES(data), version = VALUES(version), updated_at = VALUES(updated_at)
 `;
 
+const PUT_DOCS = `
+  INSERT INTO documents (collection, id, shop_id, data, version, created_at, updated_at)
+  VALUES ?
+  ON DUPLICATE KEY UPDATE shop_id = VALUES(shop_id), data = VALUES(data), version = VALUES(version), updated_at = VALUES(updated_at)
+`;
+
 export async function createMysqlDb(options) {
   const pool = mysql.createPool({
     ...options,
@@ -81,6 +87,14 @@ export async function createMysqlDb(options) {
     async getDoc(collection, id) {
       return toDocRow(await one("SELECT * FROM documents WHERE collection = ? AND id = ?", [collection, id]));
     },
+    async getDocs(collection, ids) {
+      const out = [];
+      for (let i = 0; i < ids.length; i += 500) {
+        const [rows] = await pool.query("SELECT * FROM documents WHERE collection = ? AND id IN (?)", [collection, ids.slice(i, i + 500)]);
+        out.push(...rows.map(toDocRow));
+      }
+      return out;
+    },
     async listDocs(collection, shopId) {
       const [rows] = shopId === undefined
         ? await pool.query("SELECT * FROM documents WHERE collection = ?", [collection])
@@ -94,6 +108,12 @@ export async function createMysqlDb(options) {
         const result = await fn({
           async putDoc(r) {
             await conn.query(PUT_DOC, [r.collection, r.id, r.shopId ?? null, JSON.stringify(r.data), r.version, r.createdAt, r.updatedAt]);
+          },
+          async putDocs(rows) {
+            for (let i = 0; i < rows.length; i += 100) {
+              const values = rows.slice(i, i + 100).map((r) => [r.collection, r.id, r.shopId ?? null, JSON.stringify(r.data), r.version, r.createdAt, r.updatedAt]);
+              await conn.query(PUT_DOCS, [values]);
+            }
           },
           async deleteDoc(collection, id) {
             await conn.query("DELETE FROM documents WHERE collection = ? AND id = ?", [collection, id]);

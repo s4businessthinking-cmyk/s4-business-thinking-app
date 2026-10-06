@@ -58,9 +58,28 @@ export function createTokens(secret) {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function createAuthService({ db, cfg }) {
+const LOCAL_EMAIL_DOMAIN = "@s4local.app";
+const SIGNUP_CODE_TTL_MS = 10 * 60 * 1000;
+const SIGNUP_RESEND_GAP_MS = 60 * 1000;
+
+export function createAuthService({ db, cfg, sendMail = null }) {
   const tokens = createTokens(cfg.jwtSecret);
   const attempts = new Map();
+  const signupCodes = new Map();
+  // Username-only accounts get a placeholder address that cannot receive mail.
+  const needsSignupCode = (email) => !!sendMail && !email.endsWith(LOCAL_EMAIL_DOMAIN);
+
+  const takeSignupCode = (email, code) => {
+    const entry = signupCodes.get(email);
+    if (!entry || entry.expiresAt < Date.now()) fail("invalid-argument", "auth/email-code-expired");
+    entry.tries += 1;
+    const given = Buffer.from(sha256(`${email}:${String(code || "").trim()}`));
+    if (!crypto.timingSafeEqual(given, Buffer.from(entry.hash))) {
+      if (entry.tries >= 5) signupCodes.delete(email);
+      fail("invalid-argument", "auth/invalid-email-code");
+    }
+    signupCodes.delete(email);
+  };
 
   const throttle = (key) => {
     const now = Date.now();
@@ -98,12 +117,32 @@ export function createAuthService({ db, cfg }) {
   return {
     verifyIdToken: tokens.verifyIdToken,
 
-    async signUp({ email, password }, ip = "") {
+    async requestSignupCode({ email }, ip = "") {
+      const e = normEmail(email);
+      if (!EMAIL_RE.test(e) || e.endsWith(LOCAL_EMAIL_DOMAIN)) fail("invalid-argument", "auth/invalid-email");
+      if (!sendMail) return { ok: true, required: false };
+      throttle(`signup-code:${ip}`);
+      if (await db.findAccountByEmail(e)) fail("already-exists", "auth/email-already-in-use");
+      const prev = signupCodes.get(e);
+      if (prev && Date.now() - prev.sentAt < SIGNUP_RESEND_GAP_MS) fail("resource-exhausted", "auth/code-resend-too-soon");
+      const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, "0");
+      await sendMail({
+        to: e,
+        subject: `S4 Business Thinking — email verification code ${code}`,
+        text: `Your verification code is ${code}\n\nIt expires in 10 minutes. If you did not create an S4 Business Thinking account, ignore this email.\n\nআপনার যাচাই কোড: ${code}\n১০ মিনিটের মধ্যে ব্যবহার করুন। আপনি অ্যাকাউন্ট না খুললে এই ইমেইল উপেক্ষা করুন।`,
+      });
+      signupCodes.set(e, { hash: sha256(`${e}:${code}`), expiresAt: Date.now() + SIGNUP_CODE_TTL_MS, sentAt: Date.now(), tries: 0 });
+      return { ok: true, required: true, expiresInSec: SIGNUP_CODE_TTL_MS / 1000 };
+    },
+
+    /** `byShopOwner`: a signed-in owner is adding staff, so the address needs no code. */
+    async signUp({ email, password, code }, ip = "", { byShopOwner = false } = {}) {
       const e = normEmail(email);
       if (!EMAIL_RE.test(e)) fail("invalid-argument", "auth/invalid-email");
       if (String(password || "").length < 6) fail("invalid-argument", "auth/weak-password");
       throttle(`signup:${ip}`);
       if (await db.findAccountByEmail(e)) fail("already-exists", "auth/email-already-in-use");
+      if (needsSignupCode(e) && !byShopOwner) takeSignupCode(e, code);
       const now = new Date().toISOString();
       const account = { uid: newUid(), email: e, passwordHash: await hashPassword(password), createdAt: now, updatedAt: now };
       await db.insertAccount(account);

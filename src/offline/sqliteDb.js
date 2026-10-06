@@ -246,6 +246,8 @@ export async function bootOfflineSqlite() {
     db = savedBytes ? new SQL.Database(new Uint8Array(savedBytes)) : new SQL.Database();
 
     initSchema();
+    // Synced queue rows used to be kept with status DONE; they only bloat every export.
+    db.run(`DELETE FROM sync_queue WHERE status = 'DONE'`);
     const migration = migrateLocalAuthSchema({
       executeSql: exec,
       queryRows: query,
@@ -275,7 +277,8 @@ export async function bootOfflineSqlite() {
   return bootPromise;
 }
 
-export async function saveLocalRecord(collectionName, documentId, data) {
+// skipPersist: the caller persists right after (e.g. together with its sync-queue row).
+export async function saveLocalRecord(collectionName, documentId, data, options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -296,7 +299,7 @@ export async function saveLocalRecord(collectionName, documentId, data) {
     [id, collectionName, documentId, dataJson, now, now]
   );
 
-  await persist();
+  if (!options.skipPersist) await persist();
 
   return { ok: true, id, collectionName, documentId };
 }
@@ -385,7 +388,7 @@ export async function cacheCloudRecords(collectionName, records = []) {
   return { ok: true, collectionName, cached, skipped };
 }
 
-export async function deleteLocalRecord(collectionName, documentId) {
+export async function deleteLocalRecord(collectionName, documentId, options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -398,7 +401,7 @@ export async function deleteLocalRecord(collectionName, documentId) {
     [now, collectionName, documentId]
   );
 
-  await persist();
+  if (!options.skipPersist) await persist();
 
   return { ok: true, id, collectionName, documentId };
 }
@@ -535,6 +538,54 @@ export async function purgeLocalRecord(collectionName, documentId) {
   return { ok: true, collectionName, documentId };
 }
 
+export async function getLocalRecord(collectionName, documentId) {
+  await bootOfflineSqlite();
+
+  const rows = query(
+    `SELECT *
+     FROM local_records
+     WHERE collection_name = ? AND document_id = ? AND deleted = 0`,
+    [collectionName, documentId]
+  );
+  if (!rows.length) return null;
+  return { ...rows[0], data: JSON.parse(rows[0].data_json || "{}") };
+}
+
+// Unsynced local state (including local tombstones) that must win over cloud snapshots.
+export async function getDirtyLocalRecords(collectionName) {
+  await bootOfflineSqlite();
+
+  return query(
+    `SELECT document_id, data_json, deleted
+     FROM local_records
+     WHERE collection_name = ? AND dirty = 1`,
+    [collectionName]
+  ).map((row) => ({
+    documentId: row.document_id,
+    deleted: Number(row.deleted || 0) === 1,
+    data: JSON.parse(row.data_json || "{}"),
+  }));
+}
+
+// Drops cached copies of documents that no longer exist in the cloud; unsynced rows are kept.
+export async function purgeCleanLocalRecords(collectionName, documentIds = []) {
+  await bootOfflineSqlite();
+
+  let purged = 0;
+  for (const documentId of documentIds) {
+    db.run(
+      `DELETE FROM local_records
+       WHERE collection_name = ? AND document_id = ? AND dirty = 0`,
+      [collectionName, documentId]
+    );
+    purged += db.getRowsModified();
+  }
+
+  if (purged > 0) schedulePersist();
+
+  return { ok: true, collectionName, purged };
+}
+
 export async function getLocalRecords(collectionName) {
   await bootOfflineSqlite();
 
@@ -626,21 +677,18 @@ export async function markSyncDone(queueId, options = {}) {
     [queueId]
   );
 
-  db.run(
-    `UPDATE sync_queue
-     SET status = 'DONE', updated_at = ?
-     WHERE id = ?`,
-    [now, queueId]
-  );
+  db.run(`DELETE FROM sync_queue WHERE id = ?`, [queueId]);
 
   const item = rows?.[0];
 
   if (item?.collection_name && item?.document_id) {
+    // A newer edit still queued for the same record keeps it dirty.
     db.run(
       `UPDATE local_records
        SET dirty = 0, updated_at = ?
-       WHERE collection_name = ? AND document_id = ?`,
-      [now, item.collection_name, item.document_id]
+       WHERE collection_name = ? AND document_id = ?
+         AND NOT EXISTS (SELECT 1 FROM sync_queue WHERE collection_name = ? AND document_id = ?)`,
+      [now, item.collection_name, item.document_id, item.collection_name, item.document_id]
     );
   }
 
@@ -795,7 +843,10 @@ export async function bulkEnqueueUpsert(collectionName, records = []) {
     queued += 1;
   }
 
-  if (queued > 0) await persist();
+  if (queued > 0) {
+    await persist();
+    if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUED_EVENT));
+  }
 
   return { ok: true, collectionName, queued };
 }

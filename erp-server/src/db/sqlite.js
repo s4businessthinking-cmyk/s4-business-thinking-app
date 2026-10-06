@@ -96,6 +96,9 @@ export function createSqliteDb(file) {
     async putDoc(r) {
       st.putDoc.run(r.collection, r.id, r.shopId ?? null, JSON.stringify(r.data), r.version, r.createdAt, r.updatedAt);
     },
+    async putDocs(rows) {
+      for (const r of rows) await writer.putDoc(r);
+    },
     async deleteDoc(collection, id) {
       st.deleteDoc.run(collection, id);
     },
@@ -105,6 +108,9 @@ export function createSqliteDb(file) {
     driver: "sqlite",
     async getDoc(collection, id) {
       return toDocRow(st.getDoc.get(collection, id));
+    },
+    async getDocs(collection, ids) {
+      return ids.map((id) => toDocRow(st.getDoc.get(collection, id))).filter(Boolean);
     },
     async listDocs(collection, shopId) {
       const rows = shopId === undefined ? st.listAll.all(collection) : st.listByShop.all(collection, shopId);

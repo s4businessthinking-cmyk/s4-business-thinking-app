@@ -40,14 +40,32 @@ function addInvoices(invoices, shopId, into, sign, productById, statuses = STOCK
   });
 }
 
-// Stock = opening stock + purchased − sold − delivered, from invoices (which sync across devices), in base units.
-export function computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes = []) {
+const RETURN_STOCK_STATUSES = ["confirmed"];
+
+function addAdjustments(adjustments, shopId, into, productById) {
+  (adjustments || []).forEach((adj) => {
+    if (!adj || adj.isDeleted || adj.deleted || adj.status !== "confirmed") return;
+    if (shopId && adj.shopId && adj.shopId !== shopId) return;
+    (adj.items || []).forEach((it) => {
+      if (!it?.productId) return;
+      const qty = itemBaseQty(it, productById.get(it.productId));
+      if (qty <= 0) return;
+      into.set(it.productId, (into.get(it.productId) || 0) + (it.direction === "out" ? -qty : qty));
+    });
+  });
+}
+
+// Stock = opening stock + purchased − sold − delivered + sales returns − purchase returns ± adjustments, in base units.
+export function computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes = [], extras = {}) {
   const productById = new Map((products || []).map((p) => [p.id, p]));
   const movement = new Map();
   addInvoices(purchaseInvoices || [], shopId, movement, 1, productById);
   const dnById = new Map((deliveryNotes || []).filter((d) => d?.id).map((d) => [d.id, d]));
   addInvoices(salesInvoices || [], shopId, movement, -1, productById, STOCK_AFFECTING_STATUSES, dnById);
   addInvoices(deliveryNotes || [], shopId, movement, -1, productById, DELIVERY_NOTE_STOCK_STATUSES);
+  addInvoices(extras.salesReturns || [], shopId, movement, 1, productById, RETURN_STOCK_STATUSES);
+  addInvoices(extras.purchaseReturns || [], shopId, movement, -1, productById, RETURN_STOCK_STATUSES);
+  addAdjustments(extras.stockAdjustments, shopId, movement, productById);
   const stock = new Map();
   productById.forEach((p, id) => {
     stock.set(id, parseFloat(((Number(p.openingStock) || 0) + (movement.get(id) || 0)).toFixed(4)));
@@ -56,6 +74,10 @@ export function computeStockMap(products, purchaseInvoices, salesInvoices, shopI
 }
 
 export async function loadInvoiceRows() {
-  const [pur, sal, dn] = await Promise.all([offlineList("purchaseInvoices"), offlineList("salesInvoices"), offlineList("deliveryNotes")]);
-  return { purchaseInvoices: rowsOf(pur), salesInvoices: rowsOf(sal), deliveryNotes: rowsOf(dn) };
+  const [pur, sal, dn, sr, pr, adj] = await Promise.all([
+    offlineList("purchaseInvoices"), offlineList("salesInvoices"), offlineList("deliveryNotes"),
+    offlineList("salesReturns").catch(() => []), offlineList("purchaseReturns").catch(() => []), offlineList("stockAdjustments").catch(() => []),
+  ]);
+  const extras = { salesReturns: rowsOf(sr), purchaseReturns: rowsOf(pr), stockAdjustments: rowsOf(adj) };
+  return { purchaseInvoices: rowsOf(pur), salesInvoices: rowsOf(sal), deliveryNotes: rowsOf(dn), extras, ...extras };
 }

@@ -22,6 +22,7 @@ const BATCH_SIZE = 400;
 // collection too fast. Doubles (capped) after a batch that fails for a
 // retryable reason, resets after a clean batch.
 const BASE_BATCH_DELAY_MS = 300;
+const PRIORITY_COLLECTIONS = ["orders"];
 const MAX_BATCH_DELAY_MS = 5000;
 const RETRYABLE_ERROR_HINTS = [
   "unavailable",
@@ -267,9 +268,18 @@ export async function syncPendingQueueToFirebase() {
     const queue = await getPendingSyncQueue();
     result.total = queue.length;
 
-    const runnable = queue.filter(
-      (item) => !pausedCollections.has(item.payload?.collectionName || item.collection_name)
-    );
+    // Salesman orders first, then fresh writes; items that already failed go last so a stuck
+    // backlog never delays a new order reaching the shop.
+    const rank = (item) => {
+      const collectionName = item.payload?.collectionName || item.collection_name;
+      if (PRIORITY_COLLECTIONS.includes(collectionName)) return 0;
+      return String(item.status || "").toUpperCase() === "FAILED" ? 2 : 1;
+    };
+    const runnable = queue
+      .filter((item) => !pausedCollections.has(item.payload?.collectionName || item.collection_name))
+      .map((item, index) => ({ item, index, r: rank(item) }))
+      .sort((a, b) => a.r - b.r || a.index - b.index)
+      .map(({ item }) => item);
 
     const batches = [];
     for (const [collectionName, items] of groupQueueByCollection(runnable)) {
@@ -351,6 +361,26 @@ export async function syncPendingQueueToFirebase() {
       }, 0);
     }
   }
+}
+
+// Pushes one collection's pending writes right away, even while a full sync pass is busy.
+export async function syncCollectionNow(collectionName) {
+  if (!collectionName || !isOnline() || pausedCollections.has(collectionName)) return { ok: false, skipped: true };
+  const queue = await getPendingSyncQueue();
+  const items = queue.filter((item) => (item.payload?.collectionName || item.collection_name) === collectionName);
+  let done = 0;
+  for (const item of items) {
+    try {
+      const res = await syncOneQueueItem(item);
+      if (res?.skipped) continue;
+      await markSyncDone(item.id, { skipPersist: true });
+      done += 1;
+    } catch (error) {
+      console.warn(`[S4 Sync] ${collectionName} quick push failed`, error);
+    }
+  }
+  if (done) await persistOfflineDb();
+  return { ok: true, done, total: items.length };
 }
 
 export function pauseCollectionSync(collectionName) {

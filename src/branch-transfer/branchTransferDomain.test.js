@@ -5,6 +5,7 @@ import {
   buildInternalPurchaseInvoice,
   buildReceiptLines,
   deriveTransferStatus,
+  isBranchTransferBill,
   remainingQuantityForLine,
   validateTransferItems,
 } from "./branchTransferDomain.js";
@@ -140,4 +141,12 @@ test("creates credit internal purchase invoice when selected", () => {
   assert.equal(invoice.amountPaid, 0);
   assert.equal(invoice.balanceDue, 100);
   assert.equal(invoice.status, "confirmed");
+});
+
+test("receipt bill is recognised as a branch transfer bill, a direct purchase is not", () => {
+  const receipt = buildReceiptLines(transfer, [{ lineId: transfer.items[0].lineId, receivedQty: 1 }]);
+  const bill = buildInternalPurchaseInvoice({ transfer, receipt: { id: "r1", sequence: 1, lines: receipt }, invoiceId: "pi-1" });
+  assert.equal(isBranchTransferBill(bill), true);
+  assert.equal(isBranchTransferBill({ id: "pi-2", invoiceNo: "PI-0002", grandTotal: 100 }), false);
+  assert.equal(isBranchTransferBill(null), false);
 });

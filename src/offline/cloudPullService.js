@@ -37,6 +37,10 @@ export const SHOP_PULL_COLLECTIONS = [
   "deliveryNotes",
   "salesReceipts",
   "expenses",
+  "salesReturns",
+  "purchaseReturns",
+  "stockAdjustments",
+  "masterLists",
   "users",
 ];
 

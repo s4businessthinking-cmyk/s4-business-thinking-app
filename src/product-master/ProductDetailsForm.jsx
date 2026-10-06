@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { specsInline } from "./productSpecs";
 
 const BASE_UNITS = ["Number", "Pcs", "Set", "Nos", "Kg", "Litre", "Ltr", "Box", "Pair", "Cm", "Mtr"];
 
@@ -12,8 +13,11 @@ export default function ProductDetailsForm({
   onOpenNewUnit,
   onPickSuggestion,
   onValidateIdentityCode,
+  onOpenSpecification,
+  onOpenPhoto,
 }) {
   const [lang, setLang] = useState("EN");
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const distinct = (values) => [...new Set(values.filter(Boolean).map(String))].sort();
@@ -79,9 +83,7 @@ export default function ProductDetailsForm({
             enterKeyHint="next"
             value={form.barcode || ""}
             onChange={(e) => upd("barcode", e.target.value)}
-            onBlur={() => {
-              if (!onValidateIdentityCode("barcode", form.barcode)) upd("barcode", "");
-            }}
+            onBlur={() => onValidateIdentityCode("barcode", form.barcode)}
           />
           <div className="pm-barcode-checks">
             <label className="pm-check">
@@ -102,9 +104,7 @@ export default function ProductDetailsForm({
             enterKeyHint="next"
             value={form.ean || ""}
             onChange={(e) => upd("ean", e.target.value)}
-            onBlur={() => {
-              if (!onValidateIdentityCode("ean", form.ean)) upd("ean", "");
-            }}
+            onBlur={() => onValidateIdentityCode("ean", form.ean)}
           />
           <button type="button" className="pm-btn-secondary" onClick={onOpenMoreBarcodes}>
             More Barcodes...
@@ -158,6 +158,41 @@ export default function ProductDetailsForm({
           <label className="pm-label">Description</label>
           <input className="pm-input pm-nav-control" enterKeyHint="next" value={form.description || ""} onChange={(e) => upd("description", e.target.value)} />
         </div>
+
+        <div className="pm-form-row pm-unit-row">
+          <label className="pm-label">Specification</label>
+          <input
+            className="pm-input"
+            readOnly
+            value={specsInline(form)}
+            title={specsInline(form)}
+            placeholder="No specification — click to add"
+            onClick={onOpenSpecification}
+            style={{ cursor: "pointer", color: "#0b3a7a", fontWeight: 600 }}
+          />
+          <label className="pm-check" title="Show this specification in Sales when the product is selected">
+            <input type="checkbox" checked={!!form.specShowInSales} onChange={(e) => upd("specShowInSales", e.target.checked)} />
+            Show in Sales
+          </label>
+        </div>
+
+        <div className="pm-form-row pm-unit-row">
+          <label className="pm-label">Photo</label>
+          <div className="pm-photo-thumb">
+            {form.photoUrl ? (
+              <img src={form.photoUrl} alt={form.name || "Product"} title="Click to enlarge" onClick={() => setPhotoOpen(true)} />
+            ) : (
+              <span onClick={onOpenPhoto}>No photo — click to add</span>
+            )}
+          </div>
+          <button type="button" className="pm-btn-secondary" onClick={onOpenPhoto}>{form.photoUrl ? "Change Photo" : "Add Photo"}</button>
+        </div>
+        {photoOpen && form.photoUrl && (
+          <div className="pm-photo-viewer" onMouseDown={() => setPhotoOpen(false)}>
+            <img src={form.photoUrl} alt={form.name || "Product"} />
+            <span>{form.name} — click anywhere to close</span>
+          </div>
+        )}
 
         <div className="pm-form-row pm-unit-row">
           <label className="pm-label">Base Unit</label>

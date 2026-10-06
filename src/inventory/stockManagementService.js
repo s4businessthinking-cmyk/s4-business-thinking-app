@@ -12,7 +12,46 @@ export const STOCK_COLLECTIONS = {
  * Creates a stock ledger entry for purchases or sales
  * Automatically increases stock on purchase, decreases on sale
  */
-export async function createStockLedgerEntry({
+export async function createStockLedgerEntry(params = {}) {
+  const entry = buildStockLedgerEntry(params);
+  const { productId, movementType } = params;
+  const entryId = entry.id;
+  const signedQuantity = entry.quantity;
+
+  try {
+    const result = await offlineUpsert(
+      STOCK_COLLECTIONS.STOCK_LEDGER,
+      entryId,
+      entry
+    );
+
+    if (!result?.ok) {
+      throw new Error(
+        `Failed to create stock ledger entry: ${result?.error || "unknown error"}`
+      );
+    }
+
+    console.log(
+      `[S4 Stock] Ledger entry created: ${movementType} +${signedQuantity} of product ${productId}`
+    );
+
+    return {
+      ok: true,
+      entryId,
+      quantity: signedQuantity,
+    };
+  } catch (err) {
+    console.error(
+      "[S4 Stock] Failed to create stock ledger entry",
+      productId,
+      err
+    );
+    throw err;
+  }
+}
+
+// Validates and builds a ledger row without saving it (bulk callers save many at once).
+export function buildStockLedgerEntry({
   productId,
   shopId,
   quantity,
@@ -56,36 +95,7 @@ export async function createStockLedgerEntry({
     _offline_first: true,
   };
 
-  try {
-    const result = await offlineUpsert(
-      STOCK_COLLECTIONS.STOCK_LEDGER,
-      entryId,
-      entry
-    );
-
-    if (!result?.ok) {
-      throw new Error(
-        `Failed to create stock ledger entry: ${result?.error || "unknown error"}`
-      );
-    }
-
-    console.log(
-      `[S4 Stock] Ledger entry created: ${movementType} +${signedQuantity} of product ${productId}`
-    );
-
-    return {
-      ok: true,
-      entryId,
-      quantity: signedQuantity,
-    };
-  } catch (err) {
-    console.error(
-      "[S4 Stock] Failed to create stock ledger entry",
-      productId,
-      err
-    );
-    throw err;
-  }
+  return entry;
 }
 
 /**

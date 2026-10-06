@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, inp, lbl, btn, th, td, todayIso, fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
-import { offlineGetById, offlineUpdate } from "../offline/offlineRepository";
+import { offlineGetById, offlinePatch } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 
@@ -46,25 +46,25 @@ export async function bounceVoucher(type, voucher, uid) {
     const paid = Math.max(0, parseFloat(f2(n2(inv.amountPaid) - n2(a.amount))));
     const balance = Math.max(0, parseFloat(f2(n2(inv.grandTotal) - paid)));
     const status = balance < 0.01 ? "paid" : paid > 0 ? "partial" : "confirmed";
-    await offlineUpdate(m.invCol, a.invoiceId, { ...inv, amountPaid: paid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: uid });
+    await offlinePatch(m.invCol, a.invoiceId, { amountPaid: paid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: uid }, inv);
   }
-  await offlineUpdate(m.col, voucher.id, {
-    ...voucher, status: "cancelled", chequeStatus: "bounced", cancelReason: "cheque_bounced",
+  await offlinePatch(m.col, voucher.id, {
+    status: "cancelled", chequeStatus: "bounced", cancelReason: "cheque_bounced",
     cancelledAt: nowIso, cancelledBy: uid, bouncedAt: nowIso, bouncedBy: uid, updatedAt: nowIso, updatedBy: uid,
-  });
+  }, voucher);
 }
 
 export async function clearVoucher(type, voucher, clearedAt, uid) {
   const nowIso = new Date().toISOString();
-  await offlineUpdate(TYPES[type].col, voucher.id, { ...voucher, chequeStatus: "cleared", clearedAt, clearedBy: uid, updatedAt: nowIso, updatedBy: uid });
+  await offlinePatch(TYPES[type].col, voucher.id, { chequeStatus: "cleared", clearedAt, clearedBy: uid, updatedAt: nowIso, updatedBy: uid }, voucher);
 }
 
 export async function postponeCheque(type, voucher, newChequeDate, uid) {
   const nowIso = new Date().toISOString();
-  await offlineUpdate(TYPES[type].col, voucher.id, {
-    ...voucher, chequeDate: newChequeDate, chequeDateBefore: voucher.chequeDate || "", chequePostponedAt: nowIso, chequePostponedBy: uid,
+  await offlinePatch(TYPES[type].col, voucher.id, {
+    chequeDate: newChequeDate, chequeDateBefore: voucher.chequeDate || "", chequePostponedAt: nowIso, chequePostponedBy: uid,
     updatedAt: nowIso, updatedBy: uid,
-  });
+  }, voucher);
 }
 
 // Old-ERP "Post Dated Cheques" register for both supplier payments (issued) and customer receipts (received).

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { nsq } from "../utils/productSearch";
+import { specValues } from "../product-master/productSpecs";
 
 const MAX_ROWS = 300;
 const ROW_H = 18;
@@ -15,6 +16,8 @@ function rank(text, q, key) {
   if (t.includes(q)) return 2;
   return key && nsq(t).includes(key) ? 1 : 0;
 }
+
+const specRank = (p, q, key) => (q.length >= 2 ? rank(specValues(p), q, key) : 0);
 
 function useListKeys(items, open, setOpen) {
   const [active, setActive] = useState(0);
@@ -71,7 +74,7 @@ export function ProductNameLookup({ products, value, onChange, onPickName, input
     if (!q) return groups.slice(0, MAX_ROWS);
     const key = nsq(q);
     return groups
-      .map((g) => ({ g, s: rank(g.name, q, key) }))
+      .map((g) => ({ g, s: rank(g.name, q, key) || (g.items.some((p) => specRank(p, q, key)) ? 0.5 : 0) }))
       .filter((r) => r.s > 0)
       .sort((a, b) => b.s - a.s || a.g.name.localeCompare(b.g.name))
       .slice(0, MAX_ROWS)
@@ -138,7 +141,7 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
     return products.filter(isActive)
       .map((p) => {
         const codes = [p.code, p.barcode, p.ean, ...(Array.isArray(p.moreBarcodes) ? p.moreBarcodes : [])];
-        return { p, s: Math.max(...codes.map((c) => rank(c, q, key))) };
+        return { p, s: Math.max(...codes.map((c) => rank(c, q, key))) || (specRank(p, q, key) ? 0.5 : 0) };
       })
       .filter((r) => r.s > 0)
       .sort((a, b) => b.s - a.s || String(a.p.code || "").localeCompare(String(b.p.code || "")))

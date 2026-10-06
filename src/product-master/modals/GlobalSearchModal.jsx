@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { specValues } from "../productSpecs";
 
 const EMPTY_FIELDS = {
   productName: "",
@@ -47,6 +48,7 @@ const loadColumnSettings = () => {
   }
 };
 const clean = (value) => String(value ?? "").trim().toLowerCase();
+const cleanText = (value) => clean(value).replace(/\s+/g, " ");
 
 function productRefs(product) {
   return [
@@ -56,6 +58,29 @@ function productRefs(product) {
     ...(Array.isArray(product.moreBarcodes) ? product.moreBarcodes : []),
     ...(Array.isArray(product.unitPrices) ? product.unitPrices.map((row) => row.barcode) : []),
   ].filter(Boolean);
+}
+
+// Cleaned search fields per product object; a changed product is a new object, so it is re-indexed.
+const searchIndexCache = new WeakMap();
+function searchIndex(product) {
+  let index = searchIndexCache.get(product);
+  if (!index) {
+    index = {
+      name: cleanText(product.name),
+      code: cleanText(product.code),
+      ean: cleanText(product.ean),
+      company: cleanText(product.company || product.brand),
+      category: cleanText(product.category),
+      subcategory: cleanText(product.subcategory),
+      productGroup: cleanText(product.productGroup),
+      commodityCode: cleanText(product.commodityCode),
+      mrp: cleanText(product.mrp),
+      refs: productRefs(product).map(cleanText),
+      spec: cleanText(specValues(product)),
+    };
+    searchIndexCache.set(product, index);
+  }
+  return index;
 }
 
 const EMBEDDED_COLUMNS = [
@@ -68,36 +93,33 @@ const EMBEDDED_BASIC_FIELDS = 3;
 export default function GlobalSearchModal({
   products, onSelect, onClose, embedded = false, selectedProductId = null,
   initialFields = null, rowTitle = "Double-click to recall this product in Product Master (tap once on mobile)",
+  showCost = false,
+  active = true,
 }) {
   const [showAllFields, setShowAllFields] = useState(false);
   const [fields, setFields] = useState(() => ({ ...EMPTY_FIELDS, ...(initialFields || {}) }));
   const [results, setResults] = useState([]);
   const [extendedSearch, setExtendedSearch] = useState(true);
   const [autoSearch, setAutoSearch] = useState(true);
-  const [lang, setLang] = useState("EN");
   const [showColumnSettings, setShowColumnSettings] = useState(false);
   const [columnSettings, setColumnSettings] = useState(loadColumnSettings);
   const [draftColumns, setDraftColumns] = useState(defaultColumnSettings);
   const [selectedColumn, setSelectedColumn] = useState("productName");
   const [selectedId, setSelectedId] = useState(null);
+  const [photoView, setPhotoView] = useState(null);
   const firstInputRef = useRef(null);
   const gridRef = useRef(null);
   const columnSettingsRef = useRef(columnSettings);
-  const activeColumnSettings = embedded ? EMBEDDED_COLUMNS : columnSettings;
+  const activeColumnSettings = embedded
+    ? EMBEDDED_COLUMNS
+    : (showCost ? columnSettings : columnSettings.filter((column) => column.key !== "landingCost"));
 
   const hasCriteria = useMemo(
     () => Object.values(fields).some((value) => String(value).trim()),
     [fields]
   );
 
-  function matches(actual, expected) {
-    const haystack = clean(actual).replace(/\s+/g, " ");
-    const needle = clean(expected).replace(/\s+/g, " ");
-    if (!needle) return true;
-    return extendedSearch ? haystack.includes(needle) : haystack.startsWith(needle);
-  }
-
-  function runSearch({ allowEmpty = true, nextFields = fields } = {}) {
+  function runSearch({ allowEmpty = true, nextFields = fields, keepSelection = false } = {}) {
     const criteria = Object.values(nextFields).some((value) => String(value).trim());
     if (!criteria && !allowEmpty) {
       setResults([]);
@@ -105,25 +127,29 @@ export default function GlobalSearchModal({
       return;
     }
 
+    const needles = Object.fromEntries(Object.entries(nextFields).map(([key, value]) => [key, cleanText(value)]));
+    const matches = (haystack, needle) =>
+      !needle || (extendedSearch ? haystack.includes(needle) : haystack.startsWith(needle));
     const catalog = Array.isArray(products) ? products : [];
     const found = catalog.filter((product) => {
-      const refs = productRefs(product);
+      const p = searchIndex(product);
       return (
-        matches(product.name, nextFields.productName) &&
-        matches(product.code, nextFields.productCode) &&
-        (!nextFields.barcode || refs.some((value) => matches(value, nextFields.barcode))) &&
-        matches(product.ean, nextFields.ean) &&
-        (!nextFields.alternateCodes || refs.some((value) => matches(value, nextFields.alternateCodes))) &&
-        matches(product.company || product.brand, nextFields.company) &&
-        matches(product.category, nextFields.category) &&
-        matches(product.subcategory, nextFields.subCategory) &&
-        matches(product.productGroup, nextFields.productGroup) &&
-        matches(product.commodityCode, nextFields.commodityCode) &&
-        matches(product.mrp, nextFields.mrp)
+        (matches(p.name, needles.productName) || (needles.productName.length >= 2 && p.spec.includes(needles.productName))) &&
+        matches(p.code, needles.productCode) &&
+        (!needles.barcode || p.refs.some((value) => matches(value, needles.barcode))) &&
+        matches(p.ean, needles.ean) &&
+        (!needles.alternateCodes || p.refs.some((value) => matches(value, needles.alternateCodes))) &&
+        matches(p.company, needles.company) &&
+        matches(p.category, needles.category) &&
+        matches(p.subcategory, needles.subCategory) &&
+        matches(p.productGroup, needles.productGroup) &&
+        matches(p.commodityCode, needles.commodityCode) &&
+        matches(p.mrp, needles.mrp)
       );
     });
-    setResults(found.slice(0, 500));
-    setSelectedId(null);
+    const shown = found.slice(0, 500);
+    setResults(shown);
+    setSelectedId((previous) => (keepSelection && shown.some((p) => p.id === previous) ? previous : null));
   }
 
   useEffect(() => {
@@ -135,13 +161,20 @@ export default function GlobalSearchModal({
     columnSettingsRef.current = columnSettings;
   }, [columnSettings]);
 
+  const lastSearchRef = useRef(null);
   useEffect(() => {
-    if (!autoSearch) return undefined;
-    const timer = setTimeout(() => runSearch({ allowEmpty: embedded }), 220);
+    // A hidden embedded search does no work until it is shown again.
+    if (!autoSearch || !active) return undefined;
+    const previous = lastSearchRef.current;
+    const onlyProductsChanged = !!previous && previous.fields === fields && previous.extendedSearch === extendedSearch;
+    const timer = setTimeout(() => {
+      lastSearchRef.current = { fields, extendedSearch };
+      runSearch({ allowEmpty: embedded, keepSelection: onlyProductsChanged });
+    }, 220);
     return () => clearTimeout(timer);
     // Search is intentionally recalculated from all field values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fields, autoSearch, extendedSearch, products]);
+  }, [fields, autoSearch, extendedSearch, products, active]);
 
   useEffect(() => {
     if (embedded) return undefined;
@@ -149,7 +182,8 @@ export default function GlobalSearchModal({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        if (showColumnSettings) setShowColumnSettings(false);
+        if (photoView) setPhotoView(null);
+        else if (showColumnSettings) setShowColumnSettings(false);
         else onClose();
         return;
       }
@@ -165,7 +199,7 @@ export default function GlobalSearchModal({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose, showColumnSettings, embedded]);
+  }, [onClose, showColumnSettings, embedded, photoView]);
 
   const updateField = (key, value) => setFields((prev) => ({ ...prev, [key]: value }));
   const focusGrid = () => {
@@ -275,6 +309,7 @@ export default function GlobalSearchModal({
   ];
 
   const highlightId = embedded ? selectedProductId : selectedId;
+  const selectedProduct = results.find((p) => p.id === selectedId) || null;
   const visibleFields = embedded && !showAllFields ? fieldsConfig.slice(0, EMBEDDED_BASIC_FIELDS) : fieldsConfig;
 
   const windowBody = (
@@ -321,9 +356,6 @@ export default function GlobalSearchModal({
                   </button>
                 )}
                 <button type="button" onClick={() => runSearch()}>Search</button>
-                <button type="button" className="pm-search-lang" onClick={() => setLang(lang === "EN" ? "AR" : "EN")}>
-                  {lang}
-                </button>
               </div>
             </div>
           </fieldset>
@@ -333,6 +365,7 @@ export default function GlobalSearchModal({
             {results.length > 0 && <span>{results.length}{results.length === 500 ? "+" : ""} products</span>}
           </div>
 
+          <div className="pm-search-result-row">
           <div ref={gridRef} tabIndex={0} className="pm-search-grid-wrap" onKeyDown={onGridKeyDown}
             onFocus={() => { if (!embedded && results.length && !results.some((p) => p.id === selectedId)) setSelectedId(results[0].id); }}>
             <table
@@ -371,6 +404,11 @@ export default function GlobalSearchModal({
                       const value = columnValue(product, column.key);
                       return (
                         <td key={column.key} style={{ width: Number(column.width) }} title={String(value || "")}>
+                          {column.key === "productName" && product.photoUrl ? (
+                            <span className="pm-search-has-photo" title="View photo"
+                              onClick={(event) => { event.stopPropagation(); setPhotoView(product); }}
+                              onDoubleClick={(event) => event.stopPropagation()}>📷 </span>
+                          ) : null}
                           {value}
                         </td>
                       );
@@ -387,7 +425,27 @@ export default function GlobalSearchModal({
               </tbody>
             </table>
           </div>
+          {!embedded && (
+            <aside className="pm-search-photo">
+              {selectedProduct?.photoUrl ? (
+                <>
+                  <img src={selectedProduct.photoUrl} alt={selectedProduct.name || "Product"} title="Click to enlarge"
+                    onClick={() => setPhotoView(selectedProduct)} />
+                  <span>{selectedProduct.name}</span>
+                </>
+              ) : (
+                <em>{selectedProduct ? "No photo for this product" : "Select a product to see its photo"}</em>
+              )}
+            </aside>
+          )}
+          </div>
         </div>
+        {photoView && (
+          <div className="pm-photo-viewer" onMouseDown={(event) => { event.stopPropagation(); setPhotoView(null); }}>
+            <img src={photoView.photoUrl} alt={photoView.name || "Product"} />
+            <span>{photoView.name} — click anywhere to close</span>
+          </div>
+        )}
 
         <footer className="pm-search-footer">
           <div className="pm-search-options">
@@ -416,7 +474,7 @@ export default function GlobalSearchModal({
               <div className="pm-search-column-settings__body">
                 <div className="pm-search-column-settings__list">
                   <div className="pm-search-column-settings__head">Field List</div>
-                  {draftColumns.map((column) => (
+                  {draftColumns.filter((column) => showCost || column.key !== "landingCost").map((column) => (
                     <button
                       type="button"
                       key={column.key}

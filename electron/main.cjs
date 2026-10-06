@@ -98,6 +98,12 @@ function setupPrintIpc() {
       throw new Error("invalid print document");
     }
     const deviceName = typeof options.deviceName === "string" ? options.deviceName : "";
+    // A silent print uses the printer's default paper, so documents like cheques send their exact size.
+    const mm = options.pageSizeMm || {};
+    const exactPage = Number(mm.width) >= 50 && Number(mm.width) <= 500 && Number(mm.height) >= 30 && Number(mm.height) <= 500;
+    const pageOptions = exactPage
+      ? { pageSize: { width: Math.round(mm.width * 1000), height: Math.round(mm.height * 1000) }, margins: { marginType: "none" } }
+      : {};
     const file = path.join(app.getPath("temp"), `s4-print-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`);
     await fs.promises.writeFile(file, html, "utf8");
     const win = new BrowserWindow({
@@ -108,7 +114,7 @@ function setupPrintIpc() {
       await win.loadFile(file);
       await new Promise((resolve) => setTimeout(resolve, 300));
       return await new Promise((resolve) => {
-        win.webContents.print({ silent: true, printBackground: true, deviceName }, (ok, reason) => {
+        win.webContents.print({ silent: true, printBackground: true, deviceName, ...pageOptions }, (ok, reason) => {
           resolve({ ok, error: ok ? "" : String(reason || "print failed") });
         });
       });

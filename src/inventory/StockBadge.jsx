@@ -10,9 +10,9 @@ export default function StockBadge({ product, products, shopId, refreshKey, lang
     if (!productId) { setStock(null); return undefined; }
     let cancelled = false;
     loadInvoiceRows()
-      .then(({ purchaseInvoices, salesInvoices, deliveryNotes }) => {
+      .then(({ purchaseInvoices, salesInvoices, deliveryNotes, extras }) => {
         if (cancelled) return;
-        const map = computeStockMap(products || [product], purchaseInvoices, salesInvoices, shopId, deliveryNotes);
+        const map = computeStockMap(products || [product], purchaseInvoices, salesInvoices, shopId, deliveryNotes, extras);
         setStock(map.has(productId) ? map.get(productId) : null);
       })
       .catch(() => { if (!cancelled) setStock(null); });

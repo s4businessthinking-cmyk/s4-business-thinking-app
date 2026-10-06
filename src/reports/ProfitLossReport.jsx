@@ -1,4 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { PM_CSS } from "../product-master/pmStyles";
+import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineList } from "../offline/offlineRepository";
 import { computeStockMap, loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { itemBaseQty } from "../inventory/unitConversion";
@@ -48,6 +50,9 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
   const [to, setTo] = useState(() => localDay());
   const [data, setData] = useState(null);
   const [tick, setTick] = useState(0);
+  const mobile = usePmMobile();
+  const rootRef = useRef(null);
+  const fitH = usePmFitHeight(rootRef, mobile);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,10 +62,20 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     return () => { cancelled = true; };
   }, [shopId, tick]);
 
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState !== "hidden") setTick((v) => v + 1); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, []);
+
   const report = useMemo(() => {
     if (!data) return null;
-    const sales = data.salesInvoices.filter((inv) => isLive(inv, shopId) && LIVE.includes(inv.status) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
-    const purchases = data.purchaseInvoices.filter((inv) => isLive(inv, shopId) && LIVE.includes(inv.status) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
+    const liveSales = data.salesInvoices.filter((inv) => isLive(inv, shopId) && LIVE.includes(inv.status) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
+    const sales = liveSales.filter((inv) => inv.source !== "openingBalance");
+    const livePurchases = data.purchaseInvoices.filter((inv) => isLive(inv, shopId) && LIVE.includes(inv.status) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
+    // A party's opening balance is money owed from before, not a sale or purchase of goods.
+    const purchases = livePurchases.filter((inv) => inv.source !== "openingBalance");
     const receipts = data.receipts.filter((r) => isLive(r, shopId) && r.status !== "cancelled");
     const payments = data.payments.filter((p) => isLive(p, shopId) && p.status !== "cancelled");
     const productById = new Map(products.map((p) => [p.id, p]));
@@ -69,9 +84,19 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     const salesIn = sales.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to));
     const purchIn = purchases.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to));
 
+    const liveReturns = (list) => (list || []).filter((r) => isLive(r, shopId) && r.status !== "cancelled");
+    const salesRet = liveReturns(data.extras?.salesReturns);
+    const purchRet = liveReturns(data.extras?.purchaseReturns);
+    const salesRetIn = salesRet.filter((r) => inRange(dayOf(r.returnDate), from, to));
+    const purchRetIn = purchRet.filter((r) => inRange(dayOf(r.returnDate), from, to));
+    const salesReturnTotal = salesRetIn.reduce((t, r) => t + n(r.total), 0);
+    const salesReturnVat = salesRetIn.reduce((t, r) => t + n(r.totalVat), 0);
+    const purchReturnTotal = purchRetIn.reduce((t, r) => t + n(r.total), 0);
+    const purchReturnVat = purchRetIn.reduce((t, r) => t + n(r.totalVat), 0);
+
     const grossSales = salesIn.reduce((t, inv) => t + n(inv.grandTotal), 0);
-    const vatOut = salesIn.reduce((t, inv) => t + n(inv.totalVat), 0);
-    const netSales = grossSales - vatOut;
+    const vatOut = salesIn.reduce((t, inv) => t + n(inv.totalVat), 0) - salesReturnVat;
+    const netSales = grossSales - salesReturnTotal - vatOut;
     let cogs = 0;
     let unpriced = 0;
     salesIn.forEach((inv) => (inv.items || []).forEach((it) => {
@@ -80,37 +105,47 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
       if (!cost) unpriced += 1;
       cogs += itemBaseQty(it, productById.get(it.productId)) * cost;
     }));
+    salesRetIn.forEach((r) => (r.items || []).forEach((it) => {
+      if (!it?.productId) return;
+      cogs -= itemBaseQty(it, productById.get(it.productId)) * (avg.get(it.productId) || 0);
+    }));
     const grossProfit = netSales - cogs;
 
     const grossPurch = purchIn.reduce((t, inv) => t + n(inv.grandTotal), 0);
-    const vatIn = purchIn.reduce((t, inv) => t + n(inv.totalTax), 0);
+    const vatIn = purchIn.reduce((t, inv) => t + n(inv.totalTax), 0) - purchReturnVat;
 
     const allocSum = (vouchers, id) => vouchers.reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
-    const cashOnSales = salesIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(receipts, inv.id)), 0);
+    const appliedSum = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((t, r) => t + n(r.appliedToInvoice), 0);
+    const cashOnSales = salesIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(receipts, inv.id) - appliedSum(salesRet, inv.id)), 0);
     const receiptsIn = receipts.filter((r) => inRange(dayOf(r.receiptDate || r.createdAt), from, to)).reduce((t, r) => t + n(r.totalAmount), 0);
-    const cashOnPurch = purchIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(payments, inv.id)), 0);
+    const cashOnPurch = purchIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(payments, inv.id) - appliedSum(purchRet, inv.id)), 0);
+    const refundsPaid = salesRetIn.reduce((t, r) => t + n(r.refundAmount), 0);
+    const refundsReceived = purchRetIn.reduce((t, r) => t + n(r.refundAmount), 0);
     const paymentsIn = payments.filter((p) => inRange(dayOf(p.paymentDate || p.createdAt), from, to));
     const paymentsOut = paymentsIn.reduce((t, p) => t + n(p.chequeAmount ?? p.totalAmount), 0);
     const vendorDiscount = paymentsIn.reduce((t, p) => t + n(p.discountAmount), 0);
 
     const expensesIn = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && inRange(dayOf(e.expenseDate), from, to));
     const expenseTotal = expensesIn.reduce((t, e) => t + n(e.amount), 0);
+    // A bounced expense cheque is still an expense, but the money never left.
+    const expensePaid = expensesIn.filter((e) => !(e.method === "cheque" && e.chequeStatus === "bounced")).reduce((t, e) => t + n(e.amount), 0);
     const expenseMap = new Map();
     expensesIn.forEach((e) => { const k = expenseCategoryLabel(e, bn); expenseMap.set(k, (expenseMap.get(k) || 0) + n(e.amount)); });
     const expenseByCat = [...expenseMap.entries()].sort((a, b) => b[1] - a[1]);
 
-    const receivable = sales.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
-    const payable = purchases.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
-    const stock = computeStockMap(products, data.purchaseInvoices, data.salesInvoices, shopId, data.deliveryNotes);
+    const receivable = liveSales.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
+    const payable = livePurchases.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
+    const stock = computeStockMap(products, data.purchaseInvoices, data.salesInvoices, shopId, data.deliveryNotes, data.extras);
     let stockValue = 0;
     stock.forEach((q, id) => { if (q > 0) stockValue += q * (avg.get(id) || 0); });
 
     return {
       count: salesIn.length, purchCount: purchIn.length, grossSales, vatOut, netSales, cogs, grossProfit,
       margin: netSales > 0 ? (grossProfit / netSales) * 100 : 0, unpriced,
-      grossPurch, vatIn, netPurch: grossPurch - vatIn, vatPayable: vatOut - vatIn,
-      moneyIn: cashOnSales + receiptsIn, cashOnSales, receiptsIn,
-      moneyOut: cashOnPurch + paymentsOut + expenseTotal, cashOnPurch, paymentsOut,
+      grossPurch, vatIn, netPurch: grossPurch - purchReturnTotal - vatIn, vatPayable: vatOut - vatIn,
+      salesReturnTotal, salesReturnCount: salesRetIn.length, purchReturnTotal, purchReturnCount: purchRetIn.length,
+      moneyIn: cashOnSales + receiptsIn + refundsReceived, cashOnSales, receiptsIn, refundsReceived,
+      moneyOut: cashOnPurch + paymentsOut + expensePaid + refundsPaid, cashOnPurch, paymentsOut, refundsPaid, expensePaid,
       receivable, payable, stockValue,
       expenseTotal, expenseByCat, expenseCount: expensesIn.length, vendorDiscount, netProfit: grossProfit + vendorDiscount - expenseTotal,
     };
@@ -120,6 +155,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
   const sections = report ? [
     [L("বিক্রি ও লাভ", "Sales & Profit"), [
       [L(`মোট বিক্রি (${report.count}টি বিল, VAT সহ)`, `Total sales (${report.count} bills, incl. VAT)`), report.grossSales],
+      ...(report.salesReturnCount ? [[L(`সেলস রিটার্ন (${report.salesReturnCount}টি)`, `Sales returns (${report.salesReturnCount})`), -report.salesReturnTotal]] : []),
       [L("বিক্রির VAT", "VAT on sales"), -report.vatOut],
       [L("নিট বিক্রি", "Net sales"), report.netSales, true],
       [L("বিক্রি হওয়া মালের ক্রয়মূল্য (গড় খরচ)", "Cost of goods sold (average cost)"), -report.cogs],
@@ -134,6 +170,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     ]],
     [L("ক্রয়", "Purchases"), [
       [L(`মোট ক্রয় (${report.purchCount}টি বিল, VAT সহ)`, `Total purchases (${report.purchCount} bills, incl. VAT)`), report.grossPurch],
+      ...(report.purchReturnCount ? [[L(`পারচেজ রিটার্ন (${report.purchReturnCount}টি)`, `Purchase returns (${report.purchReturnCount})`), -report.purchReturnTotal]] : []),
       [L("ক্রয়ের VAT", "VAT on purchases"), -report.vatIn],
       [L("নিট ক্রয়", "Net purchases"), report.netPurch, true],
     ]],
@@ -145,10 +182,12 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     [L("টাকা আসা-যাওয়া", "Money in / out"), [
       [L("বিলে নগদ পাওয়া", "Received on bills"), report.cashOnSales],
       [L("রিসিট ভাউচারে পাওয়া", "Receipt vouchers"), report.receiptsIn],
+      ...(report.refundsReceived > 0 ? [[L("সাপ্লায়ার থেকে ফেরত", "Refunds from suppliers"), report.refundsReceived]] : []),
       [L("মোট টাকা এসেছে", "Total money in"), report.moneyIn, true, "#16a34a"],
       [L("বিলে নগদ দেওয়া", "Paid on bills"), -report.cashOnPurch],
       [L("পেমেন্ট ভাউচারে দেওয়া", "Payment vouchers"), -report.paymentsOut],
-      [L("দোকানের খরচ", "Shop expenses"), -report.expenseTotal],
+      ...(report.refundsPaid > 0 ? [[L("কাস্টমারকে ফেরত", "Refunds to customers"), -report.refundsPaid]] : []),
+      [L("দোকানের খরচ", "Shop expenses"), -report.expensePaid],
       [L("মোট টাকা গেছে", "Total money out"), -report.moneyOut, true, "#dc2626"],
       [L("নিট (এসেছে − গেছে)", "Net (in − out)"), report.moneyIn - report.moneyOut, true],
     ]],
@@ -173,56 +212,84 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     }), { lang });
   };
 
-  const card = { ...(s?.card || {}), padding: 14, borderRadius: 14, background: th.bgCard, border: `1px solid ${th.border}` };
-  const inpStyle = { padding: "8px 10px", borderRadius: 8, border: `1px solid ${th.borderMid || th.border}`, background: th.bgInp, color: th.txtPrimary, fontFamily: "inherit", fontSize: 13 };
+  const today = localDay();
+  const yearStart = `${new Date().getFullYear()}-01-01`;
   const quick = [
-    [L("আজ", "Today"), () => { const d = localDay(); setFrom(d); setTo(d); }],
-    [L("এই মাস", "This month"), () => { setFrom(monthStart()); setTo(localDay()); }],
-    [L("এই বছর", "This year"), () => { setFrom(`${new Date().getFullYear()}-01-01`); setTo(localDay()); }],
-    [L("সব সময়", "All time"), () => { setFrom(""); setTo(""); }],
+    ["today", L("আজ", "Today"), today, today],
+    ["month", L("এই মাস", "This month"), monthStart(), today],
+    ["year", L("এই বছর", "This year"), yearStart, today],
+    ["all", L("সব সময়", "All time"), "", ""],
   ];
+  const activeQuick = quick.find(([, , f, t]) => f === from && t === to)?.[0];
+  const badRange = !!(from && to && from > to);
+  const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
+  const valColor = (value, color) => color || (value < 0 ? "#b91c1c" : undefined);
 
   return (
-    <div style={isDesktop ? s?.desktopPanel : s?.panel}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, color: th.txtPrimary }}>📊 {L("হিসাব নিকাশ", "Accounts Summary")}</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" onClick={() => setTick((v) => v + 1)} style={{ ...inpStyle, cursor: "pointer", fontWeight: 700 }}>🔄</button>
-          <button type="button" onClick={print} disabled={!report} style={{ ...inpStyle, cursor: "pointer", fontWeight: 800, background: "#2563eb", color: "#fff", border: "none" }}>🖨️ {L("প্রিন্ট", "Print")}</button>
-        </div>
+    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+      <style>{PM_CSS}</style>
+      <style>{SI_CSS}</style>
+      <div className="pm-reference-title">
+        <strong>📊 {L("হিসাব নিকাশ", "Accounts Summary")}</strong>
+        <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
-      <div style={{ ...card, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 12 }}>
-        <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inpStyle} />
-        <span style={{ color: th.txtMuted }}>—</span>
-        <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inpStyle} />
-        {quick.map(([label, fn]) => (
-          <button key={label} type="button" onClick={fn} style={{ ...inpStyle, cursor: "pointer", fontWeight: 700 }}>{label}</button>
-        ))}
-      </div>
-      {!report ? (
-        <div style={{ ...card, textAlign: "center", color: th.txtMuted }}>{L("লোড হচ্ছে…", "Loading…")}</div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "repeat(2, minmax(0,1fr))" : "1fr", gap: 12 }}>
-          {sections.map(([title, lines]) => (
-            <div key={title} style={card}>
-              <div style={{ fontSize: 12, fontWeight: 900, color: "#3b82f6", textTransform: "uppercase", marginBottom: 6 }}>{title}</div>
-              {lines.map(([label, value, strong, color]) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "6px 0", borderTop: strong ? `1px solid ${th.border}` : "none" }}>
-                  <span style={{ fontSize: 13, color: strong ? th.txtPrimary : th.txtSecondary, fontWeight: strong ? 800 : 500 }}>{label}</span>
-                  <span style={{ fontSize: strong ? 15 : 13, fontWeight: strong ? 900 : 700, color: color || (value < 0 ? "#dc2626" : th.txtPrimary), whiteSpace: "nowrap" }}>{cur} {money(value)}</span>
-                </div>
-              ))}
-            </div>
+      <div className="si-toolbar">
+        <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!report || badRange}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}>🔄 {L("রিফ্রেশ", "Refresh")}</button>
+        <span className="si-toolbar-gap" />
+        <div className="si-pills">
+          {quick.map(([key, label, f, t]) => (
+            <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
-          <div style={{ ...card, gridColumn: isDesktop ? "1 / -1" : undefined, fontSize: 11, color: th.txtMuted, lineHeight: 1.6 }}>
-            {L(
-              "মোট লাভ = নিট বিক্রি − বিক্রি হওয়া মালের গড় ক্রয়মূল্য (opening stock আর confirmed পারচেজ থেকে, VAT বাদে)। নিট লাভ = মোট লাভ − 💸 খরচ পেজে লেখা দোকানের খরচ। Draft, বাতিল, কোটেশন আর ডেলিভারি নোট ধরা হয়নি।",
-              "Gross profit = net sales − average purchase cost of goods sold (from opening stock and confirmed purchases, VAT excluded). Net profit = gross profit − shop expenses entered on the 💸 Expenses page. Drafts, cancelled bills, quotations and delivery notes are excluded."
-            )}
-            {report.unpriced > 0 && <div style={{ color: "#f59e0b", fontWeight: 700 }}>⚠ {L(`${report.unpriced}টি বিক্রির লাইনে প্রোডাক্টের ক্রয়মূল্য নেই, তাই সেগুলোর খরচ 0 ধরা হয়েছে।`, `${report.unpriced} sold line(s) have no purchase cost, so their cost is counted as 0.`)}</div>}
-          </div>
+        </div>
+        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
+      </div>
+      {report && (
+        <div className="si-kpis">
+          <div className="si-kpi"><span>{L("নিট বিক্রি", "Net sales")}</span><b>{cur} {money(report.netSales)}</b></div>
+          <div className="si-kpi"><span>{L("মোট লাভ", "Gross profit")} ({report.margin.toFixed(1)}%)</span><b style={{ color: report.grossProfit >= 0 ? "#15803d" : "#b91c1c" }}>{money(report.grossProfit)}</b></div>
+          <div className="si-kpi"><span>{L("খরচ", "Expenses")}</span><b style={{ color: "#b91c1c" }}>{money(report.expenseTotal)}</b></div>
+          <div className="si-kpi"><span>{report.netProfit >= 0 ? L("নিট লাভ", "Net profit") : L("নিট ক্ষতি", "Net loss")}</span><b style={{ color: report.netProfit >= 0 ? "#15803d" : "#b91c1c" }}>{cur} {money(report.netProfit)}</b></div>
         </div>
       )}
+      <div className="si-body">
+        {badRange && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
+        {!report ? (
+          <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div>
+        ) : (
+          <>
+            <div className={mobile ? "" : "si-cols"} style={mobile ? { display: "flex", flexDirection: "column", gap: 4 } : { alignItems: "start" }}>
+              {sections.map(([title, lines]) => (
+                <fieldset key={title} className="pm-panel" style={{ margin: 0 }}>
+                  <legend className="pm-panel-legend">{title}</legend>
+                  <div className="si-panel-body">
+                    {lines.map(([label, value, strong, color]) => (
+                      <div key={label} className={`si-total-row${strong ? " is-grand" : ""}`} style={strong ? { fontSize: mobile ? 15 : 12 } : undefined}>
+                        <span style={{ whiteSpace: "pre-wrap", color: strong ? undefined : "#1f2937" }}>{label}</span>
+                        <b style={{ whiteSpace: "nowrap", color: valColor(value, color) }}>{cur} {money(value)}</b>
+                      </div>
+                    ))}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+            <div className="si-note">
+              {L(
+                "মোট লাভ = নিট বিক্রি − বিক্রি হওয়া মালের গড় ক্রয়মূল্য (opening stock আর confirmed পারচেজ থেকে, VAT বাদে)। নিট লাভ = মোট লাভ − 💸 খরচ পেজে লেখা দোকানের খরচ। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর পার্টির Opening Balance বিল বিক্রি/ক্রয়ে ধরা হয়নি (তবে বাকিতে ধরা আছে)। বাউন্স হওয়া খরচের চেক টাকা-যাওয়াতে ধরা হয়নি।",
+                "Gross profit = net sales − average purchase cost of goods sold (from opening stock and confirmed purchases, VAT excluded). Net profit = gross profit − shop expenses entered on the 💸 Expenses page. Drafts, cancelled bills, quotations, delivery notes and party opening-balance bills are not counted as sales/purchases (they are in the dues). Bounced expense cheques are not counted as money out."
+              )}
+              {report.unpriced > 0 && <div style={{ color: "#b45309", fontWeight: 700, marginTop: 3 }}>⚠ {L(`${report.unpriced}টি বিক্রির লাইনে প্রোডাক্টের ক্রয়মূল্য নেই, তাই সেগুলোর খরচ 0 ধরা হয়েছে।`, `${report.unpriced} sold line(s) have no purchase cost, so their cost is counted as 0.`)}</div>}
+            </div>
+          </>
+        )}
+      </div>
+      <div className="si-statusbar">
+        {report && <span>{L("বিক্রির বিল", "Sales bills")} <b>{report.count}</b></span>}
+        {report && <span>{L("ক্রয়ের বিল", "Purchase bills")} <b>{report.purchCount}</b></span>}
+        {report && <span>{L("খরচ", "Expenses")} <b>{report.expenseCount}</b></span>}
+        <span>{L("উইন্ডোতে ফিরলে নিজে থেকে রিফ্রেশ হয়", "Refreshes automatically when you come back to the window")}</span>
+      </div>
     </div>
   );
 }

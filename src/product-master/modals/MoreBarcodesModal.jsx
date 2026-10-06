@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import Modal from "../Modal";
+import { normalizePartNumber, parsePartNumbers } from "../partNumberPaste";
 
 export default function MoreBarcodesModal({ form, products, currentProductId, upd, onClose, notify, onDuplicate }) {
   const rows = Array.isArray(form.moreBarcodes) ? form.moreBarcodes.map(String) : [];
@@ -15,13 +16,53 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
     prevCount.current = rows.length;
   }, [rows.length]);
 
+  function addMany(text) {
+    const codes = parsePartNumbers(text);
+    if (!codes.length) return notify("No part number found in the pasted text", "err");
+    const unitBarcodes = (product) => (Array.isArray(product?.unitPrices) ? product.unitPrices.map((row) => row?.barcode) : []);
+    const taken = new Set([form.barcode, form.ean, ...rows, ...unitBarcodes(form)].map(normalizePartNumber).filter(Boolean));
+    const owners = new Map();
+    products.forEach((product) => {
+      if (product.id === currentProductId) return;
+      [product.barcode, product.ean, ...(Array.isArray(product.moreBarcodes) ? product.moreBarcodes : []), ...unitBarcodes(product)]
+        .map(normalizePartNumber).filter(Boolean)
+        .forEach((key) => { if (!owners.has(key)) owners.set(key, product.name); });
+    });
+    const added = [];
+    let inThis = 0;
+    const elsewhere = [];
+    codes.forEach((code) => {
+      const key = normalizePartNumber(code);
+      if (taken.has(key)) { inThis += 1; return; }
+      if (owners.has(key)) { elsewhere.push(`${code} (${owners.get(key)})`); return; }
+      taken.add(key);
+      added.push(code);
+    });
+    if (added.length) upd("moreBarcodes", [...rows, ...added]);
+    setBarcode("");
+    inputRef.current?.focus();
+    const parts = [`${added.length} part number${added.length === 1 ? "" : "s"} added`];
+    if (inThis) parts.push(`${inThis} already in this product skipped`);
+    if (elsewhere.length) parts.push(`${elsewhere.length} belong to other products skipped: ${elsewhere.slice(0, 5).join(", ")}${elsewhere.length > 5 ? ", ..." : ""}`);
+    if (added.length) notify(parts.join(". "));
+    else notify(parts.join(". "), "err");
+  }
+
+  function onPaste(e) {
+    const text = e.clipboardData?.getData("text") || "";
+    if (parsePartNumbers(text).length < 2 && !/\n/.test(text.trim())) return;
+    e.preventDefault();
+    addMany(text);
+  }
+
   function add() {
+    if (parsePartNumbers(barcode).length > 1) return addMany(barcode);
     const code = barcode.trim();
-    const normalized = code.toLowerCase();
+    const normalized = normalizePartNumber(code);
     if (!code) return notify("Barcode is required", "err");
     const unitBarcodes = (product) => (Array.isArray(product?.unitPrices) ? product.unitPrices.map((row) => row?.barcode) : []);
     const inCurrentProduct = [form.barcode, form.ean, ...rows, ...unitBarcodes(form)]
-      .map((value) => String(value || "").trim().toLowerCase())
+      .map(normalizePartNumber)
       .filter(Boolean);
     if (inCurrentProduct.includes(normalized)) {
       const message = `The number "${code}" is already entered in this product. The same number cannot be used in Barcode, EAN Code, More Barcodes, or an alternate unit barcode.`;
@@ -33,7 +74,7 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
       product.ean,
       ...(Array.isArray(product.moreBarcodes) ? product.moreBarcodes : []),
       ...unitBarcodes(product),
-    ].map((value) => String(value || "").trim().toLowerCase()).includes(normalized));
+    ].map(normalizePartNumber).includes(normalized));
     if (owner) {
       const message = `The number "${code}" already belongs to product "${owner.name}".`;
       onDuplicate?.(message);
@@ -66,6 +107,8 @@ export default function MoreBarcodesModal({ form, products, currentProductId, up
               className="pm-input"
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
+              onPaste={onPaste}
+              placeholder="Type one barcode, or paste a full list of OE / cross-reference numbers"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
               autoFocus
             />

@@ -44,6 +44,7 @@ const TARGET_FIELDS = [
   { value: "customerTypes", label: "Customer Types JSON" },
   { value: "multiCustomerRatesEnabled", label: "Multi Customer Rates Enabled" },
   { value: "specificationText", label: "Specification Text" },
+  { value: "specShowInSales", label: "Show Specification in Sales" },
   { value: "photoUrl", label: "Photo URL" },
   { value: "description", label: "Description" },
 ];
@@ -89,6 +90,7 @@ const MATCH_HINTS = {
   customerTypes: ["customertypes", "customertypesjson"],
   multiCustomerRatesEnabled: ["multicustomerratesenabled"],
   specificationText: ["specificationtext", "specification"],
+  specShowInSales: ["specshowinsales", "showspecinsales"],
   photoUrl: ["photourl", "photo"],
   description: ["description", "remarks"],
 };

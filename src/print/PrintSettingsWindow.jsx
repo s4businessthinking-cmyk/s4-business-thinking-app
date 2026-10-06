@@ -56,10 +56,11 @@ function PaperPreview({ paper }) {
   );
 }
 
-function PrinterSetup({ bn, billPrinter, barcodePrinter, onSet, onClose }) {
+function PrinterSetup({ bn, billPrinter, barcodePrinter, chequePrinter, onSet, onClose }) {
   const [printers, setPrinters] = useState(null);
   const [bill, setBill] = useState(billPrinter);
   const [barcode, setBarcode] = useState(barcodePrinter);
+  const [cheque, setCheque] = useState(chequePrinter);
   const supported = canPickPrinter();
   useEscapeKey(onClose, { level: 4 });
   useEffect(() => { if (supported) listPrinters().then(setPrinters); }, [supported]);
@@ -107,6 +108,16 @@ function PrinterSetup({ bn, billPrinter, barcodePrinter, onSet, onClose }) {
                   {printers === null ? <div style={{ fontSize: 12 }}>…</div> : select(barcode, setBarcode)}
                 </div>
               </div>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}>🏦</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{bn ? "চেক প্রিন্টার বাছুন" : "Select Cheque Printer"}</div>
+                  {printers === null ? <div style={{ fontSize: 12 }}>…</div> : select(cheque, setCheque)}
+                  <div style={{ fontSize: 11, color: "#1f2937", marginTop: 3 }}>
+                    {bn ? "বেছে রাখলে চেক সরাসরি এই প্রিন্টারে চেকের মাপেই যাবে। খালি রাখলে আগের মতো প্রিন্ট ডায়ালগ আসবে।" : "When set, cheques go straight to this printer at the cheque's own size. Leave blank to get the print dialog as before."}
+                  </div>
+                </div>
+              </div>
               <div style={{ fontSize: 11, color: "#1f2937", lineHeight: 1.45 }}>
                 {bn
                   ? "⚡ প্রিন্টার বেছে রেখে \"প্রিন্টের আগে বিল দেখাও\" টিক তুলে দিলে বিল কোনো ডায়ালগ ছাড়াই সরাসরি এই প্রিন্টারে চলে যাবে।"
@@ -116,7 +127,7 @@ function PrinterSetup({ bn, billPrinter, barcodePrinter, onSet, onClose }) {
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "3px double #6b8f7a", paddingTop: 10 }}>
             {supported && bill && <button type="button" style={winBtn(false)} onClick={testPrint}>{bn ? "টেস্ট প্রিন্ট" : "Test Print"}</button>}
-            {supported && <button type="button" style={winBtn(true)} onClick={() => { onSet(bill, barcode); onClose(); }}><u>S</u>et</button>}
+            {supported && <button type="button" style={winBtn(true)} onClick={() => { onSet(bill, barcode, cheque); onClose(); }}><u>S</u>et</button>}
             <button type="button" style={winBtn(false)} onClick={onClose}><u>C</u>lose</button>
           </div>
         </div>
@@ -350,6 +361,7 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
                     <div style={{ flex: "1 1 220px", minWidth: 0, fontSize: 12, lineHeight: 1.6 }}>
                       <div>🧾 {bn ? "বিল:" : "Bill:"} <b>{draft.billPrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
                       <div>🏷️ {bn ? "বারকোড:" : "Barcode:"} <b>{draft.barcodePrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
+                      <div>🏦 {bn ? "চেক:" : "Cheque:"} <b>{draft.chequePrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
                     </div>
                     <button type="button" style={{ ...winBtn(true), minWidth: 130 }} onClick={() => setSetupOpen(true)}>
                       {bn ? "প্রিন্টার সেটআপ" : "Printer Setup"}
@@ -413,12 +425,12 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
         )}
 
         {setupOpen && (
-          <PrinterSetup bn={bn} billPrinter={draft.billPrinter} barcodePrinter={draft.barcodePrinter}
+          <PrinterSetup bn={bn} billPrinter={draft.billPrinter} barcodePrinter={draft.barcodePrinter} chequePrinter={draft.chequePrinter}
             onClose={() => setSetupOpen(false)}
-            onSet={(billPrinter, barcodePrinter) => {
-              const next = { ...draft, billPrinter, barcodePrinter };
+            onSet={(billPrinter, barcodePrinter, chequePrinter) => {
+              const next = { ...draft, billPrinter, barcodePrinter, chequePrinter };
               setDraft(next);
-              savePrintSettings({ ...loadPrintSettings(), billPrinter, barcodePrinter });
+              savePrintSettings({ ...loadPrintSettings(), billPrinter, barcodePrinter, chequePrinter });
               toast?.(bn ? "✅ প্রিন্টার সেট হয়েছে" : "✅ Printers set");
             }} />
         )}

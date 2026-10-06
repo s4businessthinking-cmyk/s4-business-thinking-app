@@ -66,10 +66,11 @@ export function assertFirebaseReady(requireNetwork = true) {
   }
 }
 
-export async function createFirebaseAccount(email, password, { useProvisioner = false } = {}) {
+export async function createFirebaseAccount(email, password, { useProvisioner = false, emailCode = "" } = {}) {
   assertFirebaseReady(true);
   const authInstance = useProvisioner ? getProvisionerAuth() : auth;
-  const cred = await createUserWithEmailAndPassword(authInstance, email, password);
+  const ownerToken = useProvisioner ? await auth.currentUser?.getIdToken?.().catch(() => null) : null;
+  const cred = await createUserWithEmailAndPassword(authInstance, email, password, emailCode, ownerToken);
   return cred.user;
 }
 

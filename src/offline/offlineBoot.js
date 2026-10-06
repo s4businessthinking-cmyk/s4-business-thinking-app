@@ -1,6 +1,7 @@
 import {
   startAutoFirebaseSync,
   syncPendingQueueToFirebase,
+  syncCollectionNow,
   pauseCollectionSync,
   resumeCollectionSync,
   isCollectionSyncPaused,
@@ -108,6 +109,7 @@ export async function startOfflineEngine() {
       search: offlineSearch,
       clearCollection: offlineClearCollection,
       syncNow: syncPendingQueueToFirebase,
+      syncCollectionNow,
       pauseCollectionSync,
       resumeCollectionSync,
       isCollectionSyncPaused,

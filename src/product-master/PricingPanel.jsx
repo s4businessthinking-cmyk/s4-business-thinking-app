@@ -7,7 +7,7 @@ function vatChoices(current) {
   return VAT_OPTIONS.includes(value) ? VAT_OPTIONS : [...VAT_OPTIONS, value];
 }
 
-export default function PricingPanel({ form, upd }) {
+export default function PricingPanel({ form, upd, showCost = false }) {
   return (
     <div className="pm-pricing-stack">
       <div className="pm-tax-row">
@@ -36,34 +36,40 @@ export default function PricingPanel({ form, upd }) {
             </div>
           </div>
         </fieldset>
-        <div className="pm-average-cost">
-          <span>Average Cost :</span>
-          <strong>{form.averageCost || form.landingCost || ""}</strong>
-        </div>
+        {showCost && (
+          <div className="pm-average-cost">
+            <span>Average Cost :</span>
+            <strong>{form.averageCost || form.landingCost || ""}</strong>
+          </div>
+        )}
       </div>
 
       <fieldset className="pm-panel pm-price-panel">
         <div className="pm-panel-body">
           <div className="pm-grid-3">
-            <div className="pm-field">
-              <label className="pm-label">Landing Cost</label>
-              <input className="pm-input pm-nav-control" enterKeyHint="next" inputMode="decimal" value={form.landingCost || ""} onChange={(e) => upd("landingCost", e.target.value)} />
-            </div>
-            <div className="pm-field">
-              <label className="pm-label">Margin %</label>
-              <input className="pm-input pm-nav-control" enterKeyHint="next" inputMode="decimal" value={form.marginPerc || ""} onChange={(e) => upd("marginPerc", e.target.value)} />
-            </div>
-            <div className="pm-field">
-              <label className="pm-label">Margin Amount</label>
-              <input
-                className="pm-input pm-nav-control"
-                enterKeyHint="next"
-                inputMode="decimal"
-                style={{ color: "#15803d", fontWeight: 700 }}
-                value={form.marginAmount || ""}
-                onChange={(e) => upd("marginAmount", e.target.value)}
-              />
-            </div>
+            {showCost && (
+              <>
+                <div className="pm-field">
+                  <label className="pm-label">Landing Cost</label>
+                  <input className="pm-input pm-nav-control" enterKeyHint="next" inputMode="decimal" value={form.landingCost || ""} onChange={(e) => upd("landingCost", e.target.value)} />
+                </div>
+                <div className="pm-field">
+                  <label className="pm-label">Margin %</label>
+                  <input className="pm-input pm-nav-control" enterKeyHint="next" inputMode="decimal" value={form.marginPerc || ""} onChange={(e) => upd("marginPerc", e.target.value)} />
+                </div>
+                <div className="pm-field">
+                  <label className="pm-label">Margin Amount</label>
+                  <input
+                    className="pm-input pm-nav-control"
+                    enterKeyHint="next"
+                    inputMode="decimal"
+                    style={{ color: "#15803d", fontWeight: 700 }}
+                    value={form.marginAmount || ""}
+                    onChange={(e) => upd("marginAmount", e.target.value)}
+                  />
+                </div>
+              </>
+            )}
             <div className="pm-field">
               <label className="pm-label">VAT Exclusive Rate</label>
               <input

@@ -36,6 +36,7 @@ export const LAYOUT_FIELDS = {
     ["invoiceNo", "Invoice no", "ইনভয়েস নং"], ["date", "Date", "তারিখ"], ["time", "Time", "সময়"],
     ["customerName", "Customer name", "কাস্টমারের নাম"], ["customerMobile", "Customer mobile", "কাস্টমারের মোবাইল"],
     ["customerAddress", "Customer address", "কাস্টমারের ঠিকানা"], ["customerTrn", "Customer TRN", "কাস্টমারের TRN"],
+    ["customerCode", "Customer code", "কাস্টমার কোড"],
     ["refNo", "Ref / LPO no", "রেফ / LPO নং"], ["salesman", "Salesman", "বিক্রেতা"], ["payment", "Payment method", "পেমেন্ট পদ্ধতি"],
     ["userName", "User", "ইউজার"], ["deliveryNo", "Delivery note no", "ডেলিভারি নোট নং"], ["vehicleNo", "Vehicle no", "গাড়ির নম্বর"],
     ["validUntil", "Valid until", "মেয়াদ"], ["totalQty", "Total qty", "মোট পরিমাণ"],
@@ -398,7 +399,7 @@ export const SAMPLE_DATA = {
     fields: {
       shopName: "S4 Auto Spare Parts", shopAddress: "Industrial Area 4, Sharjah", shopPhone: "+971 50 000 0000", shopTrn: "100000000000003",
       title: "TAX INVOICE", invoiceNo: "SI-0001", date: "04/10/2026", time: "10:30", customerName: "Al Noor Garage", customerMobile: "+971 55 111 2222",
-      customerAddress: "Ajman", customerTrn: "100222333000003", refNo: "LPO-778", salesman: "Rahim", payment: "Credit", userName: "Admin",
+      customerAddress: "Ajman", customerTrn: "100222333000003", customerCode: "C-0001", refNo: "LPO-778", salesman: "Rahim", payment: "Credit", userName: "Admin",
       deliveryNo: "DN-0005", vehicleNo: "SHJ 12345", validUntil: "15/10/2026", totalQty: "7",
       subtotal: "1,250.00", discount: "50.00", vat: "60.00", grandTotal: "1,260.00", paid: "500.00", balance: "760.00",
       customerBalance: "3,450.00", amountWords: amountInWords(1260), note: "Goods once sold will not be taken back.",

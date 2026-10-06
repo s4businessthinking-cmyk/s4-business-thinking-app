@@ -31,6 +31,8 @@ export default defineConfig({
       disable: disablePwa,
       registerType: "autoUpdate",
       workbox: {
+        // The main bundle is over the 2 MiB default; it must stay precached for offline start.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,

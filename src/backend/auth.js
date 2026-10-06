@@ -200,8 +200,13 @@ export async function signInWithEmailAndPassword(auth, email, password) {
   return credential(auth);
 }
 
-export async function createUserWithEmailAndPassword(auth, email, password) {
-  const res = await callAuth("/v1/auth/signup", { email, password });
+/** Mails a sign-up code. `required: false` means the server has no email set up and sign-up needs no code. */
+export async function requestSignupCode(email) {
+  return callAuth("/v1/auth/signup-code", { email });
+}
+
+export async function createUserWithEmailAndPassword(auth, email, password, code = "", ownerIdToken = null) {
+  const res = await callAuth("/v1/auth/signup", { email, password, code }, ownerIdToken);
   auth._setSession(toSession(res));
   return credential(auth);
 }

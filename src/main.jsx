@@ -82,6 +82,17 @@ clearStaleShellWebCache()
     }
   });
 
+// Ctrl+A outside a text field would highlight the whole UI (menus, buttons, grids).
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || String(e.key).toLowerCase() !== "a") return;
+    const el = e.target;
+    const tag = String(el?.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || el?.isContentEditable) return;
+    e.preventDefault();
+  });
+}
+
 const RootApp = isErpDashboardRoute() ? ErpBuildDashboard : App;
 
 ReactDOM.createRoot(document.getElementById("root")).render(

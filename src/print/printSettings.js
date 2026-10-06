@@ -37,6 +37,7 @@ export const DEFAULT_PRINT_SETTINGS = {
   printTime: false,
   billPrinter: "",
   barcodePrinter: "",
+  chequePrinter: "",
   retail: { ...DOC_DEFAULTS },
   tax: { ...DOC_DEFAULTS },
 };
@@ -80,7 +81,7 @@ export async function listPrinters() {
 // Prints an HTML document. On the desktop app with a chosen printer and preview off it goes
 // straight to that printer; with preview it opens a window (bill + print dialog); otherwise
 // it prints from a hidden frame.
-export async function printHtmlDocument(html, { preview = true, lang = "en", printer = "" } = {}) {
+export async function printHtmlDocument(html, { preview = true, lang = "en", printer = "", pageSizeMm = null } = {}) {
   if (isNativeApp()) {
     try {
       const name = (html.match(/<title>([^<]*)<\/title>/i)?.[1] || "S4 Document").trim();
@@ -93,7 +94,7 @@ export async function printHtmlDocument(html, { preview = true, lang = "en", pri
   const api = desktopPrinting();
   if (api && printer && !preview) {
     try {
-      const result = await api.printHtml(html, { deviceName: printer });
+      const result = await api.printHtml(html, { deviceName: printer, ...(pageSizeMm ? { pageSizeMm } : {}) });
       if (result?.ok) return;
       console.warn("[S4 Print] direct print failed", result?.error);
     } catch (error) {

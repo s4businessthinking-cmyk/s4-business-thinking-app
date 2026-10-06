@@ -1,19 +1,6 @@
 import React, { useState } from "react";
 import Modal from "../Modal";
-
-function parseSpecs(text) {
-  return String(text || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const at = line.indexOf(":");
-      if (at < 0) return { key: line, value: "" };
-      return { key: line.slice(0, at).trim(), value: line.slice(at + 1).trim() };
-    });
-}
-
-const serializeSpecs = (rows) => rows.map((r) => `${r.key}: ${r.value}`).join("\n");
+import { parseSpecs, serializeSpecs } from "../productSpecs";
 
 export default function SpecificationModal({ form, upd, onClose, notify }) {
   const [rows, setRows] = useState(() => parseSpecs(form.specificationText));
@@ -74,6 +61,10 @@ export default function SpecificationModal({ form, upd, onClose, notify }) {
           </tbody>
         </table>
       </div>
+      <label className="pm-check">
+        <input type="checkbox" checked={!!form.specShowInSales} onChange={(e) => upd("specShowInSales", e.target.checked)} />
+        Show specification in Sales when this product is selected
+      </label>
       <div className="pm-window-foot">
         <button type="button" className="pm-btn" onClick={onClose}>Done</button>
       </div>

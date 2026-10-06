@@ -3,6 +3,7 @@ import {
   offlineCreate,
   offlineGetById,
   offlineList,
+  offlineRemove,
   offlineUpdate,
   offlineUpsert,
 } from "../offline/offlineRepository";
@@ -236,7 +237,7 @@ export async function saveBranchTransferSettings({ shopId, settings, actor }) {
     payload.id,
     payload
   );
-  await syncIfOnline();
+  kickSync();
   return { ...result.data, id: payload.id };
 }
 
@@ -272,7 +273,7 @@ export async function saveBranch({ shopId, branch, actor }) {
   }
 
   const result = await offlineUpsert(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, id, payload);
-  await syncIfOnline();
+  kickSync();
   return { ...result.data, id };
 }
 
@@ -286,7 +287,7 @@ export async function disableBranch({ branch, actor }) {
     updatedBy: actor.uid || actor.localUserId || "",
     updatedByName: actor.personName || "",
   });
-  await syncIfOnline();
+  kickSync();
   return { ...result.data, id: branch.id };
 }
 
@@ -414,13 +415,14 @@ export async function createBranchTransfer({
     await ensureDispatchMovements(transfer, actor);
   }
 
-  await syncIfOnline();
+  kickSync();
   return transfer;
 }
 
-export async function updateTransferStatus({ transfer, status, actor }) {
-  if (!transfer?.id) throw new Error("TRANSFER_REQUIRED");
+export async function updateTransferStatus({ transfer: given, status, actor }) {
+  if (!given?.id) throw new Error("TRANSFER_REQUIRED");
   if (!canSendBranchTransferActor(actor)) throw new Error("OWNER_REQUIRED");
+  const transfer = await freshTransfer(given);
 
   const allowed = new Set([
     BRANCH_TRANSFER_STATUSES.PACKED,
@@ -488,9 +490,56 @@ export async function updateTransferStatus({ transfer, status, actor }) {
   ) {
     await ensureDispatchMovements(updated, actor);
   }
+  if (status === BRANCH_TRANSFER_STATUSES.CANCELLED && transfer.dispatchedAt) {
+    await reverseDispatchMovements(updated, actor);
+  }
 
-  await syncIfOnline();
+  kickSync();
   return updated;
+}
+
+async function reverseDispatchMovements(transfer, actor) {
+  const timestamp = nowIso();
+  for (const item of transfer.items || []) {
+    const qty = remainingQuantityForLine(transfer, item);
+    if (qty <= 0) continue;
+    const movementId = `${dispatchMovementId(transfer.id, item.lineId)}-cancel`;
+    await offlineUpsert(BRANCH_TRANSFER_COLLECTIONS.STOCK_MOVEMENTS, movementId, {
+      id: movementId,
+      shopId: transfer.shopId,
+      branchId: transfer.branchId,
+      branchName: transfer.branchName || "",
+      transferId: transfer.id,
+      transferNo: transfer.transferNo,
+      lineId: item.lineId,
+      productId: item.productId,
+      productName: item.name,
+      direction: "IN",
+      movementType: "BRANCH_TRANSFER_CANCEL",
+      quantity: qty,
+      unit: item.unit || "Pcs",
+      unitCost: roundMoney(item.unitCost),
+      createdAt: timestamp,
+      createdBy: actor.uid || actor.localUserId || "",
+      createdByName: actor.personName || "",
+    });
+  }
+}
+
+export async function deleteBranchTransfer({ transfer: given, actor }) {
+  if (!given?.id) throw new Error("TRANSFER_REQUIRED");
+  if (!isOwnerActor(actor)) throw new Error("OWNER_REQUIRED");
+  const transfer = await freshTransfer(given);
+  if (transfer.status !== BRANCH_TRANSFER_STATUSES.CANCELLED) throw new Error("TRANSFER_NOT_CANCELLED");
+  await offlineRemove(BRANCH_TRANSFER_COLLECTIONS.TRANSFERS, transfer.id);
+  kickSync();
+  return true;
+}
+
+// The caller's copy can be stale (another device received or cancelled it).
+async function freshTransfer(transfer) {
+  const row = await offlineGetById(BRANCH_TRANSFER_COLLECTIONS.TRANSFERS, transfer.id);
+  return row?.data ? { ...transfer, ...row.data, id: transfer.id } : transfer;
 }
 
 function matchesAssignedReceiver(transfer, actor) {
@@ -519,7 +568,10 @@ async function applyAcceptedStock({ transfer, receipt, line, actor }) {
       lastTransferId: transfer.id,
       lastReceiptId: receipt.id,
       receiverUserId: transfer.receiverUserId || "",
+      receiverFirebaseUid: transfer.receiverFirebaseUid || "",
       receiverLocalUserId: transfer.receiverLocalUserId || "",
+      receiverUsername: transfer.receiverUsername || "",
+      receiverEmail: transfer.receiverEmail || "",
       productId: line.productId,
       productName: line.name,
       productCode: line.code || "",
@@ -609,14 +661,15 @@ function nextReceiptSequence(transfer) {
 }
 
 export async function receiveBranchTransfer({
-  transfer,
+  transfer: given,
   inputLines,
   settings,
   shop,
   actor,
 }) {
-  if (!transfer?.id) throw new Error("TRANSFER_REQUIRED");
+  if (!given?.id) throw new Error("TRANSFER_REQUIRED");
   if (!canReceiveBranchTransferActor(actor)) throw new Error("RECEIVE_PERMISSION_REQUIRED");
+  const transfer = await freshTransfer(given);
   if (!matchesAssignedReceiver(transfer, actor)) throw new Error("RECEIVER_NOT_ASSIGNED");
   if (!RECEIVABLE_STATUSES.has(transfer.status)) throw new Error("TRANSFER_NOT_RECEIVABLE");
 
@@ -638,7 +691,7 @@ export async function receiveBranchTransfer({
   );
   if (
     settings?.allowPartialReceive === false &&
-    acceptedTotal < remainingBefore
+    handledTotal < remainingBefore
   ) {
     throw new Error("PARTIAL_RECEIVE_DISABLED");
   }
@@ -724,7 +777,7 @@ export async function receiveBranchTransfer({
     }
   );
 
-  await syncIfOnline();
+  kickSync();
   return {
     transfer: { ...result.data, id: transfer.id },
     receipt,
@@ -733,13 +786,14 @@ export async function receiveBranchTransfer({
 }
 
 export async function createPurchaseInvoiceFromReceipt({
-  transfer,
+  transfer: given,
   receiptId,
   shop,
   actor,
 }) {
-  if (!transfer?.id || !receiptId) throw new Error("RECEIPT_REQUIRED");
+  if (!given?.id || !receiptId) throw new Error("RECEIPT_REQUIRED");
   if (!canReceiveBranchTransferActor(actor)) throw new Error("RECEIVE_PERMISSION_REQUIRED");
+  const transfer = await freshTransfer(given);
   if (!matchesAssignedReceiver(transfer, actor)) throw new Error("RECEIVER_NOT_ASSIGNED");
 
   const receipt = (transfer.receipts || []).find((entry) => entry.id === receiptId);
@@ -796,13 +850,18 @@ export async function createPurchaseInvoiceFromReceipt({
     }
   );
 
-  await syncIfOnline();
+  kickSync();
   return {
     transfer: { ...result.data, id: transfer.id },
     receipt: receipts.find((entry) => entry.id === receipt.id),
     invoice,
     alreadyCreated: false,
   };
+}
+
+// Local save is already done; pushing to the server must not hold up the UI.
+function kickSync() {
+  syncIfOnline();
 }
 
 export async function syncIfOnline() {

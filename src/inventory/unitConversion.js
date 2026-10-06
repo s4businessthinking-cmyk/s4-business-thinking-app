@@ -8,6 +8,16 @@ export function unitFactorFor(product, unit) {
   return row ? Number(row.factor) : 1;
 }
 
+// A per-unit price re-expressed for another unit of the same product (cost of 1 Pcs → cost of 1 Box of 12).
+export function rescaleForUnit(value, product, fromUnit, toUnit) {
+  const amount = Number(value);
+  if (!product || !Number.isFinite(amount) || String(value).trim() === "") return value;
+  const from = unitFactorFor(product, fromUnit);
+  const to = unitFactorFor(product, toUnit);
+  if (from === to) return value;
+  return String(Math.round((amount / from) * to * 10000) / 10000);
+}
+
 // Invoices saved before unit factors existed carry no unitFactor, so fall back to the product's current rows.
 export function itemBaseQty(item, product) {
   const qty = Number(item?.qty) || 0;

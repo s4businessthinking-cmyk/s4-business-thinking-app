@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { computeStockMap, loadInvoiceRows } from "./stockFromInvoices";
 
 const MAX_ROWS = 50;
@@ -17,8 +17,8 @@ export default function ReorderAlertCard({ products = [], shopId, lang = "en", s
     let cancelled = false;
     const load = async () => {
       try {
-        const { purchaseInvoices, salesInvoices, deliveryNotes } = await loadInvoiceRows();
-        if (!cancelled) setStockMap(computeStockMap(watched, purchaseInvoices, salesInvoices, shopId, deliveryNotes));
+        const { purchaseInvoices, salesInvoices, deliveryNotes, extras } = await loadInvoiceRows();
+        if (!cancelled) setStockMap(computeStockMap(watched, purchaseInvoices, salesInvoices, shopId, deliveryNotes, extras));
       } catch (err) {
         console.warn("[S4 Reorder] stock load failed", err);
       }

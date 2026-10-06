@@ -1,5 +1,6 @@
 import http from "node:http";
 import zlib from "node:zlib";
+import { promisify } from "node:util";
 import { ApiError, fail } from "./errors.js";
 
 const RESTORE_MAX_BYTES = 300 * 1024 * 1024;
@@ -46,11 +47,13 @@ const CORS = {
   "Access-Control-Max-Age": "86400",
 };
 
-function send(req, res, status, body) {
+const gzipAsync = promisify(zlib.gzip);
+
+async function send(req, res, status, body) {
   let payload = Buffer.from(JSON.stringify(body), "utf8");
   const headers = { ...CORS, "Content-Type": "application/json; charset=utf-8", Vary: "Accept-Encoding" };
   if (payload.length >= GZIP_RESPONSE_MIN_BYTES && /\bgzip\b/.test(String(req.headers["accept-encoding"] || ""))) {
-    payload = zlib.gzipSync(payload);
+    payload = await gzipAsync(payload);
     headers["Content-Encoding"] = "gzip";
   }
   headers["Content-Length"] = payload.length;
@@ -58,7 +61,7 @@ function send(req, res, status, body) {
   res.end(payload);
 }
 
-export function createHttpServer({ cfg, auth, store }) {
+export function createHttpServer({ cfg, auth, store, pinReset }) {
   const clientIp = (req) => {
     const fwd = cfg.trustProxy ? String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() : "";
     return fwd || req.socket.remoteAddress || "";
@@ -79,10 +82,17 @@ export function createHttpServer({ cfg, auth, store }) {
     return claims.sub;
   };
 
+  const isShopOwner = async (uid) => {
+    if (!uid) return false;
+    const profile = await store.getDocument(uid, "users", uid);
+    return profile?.data?.role === "owner";
+  };
+
   const routes = {
     "GET /": async () => ({ ok: true, service: "S4 Business Thinking ERP server", message: "Server is running. Use the S4 Business Thinking app to connect." }),
     "GET /health": async () => ({ ok: true, time: new Date().toISOString() }),
-    "POST /v1/auth/signup": async (req, body) => auth.signUp(body, clientIp(req)),
+    "POST /v1/auth/signup-code": async (req, body) => auth.requestSignupCode(body, clientIp(req)),
+    "POST /v1/auth/signup": async (req, body) => auth.signUp(body, clientIp(req), { byShopOwner: await isShopOwner(optionalUid(req)) }),
     "POST /v1/auth/login": async (req, body) => auth.signIn(body, clientIp(req)),
     "POST /v1/auth/refresh": async (req, body) => auth.refresh(body),
     "POST /v1/auth/logout": async (req, body) => auth.signOut(body),
@@ -92,6 +102,8 @@ export function createHttpServer({ cfg, auth, store }) {
     "POST /v1/db/commit": async (req, body) => store.commit(requireUid(req), body.writes, body.preconditions),
     "POST /v1/backup/export": async (req, body) => store.exportShop(requireUid(req), body.shopId),
     "POST /v1/backup/restore": async (req, body) => store.restoreShop(requireUid(req), body.backup),
+    "POST /v1/pin/request-code": async (req) => pinReset.requestCode(requireUid(req)),
+    "POST /v1/pin/verify-code": async (req, body) => pinReset.verifyCode(requireUid(req), body),
   };
   const bodyLimit = (path) => (path === "/v1/backup/restore" ? RESTORE_MAX_BYTES : cfg.maxBodyBytes);
 
@@ -104,19 +116,24 @@ export function createHttpServer({ cfg, auth, store }) {
     const url = new URL(req.url, "http://x");
     const handler = routes[`${req.method} ${url.pathname}`];
     if (!handler) {
-      send(req, res, 404, { error: { code: "not-found", message: "no such endpoint" } });
+      await send(req, res, 404, { error: { code: "not-found", message: "no such endpoint" } });
       return;
     }
     try {
       const body = req.method === "POST" ? await readJson(req, bodyLimit(url.pathname)) : {};
-      send(req, res, 200, await handler(req, body));
+      await send(req, res, 200, await handler(req, body));
     } catch (error) {
+      if (res.headersSent) {
+        console.error("[S4 ERP] response failed", req.method, url.pathname, error);
+        res.destroy();
+        return;
+      }
       if (error instanceof ApiError) {
-        send(req, res, error.status, { error: { code: error.code, message: error.message } });
+        await send(req, res, error.status, { error: { code: error.code, message: error.message } });
         return;
       }
       console.error("[S4 ERP] request failed", req.method, url.pathname, error);
-      send(req, res, 500, { error: { code: "internal", message: "internal error" } });
+      await send(req, res, 500, { error: { code: "internal", message: "internal error" } });
     }
   });
 }

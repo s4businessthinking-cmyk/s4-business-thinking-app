@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { offlineCreate, offlineUpdate } from "../offline/offlineRepository";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { offlineCreate, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
+import { PM_CSS } from "../product-master/pmStyles";
+import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
+import { logAudit } from "../utils/auditLog.js";
 
 export const EXPENSE_CATEGORIES = [
   { key: "rent", bn: "দোকান ভাড়া", en: "Rent", icon: "🏠" },
@@ -43,7 +46,7 @@ export function expenseCategoryLabel(row, bn) {
 
 const emptyForm = () => ({ expenseDate: localDay(), category: "rent", categoryName: "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay() });
 
-export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "" }) {
+export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [rows, setRows] = useState([]);
@@ -55,6 +58,10 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const [form, setForm] = useState(null);
   const [editId, setEditId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [baseline, setBaseline] = useState("");
+  const mobile = usePmMobile();
+  const rootRef = useRef(null);
+  const fitH = usePmFitHeight(rootRef, mobile);
 
   useEffect(() => {
     if (!shopId) return undefined;
@@ -80,9 +87,11 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     const map = new Map();
     active.forEach((r) => {
       const label = expenseCategoryLabel(r, bn);
-      map.set(label, (map.get(label) || 0) + n(r.amount));
+      const cur0 = map.get(label) || { amt: 0, key: EXPENSE_CATEGORIES.some((c) => c.key === r.category) ? r.category : "other" };
+      cur0.amt += n(r.amount);
+      map.set(label, cur0);
     });
-    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+    return [...map.entries()].map(([label, v]) => [label, v.amt, v.key]).sort((a, b) => b[1] - a[1]);
   }, [active, bn]);
 
   const nextNo = () => {
@@ -90,10 +99,12 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     return `EXP-${String(mx + 1).padStart(4, "0")}`;
   };
 
-  const openNew = () => { setEditId(null); setForm(emptyForm()); };
+  const openNew = () => { const f = emptyForm(); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
   const openEdit = (r) => {
+    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", amount: String(r.amount ?? ""), method: r.method || "cash", paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay() };
     setEditId(r.id);
-    setForm({ expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", amount: String(r.amount ?? ""), method: r.method || "cash", paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay() });
+    setForm(f);
+    setBaseline(JSON.stringify(f));
   };
 
   const save = async () => {
@@ -145,7 +156,26 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     try {
       await offlineUpdate("expenses", r.id, { ...r, ...patch });
       setRows((list) => list.map((x) => (x.id === r.id ? { ...x, ...patch } : x)));
+      setForm(null);
+      setEditId(null);
       toast?.(L("খরচ বাতিল হয়েছে", "Expense cancelled"));
+      logAudit({ shopId, user, profile, action: "cancel", collection: "expenses", docId: r.id, docNo: r.expenseNo, amount: r.amount, note: r.paidTo || "" });
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
+    } catch (e) {
+      toast?.(`❌ ${e?.message || e}`, "err");
+    }
+  };
+
+  const deleteRow = async (r) => {
+    if (!isOwner || r.status !== "cancelled") return;
+    if (!window.confirm(L(`${r.expenseNo} খরচটি একেবারে মুছে ফেলবেন?`, `Delete expense ${r.expenseNo} permanently?`))) return;
+    try {
+      await offlineRemove("expenses", r.id);
+      setRows((list) => list.filter((x) => x.id !== r.id));
+      setForm(null);
+      setEditId(null);
+      toast?.(L("খরচ মুছে ফেলা হয়েছে", "Expense deleted"), "err");
+      logAudit({ shopId, user, profile, action: "delete", collection: "expenses", docId: r.id, docNo: r.expenseNo, amount: r.amount, note: r.paidTo || "" });
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
       toast?.(`❌ ${e?.message || e}`, "err");
@@ -164,17 +194,35 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     }), { lang });
   };
 
+  const editRow = editId ? rows.find((r) => r.id === editId) : null;
+  const readOnly = !!editRow && (editRow.status === "cancelled" || !(isOwner || editRow.createdBy === user?.uid));
+  const formDirty = !!form && !readOnly && JSON.stringify(form) !== baseline;
+  const closeForm = () => {
+    if (saving) return;
+    if (formDirty && !window.confirm(L("সেভ না করা পরিবর্তন আছে। বন্ধ করবেন?", "You have unsaved changes. Close anyway?"))) return;
+    setForm(null);
+    setEditId(null);
+  };
+  useEffect(() => {
+    if (!leaveGuard || !form) return undefined;
+    const guard = {
+      leave: () => !formDirty || window.confirm(L("সেভ না করা পরিবর্তন আছে। বন্ধ করবেন?", "You have unsaved changes. Close anyway?")),
+      back: () => { closeForm(); return true; },
+    };
+    leaveGuard.current = guard;
+    return () => { if (leaveGuard.current === guard) leaveGuard.current = null; };
+  });
+
   useEffect(() => {
     if (!form) return undefined;
-    const onKey = (e) => { if (e.key === "Escape" && !saving) setForm(null); };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); closeForm(); }
+      else if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === "s") { e.preventDefault(); if (!readOnly) save(); }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [form, saving]);
+  });
 
-  const card = { padding: 14, borderRadius: 14, background: th.bgCard, border: `1px solid ${th.border}` };
-  const inp = { padding: "10px 11px", borderRadius: 10, border: `1px solid ${th.borderMid || th.border}`, background: th.bgInp, color: th.txtPrimary, fontFamily: "inherit", fontSize: 14, width: "100%", boxSizing: "border-box", outline: "none" };
-  const btn = (bg, color = "#fff") => ({ padding: "9px 14px", borderRadius: 10, border: "none", background: bg, color, fontWeight: 800, fontSize: 13, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" });
-  const lbl = { fontSize: 11, fontWeight: 800, color: th.txtMuted, marginBottom: 5, textTransform: "uppercase", letterSpacing: 0.3 };
   const today = localDay();
   const yearStart = `${new Date().getFullYear()}-01-01`;
   const quick = [
@@ -184,249 +232,255 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     ["all", L("সব", "All"), "", ""],
   ];
   const activeQuick = quick.find(([, , f, t]) => f === from && t === to)?.[0];
-  const chip = (on) => ({
-    padding: "7px 13px", borderRadius: 999, fontSize: 12.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
-    border: `1px solid ${on ? "#f97316" : th.border}`, background: on ? "#f97316" : th.bgInp, color: on ? "#fff" : th.txtSecondary,
-  });
-  const catIcon = (r) => (EXPENSE_CATEGORIES.find((c) => c.key === r.category) || EXPENSE_CATEGORIES[EXPENSE_CATEGORIES.length - 1]).icon;
   const catName = (r) => expenseCategoryLabel(r, bn).replace(/^\S+\s/, "");
-
-  const filters = (
-    <div style={{ ...card, padding: isDesktop ? 12 : 10, marginBottom: 12, display: "grid", gap: 8 }}>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-        {quick.map(([key, label, f, t]) => <button key={key} type="button" onClick={() => { setFrom(f); setTo(t); }} style={chip(activeQuick === key)}>{label}</button>)}
-        {isDesktop && (
-          <>
-            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inp, width: 150, padding: "6px 9px", fontSize: 13 }} />
-            <span style={{ color: th.txtMuted, alignSelf: "center" }}>—</span>
-            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inp, width: 150, padding: "6px 9px", fontSize: 13 }} />
-          </>
-        )}
-      </div>
-      {!isDesktop && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...inp, padding: "8px 9px", fontSize: 13 }} />
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...inp, padding: "8px 9px", fontSize: 13 }} />
-        </div>
-      )}
-      <div style={{ display: "grid", gridTemplateColumns: isDesktop ? "220px 240px auto" : "1fr 1fr", gap: 6, alignItems: "center" }}>
-        <select value={catFilter} onChange={(e) => setCatFilter(e.target.value)} style={{ ...inp, padding: "8px 9px", fontSize: 13 }}>
-          <option value="">{L("সব ধরন", "All types")}</option>
-          {EXPENSE_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.icon} {bn ? c.bn : c.en}</option>)}
-        </select>
-        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`🔍 ${L("খুঁজুন…", "Search…")}`} style={{ ...inp, padding: "8px 9px", fontSize: 13 }} />
-        <label style={{ fontSize: 12, color: th.txtSecondary, display: "flex", gap: 5, alignItems: "center", cursor: "pointer", gridColumn: isDesktop ? undefined : "1 / -1" }}>
-          <input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}
-        </label>
-      </div>
-    </div>
-  );
-
-  const summary = (
-    <div style={{ ...card, background: "linear-gradient(135deg, rgba(239,68,68,0.18), rgba(249,115,22,0.12))", border: "1px solid rgba(249,115,22,0.35)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-        <div style={{ fontSize: 12, color: th.txtSecondary, fontWeight: 800 }}>{L("মোট খরচ", "Total expenses")}</div>
-        <div style={{ fontSize: 11, color: th.txtMuted, fontWeight: 700 }}>{active.length} {L("টি", "entries")}</div>
-      </div>
-      <div style={{ fontSize: isDesktop ? 26 : 28, fontWeight: 900, color: "#ef4444", margin: "2px 0 10px" }}>{cur} {money(total)}</div>
-      {isDesktop ? (
-        byCategory.map(([label, amt]) => (
-          <div key={label} style={{ marginBottom: 7 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: th.txtPrimary, fontWeight: 700 }}>
-              <span>{label}</span><span>{money(amt)}</span>
-            </div>
-            <div style={{ height: 5, borderRadius: 4, background: th.bgInp, marginTop: 3 }}>
-              <div style={{ height: 5, borderRadius: 4, width: `${total > 0 ? Math.max(2, (amt / total) * 100) : 0}%`, background: "#f97316" }} />
-            </div>
-          </div>
-        ))
-      ) : (
-        <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
-          {byCategory.map(([label, amt]) => (
-            <div key={label} style={{ flex: "0 0 auto", padding: "6px 10px", borderRadius: 10, background: th.bgCard, border: `1px solid ${th.border}` }}>
-              <div style={{ fontSize: 11, color: th.txtSecondary, fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
-              <div style={{ fontSize: 13, color: th.txtPrimary, fontWeight: 900 }}>{money(amt)}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {!byCategory.length && <div style={{ fontSize: 12, color: th.txtMuted }}>{L("এই সময়ে কোনো খরচ নেই", "No expenses in this period")}</div>}
-    </div>
-  );
-
-  const list = (
-    <div style={{ display: "grid", gap: 8 }}>
-      {filtered.map((r) => {
-        const cancelled = r.status === "cancelled";
-        const canEdit = !cancelled && (isOwner || r.createdBy === user?.uid);
-        const method = (METHODS.find((m) => m.key === r.method)?.[bn ? "bn" : "en"]) || r.method;
-        return (
-          <div key={r.id} style={{ ...card, padding: "10px 12px", opacity: cancelled ? 0.55 : 1, display: "flex", gap: 10, alignItems: "flex-start" }}>
-            <div style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, background: "rgba(249,115,22,0.14)" }}>{catIcon(r)}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: th.txtPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catName(r)}</div>
-                <div style={{ fontSize: 15, fontWeight: 900, color: cancelled ? th.txtMuted : "#ef4444", whiteSpace: "nowrap", textDecoration: cancelled ? "line-through" : "none" }}>{cur} {money(r.amount)}</div>
-              </div>
-              {r.paidTo && <div style={{ fontSize: 12.5, color: th.txtSecondary, fontWeight: 600, marginTop: 1 }}>👤 {r.paidTo}</div>}
-              <div style={{ fontSize: 11, color: th.txtMuted, marginTop: 3, lineHeight: 1.5 }}>
-                📅 {fmtDay(r.expenseDate)} · {r.expenseNo} · {method}{r.refNo ? ` · Ref ${r.refNo}` : ""}{isOwner && r.createdByName ? ` · ${r.createdByName}` : ""}
-                {cancelled ? <span style={{ color: "#ef4444", fontWeight: 800 }}> · {L("বাতিল", "Cancelled")}</span> : null}
-              </div>
-              {r.method === "cheque" && r.chequeDate && (
-                <div style={{ fontSize: 11.5, marginTop: 3, color: th.txtSecondary, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <span>🧾 {L("চেক", "Cheque")} {r.chequeNo || "—"}{r.chequeBank ? ` · ${r.chequeBank}` : ""} · 📅 {fmtDay(r.chequeDate)}</span>
-                  <span style={{ padding: "1px 7px", borderRadius: 999, fontWeight: 800, fontSize: 10.5,
-                    ...(r.chequeStatus === "cleared" ? { background: "rgba(22,163,74,0.15)", color: "#16a34a" }
-                      : r.chequeStatus === "bounced" ? { background: "rgba(220,38,38,0.15)", color: "#ef4444" }
-                        : { background: "rgba(245,158,11,0.15)", color: "#f59e0b" }) }}>
-                    {r.chequeStatus === "cleared" ? L("ক্লিয়ার", "Cleared") : r.chequeStatus === "bounced" ? L("বাউন্স", "Bounced") : L("পেন্ডিং", "Pending")}
-                  </span>
-                </div>
-              )}
-              {r.note && <div style={{ fontSize: 12, color: th.txtSecondary, marginTop: 3 }}>📝 {r.note}</div>}
-              {canEdit && (
-                <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
-                  <button type="button" onClick={() => openEdit(r)} style={{ ...btn("rgba(37,99,235,0.12)", "#3b82f6"), padding: "5px 12px", fontSize: 12 }}>✏️ {L("এডিট", "Edit")}</button>
-                  <button type="button" onClick={() => cancelRow(r)} style={{ ...btn("rgba(220,38,38,0.12)", "#ef4444"), padding: "5px 12px", fontSize: 12 }}>✖ {L("বাতিল", "Cancel")}</button>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      {!filtered.length && (
-        <div style={{ ...card, textAlign: "center", color: th.txtMuted, padding: 30 }}>
-          <div style={{ fontSize: 34, marginBottom: 6 }}>💸</div>
-          {L("কোনো খরচ পাওয়া যায়নি", "No expenses found")}
-          <div style={{ marginTop: 10 }}><button type="button" onClick={openNew} style={btn("#16a34a")}>+ {L("প্রথম খরচ লিখুন", "Add the first expense")}</button></div>
-        </div>
-      )}
-    </div>
-  );
-
+  const methodName = (r) => (METHODS.find((m) => m.key === r.method)?.[bn ? "bn" : "en"]) || r.method || "";
+  const chequeLabel = (st) => (st === "cleared" ? L("ক্লিয়ার", "Cleared") : st === "bounced" ? L("বাউন্স", "Bounced") : L("পেন্ডিং", "Pending"));
+  const chequeColor = (st) => (st === "cleared" ? "#15803d" : st === "bounced" ? "#b91c1c" : "#b45309");
+  const cashTotal = active.filter((r) => r.method === "cash").reduce((t, r) => t + n(r.amount), 0);
+  const pendingCheques = active.filter((r) => r.method === "cheque" && (r.chequeStatus || "pending") === "pending");
+  const cancelledCount = filtered.length - active.length;
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const catGrid = form && (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 6 }}>
-      {EXPENSE_CATEGORIES.map((c) => {
-        const on = form.category === c.key;
-        return (
-          <button key={c.key} type="button" onClick={() => setF("category", c.key)}
-            style={{ padding: isDesktop ? "7px 4px" : "9px 4px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-              border: `1.5px solid ${on ? "#f97316" : th.border}`, background: on ? "rgba(249,115,22,0.16)" : th.bgInp, color: on ? "#f97316" : th.txtPrimary }}>
-            <span style={{ fontSize: isDesktop ? 17 : 20, lineHeight: 1 }}>{c.icon}</span>
-            <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.2, textAlign: "center" }}>{bn ? c.bn : c.en}</span>
-          </button>
-        );
-      })}
+  const fField = (label, control, extra) => (
+    <div className="si-field" style={extra}><span className="pm-label">{label}</span>{control}</div>
+  );
+
+  const toolbar = (
+    <div className="si-toolbar">
+      <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন খরচ", "New Expense")}</button>
+      <button type="button" className="pm-btn-secondary" onClick={print} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>
+      <span className="si-toolbar-gap" />
+      <div className="si-pills">
+        {quick.map(([key, label, f, t]) => (
+          <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
+        ))}
+      </div>
+      <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+      <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
     </div>
   );
-  const fields = form && (
-    <div style={{ display: "grid", gap: 10 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <div><div style={lbl}>{L("টাকা", "Amount")} ({cur}) *</div>
-          <input autoFocus={isDesktop} inputMode="decimal" value={form.amount} placeholder="0.00" onChange={(e) => setF("amount", e.target.value)}
-            style={{ ...inp, fontSize: 20, fontWeight: 900, color: "#ef4444", padding: "8px 11px" }} /></div>
-        <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date" value={form.expenseDate} onChange={(e) => setF("expenseDate", e.target.value)} style={{ ...inp, padding: "12px 11px" }} /></div>
+
+  const kpis = (
+    <div className="si-kpis">
+      <div className="si-kpi"><span>{L("মোট খরচ", "Total expenses")}</span><b style={{ color: "#b91c1c" }}>{cur} {money(total)}</b></div>
+      <div className="si-kpi"><span>{L("এন্ট্রি", "Entries")}</span><b>{active.length}</b></div>
+      <div className="si-kpi"><span>{L("নগদে", "Paid in cash")}</span><b>{money(cashTotal)}</b></div>
+      <div className="si-kpi"><span>{L("পেন্ডিং চেক", "Pending cheques")}</span><b style={{ color: pendingCheques.length ? "#b45309" : undefined }}>{pendingCheques.length} · {money(pendingCheques.reduce((t, r) => t + n(r.amount), 0))}</b></div>
+    </div>
+  );
+
+  const filterBar = (
+    <div className="si-filters">
+      <div className="si-search">
+        <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("খুঁজুন: নং, কাকে, বিবরণ, রেফ…", "Search: no, paid to, note, ref…")} />
+        {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
       </div>
-      {form.category === "other" && (
-        <div><div style={lbl}>{L("খরচের ধরন", "Expense type")} *</div>
-          <input value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} style={inp} /></div>
-      )}
-      <div><div style={lbl}>{L("কীভাবে দিলেন", "Paid by")}</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 5 }}>
+      <select className="pm-input" style={{ width: mobile ? "100%" : 190 }} value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
+        <option value="">{L("সব ধরন", "All types")}</option>
+        {EXPENSE_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.icon} {bn ? c.bn : c.en}</option>)}
+      </select>
+      <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
+    </div>
+  );
+
+  const emptyBox = (
+    <div className="si-empty">
+      {mine.length ? L("এই ফিল্টারে কোনো খরচ নেই", "No expenses match these filters") : L("এখনো কোনো খরচ লেখা হয়নি", "No expenses yet")}
+    </div>
+  );
+
+  const listTable = (
+    <table className="pm-table">
+      <thead><tr>
+        <th style={{ width: 74 }}>{L("তারিখ", "Date")}</th>
+        <th style={{ width: 78 }}>{L("নং", "No")}</th>
+        <th style={{ width: 130 }}>{L("ধরন", "Type")}</th>
+        <th>{L("কাকে", "Paid To")}</th>
+        <th>{L("বিবরণ", "Note")}</th>
+        <th style={{ width: 92 }}>{L("মাধ্যম", "Mode")}</th>
+        <th style={{ width: 120 }}>{L("চেক", "Cheque")}</th>
+        {isOwner && <th style={{ width: 90 }}>{L("লিখেছেন", "By")}</th>}
+        <th style={{ width: 96 }} className="si-num">{L("টাকা", "Amount")}</th>
+      </tr></thead>
+      <tbody>
+        {filtered.map((r) => {
+          const cancelled = r.status === "cancelled";
+          return (
+            <tr key={r.id} className={`pm-clickable${editId === r.id ? " pm-selected" : ""}`} onClick={() => openEdit(r)} style={cancelled ? { color: "#6b7280" } : undefined}>
+              <td>{fmtDay(r.expenseDate)}</td>
+              <td className="si-strong">{r.expenseNo}</td>
+              <td>{catName(r)}</td>
+              <td title={r.paidTo || ""}>{r.paidTo || "—"}</td>
+              <td title={r.note || ""}>{r.refNo ? `[${r.refNo}] ` : ""}{r.note || ""}</td>
+              <td>{methodName(r)}</td>
+              <td>{r.method === "cheque" ? <><span className="si-badge" style={{ color: chequeColor(r.chequeStatus) }}>{chequeLabel(r.chequeStatus)}</span> {fmtDay(r.chequeDate)}</> : ""}</td>
+              {isOwner && <td>{r.createdByName || ""}</td>}
+              <td className="si-num si-strong" style={cancelled ? { textDecoration: "line-through" } : { color: "#b91c1c" }}>
+                {cancelled && <span className="si-badge" style={{ color: "#6b7280", marginRight: 4, textDecoration: "none" }}>{L("বাতিল", "Cancelled")}</span>}
+                {money(r.amount)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
+  const listMobile = filtered.map((r) => {
+    const cancelled = r.status === "cancelled";
+    return (
+      <button key={r.id} type="button" className="si-mrow" onClick={() => openEdit(r)} style={cancelled ? { opacity: 0.6 } : undefined}>
+        <div className="si-mrow-top">
+          <span>{catName(r)}</span>
+          <span style={cancelled ? { textDecoration: "line-through" } : { color: "#b91c1c" }}>{cur} {money(r.amount)}</span>
+        </div>
+        <div className="si-mrow-sub">
+          <span>{fmtDay(r.expenseDate)} · {r.expenseNo}{r.paidTo ? ` · ${r.paidTo}` : ""}</span>
+          <span>
+            {cancelled ? <span className="si-badge" style={{ color: "#6b7280" }}>{L("বাতিল", "Cancelled")}</span>
+              : r.method === "cheque" ? <span className="si-badge" style={{ color: chequeColor(r.chequeStatus) }}>{L("চেক", "Cheque")} · {chequeLabel(r.chequeStatus)}</span>
+                : methodName(r)}
+          </span>
+        </div>
+        {r.note && <div className="si-mrow-sub"><span>{r.note}</span></div>}
+      </button>
+    );
+  });
+
+  const categoryBox = (
+    <div className="si-box">
+      <table className="pm-table">
+        <thead><tr><th>{L("খরচের ধরন", "Expense type")}</th><th style={{ width: 92 }} className="si-num">{L("টাকা", "Amount")}</th><th style={{ width: 46 }} className="si-num">%</th></tr></thead>
+        <tbody>
+          <tr className={`pm-clickable${!catFilter ? " pm-selected" : ""}`} onClick={() => setCatFilter("")}>
+            <td className="si-strong">{L("সব ধরন", "All types")}</td><td className="si-num si-strong">{money(total)}</td><td className="si-num">{total > 0 ? "100" : "0"}</td>
+          </tr>
+          {byCategory.map(([label, amt, key]) => (
+            <tr key={label} className={`pm-clickable${catFilter === key ? " pm-selected" : ""}`} onClick={() => setCatFilter(catFilter === key ? "" : key)}>
+              <td>{label}</td>
+              <td className="si-num">{money(amt)}</td>
+              <td className="si-num">{total > 0 ? ((amt / total) * 100).toFixed(0) : "0"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!byCategory.length && <div className="si-empty">{L("এই সময়ে কোনো খরচ নেই", "No expenses in this period")}</div>}
+    </div>
+  );
+
+  const catGrid = form && (
+    <div className="si-types" style={{ gridTemplateColumns: "repeat(3, minmax(0,1fr))" }}>
+      {EXPENSE_CATEGORIES.map((c) => (
+        <button key={c.key} type="button" disabled={readOnly} className={`pm-btn-secondary${form.category === c.key ? " is-active" : ""}`} onClick={() => setF("category", c.key)}>
+          {c.icon} {bn ? c.bn : c.en}
+        </button>
+      ))}
+    </div>
+  );
+
+  const fields = form && (
+    <div className="si-panel-body" style={{ gap: 6 }}>
+      <div className="si-grid2">
+        {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input autoFocus={!mobile && !readOnly} className="pm-input" inputMode="decimal" disabled={readOnly} value={form.amount} placeholder="0.00" onChange={(e) => setF("amount", e.target.value)} style={{ fontWeight: 700, color: "#b91c1c" }} />)}
+        {fField(`${L("তারিখ", "Date")} *`, <input type="date" className="pm-input" disabled={readOnly} value={form.expenseDate} onChange={(e) => setF("expenseDate", e.target.value)} />)}
+      </div>
+      {form.category === "other" && fField(`${L("খরচের ধরন", "Expense type")} *`, <input className="pm-input" disabled={readOnly} value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} />)}
+      {fField(L("কীভাবে দিলেন", "Paid by"), (
+        <div className="si-types" style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}>
           {METHODS.map((m) => (
-            <button key={m.key} type="button" onClick={() => setF("method", m.key)}
-              style={{ padding: "8px 2px", borderRadius: 9, fontSize: 11.5, fontWeight: 800, cursor: "pointer", fontFamily: "inherit",
-                border: `1.5px solid ${form.method === m.key ? "#3b82f6" : th.border}`, background: form.method === m.key ? "rgba(59,130,246,0.16)" : th.bgInp, color: form.method === m.key ? "#3b82f6" : th.txtSecondary }}>
-              {bn ? m.bn : m.en}
-            </button>
+            <button key={m.key} type="button" disabled={readOnly} className={`pm-btn-secondary${form.method === m.key ? " is-active" : ""}`} onClick={() => setF("method", m.key)}>{bn ? m.bn : m.en}</button>
           ))}
         </div>
-      </div>
+      ))}
       {form.method === "cheque" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: 8, borderRadius: 10, background: "rgba(59,130,246,0.08)", border: "1px dashed rgba(59,130,246,0.45)" }}>
-          <div><div style={lbl}>{L("চেক নং", "Cheque No")}</div><input value={form.chequeNo} onChange={(e) => setF("chequeNo", e.target.value)} style={{ ...inp, padding: "8px 9px" }} /></div>
-          <div><div style={lbl}>{L("ব্যাংক", "Bank")}</div><input value={form.chequeBank} onChange={(e) => setF("chequeBank", e.target.value)} style={{ ...inp, padding: "8px 9px" }} /></div>
-          <div><div style={lbl}>{L("চেকের তারিখ", "Cheque date")} *</div><input type="date" value={form.chequeDate} onChange={(e) => setF("chequeDate", e.target.value)} style={{ ...inp, padding: "8px 6px", fontSize: 13 }} /></div>
-          <div style={{ gridColumn: "1 / -1", fontSize: 11, color: th.txtSecondary }}>🔔 {L("চেকের তারিখের ৭, ২ আর ১ দিন আগে নোটিফিকেশন আসবে", "You'll be reminded 7, 2 and 1 day before the cheque date")}</div>
+        <div className="si-entry">
+          <div className="si-grid2">
+            {fField(L("চেক নং", "Cheque No"), <input className="pm-input" disabled={readOnly} value={form.chequeNo} onChange={(e) => setF("chequeNo", e.target.value)} />)}
+            {fField(L("ব্যাংক", "Bank"), <input className="pm-input" disabled={readOnly} value={form.chequeBank} onChange={(e) => setF("chequeBank", e.target.value)} />)}
+          </div>
+          {fField(`${L("চেকের তারিখ", "Cheque date")} *`, <input type="date" className="pm-input" disabled={readOnly} value={form.chequeDate} onChange={(e) => setF("chequeDate", e.target.value)} />)}
+          {editRow?.method === "cheque" && <div className="si-hint" style={{ marginLeft: 0 }}>{L("চেকের অবস্থা", "Cheque status")}: <b style={{ color: chequeColor(editRow.chequeStatus) }}>{chequeLabel(editRow.chequeStatus)}</b> — {L("ক্লিয়ার/বাউন্স চেক পেজ থেকে করুন", "mark cleared/bounced from the Cheque page")}</div>}
+          {!readOnly && <div className="si-hint" style={{ marginLeft: 0 }}>🔔 {L("চেকের তারিখের ৭, ২ আর ১ দিন আগে নোটিফিকেশন আসবে", "You'll be reminded 7, 2 and 1 day before the cheque date")}</div>}
         </div>
       )}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        <div><div style={lbl}>{L("কাকে দিলেন", "Paid to")}</div><input value={form.paidTo} onChange={(e) => setF("paidTo", e.target.value)} style={inp} /></div>
-        <div><div style={lbl}>{L("রেফারেন্স / বিল নং", "Ref / Bill No")}</div><input value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} style={inp} /></div>
+      <div className="si-grid2">
+        {fField(L("কাকে দিলেন", "Paid to"), <input className="pm-input" disabled={readOnly} value={form.paidTo} onChange={(e) => setF("paidTo", e.target.value)} />)}
+        {fField(L("রেফারেন্স / বিল নং", "Ref / Bill No"), <input className="pm-input" disabled={readOnly} value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} />)}
       </div>
-      <div><div style={lbl}>{L("বিবরণ", "Note")}</div>
-        <textarea value={form.note} onChange={(e) => setF("note", e.target.value)} rows={2} style={{ ...inp, resize: "none" }} /></div>
+      {fField(L("বিবরণ", "Note"), <textarea className="pm-input" disabled={readOnly} rows={2} value={form.note} onChange={(e) => setF("note", e.target.value)} style={{ height: mobile ? 64 : 44 }} />)}
+      {editRow && (
+        <div className="si-hint" style={{ marginLeft: 0 }}>
+          {editRow.expenseNo}{editRow.createdByName ? ` · ${L("লিখেছেন", "By")} ${editRow.createdByName}` : ""}
+          {editRow.status === "cancelled" ? ` · ${L("বাতিল করা হয়েছে", "Cancelled")}` : ""}
+        </div>
+      )}
     </div>
   );
-  const saveBtn = (full) => (
-    <button type="button" disabled={saving} onClick={save} style={{ ...btn("linear-gradient(135deg,#16a34a,#15803d)"), padding: full ? "14px" : "10px 22px", fontSize: full ? 16 : 14, width: full ? "100%" : undefined, opacity: saving ? 0.7 : 1, boxShadow: "0 6px 16px rgba(22,163,74,0.35)" }}>
-      {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editId ? L("আপডেট করুন", "Update") : L("সেভ করুন", "Save")}`}
-    </button>
+
+  const title = !editRow ? L("💸 নতুন খরচ", "💸 New Expense") : readOnly ? `🧾 ${editRow.expenseNo}` : `✏️ ${L("খরচ এডিট", "Edit Expense")} — ${editRow.expenseNo}`;
+  const formWindow = form && (
+    <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
+      <div className="pm-window" style={{ maxWidth: mobile ? undefined : 780 }}>
+        <div className="pm-window-title">
+          <span>{title}</span>
+          <button type="button" className="pm-window-close" onClick={closeForm}>✕</button>
+        </div>
+        <div className="pm-window-body">
+          {readOnly && editRow?.status !== "cancelled" && <div className="si-hint" style={{ marginLeft: 0 }}>🔒 {L("এটা অন্য কেউ লিখেছেন, শুধু দেখতে পারবেন", "Entered by someone else — view only")}</div>}
+          <div className={mobile ? "" : "si-cols"} style={mobile ? { display: "flex", flexDirection: "column", gap: 8 } : undefined}>
+            <fieldset className="pm-panel" style={{ margin: 0 }}>
+              <legend className="pm-panel-legend">{L("খরচের ধরন", "Expense type")} *</legend>
+              {catGrid}
+            </fieldset>
+            <fieldset className="pm-panel" style={{ margin: 0 }}>
+              <legend className="pm-panel-legend">{L("বিস্তারিত", "Details")}</legend>
+              {fields}
+            </fieldset>
+          </div>
+        </div>
+        <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
+          {editRow && !readOnly && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelRow(editRow)}>✖ {L("খরচ বাতিল", "Cancel expense")}</button>}
+          {editRow && editRow.status === "cancelled" && isOwner && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => deleteRow(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
+          <span className="si-toolbar-gap" />
+          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
+          {!readOnly && (
+            <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={save}>
+              {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editRow ? L("আপডেট", "Update") : L("সেভ", "Save")} (Ctrl+S)`}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
-  const title = editId ? L("✏️ খরচ এডিট", "✏️ Edit Expense") : L("💸 নতুন খরচ", "💸 New Expense");
 
   return (
-    <div style={isDesktop ? s?.desktopPanel : s?.panel}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <div style={{ fontSize: isDesktop ? 18 : 17, fontWeight: 900, color: th.txtPrimary }}>💸 {L("দোকানের খরচ", "Shop Expenses")}</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {isDesktop && <button type="button" onClick={print} disabled={!active.length} style={btn("transparent", "#3b82f6")}>🖨️ {L("প্রিন্ট", "Print")}</button>}
-          <button type="button" onClick={openNew} style={{ ...btn("linear-gradient(135deg,#16a34a,#15803d)"), boxShadow: "0 6px 16px rgba(22,163,74,0.3)" }}>+ {L("নতুন খরচ", "New Expense")}</button>
-        </div>
+    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+      <style>{PM_CSS}</style>
+      <style>{SI_CSS}</style>
+      <div className="pm-reference-title">
+        <strong>💸 {L("দোকানের খরচ", "Shop Expenses")}</strong>
+        <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
-
-      {filters}
-
-      {isDesktop ? (
-        <div style={{ display: "grid", gridTemplateColumns: "280px minmax(0,1fr)", gap: 12, alignItems: "start" }}>
-          {summary}
-          {list}
+      {toolbar}
+      {kpis}
+      {filterBar}
+      {mobile ? (
+        <div className="si-main is-all">
+          <div className="si-box">{filtered.length ? listMobile : emptyBox}</div>
+          {byCategory.length > 0 && <div style={{ marginTop: 6 }}>{categoryBox}</div>}
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 12 }}>
-          {summary}
-          {list}
-          {active.length > 0 && <button type="button" onClick={print} style={{ ...btn("transparent", "#3b82f6"), border: `1px solid ${th.border}` }}>🖨️ {L("তালিকা প্রিন্ট", "Print list")}</button>}
+        <div className="si-main">
+          {categoryBox}
+          <div className="si-box">{filtered.length ? listTable : emptyBox}</div>
         </div>
       )}
-
-      {form && isDesktop && (
-        <div onMouseDown={(e) => { if (e.target === e.currentTarget && !saving) setForm(null); }}
-          style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.65)", zIndex: 10000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-          <div style={{ ...card, width: "min(860px, 100%)", maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column", padding: 0, borderRadius: 18, boxShadow: "0 24px 60px rgba(0,0,0,0.45)", overflow: "hidden" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: `1px solid ${th.border}` }}>
-              <div style={{ fontSize: 16, fontWeight: 900, color: th.txtPrimary }}>{title}</div>
-              <button type="button" onClick={() => !saving && setForm(null)} style={{ ...btn("transparent", th.txtMuted), padding: "4px 8px", fontSize: 18 }}>✕</button>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16, padding: 16, overflowY: "auto" }}>
-              <div><div style={lbl}>{L("খরচের ধরন", "Expense type")} *</div>{catGrid}</div>
-              {fields}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "12px 16px", borderTop: `1px solid ${th.border}` }}>
-              <button type="button" disabled={saving} onClick={() => setForm(null)} style={{ ...btn("transparent", th.txtSecondary), border: `1px solid ${th.border}` }}>{L("বন্ধ", "Close")}</button>
-              {saveBtn(false)}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {form && !isDesktop && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: th.bgRoot || th.bgCard, display: "flex", flexDirection: "column", height: "100dvh" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 12px", paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", borderBottom: `1px solid ${th.border}`, background: th.bgCard, flexShrink: 0 }}>
-            <button type="button" onClick={() => !saving && setForm(null)} style={{ ...btn("transparent", th.txtPrimary), padding: "4px 8px", fontSize: 20 }}>←</button>
-            <div style={{ flex: 1, fontSize: 16, fontWeight: 900, color: th.txtPrimary }}>{title}</div>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "grid", gap: 14, alignContent: "start" }}>
-            {fields}
-            <div><div style={lbl}>{L("খরচের ধরন", "Expense type")} *</div>{catGrid}</div>
-          </div>
-          <div style={{ flexShrink: 0, padding: "10px 14px", paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", borderTop: `1px solid ${th.border}`, background: th.bgCard, boxShadow: "0 -6px 18px rgba(0,0,0,0.18)" }}>
-            {saveBtn(true)}
-          </div>
-        </div>
-      )}
+      <div className="si-statusbar">
+        <span>{L("দেখাচ্ছে", "Showing")} <b>{filtered.length}</b> / {mine.length}</span>
+        <span>{L("মোট", "Total")} <b>{cur} {money(total)}</b></span>
+        {cancelledCount > 0 && <span>{L("বাতিল", "Cancelled")} <b>{cancelledCount}</b></span>}
+        {!isOwner && <span>{L("শুধু আপনার লেখা খরচ দেখাচ্ছে", "Showing only expenses you entered")}</span>}
+      </div>
+      {formWindow}
     </div>
   );
 }

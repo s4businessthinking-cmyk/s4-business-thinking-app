@@ -15,7 +15,7 @@ const METHOD = { cash: "Cash", cheque: "Cheque", bank_transfer: "Bank Transfer",
 // vouchers: [{ id, no, date, partyId, partyName, method, amount, status, allocations, raw }]
 export default function PartyLedgerWindow({
   lang = "en", mode = "customer", cur = "AED", shopName = "",
-  invoices = [], vouchers = [], onOpenInvoice, onOpenVoucher, onNewVoucher, onClose,
+  invoices = [], vouchers = [], partyCodes = null, onOpenInvoice, onOpenVoucher, onNewVoucher, onClose,
 }) {
   const bn = lang === "bn";
   const isCustomer = mode === "customer";
@@ -45,13 +45,20 @@ export default function PartyLedgerWindow({
       return id ? `i:${id}` : `n:${norm(r.partyName) || "—"}`;
     };
     const map = new Map();
+    const subOf = (code, mobile) => [code, mobile].filter(Boolean).join(" · ");
     [...invoices, ...vouchers].forEach((r) => {
       const k = keyOf(r);
-      if (!map.has(k)) map.set(k, { key: k, id: r.partyId || null, name: r.partyName || "—", mobile: r.partyMobile || "", sub: r.partyMobile || "" });
-      else if (!map.get(k).mobile && r.partyMobile) Object.assign(map.get(k), { mobile: r.partyMobile, sub: r.partyMobile });
+      if (!map.has(k)) {
+        const id = r.partyId || (k.startsWith("i:") ? k.slice(2) : null);
+        const code = (id && partyCodes?.[id]) || "";
+        map.set(k, { key: k, id: r.partyId || null, name: r.partyName || "—", code, mobile: r.partyMobile || "", sub: subOf(code, r.partyMobile) });
+      } else if (!map.get(k).mobile && r.partyMobile) {
+        const p = map.get(k);
+        Object.assign(p, { mobile: r.partyMobile, sub: subOf(p.code, r.partyMobile) });
+      }
     });
     return { parties: map, keyOf };
-  }, [invoices, vouchers]);
+  }, [invoices, vouchers, partyCodes]);
 
   // Every ledger entry (all dates), grouped by party key.
   const entriesByParty = useMemo(() => {
@@ -65,7 +72,10 @@ export default function PartyLedgerWindow({
       const k = keyOf(inv);
       const due = n2(inv.total) - n2(inv.paid);
       const state = due < 0.01 ? "Paid" : n2(inv.paid) > 0.01 ? `Partial (due ${f2(due)})` : "Unpaid";
-      push(k, { key: `i-${inv.id}`, date: inv.date || "", seq: 0, type: isCustomer ? "Sales Bill" : "Purchase Bill", no: inv.no, ref: inv.ref || "", particulars: [METHOD[inv.method] || inv.method, state].filter(Boolean).join(" · "), bill: n2(inv.total), settle: 0, open: () => onOpenInvoice?.(inv.raw) });
+      const dueDate = due >= 0.01 ? String(inv.raw?.dueDate || "").slice(0, 10) : "";
+      const dueText = dueDate ? `Due ${fmtDate(dueDate)}${dueDate < todayIso() ? " — OVERDUE" : ""}` : "";
+      const type = inv.raw?.source === "openingBalance" ? "Opening Balance" : (isCustomer ? "Sales Bill" : "Purchase Bill");
+      push(k, { key: `i-${inv.id}`, date: inv.date || "", seq: 0, type, no: inv.no, ref: inv.ref || "", particulars: [METHOD[inv.method] || inv.method, state, dueText].filter(Boolean).join(" · "), bill: n2(inv.total), settle: 0, open: () => onOpenInvoice?.(inv.raw) });
       const direct = n2(inv.paid) - (allocByInv.get(inv.id) || 0);
       if (direct > 0.01) {
         push(k, { key: `d-${inv.id}`, date: inv.date || "", seq: 1, type: isCustomer ? "Received on Bill" : "Paid on Bill", no: inv.no, ref: inv.ref || "", particulars: METHOD[inv.method] || inv.method || "", bill: 0, settle: direct, open: () => onOpenInvoice?.(inv.raw) });
@@ -75,7 +85,7 @@ export default function PartyLedgerWindow({
     live.forEach((v) => {
       const allocs = v.allocations || [];
       const supRefs = isCustomer ? "" : allocs.map((a) => a.supplierInvoiceNo || refById.get(a.invoiceId) || "").filter(Boolean).join(", ");
-      push(keyOf(v), { key: `v-${v.id}`, date: v.date || "", seq: 2, type: settleLabel, no: v.no, ref: supRefs || v.ref || "", particulars: [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · "), bill: 0, settle: n2(v.amount), open: onOpenVoucher ? () => onOpenVoucher(v.raw) : null });
+      push(keyOf(v), { key: `v-${v.id}`, date: v.date || "", seq: 2, type: v.typeLabel || settleLabel, no: v.no, ref: supRefs || v.ref || "", particulars: [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · "), bill: 0, settle: n2(v.amount), open: onOpenVoucher ? () => onOpenVoucher(v.raw) : null });
     });
     out.forEach((list) => {
       const seen = new Map();
@@ -141,6 +151,7 @@ export default function PartyLedgerWindow({
   [parties, entriesByParty]);
 
   const summaryCols = [
+    ...(partyCodes ? [{ key: "code", label: "Code", width: 75, render: (r) => r.code || "" }] : []),
     { key: "name", label: partyLabel, width: 230, bold: true, render: (r) => r.name },
     { key: "mob", label: "Mobile", width: 110, render: (r) => r.mobile },
     { key: "cnt", label: "Bills", width: 55, align: "right", render: (r) => r.count },
@@ -181,7 +192,7 @@ export default function PartyLedgerWindow({
         debit: dr(e) ? f2(dr(e)) : "", credit: cr(e) ? f2(cr(e)) : "", balance: balText(e.run),
       }));
       const fields = {
-        shopName, title: `${partyLabel.toUpperCase()} STATEMENT`, partyName: party.name, partyMobile: party.mobile || "", period,
+        shopName, title: `${partyLabel.toUpperCase()} STATEMENT`, partyName: party.code ? `${party.name} (${party.code})` : party.name, partyMobile: party.mobile || "", period,
         printDate: fmtDate(todayIso()), totalDebit: f2(totalDr), totalCredit: f2(totalCr), closing: balText(totals.closing),
       };
       printWithSettings(renderLayoutDocument(design.layout.statement, "statement", { fields, items, logo: design.style.statement?.logo }, { title: fields.title, bn }));
@@ -190,7 +201,7 @@ export default function PartyLedgerWindow({
     const foot = cols.map((c, i) => (i === cols.length - 4 ? "TOTAL" : i === cols.length - 3 ? f2(totalDr) : i === cols.length - 2 ? f2(totalCr) : i === cols.length - 1 ? balText(totals.closing) : ""));
     printWithSettings(generateStatementHTML({
       shopName, title: party ? `${partyLabel.toUpperCase()} STATEMENT` : `${partyLabel.toUpperCase()} LEDGER SUMMARY`, subtitle: period,
-      partyLine: party ? [party.name, party.mobile].filter(Boolean).join(" · ") : "",
+      partyLine: party ? [party.code, party.name, party.mobile].filter(Boolean).join(" · ") : "",
       cols: cols.map((c) => ({ label: c.label, align: c.align })), rows: rows.map((r) => cols.map((c) => String(c.render(r) ?? ""))), foot,
     }, design.style.statement));
   };
@@ -202,7 +213,7 @@ export default function PartyLedgerWindow({
     </div>
   );
 
-  const winTitle = `${isCustomer ? "CUSTOMER LEDGER (CREDIT SALES)" : "SUPPLIER LEDGER"}${party ? ` — ${party.name}` : ""}`;
+  const winTitle = `${isCustomer ? "CUSTOMER LEDGER (CREDIT SALES)" : "SUPPLIER LEDGER"}${party ? ` — ${party.name}${party.code ? ` (${party.code})` : ""}` : ""}`;
   return (
     <>
     {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}

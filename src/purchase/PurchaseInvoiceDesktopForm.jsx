@@ -5,11 +5,16 @@ import { nsq } from "../utils/productSearch";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
+import PartyPickerWindow, { VENDOR_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
 
 const ACCENT = "#c2410c";
 
 function vendorHaystack(v) {
   return [v.vendorName, v.vendorCode, v.mobileNumber, v.whatsappNumber, v.city, v.trnNumber].filter(Boolean).join(" ");
+}
+
+function VendorPickerWindow({ vendors, onPick, onClose, lang }) {
+  return <PartyPickerWindow title="Select Vendor" columns={VENDOR_PICKER_COLS} items={vendors} onPick={onPick} onClose={onClose} lang={lang} partyWord="vendor" modalId="vendor-picker" />;
 }
 
 function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang, inputRef, onEnterEmpty }) {
@@ -61,7 +66,7 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
             if (open && matches.length) pick(matches[active] || matches[0]);
             else { setOpen(false); onEnterEmpty?.(); }
           }
-          else if (e.key === "Escape") setOpen(false);
+          else if (e.key === "Escape" && open) { e.preventDefault(); e.stopPropagation(); setOpen(false); }
         }} />
       {open && (
         <div style={{ position: "absolute", top: "calc(100% + 2px)", left: 0, right: -30, zIndex: 1300, background: "#fff", border: `1px solid ${C.border}`, borderRadius: 3, boxShadow: "0 10px 24px rgba(0,0,0,0.25)", maxHeight: 260, overflowY: "auto" }}>
@@ -87,8 +92,8 @@ export default function PurchaseInvoiceDesktopForm({
   form, setField, lines, setLines, current, setCurrent, totals, paid, balance,
   invoiceNo, editInvoiceId, saving, nameRef, qtyRef,
   helpers,
-  onSelectProduct, onAddCurrent, onDelLine, onPickVendor,
-  onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, toast,
+  onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine, onPickVendor,
+  onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast,
 }) {
   const { piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS } = helpers;
   const bn = lang === "bn";
@@ -102,6 +107,7 @@ export default function PurchaseInvoiceDesktopForm({
   const vatRef = useRef(null);
   const saleRef = useRef(null);
   const [editingLineId, setEditingLineId] = useState(null);
+  const [vendorPickerOpen, setVendorPickerOpen] = useState(false);
   const [codeChoices, setCodeChoices] = useState(null);
   const [codeOpenSignal, setCodeOpenSignal] = useState(0);
   const [stockMap, setStockMap] = useState(null);
@@ -114,8 +120,8 @@ export default function PurchaseInvoiceDesktopForm({
   useEffect(() => {
     let cancelled = false;
     loadInvoiceRows()
-      .then(({ purchaseInvoices, salesInvoices, deliveryNotes }) => {
-        if (!cancelled) setStockMap(computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes));
+      .then(({ purchaseInvoices, salesInvoices, deliveryNotes, extras }) => {
+        if (!cancelled) setStockMap(computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes, extras));
       })
       .catch((err) => console.warn("[S4 PI] stock load failed", err));
     return () => { cancelled = true; };
@@ -186,7 +192,7 @@ export default function PurchaseInvoiceDesktopForm({
     }
     const hit = hits[0];
     pickProduct(hit.product);
-    if (hit.unit) setTimeout(() => setCurrent((c) => ({ ...c, unit: hit.unit })), 0);
+    if (hit.unit) setTimeout(() => onChangeCurrentUnit(hit.unit), 0);
     return true;
   };
 
@@ -221,11 +227,11 @@ export default function PurchaseInvoiceDesktopForm({
       if (document.querySelector("[data-si-modal-open]")) return;
       const h = handlersRef.current;
       const tag = String(e.target?.tagName || "").toLowerCase();
-      const typing = (tag === "input" || tag === "textarea") && String(e.target.value || "").length > 0;
+      const typing = tag === "select" || ((tag === "input" || tag === "textarea") && String(e.target.value || "").length > 0);
       if (e.key === "F8") { e.preventDefault(); h.history(); }
       else if (e.key === "F9") { e.preventDefault(); h.newProduct(); }
       else if (e.key === "F10") { e.preventDefault(); h.productSearch(); }
-      else if (e.key === "Home" && !typing && !e.ctrlKey) { e.preventDefault(); vendorRef.current?.focus(); }
+      else if (e.key === "Home" && !typing && !e.ctrlKey) { e.preventDefault(); setVendorPickerOpen(true); }
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -292,11 +298,19 @@ export default function PurchaseInvoiceDesktopForm({
               F8 - Purchase History
             </button>
           </div>
-          <VendorTypeahead vendors={vendors} value={form.vendorName} lang={lang} inputRef={vendorRef}
-            placeholder={bn ? "সাপ্লায়ারের নাম লিখুন" : "Type supplier name"}
-            onEnterEmpty={() => nameRef.current?.focus()}
-            onChange={(v) => { setField("vendorName", v); if (form.vendorId) setField("vendorId", ""); }}
-            onSelect={(v) => { onPickVendor(v); setTimeout(() => nameRef.current?.focus(), 60); }} />
+          <div style={{ display: "flex", gap: 4 }}>
+            <VendorTypeahead vendors={vendors} value={form.vendorName} lang={lang} inputRef={vendorRef}
+              placeholder={bn ? "সাপ্লায়ারের নাম লিখুন" : "Type supplier name"}
+              onEnterEmpty={() => nameRef.current?.focus()}
+              onChange={(v) => { setField("vendorName", v); if (form.vendorId) setField("vendorId", ""); }}
+              onSelect={(v) => { onPickVendor(v); setTimeout(() => nameRef.current?.focus(), 60); }} />
+            <button type="button" onClick={() => setVendorPickerOpen(true)} title="Home" style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
+          </div>
+          {vendorPickerOpen && (
+            <VendorPickerWindow vendors={vendors} lang={lang}
+              onClose={() => { setVendorPickerOpen(false); setTimeout(() => vendorRef.current?.focus(), 30); }}
+              onPick={(v) => { setVendorPickerOpen(false); onPickVendor(v); setTimeout(() => nameRef.current?.focus(), 60); }} />
+          )}
         </div>
         <div>
           <div style={lbl}>Mobile</div>
@@ -319,7 +333,7 @@ export default function PurchaseInvoiceDesktopForm({
               </button>
             </div>
             <ProductNameLookup products={products} value={current.name} inputRef={nameRef}
-              onChange={(value) => { setCodeChoices(null); setCurrent((p) => ({ ...p, name: value })); }}
+              onChange={(value) => { setCodeChoices(null); setCurrent((p) => ({ ...p, name: value, productId: null })); }}
               onPickName={pickName}
               onEnterClosed={() => (current.productId ? qtyRef : codeRef).current?.focus()}
               style={inp({ fontWeight: 700 })} />
@@ -343,7 +357,7 @@ export default function PurchaseInvoiceDesktopForm({
           </div>
           <div>
             <div style={lbl}>Unit</div>
-            <select ref={unitRef} style={inp()} value={current.unit} onChange={(e) => setCurrent((p) => ({ ...p, unit: e.target.value }))}
+            <select ref={unitRef} style={inp()} value={current.unit} onChange={(e) => onChangeCurrentUnit(e.target.value)}
               onKeyDown={(e) => enterTo(e, costRef)}>
               {unitOptions.map((u) => <option key={u} value={u}>{u}</option>)}
             </select>
@@ -529,10 +543,16 @@ export default function PurchaseInvoiceDesktopForm({
             <button type="button" onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
               style={btn("#fee2e2", C.red)}>⛔ {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
           )}
+          {onDeleteInvoice && savedInvoice && ["draft", "cancelled"].includes(savedInvoice.status) && (
+            <button type="button" onClick={() => onDeleteInvoice(savedInvoice)} disabled={saving}
+              style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "মুছুন" : "Delete"}</button>
+          )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
-          <button type="button" onClick={() => { focusMissingHeader(); onSaveDraft(); }} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
+          {(!savedInvoice || savedInvoice.status === "draft") && (
+            <button type="button" onClick={() => { focusMissingHeader(); onSaveDraft(); }} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
+          )}
           <button type="button" onClick={() => { focusMissingHeader(); onConfirm(); }} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
             {saving ? "…" : (bn ? "সেভ" : "Save")}
           </button>
@@ -562,6 +582,7 @@ export default function PurchaseInvoiceDesktopForm({
           <style>{PM_CSS}</style>
           <GlobalSearchModal
             products={products}
+            showCost
             initialFields={productSearchName ? { productName: productSearchName } : null}
             rowTitle={bn ? "Double-click বা Enter চাপলে বিলে যোগ হবে" : "Double-click or press Enter to select"}
             onSelect={(p) => pickProduct(p)}

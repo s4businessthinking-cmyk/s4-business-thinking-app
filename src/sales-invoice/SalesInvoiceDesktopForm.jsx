@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ProductNameLookup, ProductCodeLookup, codeLine } from "./ProductLookupInputs.jsx";
 import { nsq } from "../utils/productSearch";
+import { parseScaleBarcode } from "./scaleBarcode";
+import { salesSpecs } from "../product-master/productSpecs";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 import { itemBaseQty } from "../inventory/unitConversion";
 import { listShopRecords } from "../branch-transfer/branchTransferService";
@@ -149,8 +151,8 @@ export default function SalesInvoiceDesktopForm({
   invoiceNo, editInvId, saving, nameRef, qtyRef,
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine,
-  onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, toast,
-  kind = "sales", sourceQuoteNo = "", sourceIsDN = false, onConvertQuote, canDiscount = true,
+  onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast,
+  kind = "sales", sourceQuoteNo = "", sourceIsDN = false, onConvertQuote, canDiscount = true, canSeeCost = false,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
@@ -193,8 +195,8 @@ export default function SalesInvoiceDesktopForm({
   useEffect(() => {
     let cancelled = false;
     loadInvoiceRows()
-      .then(({ purchaseInvoices, salesInvoices, deliveryNotes }) => {
-        if (!cancelled) setStockMap(computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes));
+      .then(({ purchaseInvoices, salesInvoices, deliveryNotes, extras }) => {
+        if (!cancelled) setStockMap(computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes, extras));
       })
       .catch((err) => console.warn("[S4 SI] stock load failed", err));
     return () => { cancelled = true; };
@@ -279,7 +281,16 @@ export default function SalesInvoiceDesktopForm({
     const key = nsq(current.code);
     if (!key) return false;
     const hits = products.map((p) => productBarcodeUnit(p, key)).filter(Boolean);
-    if (!hits.length) return false;
+    if (!hits.length) {
+      const scale = parseScaleBarcode(current.code, products);
+      if (!scale) return false;
+      pickProduct(scale.product);
+      setTimeout(() => setCurrent((p) => ({ ...p, qty: String(scale.qty) })), 0);
+      toast(scale.kind === "weight"
+        ? (bn ? `ওজনের লেবেল: ${scale.qty} kg` : `Weight label: ${scale.qty} kg`)
+        : (bn ? `দামের লেবেল: ${siFmt2(scale.amount)} → Qty ${scale.qty}` : `Rate label: ${siFmt2(scale.amount)} → Qty ${scale.qty}`));
+      return true;
+    }
     if (hits.length > 1) {
       setCurrent((p) => ({ ...p, code: "", productId: null }));
       setCodeChoices(hits.map((h) => h.product));
@@ -319,7 +330,7 @@ export default function SalesInvoiceDesktopForm({
       if (document.querySelector("[data-si-modal-open]")) return;
       const h = handlersRef.current;
       const tag = String(e.target?.tagName || "").toLowerCase();
-      const typing = (tag === "input" || tag === "textarea") && String(e.target.value || "").length > 0;
+      const typing = tag === "select" || ((tag === "input" || tag === "textarea") && String(e.target.value || "").length > 0);
       if (e.key === "F8") { e.preventDefault(); h.history(); }
       else if (e.key === "F9") { e.preventDefault(); h.newProduct(); }
       else if (e.key === "F10") { e.preventDefault(); h.productSearch(); }
@@ -420,9 +431,13 @@ export default function SalesInvoiceDesktopForm({
             <CustomerTypeahead customers={customers} value={form.customerName} lang={lang} inputRef={custRef}
               onEnterEmpty={() => salesmanRef.current?.focus()}
               placeholder={bn ? "Walk-in / নাম লিখুন" : "Walk-in / type name"}
-              onChange={(v) => { setField("customerName", v); if (form.customerId) setField("customerId", ""); }}
+              onChange={(v) => {
+                setField("customerName", v);
+                // A typed name is no longer the picked customer: drop that customer's details too.
+                if (form.customerId) ["customerId", "customerMobile", "customerAddress", "customerTrn", "customerType", "creditDays"].forEach((f) => setField(f, ""));
+              }}
               onSelect={(c) => { onSelectCustomer(c); setTimeout(() => nameRef.current?.focus(), 60); }} />
-            <button type="button" onClick={onOpenCustomerPicker} title="Home" style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11 })}>▼</button>
+            <button type="button" onClick={onOpenCustomerPicker} title="Home" style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
           </div>
         </div>
         <div>
@@ -466,7 +481,7 @@ export default function SalesInvoiceDesktopForm({
               </button>
             </div>
             <ProductNameLookup products={products} value={current.name} inputRef={nameRef} openSignal={nameOpenSignal}
-              onChange={(value) => { setCodeChoices(null); setCurrent((p) => ({ ...p, name: value })); }}
+              onChange={(value) => { setCodeChoices(null); setCurrent((p) => ({ ...p, name: value, productId: null })); }}
               onPickName={pickName}
               onEnterClosed={() => (current.productId ? qtyRef : codeRef).current?.focus()}
               style={inp({ fontWeight: 700 })} />
@@ -534,8 +549,8 @@ export default function SalesInvoiceDesktopForm({
             <>
               <span>STOCK: <span style={{ color: stockOf != null && stockOf <= 0 ? C.red : C.green }}>{stockOf == null ? "…" : stockOf}</span> {currentProduct.unit || "Pcs"}</span>
               <span>MRP: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.mrp)}</span></span>
-              <span>Lnd. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.landingCost)}</span></span>
-              <span>Avg. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.averageCost || currentProduct.landingCost)}</span></span>
+              {canSeeCost && <span>Lnd. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.landingCost)}</span></span>}
+              {canSeeCost && <span>Avg. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.averageCost || currentProduct.landingCost)}</span></span>}
               <span>Rack: {rack.rack || "—"}</span>
               <span>Floor: {rack.floor || "—"}</span>
               <span>Bin: {rack.bin || "—"}</span>
@@ -547,6 +562,11 @@ export default function SalesInvoiceDesktopForm({
             </span>
           )}
         </div>
+        {salesSpecs(currentProduct) && (
+          <div title={salesSpecs(currentProduct)} style={{ marginTop: 4, padding: "3px 8px", background: "#fff8db", border: "1px solid #e6c65c", borderRadius: 3, fontSize: 12.5, fontWeight: 700, color: "#5b4300", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            📐 Spec: {salesSpecs(currentProduct)}
+          </div>
+        )}
       </div>
 
       {/* Items table */}
@@ -675,6 +695,7 @@ export default function SalesInvoiceDesktopForm({
           {field("Round Off", (
             <div style={{ display: "flex", gap: 4 }}>
               <input style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
+                title={canDiscount ? "" : (bn ? "অনুমতি ছাড়া শুধু ১ পর্যন্ত কমানো যাবে" : "Without discount permission only up to 1 can be rounded down")}
                 placeholder="+ / -" onChange={(e) => setField("roundOff", e.target.value)} />
               <button type="button" disabled={isDelivery} title={bn ? "নিকটতম পূর্ণ সংখ্যায়" : "Round to nearest whole number"}
                 onClick={() => {
@@ -721,6 +742,10 @@ export default function SalesInvoiceDesktopForm({
             <button type="button" onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
               style={btn("#fee2e2", C.red)}>⛔ {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
           )}
+          {onDeleteInvoice && savedInvoice && canDeleteInvoice?.(savedInvoice) && (
+            <button type="button" onClick={() => onDeleteInvoice(savedInvoice)} disabled={saving}
+              style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "মুছুন" : "Delete"}</button>
+          )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
@@ -765,6 +790,7 @@ export default function SalesInvoiceDesktopForm({
           <style>{PM_CSS}</style>
           <GlobalSearchModal
             products={products}
+            showCost={canSeeCost}
             initialFields={productSearchName ? { productName: productSearchName } : null}
             rowTitle={bn ? "Double-click বা Enter চাপলে বিলে যোগ হবে" : "Double-click or press Enter to select"}
             onSelect={(p) => pickProduct(p)}

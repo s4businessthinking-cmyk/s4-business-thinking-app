@@ -17,7 +17,9 @@ const cfg = {
   refreshTokenTtlSec: 3600,
   maxBodyBytes: 1024 * 1024,
   trustProxy: false,
+  sendMail: async (message) => { sentMail.push(message); },
 };
+const sentMail = [];
 
 async function api(path, body, token) {
   const res = await fetch(`${base}${path}`, {
@@ -27,6 +29,13 @@ async function api(path, body, token) {
   });
   const json = await res.json();
   return { status: res.status, ...json };
+}
+
+const lastCode = () => sentMail.at(-1).text.match(/\b(\d{6})\b/)[1];
+
+async function signup(email, password) {
+  assert.equal((await api("/v1/auth/signup-code", { email })).status, 200);
+  return api("/v1/auth/signup", { email, password, code: lastCode() });
 }
 
 const commit = (token, writes, preconditions) => api("/v1/db/commit", { writes, preconditions }, token);
@@ -40,9 +49,9 @@ before(async () => {
   app = await startServer(cfg);
   base = `http://127.0.0.1:${app.port}`;
 
-  owner = await api("/v1/auth/signup", { email: "Owner@Shop.com", password: "secret1" });
-  sales = await api("/v1/auth/signup", { email: "sales@shop.com", password: "secret2" });
-  outsider = await api("/v1/auth/signup", { email: "x@other.com", password: "secret3" });
+  owner = await signup("Owner@Shop.com", "secret1");
+  sales = await signup("sales@shop.com", "secret2");
+  outsider = await signup("x@other.com", "secret3");
 
   assert.equal((await commit(owner.idToken, [
     set("users", owner.uid, { shopId: "shop1", role: "owner", personName: "Owner" }),
@@ -71,11 +80,45 @@ test("auth: login, wrong password, refresh, duplicate email", async () => {
   assert.equal(refreshed.status, 200);
   assert.ok(refreshed.idToken);
 
-  const dup = await api("/v1/auth/signup", { email: "owner@shop.com", password: "secret9" });
-  assert.equal(dup.status, 409);
+  assert.equal((await api("/v1/auth/signup-code", { email: "owner@shop.com" })).status, 409, "no code for a taken email");
+
+  const noCode = await api("/v1/auth/signup", { email: "new@shop.com", password: "secret9" });
+  assert.equal(noCode.status, 400);
+  assert.equal(noCode.error.message, "auth/email-code-expired");
+  assert.equal((await api("/v1/auth/signup-code", { email: "new@shop.com" })).status, 200);
+  const realCode = lastCode();
+  assert.equal(sentMail.at(-1).to, "new@shop.com");
+  const wrongCode = await api("/v1/auth/signup", { email: "new@shop.com", password: "secret9", code: realCode === "000000" ? "111111" : "000000" });
+  assert.equal(wrongCode.error.message, "auth/invalid-email-code");
+  assert.equal((await api("/v1/auth/signup", { email: "new@shop.com", password: "secret9", code: realCode })).status, 200);
+
+  const usernameOnly = await api("/v1/auth/signup", { email: "rahim.shop1@s4local.app", password: "secret9" });
+  assert.equal(usernameOnly.status, 200, "placeholder addresses cannot receive a code");
+
+  const byOwner = await api("/v1/auth/signup", { email: "staff@shop.com", password: "secret9" }, owner.idToken);
+  assert.equal(byOwner.status, 200, "an owner adding staff needs no code");
+  const byStaff = await api("/v1/auth/signup", { email: "staff2@shop.com", password: "secret9" }, sales.idToken);
+  assert.equal(byStaff.status, 400, "staff cannot skip the code");
 
   const noToken = await commit(undefined, [set("products", "p0", { shopId: "shop1", name: "x" })]);
   assert.equal(noToken.status, 401);
+});
+
+test("owner PIN reset: emailed code, owner only, wrong code and resend limits", async () => {
+  assert.equal((await api("/v1/pin/request-code", {}, sales.idToken)).status, 403, "staff cannot reset the owner PIN");
+  assert.equal((await api("/v1/pin/request-code", {})).status, 401);
+
+  const sent = await api("/v1/pin/request-code", {}, owner.idToken);
+  assert.equal(sent.status, 200);
+  assert.equal(sent.email, "ow***@shop.com");
+  assert.equal(sentMail.at(-1).to, "owner@shop.com");
+  const code = lastCode();
+
+  assert.equal((await api("/v1/pin/request-code", {}, owner.idToken)).status, 429, "one code per minute");
+  const wrong = code === "000000" ? "111111" : "000000";
+  assert.equal((await api("/v1/pin/verify-code", { code: wrong }, owner.idToken)).status, 400);
+  assert.equal((await api("/v1/pin/verify-code", { code }, owner.idToken)).status, 200);
+  assert.equal((await api("/v1/pin/verify-code", { code }, owner.idToken)).status, 404, "a code works once");
 });
 
 test("users: no self-promotion, no joining a shop without an invite", async () => {
@@ -86,7 +129,7 @@ test("users: no self-promotion, no joining a shop without an invite", async () =
   assert.equal((await commit(sales.idToken, [set("users", sales.uid, { personName: "Ali" }, true)])).status, 200);
   assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { printCheques: true } }, true)])).status, 200);
 
-  const intruder = await api("/v1/auth/signup", { email: "intruder@x.com", password: "secret4" });
+  const intruder = await signup("intruder@x.com", "secret4");
   const join = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "salesman" })]);
   assert.equal(join.status, 403);
   const reuse = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "salesman", inviteCode: "JOIN1" })]);
@@ -97,6 +140,8 @@ test("users: no self-promotion, no joining a shop without an invite", async () =
 
 test("products: shop members write and read; other shop cannot", async () => {
   assert.equal((await commit(owner.idToken, [set("products", "p1", { shopId: "shop1", name: "Brake Pad", code: "BP1" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("products", "p2", { shopId: "shop1", name: "Air Filter" })])).status, 403, "products need manageProducts");
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageProducts: true } }, true)])).status, 200);
   assert.equal((await commit(sales.idToken, [set("products", "p2", { shopId: "shop1", name: "Air Filter" })])).status, 200);
   assert.equal((await commit(sales.idToken, [set("products", "p3", { shopId: "shop1", code: "NO-NAME" })])).status, 200);
 
@@ -214,7 +259,7 @@ test("realtime: snapshot then added/modified/removed deltas, scoped per shop", a
   assert.deepEqual((await ownerWs.next((m) => m.t === "snap")).docs, []);
   await spyWs.next((m) => m.t === "snap");
 
-  await commit(sales.idToken, [set("vendors", "v1", { shopId: "shop1", vendorName: "Al Futtaim" })]);
+  await commit(owner.idToken, [set("vendors", "v1", { shopId: "shop1", vendorName: "Al Futtaim" })]);
   const added = await ownerWs.next((m) => m.t === "chg");
   assert.equal(added.changes[0].type, "added");
   assert.equal(added.changes[0].data.vendorName, "Al Futtaim");
@@ -293,4 +338,94 @@ test("realtime: rejects bad token", async () => {
     ws.on("close", (c) => resolve(c));
   });
   assert.equal(code, 4401);
+});
+
+test("rules: sales bills, receipts and customers follow the staff permissions", async () => {
+  const si = { shopId: "shop1", invoiceNo: "SI-R1", grandTotal: 100, amountPaid: 0, balanceDue: 100, status: "confirmed", createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("salesInvoices", "rsi1", si)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "rsi1", data: { note: "fixed" } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "rsi1", data: { amountPaid: 500 } }])).status, 403, "paid above the bill total");
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "rsi1", data: { status: "cancelled" } }])).status, 403, "cancel needs cancelInvoices");
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "salesInvoices", id: "rsi1" }])).status, 403, "only drafts are deleted");
+
+  assert.equal((await commit(owner.idToken, [set("salesInvoices", "rsi2", { ...si, invoiceNo: "SI-R2", createdBy: owner.uid })])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "rsi2", data: { status: "cancelled", updatedBy: sales.uid } }])).status, 403, "payment fields cannot cancel");
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "rsi2", data: { amountPaid: 40, balanceDue: 60, status: "partial", _offline_updated_at: "x", _cloud_synced_at: "y" } }])).status, 200);
+
+  const receipt = { shopId: "shop1", receiptNo: "RC-1", customerName: "Ali", method: "cheque", totalAmount: 40, allocations: [{ invoiceId: "rsi2", amount: 40 }], status: "active", chequeStatus: "pending", createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("salesReceipts", "rr1", receipt)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesReceipts", id: "rr1", data: { chequeStatus: "cleared" } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesReceipts", id: "rr1", data: { chequeStatus: "bounced", status: "cancelled" } }])).status, 403);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesReceipts", id: "rr1", data: { chequeDate: "2030-01-01" } }])).status, 403, "postpone needs managePdc");
+
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { cancelInvoices: true, manageCustomers: false } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesReceipts", id: "rr1", data: { chequeStatus: "bounced", status: "cancelled" } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "rsi1", data: { status: "cancelled" } }])).status, 200);
+
+  assert.equal((await commit(owner.idToken, [set("customers", "rc1", { shopId: "shop1", customerName: "Del Me" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "customers", id: "rc1" }])).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "customers", id: "rc1" }])).status, 200);
+
+  assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpi1", { shopId: "shop1", invoiceNo: "PI-R1", status: "confirmed", createdBy: sales.uid })])).status, 403, "purchase needs managePurchase");
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { managePurchase: true } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpi1", { shopId: "shop1", invoiceNo: "PI-R1", status: "confirmed", createdBy: sales.uid })])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "rpi1", data: { note: "edit" } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "rpi1", data: { status: "cancelled" } }])).status, 403);
+});
+
+test("rules: vendors, returns, stock adjustments, audit log and master lists follow the staff permissions", async () => {
+  const none = { managePurchase: false, manageVendors: false, manageReturns: false, stockAdjust: false, manageProducts: false };
+  const perms = (p) => commit(owner.idToken, [set("users", sales.uid, { permissions: { ...none, ...p } }, true)]);
+  const upd = (collection, id, data) => ({ op: "update", collection, id, data });
+
+  assert.equal((await perms({})).status, 200);
+  assert.equal((await commit(sales.idToken, [set("vendors", "rv1", { shopId: "shop1", vendorName: "No Perm" })])).status, 403, "vendor create needs a permission");
+  assert.equal((await perms({ managePurchase: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [set("vendors", "rv1", { shopId: "shop1", vendorName: "From Purchase" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("vendors", "rv1", { phone: "1" })])).status, 403, "vendor edit needs manageVendors");
+  assert.equal((await perms({ manageVendors: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("vendors", "rv1", { phone: "1" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "vendors", id: "rv1" }])).status, 403, "only the owner deletes vendors");
+
+  const sr = { shopId: "shop1", returnNo: "SR-0001", invoiceId: "rsi2", total: 10, status: "confirmed", createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr1", sr)])).status, 403, "returns need manageReturns");
+  assert.equal((await perms({ manageReturns: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr1", { ...sr, createdBy: owner.uid })])).status, 403, "createdBy must be the caller");
+  assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr1", sr)])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("purchaseReturns", "rpr1", { ...sr, returnNo: "PR-0001" })])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("salesReturns", "rsr2", { ...sr, returnNo: "SR-0002", createdBy: owner.uid })])).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("salesReturns", "rsr2", { status: "cancelled" })])).status, 403, "staff cancel only their own returns");
+  assert.equal((await commit(sales.idToken, [upd("salesReturns", "rsr1", { status: "cancelled" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "salesReturns", id: "rsr1" }])).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "salesReturns", id: "rsr1" }])).status, 200);
+
+  const sa = { shopId: "shop1", adjustNo: "SA-0001", status: "confirmed", items: [], createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("stockAdjustments", "rsa1", sa)])).status, 403, "adjustments need stockAdjust");
+  assert.equal((await perms({ stockAdjust: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [set("stockAdjustments", "rsa1", sa)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "shops", id: "shop1", data: { lastSASerial: 1 } }])).status, 200);
+
+  const log = { shopId: "shop1", action: "cancel", collection: "salesReturns", byUid: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("auditLogs", "ra1", { ...log, byUid: owner.uid })])).status, 403, "cannot log as someone else");
+  assert.equal((await commit(sales.idToken, [set("auditLogs", "ra1", log)])).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("auditLogs", "ra1", { note: "x" })])).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "auditLogs", id: "ra1" }])).status, 403, "audit entries are permanent");
+  assert.equal((await api("/v1/db/get", { collection: "auditLogs", id: "ra1" }, sales.idToken)).status, 403, "only the owner reads the log");
+  assert.equal((await api("/v1/db/get", { collection: "auditLogs", id: "ra1" }, owner.idToken)).status, 200);
+
+  const ml = { shopId: "shop1", kind: "units", records: [{ id: 1, symbol: "Pcs" }], updatedAt: "2026-01-01T00:00:00Z" };
+  assert.equal((await commit(sales.idToken, [set("masterLists", "shop1_units", ml)])).status, 403, "lists need manageProducts");
+  assert.equal((await commit(owner.idToken, [set("masterLists", "shop1_units", ml)])).status, 200);
+  assert.equal((await perms({ manageProducts: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("masterLists", "shop1_units", { updatedAt: "2026-01-02T00:00:00Z" })])).status, 200);
+});
+
+test("rules: a salesman bills the delivered goods of their own order only", async () => {
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { managePurchase: false, setStatus: false, markDelivery: false } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("orders", "ro-own", { shopId: "shop1", createdBy: sales.uid, items: [] })])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("orders", "ro-other", { shopId: "shop1", createdBy: owner.uid, items: [] })])).status, 200);
+  const pi = { shopId: "shop1", invoiceNo: "PI-0900", status: "confirmed", source: "salesmanOrder", createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpo1", { ...pi, sourceOrderId: "ro-other" })])).status, 403, "someone else's order");
+  assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpo1", { ...pi, sourceOrderId: "missing" })])).status, 403, "unknown order");
+  assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpo1", { ...pi, sourceOrderId: "ro-own" })])).status, 200);
 });

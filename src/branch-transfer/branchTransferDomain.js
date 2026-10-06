@@ -15,6 +15,12 @@ export const DEFAULT_BRANCH_TRANSFER_SETTINGS = Object.freeze({
   allowPartialReceive: true,
 });
 
+// The bill made when a branch receives a transfer only records the goods moving inside the shop:
+// the real supplier purchase is entered separately, so this one must not add stock, purchases or dues.
+export function isBranchTransferBill(inv) {
+  return !!inv && (inv.internalTransfer === true || inv.sourceType === "branch_transfer");
+}
+
 export function numberValue(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;

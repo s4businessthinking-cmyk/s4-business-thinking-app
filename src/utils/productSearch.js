@@ -1,3 +1,5 @@
+import { specValues } from "../product-master/productSpecs";
+
 export function nsq(str) {
   return String(str || "").replace(/[\.\-\/\\\s_,]+/g, "").toLowerCase();
 }
@@ -20,6 +22,7 @@ export function buildProductHaystack(product) {
     product.barcode,
     product.ean,
     ...(product.moreBarcodes || []),
+    specValues(product),
   ]
     .filter(Boolean)
     .join(" ");

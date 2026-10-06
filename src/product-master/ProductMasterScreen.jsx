@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { PM_CSS } from "./pmStyles";
+import { PM_CSS, PM_MOBILE_QUERY } from "./pmStyles";
 import ProductDetailsForm from "./ProductDetailsForm";
 import PricingPanel from "./PricingPanel";
 import SellingRatesPanel from "./SellingRatesPanel";
@@ -18,6 +18,8 @@ import ImportModal from "./modals/ImportModal";
 import GlobalSearchModal from "./modals/GlobalSearchModal";
 import AdditionalBarcodeConfirmModal from "./modals/AdditionalBarcodeConfirmModal";
 import ClearProductsModal from "./modals/ClearProductsModal";
+import { offlineUpsert } from "../offline/offlineRepository";
+import { subscribeShopCollection } from "../offline/realtimeSync";
 
 const DEFAULT_UNIT_RECORDS = [
   ["COUNT", "Number", "Number", "1", "Number"],
@@ -123,6 +125,7 @@ export default function ProductMasterScreen({
   selectedId,
   canDelete,
   canEdit = true,
+  canSeeCost = false,
   saving,
   onNew,
   onSave,
@@ -144,7 +147,7 @@ export default function ProductMasterScreen({
   onSearchChange,
 }) {
   const [activeModal, setActiveModal] = useState(null);
-  const mobileQuery = "(max-width: 759px)";
+  const mobileQuery = PM_MOBILE_QUERY;
   const [isMobile, setIsMobile] = useState(() => !!window.matchMedia?.(mobileQuery).matches);
   const embeddedSearchRef = useRef(null);
   const formGridRef = useRef(null);
@@ -206,6 +209,35 @@ export default function ProductMasterScreen({
     localStorage.setItem(`s4-product-master-customer-types-${shopId || "default"}`, JSON.stringify(customerTypeRecords));
   }, [shopId, customerTypeRecords]);
 
+  // Shop-wide copies of the Unit / Customer Type lists; the newest edit from any device wins.
+  const masterStampRef = useRef({ units: 0, customerTypes: 0 });
+  useEffect(() => {
+    if (!shopId) return undefined;
+    const unsub = subscribeShopCollection({
+      collectionName: "masterLists",
+      shopId,
+      onRows: (rows) => (rows || []).forEach((row) => {
+        if (!Array.isArray(row?.records) || !row.records.length) return;
+        if (row.kind !== "units" && row.kind !== "customerTypes") return;
+        const stamp = Date.parse(row.updatedAt) || 0;
+        if (stamp <= masterStampRef.current[row.kind]) return;
+        masterStampRef.current[row.kind] = stamp;
+        const records = row.records.map((record) => ({ ...record }));
+        if (row.kind === "units") setUnitRecords(records);
+        else setCustomerTypeRecords(records);
+      }),
+    });
+    return () => { try { unsub?.(); } catch { /* ignore */ } };
+  }, [shopId]);
+  const pushMasterList = (kind, records) => {
+    if (!shopId || !canEdit) return;
+    const updatedAt = new Date().toISOString();
+    masterStampRef.current[kind] = Date.parse(updatedAt);
+    offlineUpsert("masterLists", `${shopId}_${kind}`, { shopId, kind, records, updatedAt })
+      .then(() => { if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {}); })
+      .catch((err) => console.warn(`[S4 Master] ${kind} sync failed`, err));
+  };
+
   useEffect(() => {
     const onKey = (e) => {
       const tag = String(e.target?.tagName || "").toLowerCase();
@@ -237,7 +269,7 @@ export default function ProductMasterScreen({
   const close = () => setActiveModal(null);
 
   function showDuplicateBarcode(message) {
-    window.alert(`Duplicate Barcode / EAN\n\n${message}`);
+    notify(`Duplicate Barcode / EAN: ${message}`, "err");
   }
 
   function validateIdentityCode(field, rawValue) {
@@ -367,7 +399,7 @@ export default function ProductMasterScreen({
       </div>
 
       <div className="pm-quick-bar">
-        <button type="button" className="pm-btn" onClick={startNew}>New</button>
+        <button type="button" className="pm-btn" onClick={startNew} disabled={!canEdit}>New</button>
         <button type="button" className="pm-btn" onClick={onSave} disabled={!canEdit || saving || productMaintenanceActive}>{saving ? "Saving..." : "Save"}</button>
         <button type="button" className={`pm-btn-secondary${mobileTab === "search" ? " is-active" : ""}`} onClick={openSearch}>Search</button>
         <button type="button" className="pm-btn-secondary" onClick={onClose}>Close</button>
@@ -388,6 +420,7 @@ export default function ProductMasterScreen({
         <div ref={embeddedSearchRef} className="pm-embedded-search-slot" hidden={mobileTab !== "search"}>
           <GlobalSearchModal
             embedded
+            active={mobileTab === "search"}
             products={products}
             selectedProductId={selectedId}
             onSelect={selectFromEmbeddedSearch}
@@ -398,6 +431,7 @@ export default function ProductMasterScreen({
 
       <div ref={formGridRef} className={`pm-reference-grid${isMobile ? ` pm-mtab-${mobileTab}` : ""}`}>
         <div className="pm-reference-left">
+          <fieldset className="pm-readonly-wrap" disabled={!canEdit}>
           <ProductDetailsForm
             form={form}
             upd={upd}
@@ -408,11 +442,15 @@ export default function ProductMasterScreen({
             onOpenNewUnit={() => setActiveModal("newUnit")}
             onPickSuggestion={onSelectProduct}
             onValidateIdentityCode={validateIdentityCode}
+            onOpenSpecification={() => setActiveModal("specification")}
+            onOpenPhoto={() => setActiveModal("photo")}
           />
+          </fieldset>
         </div>
 
         <div className="pm-reference-middle">
-          <PricingPanel form={form} upd={upd} />
+          <fieldset className="pm-readonly-wrap" disabled={!canEdit}>
+          <PricingPanel form={form} upd={upd} showCost={canSeeCost} />
           {isMobile && (
             <label className="pm-check pm-mobile-rate-check">
               <input type="checkbox" checked={!!form.multiCustomerRatesEnabled}
@@ -435,6 +473,7 @@ export default function ProductMasterScreen({
             validateBarcode={validateSellingRateBarcode}
             enabled={!!form.multiCustomerRatesEnabled}
           />
+          </fieldset>
         </div>
 
         <div className="pm-reference-right">
@@ -486,6 +525,7 @@ export default function ProductMasterScreen({
           onClose={close}
           onRecordsChange={(records) => {
             setUnitRecords(records);
+            pushMasterList("units", records);
             upd("customUnits", records.map((record) => record.symbol));
             upd("unitDefinitions", records);
           }}
@@ -498,6 +538,7 @@ export default function ProductMasterScreen({
           onClose={close}
           onRecordsChange={(records) => {
             setCustomerTypeRecords(records);
+            pushMasterList("customerTypes", records);
             upd("customerTypes", records.map((record) => record.name));
           }}
         />
@@ -553,6 +594,7 @@ export default function ProductMasterScreen({
       {activeModal === "search" && !isMobile && (
         <GlobalSearchModal
           products={products}
+          showCost={canSeeCost}
           onSelect={onSelectProduct}
           onClose={close}
         />

@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import {
   saveLocalRecord,
   deleteLocalRecord,
+  getLocalRecord,
   getLocalRecords,
   enqueueSync,
   getOfflineStatus,
@@ -11,6 +12,9 @@ import {
   clearLocalCollection,
   clearLocalCollectionForShop,
   purgeLocalRecord,
+  bulkEnqueueUpsert,
+  getDirtyLocalRecords,
+  purgeCleanLocalRecords,
 } from "./sqliteDb";
 
 function nowIso() {
@@ -33,7 +37,7 @@ export async function offlineCreate(collectionName, data = {}) {
     _offline_created_at: data._offline_created_at || nowIso(),
   });
 
-  await saveLocalRecord(collectionName, documentId, record);
+  await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
   const syncResult = await enqueueSync(collectionName, documentId, "CREATE", {
     collectionName,
@@ -70,7 +74,7 @@ export async function offlineUpdate(collectionName, documentId, patch = {}) {
     id: documentId,
   });
 
-  await saveLocalRecord(collectionName, documentId, record);
+  await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
   const syncResult = await enqueueSync(collectionName, documentId, "UPDATE", {
     collectionName,
@@ -98,6 +102,31 @@ export async function offlineUpdate(collectionName, documentId, patch = {}) {
   };
 }
 
+// Like offlineUpdate, but only the patched fields are uploaded (merged on the server), so a stale
+// local copy can never overwrite fields that another device changed meanwhile.
+// `base` is the caller's copy of the document, used locally when it is not cached on this device.
+export async function offlinePatch(collectionName, documentId, patch = {}, base = null) {
+  const existing = await offlineGetById(collectionName, documentId);
+  const stamp = nowIso();
+  const record = { ...(existing?.data || base || {}), ...patch, id: documentId, _offline_updated_at: stamp };
+
+  await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
+
+  const syncResult = await enqueueSync(collectionName, documentId, "UPDATE", {
+    collectionName,
+    documentId,
+    data: { ...patch, id: documentId, _offline_updated_at: stamp },
+  });
+
+  if (!syncResult?.ok) {
+    throw new Error(
+      `Failed to queue ${collectionName} for sync: ${syncResult?.error || "unknown error"}`
+    );
+  }
+
+  return { ok: true, mode: "offline-first", operation: "UPDATE", collectionName, documentId, data: record };
+}
+
 export async function offlineUpsert(collectionName, documentId, data = {}) {
   const existing = await offlineGetById(collectionName, documentId);
 
@@ -109,7 +138,7 @@ export async function offlineUpsert(collectionName, documentId, data = {}) {
       existing?.data?._offline_created_at || data._offline_created_at || nowIso(),
   });
 
-  await saveLocalRecord(collectionName, documentId, record);
+  await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
   const syncResult = await enqueueSync(collectionName, documentId, "UPSERT", {
     collectionName,
@@ -138,7 +167,7 @@ export async function offlineUpsert(collectionName, documentId, data = {}) {
 }
 
 export async function offlineRemove(collectionName, documentId) {
-  await deleteLocalRecord(collectionName, documentId);
+  await deleteLocalRecord(collectionName, documentId, { skipPersist: true });
 
   const syncResult = await enqueueSync(collectionName, documentId, "DELETE", {
     collectionName,
@@ -176,11 +205,16 @@ export async function offlineList(collectionName) {
   };
 }
 
-export async function offlineGetById(collectionName, documentId) {
-  const result = await offlineList(collectionName);
-  const found = result.records.find((item) => item.document_id === documentId);
+// Many records in one local transaction + one database write (imports).
+export async function offlineBulkUpsert(collectionName, records = []) {
+  return bulkEnqueueUpsert(
+    collectionName,
+    records.map((data) => ({ documentId: data.id, data: safeData(data) }))
+  );
+}
 
-  return found || null;
+export async function offlineGetById(collectionName, documentId) {
+  return getLocalRecord(collectionName, documentId);
 }
 
 export async function offlineSearch(collectionName, keyword = "") {
@@ -222,6 +256,14 @@ export async function offlineClearCollection(collectionName) {
 
 export async function offlineClearShopCollection(collectionName, shopId) {
   return clearLocalCollectionForShop(collectionName, shopId);
+}
+
+export async function offlineDirtyRecords(collectionName) {
+  return getDirtyLocalRecords(collectionName);
+}
+
+export async function offlinePurgeCleanLocal(collectionName, documentIds = []) {
+  return purgeCleanLocalRecords(collectionName, documentIds);
 }
 
 export async function offlinePurgeLocal(collectionName, documentId) {

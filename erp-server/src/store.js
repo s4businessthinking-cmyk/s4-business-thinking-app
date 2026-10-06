@@ -146,13 +146,27 @@ export function createStore({ db }) {
         if ((row ? row.version : 0) !== Number(p.version || 0)) fail("aborted", "Document changed during transaction; retry.");
       }
 
-      const staged = new Map();
+      // All target documents are read up front, one query per collection instead of one per write.
+      const existing = new Map();
+      const idsByCollection = new Map();
       for (const w of writes) {
         checkPath(w.collection, w.id);
         const key = `${w.collection}/${w.id}`;
+        if (existing.has(key)) continue;
+        existing.set(key, null);
+        if (!idsByCollection.has(w.collection)) idsByCollection.set(w.collection, []);
+        idsByCollection.get(w.collection).push(String(w.id));
+      }
+      for (const [collection, ids] of idsByCollection) {
+        for (const row of await db.getDocs(collection, ids)) existing.set(`${collection}/${row.id}`, row);
+      }
+
+      const staged = new Map();
+      for (const w of writes) {
+        const key = `${w.collection}/${w.id}`;
         let entry = staged.get(key);
         if (!entry) {
-          const row = await db.getDoc(w.collection, w.id);
+          const row = existing.get(key);
           entry = { collection: w.collection, id: String(w.id), row, after: row ? row.data : null };
           staged.set(key, entry);
         }
@@ -182,6 +196,7 @@ export function createStore({ db }) {
 
       const results = await db.tx(async (t) => {
         const out = [];
+        const puts = [];
         for (const c of changes) {
           if (c.op === "delete") {
             await t.deleteDoc(c.collection, c.id);
@@ -189,7 +204,7 @@ export function createStore({ db }) {
             continue;
           }
           const version = (c.row ? c.row.version : 0) + 1;
-          await t.putDoc({
+          puts.push({
             collection: c.collection,
             id: c.id,
             shopId: shopIdForRow(c.collection, c.id, c.after),
@@ -200,6 +215,7 @@ export function createStore({ db }) {
           });
           out.push({ collection: c.collection, id: c.id, version });
         }
+        if (puts.length) await t.putDocs(puts);
         return out;
       });
 
@@ -218,10 +234,10 @@ export function createStore({ db }) {
     });
   }
 
-  // Listener snapshots run under the commit lock so no write lands between
-  // the snapshot read and the listener starting to receive change events.
-  const snapshotQuery = (uid, q) => lock(() => runQuery(uid, q));
-  const snapshotDoc = (uid, collection, id) => lock(() => getDocument(uid, collection, id));
+  // Listener snapshots do not take the commit lock (a large catalogue read would stall every
+  // write); realtime.js buffers changes that land during the read and replays the newer ones.
+  const snapshotQuery = (uid, q) => runQuery(uid, q);
+  const snapshotDoc = (uid, collection, id) => getDocument(uid, collection, id);
 
   async function assertShopOwner(uid, shopId) {
     const ctx = await ctxFor(uid);

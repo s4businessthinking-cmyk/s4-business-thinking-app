@@ -61,7 +61,7 @@ export function PartySelect({ parties, value, onPick, disabled, inputRef, placeh
 export default function AgainstInvoiceVoucherWindow({
   lang = "en", mode = "payment", cur = "AED", voucherNo = "",
   parties = [], salesmen = [], banks = [], getOpenInvoices, vouchers = [], prefill = null,
-  saving = false, onSave, onCancelVoucher, onSetChequeStatus, onPrint, onClose, initialViewId = null,
+  saving = false, onSave, onCancelVoucher, onDeleteVoucher, onSetChequeStatus, onPrint, onClose, initialViewId = null,
 }) {
   const bn = lang === "bn";
   const isReceipt = mode === "receipt";
@@ -412,6 +412,9 @@ export default function AgainstInvoiceVoucherWindow({
                 )}
                 {!cancelled && onCancelVoucher && (
                   <button type="button" onClick={async () => { const u = await onCancelVoucher(viewing); if (u) setViewSnapshot(u); }} style={btn("#fee2e2", C.red)}>⛔ {bn ? "ভাউচার বাতিল" : "Cancel Voucher"}</button>
+                )}
+                {cancelled && onDeleteVoucher && (
+                  <button type="button" onClick={async () => { if (await onDeleteVoucher(viewing)) resetNew(); }} style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "ভাউচার মুছুন" : "Delete Voucher"}</button>
                 )}
               </div>
             )}

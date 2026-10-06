@@ -20,6 +20,13 @@ export const config = {
   refreshTokenTtlSec: Number(env.REFRESH_TOKEN_TTL_SEC || 90 * 24 * 60 * 60),
   maxBodyBytes: Number(env.MAX_BODY_BYTES || 15 * 1024 * 1024),
   trustProxy: env.TRUST_PROXY !== "0",
+  smtp: {
+    host: env.SMTP_HOST || "",
+    port: Number(env.SMTP_PORT || 587),
+    user: env.SMTP_USER || "",
+    pass: env.SMTP_PASS || "",
+    from: env.SMTP_FROM || "",
+  },
 };
 
 export function assertConfig(cfg = config) {
