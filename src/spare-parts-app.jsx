@@ -106,6 +106,8 @@ import PrintSettingsWindow from "./print/PrintSettingsWindow.jsx";
 import { loadPrintSettings, docSettingsFor, paperCss, printHtmlDocument, printWithSettings, canPickPrinter } from "./print/printSettings.js";
 import { applyDesign, loadPrintDesign, layoutAppliesTo, renderLayoutDocument, amountInWords, generateStatementHTML, SAMPLE_DATA, shopHeaderExtras } from "./print/printDesign.js";
 import { useChequeDueNotifications } from "./dashboard/chequeNotifications.js";
+import { useEmployeeAlerts } from "./employees/useEmployeeAlerts.js";
+import { alertText as employeeAlertText } from "./employees/employeeAlerts.js";
 import VendorChequeWizard from "./vouchers/VendorChequeWizard.jsx";
 import OwnerPinModal from "./auth/OwnerPinModal.jsx";
 import ChequeHandoverModal from "./vouchers/ChequeHandoverModal.jsx";
@@ -116,6 +118,11 @@ import { saveTextFile } from "./utils/saveTextFile.js";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
 import SalesInvoiceDesktopForm from "./sales-invoice/SalesInvoiceDesktopForm.jsx";
 import PurchaseInvoiceDesktopForm from "./purchase/PurchaseInvoiceDesktopForm.jsx";
+import { purchaseOptionsOf, rateOf, isForeign, lineToBase, batchReasons, nextBatchNo } from "./purchase/purchaseOptions.js";
+import { computeStockMap, loadInvoiceRows } from "./inventory/stockFromInvoices";
+import { batchStockByProduct, saleBatchChoices } from "./inventory/batchStock";
+import BatchPickModal from "./sales-invoice/BatchPickModal";
+import { CURRENCIES } from "./reports/taxDomain.js";
 import AgainstInvoiceVoucherWindow from "./vouchers/AgainstInvoiceVoucherWindow.jsx";
 import PartyLedgerWindow from "./vouchers/PartyLedgerWindow.jsx";
 import PartyPickerWindow, { CUSTOMER_PICKER_COLS } from "./components/PartyPickerWindow.jsx";
@@ -128,6 +135,12 @@ import { isBranchTransferBill } from "./branch-transfer/branchTransferDomain.js"
 import ReturnsTab, { returnsAsLedgerVouchers } from "./returns/ReturnsTab.jsx";
 import VouchersTab from "./vouchers/VouchersTab.jsx";
 import StockAdjustmentTab from "./returns/StockAdjustmentTab.jsx";
+import StockConvertTab from "./returns/StockConvertTab.jsx";
+import PurchaseDocsTab from "./purchase/PurchaseDocsTab.jsx";
+import EmployeesTab from "./employees/EmployeesTab.jsx";
+import AttendanceTab from "./employees/AttendanceTab.jsx";
+import BankRecTab from "./accounts/BankRecTab.jsx";
+import JobCardTab from "./jobcard/JobCardTab.jsx";
 import AuditLogTab from "./returns/AuditLogTab.jsx";
 import ProfitLossReport from "./reports/ProfitLossReport.jsx";
 import TaxReport from "./reports/TaxReport.jsx";
@@ -186,7 +199,7 @@ const STOCK_AFFECTING_INVOICE_STATUSES = ["confirmed", "paid", "partial"];
 
 // Lines typed without picking a product (e.g. labour) never move stock, so the user confirms that knowingly.
 function unlinkedStockOk(items, lang) {
-  const names = (items || []).filter((it) => !it?.productId && String(it?.name || "").trim()).map((it) => it.name.trim());
+  const names = (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
   if (!names.length) return true;
   const list = names.slice(0, 5).join(", ") + (names.length > 5 ? " …" : "");
   return window.confirm(lang === "bn"
@@ -296,11 +309,6 @@ function buildSupportWhatsappUrl(lang) {
 }
 
 // ─── PRESET POSITIONS ────────────────────────────────────────
-const PRESET_POSITIONS = {
-  bn: ["সিনিয়র সেলসম্যান", "জুনিয়র সেলসম্যান", "ম্যানেজার", "ক্যাশিয়ার", "স্টোরকিপার", "ডেলিভারি ম্যান", "অ্যাকাউন্ট্যান্ট", "সুপারভাইজার"],
-  en: ["Senior Salesman", "Junior Salesman", "Manager", "Cashier", "Storekeeper", "Delivery Man", "Accountant", "Supervisor"],
-};
-
 // ─── PERMISSIONS ────────────────────────────────────────────
 const PERMISSIONS_LIST = [
   { key: "sendOrder",        bn: "অর্ডার দেওয়া",              en: "Send Orders" },
@@ -332,6 +340,9 @@ const PERMISSIONS_LIST = [
   { key: "manageReturns",    bn: "সেলস / পারচেজ রিটার্ন করা",   en: "Sales / Purchase Returns" },
   { key: "stockAdjust",      bn: "স্টক সমন্বয় (কম/বেশি) করা",   en: "Stock Adjustment" },
   { key: "accountVouchers",  bn: "জার্নাল / কন্ট্রা ভাউচার",      en: "Journal / Contra Vouchers" },
+  { key: "manageEmployees",  bn: "কর্মচারী ও হাজিরা",              en: "Employees & Attendance" },
+  { key: "bankReconcile",    bn: "ব্যাংক হিসাব মেলানো",            en: "Bank Reconciliation" },
+  { key: "manageJobs",       bn: "জব কার্ড / সার্ভিস কাজ",          en: "Job Cards / Service Jobs" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -362,6 +373,9 @@ const DEFAULT_PERMISSIONS = {
   manageReturns: false,
   stockAdjust: false,
   accountVouchers: false,
+  manageEmployees: false,
+  bankReconcile: false,
+  manageJobs: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -2292,7 +2306,7 @@ function piEmptyCurrent() {
   return { productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
 }
 function piEmptyForm() {
-  return { invoiceDate:piToday(), supplierInvoiceNo:"", vendorId:"", vendorName:"", vendorMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
+  return { invoiceDate:piToday(), supplierInvoiceNo:"", refNo:"", currency:"", exchangeRate:"", vendorId:"", vendorName:"", vendorMobile:"", paymentMethod:"cash", amountPaid:"", note:"" };
 }
 
 // ─── PI: PRODUCT PICKER MODAL ─────────────────────────────────
@@ -2356,6 +2370,7 @@ function PiItemsTable({ items, lang, onEdit, onDelete, editId }) {
                 <td className="si-wrap">
                   <div className="si-strong">{it.name}</div>
                   {(it.code||it.brand)&&<div className="si-muted">{[it.code,it.brand].filter(Boolean).join(" · ")}</div>}
+                  {it.batchNo&&<div style={{ color:"#7c3aed", fontWeight:700 }}>📦 {bn?"আলাদা ব্যাচ":"Batch"} {it.batchNo}</div>}
                   {(piN2(it.discountPerc)>0||piN2(it.taxPerc)>0||piN2(it.salePrice)>0)&&(
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                       {piN2(it.discountPerc)>0&&<span style={{ color:"#b91c1c" }}>{bn?"ছাড়":"Disc"} {it.discountPerc}% (-{piFmt2(disc)})</span>}
@@ -3543,11 +3558,17 @@ function pushOrdersNow() {
     .finally(() => off.syncNow?.().catch(err => console.warn("[S4 Sync] order sync failed", err)));
 }
 
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, onShopUpdated, purchaseSource=null, onPurchaseSourceHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
   const can = (key) => isOwner || perms[key] === true;
+  const piBaseCur = String(shop?.currency || "AED").trim().toUpperCase();
+  const purchaseOpts = useMemo(() => purchaseOptionsOf(shop), [shop]);
+  const savePurchaseOptions = async (next) => {
+    const updated = await saveShopRecord(shopId, { purchaseOptions: next }, { ownerUid: user?.uid || shop?.ownerUid, profile, user });
+    onShopUpdated?.(updated);
+  };
 
   const canManagePurchase = can("managePurchase");
   const canViewSupplierLedger = can("viewSupplierLedger") || can("viewVendors") || can("vendorPayments") || canManagePurchase;
@@ -4152,10 +4173,29 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     setPiLines([]);
     setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(null);
+    setPiSource(null);
     setPiView("form");
     setVendorSearchQ("");
     setVendorDropOpen(false);
   };
+
+  // A purchase order or a received delivery note becomes a new bill: same vendor, the lines still to be billed.
+  const [piSource,setPiSource] = useState(null);
+  useEffect(()=>{
+    if (!purchaseSource?.doc) return;
+    onPurchaseSourceHandled?.();
+    const { kind:srcKind, doc, lines } = purchaseSource;
+    setPiInvoiceNo(piPreviewNextInvoiceNo());
+    setPiForm({ ...piEmptyForm(), vendorId:doc.vendorId||"", vendorName:doc.vendorName||"", vendorMobile:doc.vendorMobile||"",
+      supplierInvoiceNo:srcKind==="grn" ? (doc.supplierRef||"") : "", refNo:doc.docNo||"", paymentMethod:"credit", note:doc.note||"" });
+    setPiLines((lines||[]).map(l=>({ ...piEmptyLine(), productId:l.productId||null, name:l.name||"", code:l.code||"", brand:l.brand||"", qty:String(l.qty||""), unit:l.unit||"Pcs",
+      unitCost:l.unitCost!=null&&l.unitCost!=="" ? String(l.unitCost) : "", taxPerc:String(l.taxPerc ?? "5"), salePrice:l.salePrice ? String(l.salePrice) : "" })));
+    setPiCurrent(piEmptyCurrent());
+    setEditInvoiceId(null);
+    setPiSource({ kind:srcKind, id:doc.id, no:doc.docNo||"", purchaseOrderId:srcKind==="po" ? doc.id : (doc.purchaseOrderId||""), purchaseOrderNo:srcKind==="po" ? (doc.docNo||"") : (doc.purchaseOrderNo||"") });
+    setPiView("form"); setVendorSearchQ(doc.vendorName||""); setVendorDropOpen(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[purchaseSource]);
 
   // ── Open edit form ──
   const piOpenEdit = (inv) => {
@@ -4163,8 +4203,11 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     if (isBranchTransferBill(inv)) { toast(lang==="bn" ? "এটা Branch Transfer রিসিভের বিল — Branch Transfer থেকে নিয়ন্ত্রণ হয়, এখানে বদলানো যাবে না।" : "This bill comes from a Branch Transfer receipt — manage it from Branch Transfer.", "err"); return; }
     piSnapRef.current = "pending";
     setPiInvoiceNo(inv.invoiceNo);
-    setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:(inv.paymentMethod||"cash")!=="cash"&&inv.amountPaid>0?String(inv.amountPaid):"", note:inv.note||"" });
-    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||"") })));
+    setPiSource(null);
+    const fxRate = inv.currency && Number(inv.exchangeRate) > 0 ? Number(inv.exchangeRate) : 1;
+    const fxBack = (v) => String(parseFloat((Number(v||0)/fxRate).toFixed(4)));
+    setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", refNo:inv.refNo||"", currency:fxRate!==1?inv.currency:"", exchangeRate:fxRate!==1?String(inv.exchangeRate):"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:(inv.paymentMethod||"cash")!=="cash"&&inv.amountPaid>0?fxBack(inv.amountPaid):"", note:inv.note||"" });
+    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:fxRate!==1?String(it.fcUnitCost ?? fxBack(it.unitCost)):String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||""), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) })));
     setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
   };
@@ -4177,13 +4220,43 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
 
   // ── Add the staged entry row into the confirmed items list ──
-  const piAddCurrentItem = () => {
+  // With a Purchase Option on, a product bought from another vendor / at another MRP or cost can be kept as its own batch.
+  const piBatchCheck = async (line) => {
+    const o = purchaseOpts;
+    if (!line.productId || line.batchNo || !(o.batchVendor || o.batchMrp || o.batchCost)) return line;
+    const prod = products.find(p => p.id === line.productId);
+    if (!prod) return line;
+    let stock = 0;
+    try {
+      const rows = await loadInvoiceRows();
+      stock = computeStockMap([prod], rows.purchaseInvoices, rows.salesInvoices, shopId, rows.deliveryNotes, rows.extras).get(prod.id) || 0;
+    } catch (err) { console.warn("[S4 PI] batch stock check failed", err); }
+    let last = null;
+    invoices.forEach(inv => {
+      if (inv.id === editInvoiceId || !STOCK_AFFECTING_INVOICE_STATUSES.includes(inv.status) || isBranchTransferBill(inv)) return;
+      if (!(inv.items || []).some(it => it.productId === prod.id)) return;
+      if (!last || String(inv.invoiceDate || "") > String(last.invoiceDate || "")) last = inv;
+    });
+    const reasons = batchReasons({ options:o, product:prod, line, rate:rateOf(piForm, piBaseCur), vendorId:piForm.vendorId, vendorName:piForm.vendorName, lastVendor:last ? { id:last.vendorId, name:last.vendorName } : null, stock });
+    if (!reasons.length) return line;
+    const bnM = lang==="bn";
+    const said = reasons.map(r => r.key==="vendor" ? (bnM?`সাপ্লায়ার: ${r.from} → ${r.to}`:`Vendor: ${r.from} → ${r.to}`)
+      : r.key==="mrp" ? `M.R.P: ${piFmt2(r.from)} → ${piFmt2(r.to)}` : `Landing Cost: ${piFmt2(r.from)} → ${piFmt2(r.to)}`).join("\n");
+    const ok = window.confirm(bnM
+      ? `"${prod.name}" — দোকানে আগের মাল আছে (${stock} ${prod.unit||"Pcs"})।\n${said}\n\nএই মাল কি আলাদা stock (নতুন ব্যাচ) হিসেবে রাখবেন?\nOK = আলাদা ব্যাচ, Cancel = আগের stock-এর সাথে মিশে যাবে`
+      : `"${prod.name}" — ${stock} ${prod.unit||"Pcs"} of earlier stock is on hand.\n${said}\n\nKeep this as separate stock (a new batch)?\nOK = separate batch, Cancel = merge with existing stock`);
+    if (!ok) return line;
+    return { ...line, batchNo:nextBatchNo(piInvoiceNo, piLines), batchReasons:reasons.map(r => r.key) };
+  };
+
+  const piAddCurrentItem = async () => {
     if (!piCurrent.name.trim()) { toast(lang==="bn"?"আইটেমের নাম লিখুন!":"Enter item name!","err"); return; }
     if (!piCurrent.qty || piN2(piCurrent.qty)<=0) { toast(lang==="bn"?"সঠিক পরিমাণ লিখুন!":"Enter valid quantity!","err"); return; }
     const editId = piEditLineId;
+    const entry = await piBatchCheck(piCurrent);
     setPiLines(prev=>editId && prev.some(x=>x.id===editId)
-      ? prev.map(x=>x.id===editId ? { ...piCurrent, id:editId } : x)
-      : [...prev, { ...piCurrent, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
+      ? prev.map(x=>x.id===editId ? { ...entry, id:editId } : x)
+      : [...prev, { ...entry, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
     setPiEditLineId(null);
     setPiCurrent(piEmptyCurrent());
     setTimeout(()=>piNameRef.current?.focus(), 80);
@@ -4191,7 +4264,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // ── Load a confirmed item into the entry row for editing; it stays in the bill until Add updates it ──
   const piEditLine = (item) => {
-    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc??"0"), taxPerc:String(item.taxPerc??"5"), salePrice:String(item.salePrice||"") });
+    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc??"0"), taxPerc:String(item.taxPerc??"5"), salePrice:String(item.salePrice||""), ...(item.batchNo?{ batchNo:item.batchNo, batchReasons:item.batchReasons||[] }:{}) });
     setPiEditLineId(item.id);
     setTimeout(()=>piNameRef.current?.focus(), 80);
   };
@@ -4202,7 +4275,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   });
 
   const piSelectProduct=(prod)=>{
-    setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:prod.landingCost||prod.averageCost||p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.purchaseVat||prod.salesVat||p.taxPerc||"5" }));
+    const fx = rateOf(piForm, piBaseCur);
+    const knownCost = prod.landingCost||prod.averageCost;
+    setPiCurrent(p=>({ ...p, productId:prod.id, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs", unitCost:knownCost ? (fx!==1&&fx>0 ? String(parseFloat((Number(knownCost)/fx).toFixed(4))) : knownCost) : p.unitCost, salePrice:prod.vatInclusive||prod.mrp||prod.vatExclusive||p.salePrice, taxPerc:prod.purchaseVat||prod.salesVat||p.taxPerc||"5" }));
     setTimeout(()=>piQtyRef.current?.focus(), 100);
   };
 
@@ -4316,13 +4391,27 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       if (piN2(it.taxPerc)<0){ toast(lang==="bn"?"❌ VAT % ঋণাত্মক হতে পারে না":"❌ VAT % cannot be negative","err"); return null; }
       if (piN2(it.discountPerc)<0||piN2(it.discountPerc)>100){ toast(lang==="bn"?`❌ "${it.name}": ছাড় ০–১০০% হতে হবে`:`❌ "${it.name}": discount must be 0–100%`,"err"); return null; }
     }
-    const builtItems=valid.map(it=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null }; });
-    const { sub, disc, tax, grand } = piCalcTotals(piLines);
-    const typedPaid=piForm.paymentMethod==="cash" ? parseFloat(piFmt2(grand)) : piN2(piForm.amountPaid);
+    const foreign = isForeign(piForm, piBaseCur);
+    const rate = rateOf(piForm, piBaseCur);
+    if (foreign && !(rate > 0)) { toast(lang==="bn"?`❌ ${piForm.currency} থেকে ${piBaseCur}-এর রেট (Exchange Rate) দিন`:`❌ Enter the exchange rate from ${piForm.currency} to ${piBaseCur}`,"err"); return null; }
+    const baseLines = valid.map(it=>lineToBase(it, rate));
+    const builtItems=baseLines.map((it,idx)=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null,
+      ...(foreign?{ fcUnitCost:piN2(valid[idx].unitCost) }:{}), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) }; });
+    const { sub, disc, tax, grand } = piCalcTotals(baseLines);
+    const fcGrand = piCalcTotals(valid).grand;
+    // Paying the whole bill in a foreign currency settles it exactly, without a rounding paisa left over.
+    const fcPaid = piN2(piForm.amountPaid);
+    const typedPaid=piForm.paymentMethod==="cash" ? parseFloat(piFmt2(grand)) : (foreign && Math.abs(fcPaid-fcGrand)<0.01 ? grand : fcPaid*rate);
     if (typedPaid > grand + 0.01) { toast(lang==="bn"?"পরিশোধিত টাকা মোট বিলের চেয়ে বেশি হতে পারে না!":"Amount paid cannot exceed the grand total!","err"); return null; }
     const paid=Math.min(Math.max(typedPaid,0), grand), balanceDue=Math.max(0,grand-paid);
     const derivedStatus = status==="confirmed" ? (balanceDue<0.01?"paid":paid>0?"partial":"confirmed") : status;
-    return { shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), invoiceDate:piForm.invoiceDate, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
+    const linkFrom = piSource || priorInv || {};
+    const sourceFields = {
+      ...((piSource ? piSource.purchaseOrderId : linkFrom.purchaseOrderId) ? { purchaseOrderId:piSource ? piSource.purchaseOrderId : linkFrom.purchaseOrderId, purchaseOrderNo:piSource ? piSource.purchaseOrderNo : (linkFrom.purchaseOrderNo||"") } : {}),
+      ...(piSource?.kind==="grn" ? { goodsReceiptId:piSource.id, goodsReceiptNo:piSource.no } : priorInv?.goodsReceiptId ? { goodsReceiptId:priorInv.goodsReceiptId, goodsReceiptNo:priorInv.goodsReceiptNo||"" } : {}),
+    };
+    return { ...sourceFields, shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate,
+      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
   };
 
   const savePurchaseInvoiceOffline = async (payload, successMessage) => {
@@ -4359,7 +4448,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       toast(successMessage);
     }
 
-    await applyInvoiceStockEffect({
+    if (!payload.goodsReceiptId) await applyInvoiceStockEffect({
       oldInvoice: priorInvoice,
       newInvoice: payload,
       invoiceId: savedId,
@@ -4496,11 +4585,16 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       }
       const payload = piBuild(status, piInvoiceNo);
       if (!payload) return;
+      if (!editInvoiceId && payload.goodsReceiptId) {
+        const already = invoices.find(inv => inv.goodsReceiptId===payload.goodsReceiptId && inv.status!=="cancelled");
+        if (already) { toast(lang==="bn" ? `❌ ${payload.goodsReceiptNo}-এর বিল আগেই হয়েছে: ${already.invoiceNo}` : `❌ ${payload.goodsReceiptNo} is already billed as ${already.invoiceNo}`, "err"); return; }
+      }
       if (status!=="draft" && !unlinkedStockOk(payload.items, lang)) return;
       if (!piVendorTermsOk(payload, status)) return;
       if (!piSupplierInvoiceDuplicateOk(payload)) return;
       if (!editInvoiceId) payload.invoiceNo = await reservePiInvoiceNo();
       await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : successMsg);
+      if (!editInvoiceId) setPiSource(null);
     } catch(e) {
       toast(e.message,"err");
     } finally {
@@ -4551,7 +4645,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       setInvoices(prev => prev.map(x => x.id === inv.id ? updated : x));
       setSelInvoice(updated);
 
-      await applyInvoiceStockEffect({
+      if (!inv.goodsReceiptId) await applyInvoiceStockEffect({
         oldInvoice: inv,
         newInvoice: updated,
         invoiceId: inv.id,
@@ -4596,7 +4690,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const q=piSearch.trim();
     const matchSt=piStatusF==="ALL"||inv.status===piStatusF;
     if (!q) return matchSt;
-    const hay=[inv.invoiceNo,inv.vendorName,inv.supplierInvoiceNo,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code+" "+it.brand)].filter(Boolean).join(" ");
+    const hay=[inv.invoiceNo,inv.vendorName,inv.supplierInvoiceNo,inv.refNo,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code+" "+it.brand)].filter(Boolean).join(" ");
     return matchSt&&nsmatch(hay,q);
   });
   const piKPIs = invoices.reduce((a,inv)=>{ a.total++; if (inv.status==="cancelled"||inv.status==="draft"||isBranchTransferBill(inv)) return a; if (!isOpeningBill(inv)) a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{ total:0,amount:0,paid:0,due:0 });
@@ -4969,6 +5063,10 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
               <div className="si-panel-body">
                 {vRow(t.pi_invoiceNo, inv.invoiceNo, { strong:true, color:piAccent })}
                 {inv.supplierInvoiceNo&&vRow(t.pi_supplierInvoiceNo, inv.supplierInvoiceNo, { color:"#7e22ce" })}
+                {inv.refNo&&vRow("Ref. No", inv.refNo)}
+                {inv.purchaseOrderNo&&vRow(bnL?"পারচেজ অর্ডার":"Purchase Order", inv.purchaseOrderNo, { color:"#1d4ed8" })}
+                {inv.goodsReceiptNo&&vRow(bnL?"মাল গ্রহণ (DN)":"Goods Received (DN)", inv.goodsReceiptNo, { color:"#0f766e" })}
+                {inv.currency&&vRow(bnL?"মুদ্রা":"Currency", `${inv.currency} ${piFmt2(inv.fcGrandTotal)} @ ${inv.exchangeRate}`, { color:"#0e7490" })}
                 {vRow(t.pi_date, inv.invoiceDate||"-")}
                 {vRow(t.pi_createdBy, inv.createdByName||"-")}
                 {isOB&&<div className="si-note">{bnL?"এটা ভেন্ডরের শুরুর ব্যালেন্স (Opening Balance) — বদলাতে ভেন্ডর মাস্টারে যান।":"This is the vendor's opening balance — change it in Vendor Master."}</div>}
@@ -5061,6 +5159,8 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         totals={totals} paid={paid} balance={balance}
         invoiceNo={piInvoiceNo} editInvoiceId={editInvoiceId} saving={piSaving} nameRef={piNameRef} qtyRef={piQtyRef}
         helpers={{ piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS, emptyCurrent:piEmptyCurrent }}
+        purchaseOptions={purchaseOpts} baseCurrency={piBaseCur} onSaveOptions={isOwner ? savePurchaseOptions : undefined}
+        sourceNote={piSource ? `${piSource.kind==="grn" ? (bnL?"মাল গ্রহণ থেকে":"From Goods Received") : (bnL?"পারচেজ অর্ডার থেকে":"From Purchase Order")}: ${piSource.no}` : ""}
         onSelectProduct={piSelectProduct} onChangeCurrentUnit={piChangeCurrentUnit} onAddCurrent={piAddCurrentItem} onDelLine={piDelLine} onPickVendor={piPickVendor}
         onConfirm={piConfirm} onSaveDraft={piSaveDraft}
         onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }}
@@ -5109,6 +5209,17 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           {fRow(t.pi_date, <input type="date" className="pm-input" value={piForm.invoiceDate} onChange={e=>piUpd("invoiceDate",e.target.value)} />)}
           {fRow(<>{t.pi_supplierInvoiceNo} <span style={{ color:"#b91c1c" }}>*</span></>,
             <input className="pm-input" style={piForm.supplierInvoiceNo.trim()?undefined:{ borderColor:"#b91c1c" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />)}
+          {(purchaseOpts.refNo||piForm.refNo)&&fRow("Ref. No", <input className="pm-input" value={piForm.refNo||""} onChange={e=>piUpd("refNo",e.target.value)} placeholder={bnL?"PO / চালান নং":"PO / challan no"} />)}
+          {(purchaseOpts.multiCurrency||piForm.currency)&&fRow(bnL?"মুদ্রা":"Currency", (
+            <div style={{ display:"flex", gap:4 }}>
+              <select className="pm-input" style={{ flex:1 }} value={piForm.currency||""} onChange={e=>{ piUpd("currency",e.target.value); if (!e.target.value) piUpd("exchangeRate",""); }}>
+                <option value="">{piBaseCur}</option>
+                {CURRENCIES.filter(([c])=>c!==piBaseCur).map(([c,label])=><option key={c} value={c}>{label}</option>)}
+              </select>
+              {isForeign(piForm, piBaseCur)&&<input className="pm-input" style={{ flex:1 }} inputMode="decimal" value={piForm.exchangeRate||""} onChange={e=>piUpd("exchangeRate",e.target.value)} placeholder={`1 ${piForm.currency} = ? ${piBaseCur}`} />}
+            </div>
+          ))}
+          {isForeign(piForm, piBaseCur)&&<div className="si-hint" style={{ marginLeft:0 }}>{bnL?`দাম ${piForm.currency}-এ লিখুন; সেভের সময় ${piBaseCur}-এ বদলে stock আর হিসাবে যাবে।`:`Enter prices in ${piForm.currency}; they are converted to ${piBaseCur} for stock and accounts when saved.`}</div>}
         </>)}
 
         {fPanel(`🏭 ${t.pi_vendor}`, <>
@@ -5266,6 +5377,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 const SI_PREFIX  = "SI-";
 const QT_PREFIX  = "QT-";
 const DN_PREFIX  = "DN-";
+const SO_PREFIX  = "SO-";
 const QT_VALID_DAYS = 15;
 const SI_UNITS   = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];
 
@@ -5336,6 +5448,21 @@ const DN_STATUSES = {
   invoiced:  { bn:"ইনভয়েস হয়েছে",  en:"Invoiced",  color:"#22c55e", bg:"#052e16" },
   cancelled: SI_STATUSES.cancelled,
 };
+const SO_STATUSES = {
+  draft:     SI_STATUSES.draft,
+  open:      { bn:"অপেক্ষায়",        en:"Pending",   color:"#06b6d4", bg:"#083344" },
+  delivered: { bn:"ডেলিভারি হয়েছে", en:"Delivered", color:"#a855f7", bg:"#2e1065" },
+  invoiced:  { bn:"ইনভয়েস হয়েছে",  en:"Invoiced",  color:"#22c55e", bg:"#052e16" },
+  cancelled: SI_STATUSES.cancelled,
+};
+// Where a converted quotation / sales order / delivery note lives and what it becomes.
+const SOURCE_DOC = {
+  delivery:   { col:"deliveryNotes", idKey:"deliveryNoteId", noKey:"deliveryNoteNo" },
+  salesOrder: { col:"salesOrders",   idKey:"salesOrderId",   noKey:"salesOrderNo" },
+  quotation:  { col:"quotations",    idKey:"quotationId",    noKey:"quotationNo" },
+  jobOrder:   { col:"jobOrders",     idKey:"jobOrderId",     noKey:"jobOrderNo" },
+};
+const sourceDocOf = (src) => SOURCE_DOC[src?.docKind] || SOURCE_DOC.quotation;
 const siR2 = (n) => Math.round(((parseFloat(n)||0)+Number.EPSILON)*100)/100;
 const siFmt2 = (n) => siR2(n).toFixed(2);
 const siN2   = (v) => parseFloat(v)||0;
@@ -5421,7 +5548,8 @@ function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opt
   const invType    = invoice.invoiceType||"regular";
   const isTax      = invType==="tax";
   const isDelivery = invType==="delivery";
-  const isQuote    = invoice.docKind==="quotation";
+  const isSO       = invoice.docKind==="salesOrder";
+  const isQuote    = invoice.docKind==="quotation" || isSO;
 
   // Delivery note keeps amount columns, but VAT/Tax is not applied.
   const effectiveTax = isTax && !isDelivery;
@@ -5436,6 +5564,8 @@ function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opt
   const metaHTML = [
     invoice.refNo ? `Ref: ${invoice.refNo}` : "",
     invoice.quotationNo ? `${isBn?"কোটেশন":"Quotation"}: ${invoice.quotationNo}` : "",
+    invoice.salesOrderNo ? `${isBn?"সেলস অর্ডার":"Sales Order"}: ${invoice.salesOrderNo}` : "",
+    invoice.jobOrderNo ? `${isBn?"জব কার্ড":"Job Card"}: ${invoice.jobOrderNo}` : "",
     ps.printSalesman&&invoice.salesmanName ? `${isBn?"বিক্রেতা":"Salesman"}: ${invoice.salesmanName}` : "",
     ps.printCreditPeriod&&siN2(invoice.creditDays)>0 ? `${isBn?"বাকির মেয়াদ":"Credit"}: ${invoice.creditDays} ${isBn?"দিন":"days"}` : "",
   ].filter(Boolean).join(" &nbsp;·&nbsp; ");
@@ -5466,7 +5596,9 @@ function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opt
     ? `<div class="bal-box" style="background:#fff7ed;border-color:#f59e0b"><span style="font-weight:700;color:#b45309">📒 ${isBn?"কাস্টমারের মোট বাকি (সব বিল)":"Customer's total balance (all bills)"}</span><span style="font-size:15px;font-weight:900;color:#b45309">${cur} ${siFmt2(custBalance)}</span></div>`
     : "";
 
-  const title = isQuote
+  const title = isSO
+    ? (isBn?"সেলস অর্ডার":"SALES ORDER")
+    : isQuote
     ? (isBn?"কোটেশন":"QUOTATION")
     : isTax
     ? (isBn?"কর ইনভয়েস":"TAX INVOICE")
@@ -5546,7 +5678,7 @@ function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opt
   const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerCode?`<div class="info-sub">${isBn?"কোড":"Code"}: ${invoice.customerCode}</div>`:""}${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
 
   const payInfoHTML = isQuote
-    ? `<div class="info-box"><div class="info-label">📅 ${isBn?"মেয়াদ":"Valid Until"}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">👤 ${invoice.createdByName||""}</div></div>`
+    ? `<div class="info-box"><div class="info-label">📅 ${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">👤 ${invoice.createdByName||""}</div></div>`
     : isDelivery
     ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}<div class="info-sub">👤 ${invoice.createdByName}</div></div>`
     : `<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div>`;
@@ -5614,7 +5746,7 @@ ${isDelivery?`<div class="recv-box"><div style="font-size:11px;color:#7c3aed;fon
 ${custBalanceHTML}
 ${ps.printNarration&&invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
 ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
-</div><div class="footer">${isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ! 🙏`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you! 🙏`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
+</div><div class="footer">${isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ! 🙏":"Thank you for your order! 🙏"):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ! 🙏`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you! 🙏`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
   const doc = applyDesign(rawDoc, "invoice", opts.style || design.style.invoice);
   const copies = Math.max(1, Math.min(10, parseInt(ds.copies, 10) || 1));
   if (copies === 1) return doc;
@@ -5888,7 +6020,7 @@ function SiItemsTable({ items, lang, isTax, showDisc=true, onEdit, onDelete, edi
               <tr key={it.id||i} className={active?"is-editing":""}>
                 <td className="si-center si-strong" style={{ verticalAlign:"top" }}>{i+1}</td>
                 <td className="si-wrap">
-                  <div className="si-strong">{it.name}</div>
+                  <div className="si-strong">{it.name}{it.batchNo&&<span style={{ marginLeft:6, fontSize:11, color:"#7c3aed" }}>[{it.batchNo}]</span>}</div>
                   {(it.code||it.brand)&&<div className="si-muted">{[it.code,it.brand].filter(Boolean).join(" · ")}</div>}
                   {((showDisc&&disc>0)||(isTax&&siN2(it.vatPerc)>0))&&(
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -5939,7 +6071,7 @@ async function migrateLegacyDeliveryNotes(rows) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onConvertToDN, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const siPerm = (key) => isOwner || { ...DEFAULT_PERMISSIONS, ...(profile?.permissions||{}) }[key] === true;
@@ -5947,13 +6079,15 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const canCancelInv = siPerm("cancelInvoices");
   const canCustBalance = siPerm("viewCustomerBalance");
   const canSeeCost = siPerm("manageProducts") || siPerm("managePurchase");
-  const isQuote = kind==="quotation";
+  // A sales order behaves like a quotation (no stock, no money) until it becomes a delivery note or an invoice.
+  const isSO = kind==="salesOrder";
+  const isQuote = kind==="quotation" || isSO;
   const isDN = kind==="delivery";
-  const COL = isQuote ? "quotations" : isDN ? "deliveryNotes" : "salesInvoices";
-  const DOC_PREFIX = isQuote ? QT_PREFIX : isDN ? DN_PREFIX : SI_PREFIX;
-  const STATUSES = isQuote ? QT_STATUSES : isDN ? DN_STATUSES : SI_STATUSES;
-  const serialRe = isQuote ? /QT-?(\d+)(?:-[A-Z]{2})?$/i : isDN ? /DN-?(\d+)(?:-[A-Z]{2})?$/i : /SI-?(\d+)(?:-[A-Z]{2})?$/i;
-  const serialField = isQuote ? "lastQTSerial" : isDN ? "lastDNSerial" : "lastSISerial";
+  const COL = isSO ? "salesOrders" : isQuote ? "quotations" : isDN ? "deliveryNotes" : "salesInvoices";
+  const DOC_PREFIX = isSO ? SO_PREFIX : isQuote ? QT_PREFIX : isDN ? DN_PREFIX : SI_PREFIX;
+  const STATUSES = isSO ? SO_STATUSES : isQuote ? QT_STATUSES : isDN ? DN_STATUSES : SI_STATUSES;
+  const serialRe = isSO ? /SO-?(\d+)(?:-[A-Z]{2})?$/i : isQuote ? /QT-?(\d+)(?:-[A-Z]{2})?$/i : isDN ? /DN-?(\d+)(?:-[A-Z]{2})?$/i : /SI-?(\d+)(?:-[A-Z]{2})?$/i;
+  const serialField = isSO ? "lastSOSerial" : isQuote ? "lastQTSerial" : isDN ? "lastDNSerial" : "lastSISerial";
   // The quotation or delivery note this new sales invoice is being made from.
   const [sourceQuote,setSourceQuote] = useState(null);
   const [dnMigrateTick,setDnMigrateTick] = useState(0);
@@ -5995,6 +6129,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const siEmptyCurrent = () => ({ productId:null, name:"", code:"", brand:"", qty:"1", unit:"Pcs", unitPrice:"", discountPerc:"0", discountFlat:"", vatPerc:"5" });
   const [siCurrent,setSiCurrent]   = useState(siEmptyCurrent);
   const [siEditLineId,setSiEditLineId] = useState(null);
+  const [siBatchAsk,setSiBatchAsk] = useState(null);
   const siNameRef = useRef(null);
   const siQtyRef = useRef(null);
 
@@ -6193,7 +6328,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       creditDays:Number.isFinite(termDays)&&termDays>0 ? String(termDays) : "",
       ...(kind==="sales" && customer.paymentType==="credit" ? { paymentMethod:"credit", amountPaid:"" } : {}),
     } : {};
-    setSiForm({ ...siEmptyForm(), ...(isDN?{ invoiceType:"delivery" }:{}), salesmanId:user?.uid||"", salesmanName:profile?.personName||"", validUntil:isQuote?siAddDays(siToday(), QT_VALID_DAYS):"", ...customerFields });
+    setSiForm({ ...siEmptyForm(), ...(isDN?{ invoiceType:"delivery" }:{}), salesmanId:user?.uid||"", salesmanName:profile?.personName||"", validUntil:isQuote&&!isSO?siAddDays(siToday(), QT_VALID_DAYS):"", ...customerFields });
     setSiLines([]);
     setSiCurrent(siEmptyCurrent());
     setEditInvId(null);
@@ -6221,7 +6356,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       hideCodeInPrint:!!inv.hideCodeInPrint,
       validUntil:inv.validUntil||"",
     });
-    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), discountFlat:siN2(it.discountFlat)>0?String(it.discountFlat):"", vatPerc:it.vatPerc!=null&&it.vatPerc!==""?String(it.vatPerc):"5" })));
+    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), discountFlat:siN2(it.discountFlat)>0?String(it.discountFlat):"", vatPerc:it.vatPerc!=null&&it.vatPerc!==""?String(it.vatPerc):"5", batchNo:it.batchNo||"", ...(it.isService?{ isService:true }:{}) })));
     setSiCurrent(siEmptyCurrent());
   };
   const siOpenEdit=(inv)=>{
@@ -6250,15 +6385,15 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     if (isQuote || !quoteToConvert) return;
     siLoadDoc(quoteToConvert);
     // Delivery notes store every line at 0% VAT; the invoice needs each product's real VAT rate.
-    if (quoteToConvert.docKind==="delivery" || quoteToConvert.invoiceType==="delivery") {
+    if (!isDN && (quoteToConvert.docKind==="delivery" || quoteToConvert.invoiceType==="delivery")) {
       setSiLines(prev=>prev.map(l=>{
         const vat = siFindProduct(l.productId)?.salesVat;
         return { ...l, vatPerc: vat!=null && String(vat).trim()!=="" ? String(vat) : "5" };
       }));
     }
     setSiForm(p=>({ ...p, invoiceDate:siToday(), validUntil:"", refNo:p.refNo||quoteToConvert.invoiceNo||"",
-      invoiceType:quoteToConvert.invoiceType==="regular"?"regular":"tax",
-      ...(p.invoiceType==="delivery" ? { deliveryNoteNo:quoteToConvert.invoiceNo||"" } : {}) }));
+      invoiceType:isDN?"delivery":quoteToConvert.invoiceType==="regular"?"regular":"tax",
+      ...(!isDN && p.invoiceType==="delivery" ? { deliveryNoteNo:quoteToConvert.invoiceNo||"" } : {}) }));
     setSiInvoiceNo(siPreviewNextInvoiceNo());
     setEditInvId(null);
     setSourceQuote(quoteToConvert);
@@ -6303,10 +6438,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   };
 
   // Quick add: adds product as new line directly from picker
-  const siAddProductLine = (prod) => {
+  const siAddProductLine = async (prod) => {
     const unit = prod.unit||"Pcs";
     const rate = siResolveRate(prod, unit, siForm.customerType);
-    const newLine = {
+    const draftLine = {
       ...siEmptyLine(),
       productId:  prod.id,
       name:       rate.name,
@@ -6318,7 +6453,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       vatPerc:    prod.salesVat||"5",
       qty:        "1",
     };
-    setSiLines(p=>[...p, newLine]);
+    const newLine = await siPickBatch(draftLine);
+    if (newLine) setSiLines(p=>[...p, newLine]);
   };
 
   const siSelectProduct=(prod)=>{
@@ -6334,17 +6470,38 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       unitPrice: rate.unitPrice||p.unitPrice,
       discountPerc: String(siAutoDisc(prod)),
       vatPerc:   prod.salesVat||"5",
+      batchNo:   undefined,
     }));
     setTimeout(()=>siQtyRef.current?.focus(), 100);
   };
 
-  const siAddCurrentItem = () => {
+  // A product kept in separate batches asks which batch the goods leave from; null means the user closed the window.
+  const siPickBatch = async (line) => {
+    if (isQuote || !line.productId || line.batchNo !== undefined) return line;
+    const prod = siFindProduct(line.productId);
+    if (!prod) return line;
+    let choices = [];
+    try {
+      const rows = await loadInvoiceRows();
+      const stockMap = computeStockMap([prod], rows.purchaseInvoices, rows.salesInvoices, shopId, rows.deliveryNotes, rows.extras);
+      choices = saleBatchChoices(batchStockByProduct([prod], rows, shopId, stockMap).get(prod.id));
+    } catch (err) { console.warn("[S4 SI] batch lookup failed", err); }
+    if (choices.length < 2) return choices[0] && !choices[0].isMain ? { ...line, batchNo:choices[0].batchNo } : line;
+    const picked = await new Promise(resolve => setSiBatchAsk({ product:prod, choices, resolve }));
+    setSiBatchAsk(null);
+    if (!picked) return null;
+    return picked.isMain ? line : { ...line, batchNo:picked.batchNo };
+  };
+
+  const siAddCurrentItem = async () => {
     if (!siCurrent.name.trim()) { toast(t.si_errName,"err"); return; }
     if (!siCurrent.qty||siN2(siCurrent.qty)<=0) { toast(t.si_errQty,"err"); return; }
     const editId = siEditLineId;
+    const entry = editId && siCurrent.batchNo !== undefined ? siCurrent : await siPickBatch(siCurrent);
+    if (!entry) { setTimeout(()=>siQtyRef.current?.focus(), 80); return; }
     setSiLines(prev=>editId && prev.some(x=>x.id===editId)
-      ? prev.map(x=>x.id===editId ? { ...siCurrent, id:editId } : x)
-      : [...prev, { ...siCurrent, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
+      ? prev.map(x=>x.id===editId ? { ...entry, id:editId } : x)
+      : [...prev, { ...entry, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
     setSiEditLineId(null);
     setSiCurrent(siEmptyCurrent());
     setTimeout(()=>siNameRef.current?.focus(), 80);
@@ -6516,7 +6673,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const builtItems=valid.map(it=>{
       const item = isDelivery ? siDeliveryLines([it])[0] : it;
       const { disc, vat, total }=siCalcLine(item, effectiveIsTax);
-      return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(siFindProduct(it.productId), it.unit), unitPrice:siN2(it.unitPrice), discountPerc:isDelivery?0:siN2(it.discountPerc), discountFlat:isDelivery||siN2(it.discountPerc)>0?0:siN2(it.discountFlat), discountAmt:parseFloat(siFmt2(disc)), vatPerc:effectiveIsTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)) };
+      return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:siN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(siFindProduct(it.productId), it.unit), unitPrice:siN2(it.unitPrice), discountPerc:isDelivery?0:siN2(it.discountPerc), discountFlat:isDelivery||siN2(it.discountPerc)>0?0:siN2(it.discountFlat), discountAmt:parseFloat(siFmt2(disc)), vatPerc:effectiveIsTax?siN2(it.vatPerc):0, vatAmt:parseFloat(siFmt2(vat)), lineTotal:parseFloat(siFmt2(total)), ...(it.batchNo?{ batchNo:it.batchNo }:{}), ...(it.isService&&!it.productId?{ isService:true }:{}) };
     });
     const formTotals = isDelivery ? siCalcTotals(siDeliveryLines(valid), false) : siCalcTotals(valid, effectiveIsTax, siInvoiceExtras(siForm));
     const { sub, disc, vat, grand } = formTotals;
@@ -6584,13 +6741,15 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                         : isDelivery ? "confirmed"
                         : (status==="confirmed" ? (bal<0.01?"paid":paid>0?"partial":"confirmed") : status);
     const keepConverted = priorDoc?.convertedInvoiceNo ? { convertedInvoiceId:priorDoc.convertedInvoiceId||"", convertedInvoiceNo:priorDoc.convertedInvoiceNo } : {};
-    const sourceLink = (src) => src?.docKind==="delivery"
-      ? { deliveryNoteId:src.id, deliveryNoteNo:src.invoiceNo||"" }
-      : { quotationId:src.id, quotationNo:src.invoiceNo||"" };
-    const quoteFields = isQuote ? { docKind:"quotation", validUntil:siForm.validUntil||"", ...keepConverted }
-      : isDN ? { docKind:"delivery", ...keepConverted }
-      : sourceQuote ? sourceLink(sourceQuote)
-      : priorDoc?.deliveryNoteId ? { deliveryNoteId:priorDoc.deliveryNoteId, deliveryNoteNo:priorDoc.deliveryNoteNo||"" }
+    const sourceLink = (src) => { const m = sourceDocOf(src); return { [m.idKey]:src.id, [m.noKey]:src.invoiceNo||"" }; };
+    // A delivery note made from a sales order keeps that link, and its invoice inherits it.
+    const keepOrder = (doc) => doc?.salesOrderId ? { salesOrderId:doc.salesOrderId, salesOrderNo:doc.salesOrderNo||"" } : {};
+    const quoteFields = isQuote ? { docKind:isSO?"salesOrder":"quotation", validUntil:siForm.validUntil||"", ...keepConverted }
+      : isDN ? { docKind:"delivery", ...keepConverted, ...(sourceQuote ? sourceLink(sourceQuote) : keepOrder(priorDoc)) }
+      : sourceQuote ? { ...keepOrder(sourceQuote), ...sourceLink(sourceQuote) }
+      : priorDoc?.deliveryNoteId ? { deliveryNoteId:priorDoc.deliveryNoteId, deliveryNoteNo:priorDoc.deliveryNoteNo||"", ...keepOrder(priorDoc) }
+      : priorDoc?.salesOrderId ? keepOrder(priorDoc)
+      : priorDoc?.jobOrderId ? { jobOrderId:priorDoc.jobOrderId, jobOrderNo:priorDoc.jobOrderNo||"" }
       : priorDoc?.quotationId ? { quotationId:priorDoc.quotationId, quotationNo:priorDoc.quotationNo||"" } : {};
     const docType = isDN ? "delivery" : isQuote ? (isTax ? "tax" : "regular") : (siForm.invoiceType||"tax");
     return { ...quoteFields, shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:docType, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerCode:siForm.customerId?((customers||[]).find(c=>c.id===siForm.customerId)?.customerCode||""):"", customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:priorDoc?.createdBy||user.uid, createdByName:priorDoc?.createdByName||profile.personName,
@@ -6682,12 +6841,15 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
     if (!editInvId) bumpShopSiSerial(payload.invoiceNo);
 
-    if (kind==="sales" && !editInvId && sourceQuote?.id) {
-      const fromDN = sourceQuote.docKind==="delivery";
+    if ((kind==="sales" || isDN) && !editInvId && sourceQuote?.id) {
+      const src = sourceDocOf(sourceQuote);
       try {
-        await offlineUpdate(fromDN ? "deliveryNotes" : "quotations", sourceQuote.id, {
-          ...sourceQuote,
-          status: fromDN ? "invoiced" : "converted",
+        const latestSrc = await offlineGetById(src.col, sourceQuote.id).catch(() => null);
+        const baseSrc = latestSrc?.data ? { ...latestSrc.data, id: sourceQuote.id } : sourceQuote;
+        await offlineUpdate(src.col, sourceQuote.id, {
+          ...baseSrc,
+          ...(sourceQuote.docKind==="jobOrder" ? { prevStatus: baseSrc.status || "", invoicedAt: baseSrc.invoicedAt || nowIso, statusHistory: [...(baseSrc.statusHistory || []), { status: "invoiced", at: nowIso, by: profile?.personName || "" }] } : {}),
+          status: sourceQuote.docKind==="quotation" || !sourceQuote.docKind ? "converted" : isDN ? "delivered" : "invoiced",
           convertedInvoiceId: savedInvoice.id,
           convertedInvoiceNo: payload.invoiceNo,
           updatedAt: nowIso,
@@ -6722,11 +6884,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         toast(lang==="bn" ? `এই বিলে রিটার্ন আছে (${lockedBy.map(r=>r.returnNo).join(", ")}) — আগে রিটার্ন বাতিল করুন` : `This bill has return(s) ${lockedBy.map(r=>r.returnNo).join(", ")}; cancel them before editing`, "err");
         return;
       }
-      if (kind==="sales" && !editInvId && sourceQuote?.id) {
-        const fromDN = sourceQuote.docKind==="delivery";
-        const latest = await offlineGetById(fromDN ? "deliveryNotes" : "quotations", sourceQuote.id).catch(() => null);
+      if ((kind==="sales" || isDN) && !editInvId && sourceQuote?.id) {
+        const latest = await offlineGetById(sourceDocOf(sourceQuote).col, sourceQuote.id).catch(() => null);
         const src = latest?.data || null;
-        if (src && ["converted","invoiced"].includes(src.status)) {
+        if (src && ["converted","invoiced","delivered"].includes(src.status)) {
           const msg = lang==="bn"
             ? `${sourceQuote.invoiceNo} আগেই ইনভয়েস ${src.convertedInvoiceNo||""} হয়ে গেছে। তবুও আরেকটা ইনভয়েস বানাবেন?`
             : `${sourceQuote.invoiceNo} was already invoiced as ${src.convertedInvoiceNo||"another invoice"}. Create another invoice anyway?`;
@@ -6740,7 +6901,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       const p = siBuild(status, siInvoiceNo);
       if (!p) return;
       if (!siCustomerTermsOk(p)) return;
-      if (status!=="draft" && kind!=="quotation" && !unlinkedStockOk(p.items, lang)) return;
+      if (status!=="draft" && !isQuote && !unlinkedStockOk(p.items, lang)) return;
       if (!editInvId) p.invoiceNo = await reserveSiInvoiceNo();
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : successMsg, options);
     } catch(e) {
@@ -6986,6 +7147,30 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         }
       }
 
+      if (inv.salesOrderId) {
+        try {
+          const latest = await offlineGetById("salesOrders", inv.salesOrderId).catch(() => null);
+          const so = latest?.data ? { ...latest.data, id: inv.salesOrderId } : null;
+          if (so && ["delivered","invoiced"].includes(so.status) && so.convertedInvoiceId===inv.id) {
+            await offlineUpdate("salesOrders", so.id, { ...so, status:"open", convertedInvoiceId:"", convertedInvoiceNo:"", updatedAt:nowIso, updatedBy:user?.uid || "" });
+          }
+        } catch (err) {
+          console.warn("[S4 SI] reopen sales order failed", err);
+        }
+      }
+
+      if (inv.jobOrderId) {
+        try {
+          const latest = await offlineGetById("jobOrders", inv.jobOrderId).catch(() => null);
+          const job = latest?.data ? { ...latest.data, id: inv.jobOrderId } : null;
+          if (job && job.status==="invoiced" && job.convertedInvoiceId===inv.id) {
+            await offlineUpdate("jobOrders", job.id, { ...job, status:job.prevStatus||"completed", convertedInvoiceId:"", convertedInvoiceNo:"", updatedAt:nowIso, updatedBy:user?.uid || "" });
+          }
+        } catch (err) {
+          console.warn("[S4 SI] reopen job order failed", err);
+        }
+      }
+
       if (!isQuote && !inv.deliveryNoteId) await applyInvoiceStockEffect({
         oldInvoice: inv,
         newInvoice: updated,
@@ -7033,8 +7218,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const hay=[inv.invoiceNo,inv.customerName,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
     return matchSt&&nsmatch(hay,q);
   });
-  const siKPIs=invoices.reduce((a,inv)=>{ a.total++; if (inv.status!=="cancelled"&&inv.status!=="draft") { if (!isOpeningBill(inv)) a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; } if (inv.status==="open") a.open++; if (inv.status==="converted") a.converted++; if (inv.status==="confirmed") a.delivered++; if (inv.status==="invoiced") a.invoiced++; return a; },{total:0,amount:0,paid:0,due:0,open:0,converted:0,delivered:0,invoiced:0});
-  const kpiCards = isDN
+  const siKPIs=invoices.reduce((a,inv)=>{ a.total++; if (inv.status!=="cancelled"&&inv.status!=="draft") { if (!isOpeningBill(inv)) a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; } if (inv.status==="open") a.open++; if (inv.status==="converted") a.converted++; if (inv.status==="confirmed") a.delivered++; if (inv.status==="invoiced") a.invoiced++; if (inv.status==="delivered") a.soDelivered++; return a; },{total:0,amount:0,paid:0,due:0,open:0,converted:0,delivered:0,invoiced:0,soDelivered:0});
+  const kpiCards = isSO
+    ? [{l:lang==="bn"?"মোট সেলস অর্ডার":"Sales Orders",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#0e7490",pre:t.cur+" "},{l:SO_STATUSES.open[lang],v:siKPIs.open,c:"#06b6d4",pre:""},{l:lang==="bn"?"ডেলিভারি / ইনভয়েস হয়েছে":"Delivered / Invoiced",v:siKPIs.soDelivered+siKPIs.invoiced,c:"#22c55e",pre:""}]
+    : isDN
     ? [{l:lang==="bn"?"মোট ডেলিভারি নোট":"Delivery Notes",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#a855f7",pre:t.cur+" "},{l:lang==="bn"?"ইনভয়েস বাকি":"Not Invoiced",v:siKPIs.delivered,c:"#06b6d4",pre:""},{l:DN_STATUSES.invoiced[lang],v:siKPIs.invoiced,c:"#22c55e",pre:""}]
     : isQuote
     ? [{l:lang==="bn"?"মোট কোটেশন":"Quotations",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#f59e0b",pre:t.cur+" "},{l:QT_STATUSES.open[lang],v:siKPIs.open,c:"#06b6d4",pre:""},{l:QT_STATUSES.converted[lang],v:siKPIs.converted,c:"#22c55e",pre:""}]
@@ -7055,10 +7242,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
   // ══ LIST ══
   const bnL = lang==="bn";
-  const siAccent = isQuote ? "#b45309" : isDN ? "#7e22ce" : "#15803d";
+  const siAccent = isSO ? "#0e7490" : isQuote ? "#b45309" : isDN ? "#7e22ce" : "#15803d";
   const siLightC = { "#a1a1aa":"#07101c", "#22c55e":"#15803d", "#06b6d4":"#0e7490", "#ef4444":"#b91c1c", "#a855f7":"#7e22ce", "#f59e0b":"#b45309" };
   const siBadge = (st) => <span className="si-badge" style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{STATUSES[st]?.[lang]||st}</span>;
-  const siExpiredBadge = (inv) => isQuote && qtIsExpired(inv) ? <span className="si-badge" style={{ color:"#b91c1c", marginRight:3 }}>{bnL?"মেয়াদ শেষ":"Expired"}</span> : null;
+  const siExpiredBadge = (inv) => isQuote && !isSO && qtIsExpired(inv) ? <span className="si-badge" style={{ color:"#b91c1c", marginRight:3 }}>{bnL?"মেয়াদ শেষ":"Expired"}</span> : null;
   const siRowDue = (inv) => (isQuote || isDN || ["cancelled","draft"].includes(inv.status)) ? 0 : Math.max(0, siN2(inv.grandTotal) - siN2(inv.amountPaid));
   const siMatchedLines = (inv) => {
     const q = siSearch.trim();
@@ -7070,7 +7257,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     });
   };
   const siOpenInvoice = (inv) => { if (!siLeaveMinOk()) return; setSelInv(inv); setSiView("detail"); };
-  const siDocTitle = isQuote ? (bnL?"কোটেশন":"QUOTATION") : isDN ? (bnL?"ডেলিভারি নোট":"DELIVERY NOTE") : (bnL?"সেলস ইনভয়েস":"SALES INVOICE");
+  const siDocTitle = isSO ? (bnL?"সেলস অর্ডার":"SALES ORDER") : isQuote ? (bnL?"কোটেশন":"QUOTATION") : isDN ? (bnL?"ডেলিভারি নোট":"DELIVERY NOTE") : (bnL?"সেলস ইনভয়েস":"SALES INVOICE");
   const siRootStyle = siFitH && !siMobile ? { height:siFitH } : undefined;
 
   if (siView==="list" || (siView==="form" && siWin.min && wideDesktop)) {
@@ -7086,8 +7273,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     }, { total:0, due:0, drafts:0 });
     const showParties = siGroupMode==="folders" && (!siMobile || !openGroup);
     const showInvoices = siGroupMode==="all" || !siMobile || !!openGroup;
-    const newLabel = isQuote ? (bnL?"+ নতুন কোটেশন":"+ New Quotation") : isDN ? (bnL?"+ নতুন ডেলিভারি নোট":"+ New Delivery Note") : (bnL?"+ নতুন ইনভয়েস":"+ New Invoice");
-    const emptyText = isQuote ? (bnL?"এখনো কোনো কোটেশন নেই":"No quotations yet") : isDN ? (bnL?"এখনো কোনো ডেলিভারি নোট নেই":"No delivery notes yet") : t.si_noInvoices;
+    const newLabel = isSO ? (bnL?"+ নতুন সেলস অর্ডার":"+ New Sales Order") : isQuote ? (bnL?"+ নতুন কোটেশন":"+ New Quotation") : isDN ? (bnL?"+ নতুন ডেলিভারি নোট":"+ New Delivery Note") : (bnL?"+ নতুন ইনভয়েস":"+ New Invoice");
+    const emptyText = isSO ? (bnL?"এখনো কোনো সেলস অর্ডার নেই":"No sales orders yet") : isQuote ? (bnL?"এখনো কোনো কোটেশন নেই":"No quotations yet") : isDN ? (bnL?"এখনো কোনো ডেলিভারি নোট নেই":"No delivery notes yet") : t.si_noInvoices;
     const matchBlock = (inv) => siMatchedLines(inv).map(({ it, net }, i)=>(
       <div key={i} className="si-match">📦 {it.name}{it.code?` · ${it.code}`:""} — {it.qty} {it.unit} × {siFmt2(net)}</div>
     ));
@@ -7097,7 +7284,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         <style>{SI_CSS}</style>
         {siView==="form"&&siWin.min&&(
           <MinimizedChip lang={lang} onRestore={siWin.restore}
-            title={`${isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"} ${siInvoiceNo||""}`}
+            title={`${isSO?"SALES ORDER":isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"} ${siInvoiceNo||""}`}
             onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
         )}
         {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
@@ -7105,7 +7292,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           <div className="pm-backdrop" style={{ zIndex:10000, alignItems:"center" }}>
             <div className="pm-window" style={{ maxWidth:380 }} role="dialog" aria-modal="true">
               <div className="pm-window-title">
-                <span>✅ {isQuote ? (bnL?"কোটেশন সেভ হয়েছে":"Quotation saved") : isDN ? (bnL?"ডেলিভারি নোট সেভ হয়েছে":"Delivery note saved") : (bnL?"ইনভয়েস সেভ হয়েছে":"Invoice saved")}</span>
+                <span>✅ {isSO ? (bnL?"সেলস অর্ডার সেভ হয়েছে":"Sales order saved") : isQuote ? (bnL?"কোটেশন সেভ হয়েছে":"Quotation saved") : isDN ? (bnL?"ডেলিভারি নোট সেভ হয়েছে":"Delivery note saved") : (bnL?"ইনভয়েস সেভ হয়েছে":"Invoice saved")}</span>
                 <button type="button" className="pm-window-close" onClick={()=>setSiPrintModal(null)}>✕</button>
               </div>
               <div className="pm-window-body">
@@ -7234,7 +7421,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                     <thead>
                       <tr>
                         <th>{t.si_invoiceNo}</th><th>{t.si_date}</th><th>{t.si_customer}</th><th>{bnL?"স্ট্যাটাস":"Status"}</th>
-                        {(isQuote||isDN) ? <th>{isQuote?(bnL?"মেয়াদ / ইনভয়েস":"Valid / Invoice"):(bnL?"ইনভয়েস":"Invoice")}</th>
+                        {(isQuote||isDN) ? <th>{isSO?(bnL?"ডেলিভারি / বিল":"Delivery / Bill"):isQuote?(bnL?"মেয়াদ / ইনভয়েস":"Valid / Invoice"):(bnL?"ইনভয়েস":"Invoice")}</th>
                           : <><th className="si-num">{bnL?"আইটেম":"Items"}</th><th className="si-num">{bnL?"মোট":"Total"}</th><th className="si-num">{bnL?"পরিশোধ":"Paid"}</th></>}
                         <th className="si-num">{(isQuote||isDN)?(bnL?"মোট":"Total"):(bnL?"বাকি":"Due")}</th>
                         <th>{t.si_createdBy}</th>
@@ -7333,10 +7520,13 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
                 {vRow(t.si_invoiceNo, inv.invoiceNo, { strong:true, color:siAccent })}
                 {vRow(t.si_date, inv.invoiceDate||"-")}
                 {!isQuote&&!isDN&&vRow(t.si_invoiceType, typeLabel)}
-                {isQuote&&vRow(bnL?"মেয়াদ":"Valid until", `${inv.validUntil||"—"}${qtIsExpired(inv)?(bnL?" (মেয়াদ শেষ)":" (Expired)"):""}`, { color:qtIsExpired(inv)?"#b91c1c":undefined })}
+                {isQuote&&!isSO&&vRow(bnL?"মেয়াদ":"Valid until", `${inv.validUntil||"—"}${qtIsExpired(inv)?(bnL?" (মেয়াদ শেষ)":" (Expired)"):""}`, { color:qtIsExpired(inv)?"#b91c1c":undefined })}
+                {isSO&&vRow(bnL?"ডেলিভারির তারিখ":"Delivery by", inv.validUntil||"—")}
+                {!isSO&&inv.salesOrderNo&&vRow(bnL?"সেলস অর্ডার":"Sales Order", inv.salesOrderNo, { color:"#0e7490" })}
+                {inv.jobOrderNo&&vRow(bnL?"জব কার্ড":"Job Card", inv.jobOrderNo, { color:"#c2410c" })}
                 {!isQuote&&inv.deliveryNoteId&&vRow(bnL?"ডেলিভারি নোট":"Delivery Note", inv.deliveryNoteNo, { color:"#7e22ce" })}
                 {!isQuote&&!inv.deliveryNoteId&&(inv.deliveryNoteNo||inv.vehicleNo)&&vRow(t.si_deliverySection, [inv.deliveryNoteNo, inv.vehicleNo].filter(Boolean).join(" · "))}
-                {(isQuote||isDN)&&inv.convertedInvoiceNo&&vRow(bnL?"ইনভয়েস":"Invoice", inv.convertedInvoiceNo, { strong:true, color:"#15803d" })}
+                {(isQuote||isDN)&&inv.convertedInvoiceNo&&vRow(isSO&&inv.status==="delivered"?(bnL?"ডেলিভারি নোট":"Delivery Note"):(bnL?"ইনভয়েস":"Invoice"), inv.convertedInvoiceNo, { strong:true, color:"#15803d" })}
                 {!isQuote&&inv.quotationNo&&vRow(bnL?"কোটেশন":"Quotation", inv.quotationNo, { color:"#b45309" })}
                 {inv.salesmanName&&vRow(bnL?"সেলসম্যান":"Salesman", inv.salesmanName)}
                 {vRow(t.si_createdBy, inv.createdByName||"-")}
@@ -7417,6 +7607,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           <button type="button" className="pm-btn-secondary" onClick={back}>← {bnL?"তালিকা":"List"}</button>
           <button type="button" className="pm-btn pm-btn--primary" onClick={()=>siPrint(inv)}>🖨️ {bnL?"প্রিন্ট":"Print"}</button>
           {paidOnBill>0.01&&<button type="button" className="pm-btn" onClick={()=>printMoneyReceipt(inv, paidOnBill, shop, lang)} title={bnL?"বিলের সাথে নেওয়া টাকার রশিদ":"Receipt for the money taken with this bill"}>🧾 {bnL?"মানি রিসিট":"Money Receipt"}</button>}
+          {canConvert&&isSO&&onConvertToDN&&<button type="button" className="pm-btn" onClick={()=>onConvertToDN(inv)}>🚚 {bnL?"ডেলিভারি নোট বানান":"Make Delivery Note"}</button>}
           {canConvert&&<button type="button" className="pm-btn" onClick={()=>onConvertQuote(inv)}>🧾 {bnL?"ইনভয়েসে রূপান্তর":"Convert to Invoice"}</button>}
           {canEdit&&<button type="button" className="pm-btn" onClick={()=>siOpenEdit(inv)}>✏️ {bnL?"এডিট":"Edit"}</button>}
           {canPay&&kind==="sales"&&<button type="button" className="pm-btn" onClick={()=>setReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })}>💰 {bnL?"টাকা গ্রহণ":"Receive Payment"}</button>}
@@ -7435,9 +7626,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   if (wideDesktop) return (
     <div style={{ position:"fixed", inset:siWin.max?0:"28px 40px", zIndex:1500, background:"#c7d8ee", padding:siWin.max?6:"0 6px 6px", boxSizing:"border-box", overflowX:"auto", overflowY:"hidden", display:"flex", flexDirection:"column", border:siWin.max?"none":"1px solid #2854ad", boxShadow:siWin.max?"none":"0 18px 50px rgba(2,6,23,0.45)" }}>
       <div onDoubleClick={siWin.toggleMax} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, margin:siWin.max?"-6px -6px 6px":"0 -6px 6px", padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", flexShrink:0, fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
-        <span>{isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"}{siInvoiceNo?` — ${siInvoiceNo}`:""}</span>
+        <span>{isSO?"SALES ORDER":isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"}{siInvoiceNo?` — ${siInvoiceNo}`:""}</span>
         <WindowButtons win={siWin} lang={lang} onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
       </div>
+      {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
       {showCustPicker&&(
         <PartyPickerWindow title="Select Customer" columns={CUSTOMER_PICKER_COLS} items={siPickCustomers} lang={lang}
           partyWord="customer" modalId="customer-picker"
@@ -7454,7 +7646,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         kind={kind}
         sourceQuoteNo={sourceQuote?.invoiceNo||""}
         sourceIsDN={sourceQuote?.docKind==="delivery"}
+        sourceKind={sourceQuote?.docKind||""}
         onConvertQuote={(isQuote||isDN)&&onConvertQuote ? (inv)=>{ if (siLeaveUnsavedOk()) onConvertQuote(inv); } : undefined}
+        onConvertToDN={isSO&&onConvertToDN ? (inv)=>{ if (siLeaveUnsavedOk()) onConvertToDN(inv); } : undefined}
         onSelectProduct={siSelectProduct} onChangeCurrentUnit={siChangeCurrentUnit} onAddCurrent={siAddCurrentItem} onDelLine={siDelLine}
         onOpenCustomerPicker={()=>setShowCustPicker(true)}
         onConfirm={siConfirm} onSaveDraft={siSaveDraft}
@@ -7489,7 +7683,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const fField = (label, control) => (
     <div className="si-field"><label className="pm-label">{label}</label>{control}</div>
   );
-  const formTitle = isQuote
+  const formTitle = isSO
+    ? (editInvId?(bnL?"সেলস অর্ডার এডিট":"EDIT SALES ORDER"):(bnL?"নতুন সেলস অর্ডার":"NEW SALES ORDER"))
+    : isQuote
     ? (editInvId?(bnL?"কোটেশন এডিট":"EDIT QUOTATION"):(bnL?"নতুন কোটেশন":"NEW QUOTATION"))
     : isDN
     ? (editInvId?(bnL?"ডেলিভারি নোট এডিট":"EDIT DELIVERY NOTE"):(bnL?"নতুন ডেলিভারি নোট":"NEW DELIVERY NOTE"))
@@ -7508,6 +7704,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   return (
     <div ref={siRootRef} className="si-root" style={siRootStyle}>
       <style>{PM_CSS}</style>
+      {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
       <style>{SI_CSS}</style>
       {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
 
@@ -7527,7 +7724,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         {fPanel(`${t.si_invoiceNo} & ${t.si_date}`, <>
           {fRow(t.si_invoiceNo, <div className="si-val is-strong" style={{ color:siAccent, fontFamily:"Consolas, monospace" }}>{siInvoiceNo}</div>)}
           {fRow(t.si_date, <input type="date" className="pm-input" value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />)}
-          {isQuote&&fRow(bnL?"মেয়াদ":"Valid Until", <input type="date" className="pm-input" value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
+          {isQuote&&fRow(isSO?(bnL?"ডেলিভারির তারিখ":"Delivery by"):(bnL?"মেয়াদ":"Valid Until"), <input type="date" className="pm-input" value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
         </>)}
 
         {fPanel(t.si_customer, <>
@@ -7650,7 +7847,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
             : <SiItemsTable items={siLines} lang={lang} isTax={formIsTax&&!formIsDelivery} showDisc={!formIsDelivery}
                 editId={siEditLineId}
                 onEdit={(item)=>{
-                  setSiCurrent({ productId:item.productId||null, name:item.name, code:item.code||"", brand:item.brand||"", qty:String(item.qty), unit:item.unit||"Pcs", unitPrice:String(item.unitPrice||""), discountPerc:String(item.discountPerc||"0"), discountFlat:siN2(item.discountFlat)>0?String(item.discountFlat):"", vatPerc:item.vatPerc!=null&&item.vatPerc!==""?String(item.vatPerc):"5" });
+                  setSiCurrent({ productId:item.productId||null, name:item.name, code:item.code||"", brand:item.brand||"", qty:String(item.qty), unit:item.unit||"Pcs", unitPrice:String(item.unitPrice||""), discountPerc:String(item.discountPerc||"0"), discountFlat:siN2(item.discountFlat)>0?String(item.discountFlat):"", vatPerc:item.vatPerc!=null&&item.vatPerc!==""?String(item.vatPerc):"5", batchNo:item.batchNo||"", ...(item.isService?{ isService:true }:{}) });
                   setSiEditLineId(item.id);
                   setTimeout(()=>siNameRef.current?.focus(), 80);
                 }}
@@ -7718,7 +7915,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
 
       <div className="si-actions si-sticky-actions">
         <button type="button" className="pm-btn pm-btn--primary" onClick={siConfirm} disabled={siSaving}>
-          {siSaving?"...":(isQuote?(bnL?"✅ কোটেশন সেভ":"✅ Save Quotation"):isDN?(bnL?"✅ ডেলিভারি নোট সেভ":"✅ Save Delivery Note"):(bnL?"✅ ইনভয়েস নিশ্চিত":"✅ Confirm Invoice"))}
+          {siSaving?"...":(isSO?(bnL?"✓ অর্ডার সেভ":"✓ Save Order"):isQuote?(bnL?"✅ কোটেশন সেভ":"✅ Save Quotation"):isDN?(bnL?"✅ ডেলিভারি নোট সেভ":"✅ Save Delivery Note"):(bnL?"✅ ইনভয়েস নিশ্চিত":"✅ Confirm Invoice"))}
         </button>
         <button type="button" className="pm-btn-secondary" onClick={siSaveDraft} disabled={siSaving}>{bnL?"ড্রাফট সেভ":"Save Draft"}</button>
         <button type="button" className="pm-btn pm-btn--danger" onClick={closeForm}>{bnL?"বাতিল":"Cancel"}</button>
@@ -10435,6 +10632,18 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     shopId, enabled: isOwner, cheques: finance.dueCheques, upcoming: finance.upcomingCheques, pending: finance.pendingCheques, today: finance.today,
     lang, toast, cur: t.cur || "AED", onOpen: () => setTab("dashboard"),
   });
+  const [empFocus, setEmpFocus] = useState(null);
+  const employeeAlertList = useEmployeeAlerts({
+    shopId, enabled: isOwner || can("manageEmployees"), shopCountry: localShop?.country || "",
+    lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("employees"); },
+  });
+  const openEmployeeAlert = (a) => {
+    setSettingsPage(null);
+    if (a.kind === "attendance") { setTab("attendance"); return; }
+    if ((a.kind === "salaryDue" || a.kind === "salarySoon") && (isOwner || can("manageExpenses"))) { setTab("employeeExpense"); return; }
+    if (a.employeeId) setEmpFocus({ id: a.employeeId, section: a.section || "basic", at: Date.now() });
+    setTab("employees");
+  };
 
   useEffect(() => {
     if (!shopId || !isOwner || !authSyncReady) return;
@@ -10526,9 +10735,6 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   }, [settingsPage, isOwner, shopId]);
 
   const [showChequePrinter,setShowChequePrinter]=useState(false);
-  const [newPosition,setNewPosition]=useState("");
-  const [showAddPos,setShowAddPos]=useState(false);
-
   useEffect(() => {
     if (shopProp) applyShopRecord(shopProp);
   }, [shopProp]);
@@ -11114,6 +11320,8 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [pmOverSales,setPmOverSales]=useState(false);
   const [pmPickForSales,setPmPickForSales]=useState(null);
   const [quoteToConvert,setQuoteToConvert]=useState(null);
+  const [purchaseSource,setPurchaseSource]=useState(null);
+  const [grnIncoming,setGrnIncoming]=useState(null);
   const [chequePrefill,setChequePrefill]=useState(null);
   const [ownerUnlocked,setOwnerUnlocked]=useState(false);
   const [pinModal,setPinModal]=useState(null);   // null | "unlock" | "reset"
@@ -12474,26 +12682,6 @@ const startEditOrder = (order) => {
     }
   };
 
-  const addPosition = async () => {
-    if (!newPosition.trim()) return;
-    const positions=[...(localShop?.positions||[]),newPosition.trim()];
-    try {
-      const updated = await saveShopRecord(shopId, { positions }, { ownerUid: user?.uid, profile, user });
-      setLocalShop(updated);
-      setNewPosition("");
-      setShowAddPos(false);
-      toast(t.positionAdded);
-    } catch(e) { hErr(e); }
-  };
-  const deletePosition = async (pos) => {
-    const positions=(localShop?.positions||[]).filter(p=>p!==pos);
-    try {
-      const updated = await saveShopRecord(shopId, { positions }, { ownerUid: user?.uid, profile, user });
-      setLocalShop(updated);
-      toast(t.positionDeleted,"err");
-    } catch(e) { hErr(e); }
-  };
-
   const savePermissions = async (member, newPerms) => {
     const memberId = member.uid || member.id;
     teamPermissionOverridesRef.current[memberId] = newPerms;
@@ -12738,6 +12926,10 @@ const startEditOrder = (order) => {
       sub:`${c.party||"—"} · ${lang==="bn"?"চেক":"Cheque"} ${c.chequeNo||c.no} · 📅 ${c.chequeDate.split("-").reverse().join("/")}`,
       onClick:()=>{ setSettingsPage(null); setTab("dashboard"); },
     })) : []),
+    ...employeeAlertList.filter(a => a.tone!=="info" || a.daysLeft<=7).map(a => {
+      const txt = employeeAlertText(a, lang==="bn", t.cur||"AED");
+      return { key:`emp-${a.key}`, icon:txt.icon, tone:a.tone==="danger"?"danger":undefined, title:txt.title, sub:txt.sub, onClick:()=>openEmployeeAlert(a) };
+    }),
     ...(orderModuleEnabled && unread>0 ? [{
       key:"orders", icon:"📋", count:unread,
       title:lang==="bn"?`${unread}টি নতুন অর্ডার`:`${unread} new order(s)`,
@@ -12923,28 +13115,44 @@ const startEditOrder = (order) => {
     if (serial) return fmt(serial);
     return isOwner ? fmt(local + 1) : `${fmt(local + 1)}-${deviceSerialTag()}`;
   };
+  const newTabLabels = {
+    salesOrder: lang==="bn"?"📝 সেলস অর্ডার":"📝 Sales Order",
+    purchaseOrder: lang==="bn"?"📋 পারচেজ অর্ডার":"📋 Purchase Order",
+    goodsReceipt: lang==="bn"?"📥 মাল গ্রহণ (DN Received)":"📥 Delivery Note (Received)",
+    employees: lang==="bn"?"👷 কর্মচারী":"👷 Employees",
+    employeeExpense: lang==="bn"?"🧑‍💼 কর্মচারীর খরচ":"🧑‍💼 Employee Expense",
+    attendance: lang==="bn"?"🗓️ হাজিরা খাতা":"🗓️ Attendance Register",
+    bankRec: lang==="bn"?"🏦 ব্যাংক মেলানো":"🏦 Bank Reconciliation",
+    jobCard: lang==="bn"?"🔧 জব কার্ড":"🔧 Job Card",
+  };
   const returnTabLabels = {
     salesReturn: lang==="bn"?"↩️ সেলস রিটার্ন":"↩️ Sales Return",
     purchaseReturn: lang==="bn"?"↪️ পারচেজ রিটার্ন":"↪️ Purchase Return",
     stockAdjust: lang==="bn"?"⚖️ স্টক সমন্বয়":"⚖️ Stock Adjustment",
+    loosen: lang==="bn"?"📦 পণ্য খোলা (Loosening)":"📦 Product Loosening",
+    bundle: lang==="bn"?"🧰 পণ্য জোড়া / কিট":"🧰 Product Bundling",
     auditLog: lang==="bn"?"🕵️ অডিট লগ":"🕵️ Audit Log",
   };
 
   const visibleTabs = isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["delivery",t.tabDelivery],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
-        ...(can("manageSales")?[["sales", t.tabSales],["quotation", t.tabQuotation],["delivery", t.tabDelivery]]:[]),
+        ...(can("manageSales")?[["sales", t.tabSales],["quotation", t.tabQuotation],["salesOrder", newTabLabels.salesOrder],["delivery", t.tabDelivery]]:[]),
+        ...(can("managePurchase")?[["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt]]:[]),
         ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
         ...(can("viewVendors")||can("manageVendors")?[["vendors",t.tabVendor]]:[]),
         ...(can("printCheques")?[["cheque",t.tabCheque]]:[]),
         ...(can("managePdc")?[["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"]]:[]),
-        ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"]]:[]),
+        ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employeeExpense",newTabLabels.employeeExpense]]:[]),
+        ...(can("manageEmployees")?[["employees",newTabLabels.employees],["attendance",newTabLabels.attendance]]:[]),
+        ...(can("bankReconcile")?[["bankRec",newTabLabels.bankRec]]:[]),
+        ...(can("manageJobs")?[["jobCard",newTabLabels.jobCard]]:[]),
         ...(canStaffVouchers?[["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"]]:[]),
         ...(can("manageReturns")?[["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn]]:[]),
-        ...(can("stockAdjust")?[["stockAdjust",returnTabLabels.stockAdjust]]:[]),
+        ...(can("stockAdjust")?[["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle]]:[]),
         ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),
         ["settings",t.tabSettings],
       ];
@@ -14170,6 +14378,7 @@ const startEditOrder = (order) => {
           shopId={shopId} user={user} profile={profile}
           vendors={vendors} products={products}
           shop={localShop} toast={toast} isDesktop={isDesktop} wideDesktop={windowWidth >= 1100}
+          onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))}
           syncRefreshKey={syncRefreshKey}
           onOpenProductMaster={canManageProducts ? (name) => {
             loadPmForm({ ...createEmptyPmForm(), ...(name ? { name } : {}) });
@@ -14184,7 +14393,18 @@ const startEditOrder = (order) => {
           onOpenNewHandled={()=>{ setPiNewReq(0); setPiNewVendor(null); }}
           voucherRequest={piVoucherReq}
           onVoucherHandled={()=>setPiVoucherReq(0)}
+          purchaseSource={purchaseSource}
+          onPurchaseSourceHandled={()=>setPurchaseSource(null)}
         />
+      )}
+
+      {(tab==="purchaseOrder"||tab==="goodsReceipt")&&(isOwner||can("managePurchase"))&&(
+        <PurchaseDocsTab key={tab} kind={tab==="purchaseOrder"?"po":"grn"} lang={lang} shopId={shopId} user={user} profile={profile}
+          isOwner={isOwner} canManage={isOwner||can("managePurchase")} products={products} vendors={vendors} toast={toast}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} makeNo={makeShopNo} leaveGuard={billLeaveGuard}
+          incoming={tab==="goodsReceipt"?grnIncoming:null} onIncomingHandled={()=>setGrnIncoming(null)}
+          onMakePurchase={(k,doc,lines)=>{ setPurchaseSource({ kind:k, doc, lines, at:Date.now() }); setTabState("purchase"); }}
+          onMakeReceipt={(doc,lines)=>{ setGrnIncoming({ doc, lines, at:Date.now() }); setTabState("goodsReceipt"); }} />
       )}
 
       {tab==="purchase"&&!canStaffSupplierArea&&(
@@ -14193,12 +14413,13 @@ const startEditOrder = (order) => {
         </div>
       )}
 
-      {(isOwner || can("manageSales")) && ["sales","quotation","delivery"].includes(tab)&&(
+      {(isOwner || can("manageSales")) && ["sales","quotation","delivery","salesOrder"].includes(tab)&&(
         <SalesInvoiceTab
           key={tab}
           kind={tab}
-          quoteToConvert={tab==="sales" ? quoteToConvert : null}
+          quoteToConvert={tab==="sales"||tab==="delivery" ? quoteToConvert : null}
           onConvertQuote={(q)=>{ setQuoteToConvert(q); setTabState("sales"); }}
+          onConvertToDN={(q)=>{ setQuoteToConvert(q); setTabState("delivery"); }}
           onQuoteConvertHandled={()=>setQuoteToConvert(null)}
           openNewRequest={tab==="sales" ? siNewReq : 0}
           openNewCustomer={siNewCustomer}
@@ -14245,9 +14466,32 @@ const startEditOrder = (order) => {
           onOpenVoucher={(raw)=>printPaymentVoucher(raw, localShop, lang)} />
       )}
 
-      {tab==="expenses"&&(isOwner||can("manageExpenses"))&&(
-        <ExpensesTab lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
-          cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} />
+      {(tab==="expenses"||tab==="employeeExpense")&&(isOwner||can("manageExpenses"))&&(
+        <ExpensesTab key={tab} employeeMode={tab==="employeeExpense"} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
+          cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} shop={localShop} />
+      )}
+
+      {tab==="employees"&&(isOwner||can("manageEmployees"))&&(
+        <EmployeesTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} canManage={isOwner||can("manageEmployees")}
+          cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} leaveGuard={billLeaveGuard}
+          alerts={employeeAlertList} focus={empFocus} onFocusHandled={()=>setEmpFocus(null)} onOpenAlert={openEmployeeAlert} />
+      )}
+
+      {tab==="jobCard"&&(isOwner||can("manageJobs"))&&(
+        <JobCardTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} canManage={isOwner||can("manageJobs")}
+          cur={t.cur||"AED"} toast={toast} shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))}
+          customers={customers} products={products} makeNo={makeShopNo} leaveGuard={billLeaveGuard}
+          onMakeInvoice={(isOwner||can("manageSales")) ? (src)=>{ setQuoteToConvert(src); setTabState("sales"); } : undefined} />
+      )}
+
+      {tab==="bankRec"&&(isOwner||can("bankReconcile"))&&(
+        <BankRecTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} canManage={isOwner||can("bankReconcile")}
+          cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} />
+      )}
+
+      {tab==="attendance"&&(isOwner||can("manageEmployees"))&&(
+        <AttendanceTab lang={lang} shopId={shopId} user={user} profile={profile} canManage={isOwner||can("manageEmployees")}
+          cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} />
       )}
 
       {tab==="vouchers"&&(isOwner||canStaffVouchers)&&(
@@ -14269,6 +14513,11 @@ const startEditOrder = (order) => {
       {tab==="stockAdjust"&&(isOwner||can("stockAdjust"))&&(
         <StockAdjustmentTab lang={lang} th={th} shopId={shopId} user={user} profile={profile} products={products}
           isOwner={isOwner} canManage={isOwner||can("stockAdjust")} isDesktop={isDesktop} toast={toast}
+          shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
+      )}
+      {(tab==="loosen"||tab==="bundle")&&(isOwner||can("stockAdjust"))&&(
+        <StockConvertTab key={tab} kind={tab} lang={lang} shopId={shopId} user={user} profile={profile} products={products}
+          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} toast={toast}
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
       )}
 
@@ -14306,7 +14555,6 @@ const startEditOrder = (order) => {
           isOwner && { id:"pin", icon:"🔒", label:bnS?"মালিকের পিন":"Owner PIN", sub:bnS?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN", action:()=>setPinModal("reset") },
           localShop && { id:"shop", icon:"🏢", label:plain(t.shopInfoTitle), sub:`${localShop.companyName||""}${!isOwner?(bnS?" · শুধু দেখা":" · View only"):""}` },
           isOwner && { id:"invite", icon:"🔗", label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` },
-          isOwner && { id:"positions", icon:"📋", label:plain(t.managePositionsTitle), sub:`${(localShop?.positions||[]).length} ${bnS?"টি পদবী":"positions"}` },
           (isOwner || team.length>0) && { id:"team", icon:"👥", label:plain(t.teamTitle), sub:`${team.length} ${bnS?"জন সদস্য":"members"}` },
           isOwner && { id:"orderModule", icon:"🧾", label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") },
           isOwner && { id:"branchTransfer", icon:"🚚", label:btCopy.title, sub:btCopy.subtitle },
@@ -14324,7 +14572,7 @@ const startEditOrder = (order) => {
         const current = items.find(it=>it.id===stPage);
         const settingGroups = [
           { key:"company", label:bnS?"🏢 অ্যাকাউন্ট ও দোকান":"🏢 Account & Company", ids:["profile","shop","pin","license"] },
-          { key:"team", label:bnS?"👥 টিম":"👥 Team", ids:["team","invite","positions"] },
+          { key:"team", label:bnS?"👥 টিম":"👥 Team", ids:["team","invite"] },
           { key:"features", label:bnS?"🧩 ফিচার":"🧩 Features", ids:["orderModule","branchTransfer","wastyle"] },
           { key:"display", label:bnS?"🎨 দেখা ও প্রিন্ট":"🎨 Display & Print", ids:["print","theme","language"] },
           { key:"data", label:bnS?"💾 ডেটা ও সিস্টেম":"💾 Data & System", ids:["backup","sync","update"] },
@@ -14483,42 +14731,6 @@ const startEditOrder = (order) => {
                   ))}
                 </div>
               )}
-            </div>
-          )}
-
-          {stPage==="positions"&&isOwner&&(
-            <div style={s.card}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                <div style={s.settingsLbl}>{t.managePositionsTitle}</div>
-                <button style={s.addCoBtn} onClick={()=>setShowAddPos(!showAddPos)}>{showAddPos?`✕ ${t.cancel}`:t.addPositionBtn}</button>
-              </div>
-              {showAddPos&&(
-                <div style={{ marginBottom:10 }}>
-                  <div style={{ fontSize:11, color:"#71717a", marginBottom:6 }}>{lang==="bn"?"👇 বেছে নিন বা নিজে লিখুন:":"👇 Pick one or type custom:"}</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6, marginBottom:8 }}>
-                    {PRESET_POSITIONS[lang].map(p=>(
-                      <button key={p} onClick={()=>setNewPosition(p)}
-                        style={{ padding:"5px 11px", borderRadius:20, border:`1px solid ${th.border}`, background:newPosition===p?"#f97316":"transparent", color:newPosition===p?"#fff":th.txtMuted, cursor:"pointer", fontSize:12, fontWeight:600 }}>
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  <div style={s.row}>
-                    <input style={{ ...s.inp, flex:1 }} placeholder={t.positionNameP} value={newPosition}
-                      onChange={e=>setNewPosition(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addPosition()} />
-                    <button style={s.savBtn} onClick={addPosition}>{t.addBtn}</button>
-                  </div>
-                </div>
-              )}
-              {(!localShop?.positions||localShop.positions.length===0)
-                ? <div style={{ fontSize:12, color:"#71717a" }}>{t.noPositions}</div>
-                : localShop.positions.map((pos,i)=>(
-                    <div key={i} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"7px 0", borderTop:i>0?`1px solid ${th.border}`:"none" }}>
-                      <span style={{ fontSize:13, color:th.txtPrimary }}>👤 {pos}</span>
-                      <button style={s.dlBtn} onClick={()=>deletePosition(pos)}>🗑️</button>
-                    </div>
-                  ))
-              }
             </div>
           )}
 

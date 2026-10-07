@@ -19,21 +19,23 @@ function itemsByProduct(items, productById, into = new Map(), sign = 1) {
   return into;
 }
 
-function addInvoices(invoices, shopId, into, sign, productById, statuses = STOCK_AFFECTING_STATUSES, dnById = null) {
+function addInvoices(invoices, shopId, into, sign, productById, statuses = STOCK_AFFECTING_STATUSES, dnById = null, grnById = null) {
   invoices.forEach((inv) => {
     if (!inv || inv.isDeleted || inv.deleted) return;
     if (shopId && inv.shopId && inv.shopId !== shopId) return;
     if (!statuses.includes(inv.status)) return;
     // A branch transfer only moves stock inside the same shop, so its internal purchase invoice is not new stock.
     if (inv.internalTransfer || inv.sourceType === "branch_transfer") return;
-    if (sign < 0 && inv.deliveryNoteId) {
-      // The delivery note already took its goods out; the invoice only moves what differs from the note.
-      const dn = dnById?.get(inv.deliveryNoteId);
-      if (!dn) return;
-      const dnCounted = !dn.isDeleted && !dn.deleted && DELIVERY_NOTE_STOCK_STATUSES.includes(dn.status);
+    // The delivery note (given or received) already moved its goods; the bill only moves what differs from the note.
+    const linked = sign < 0 && inv.deliveryNoteId ? { note: dnById?.get(inv.deliveryNoteId), statuses: DELIVERY_NOTE_STOCK_STATUSES }
+      : sign > 0 && inv.goodsReceiptId ? { note: grnById?.get(inv.goodsReceiptId), statuses: GOODS_RECEIPT_STOCK_STATUSES }
+      : null;
+    if (linked) {
+      if (!linked.note) return;
+      const noteCounted = !linked.note.isDeleted && !linked.note.deleted && linked.statuses.includes(linked.note.status);
       const diff = itemsByProduct(inv.items, productById);
-      if (dnCounted) itemsByProduct(dn.items, productById, diff, -1);
-      diff.forEach((q, id) => { if (Math.abs(q) > 1e-9) into.set(id, (into.get(id) || 0) - q); });
+      if (noteCounted) itemsByProduct(linked.note.items, productById, diff, -1);
+      diff.forEach((q, id) => { if (Math.abs(q) > 1e-9) into.set(id, (into.get(id) || 0) + sign * q); });
       return;
     }
     itemsByProduct(inv.items, productById, into, sign);
@@ -41,6 +43,7 @@ function addInvoices(invoices, shopId, into, sign, productById, statuses = STOCK
 }
 
 const RETURN_STOCK_STATUSES = ["confirmed"];
+export const GOODS_RECEIPT_STOCK_STATUSES = ["confirmed", "invoiced"];
 
 function addAdjustments(adjustments, shopId, into, productById) {
   (adjustments || []).forEach((adj) => {
@@ -55,11 +58,13 @@ function addAdjustments(adjustments, shopId, into, productById) {
   });
 }
 
-// Stock = opening stock + purchased − sold − delivered + sales returns − purchase returns ± adjustments, in base units.
+// Stock = opening stock + purchased + goods received − sold − delivered + sales returns − purchase returns ± adjustments, in base units.
 export function computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes = [], extras = {}) {
   const productById = new Map((products || []).map((p) => [p.id, p]));
   const movement = new Map();
-  addInvoices(purchaseInvoices || [], shopId, movement, 1, productById);
+  const grnById = new Map((extras.goodsReceipts || []).filter((g) => g?.id).map((g) => [g.id, g]));
+  addInvoices(purchaseInvoices || [], shopId, movement, 1, productById, STOCK_AFFECTING_STATUSES, null, grnById);
+  addInvoices(extras.goodsReceipts || [], shopId, movement, 1, productById, GOODS_RECEIPT_STOCK_STATUSES);
   const dnById = new Map((deliveryNotes || []).filter((d) => d?.id).map((d) => [d.id, d]));
   addInvoices(salesInvoices || [], shopId, movement, -1, productById, STOCK_AFFECTING_STATUSES, dnById);
   addInvoices(deliveryNotes || [], shopId, movement, -1, productById, DELIVERY_NOTE_STOCK_STATUSES);
@@ -74,10 +79,11 @@ export function computeStockMap(products, purchaseInvoices, salesInvoices, shopI
 }
 
 export async function loadInvoiceRows() {
-  const [pur, sal, dn, sr, pr, adj] = await Promise.all([
+  const [pur, sal, dn, sr, pr, adj, grn] = await Promise.all([
     offlineList("purchaseInvoices"), offlineList("salesInvoices"), offlineList("deliveryNotes"),
     offlineList("salesReturns").catch(() => []), offlineList("purchaseReturns").catch(() => []), offlineList("stockAdjustments").catch(() => []),
+    offlineList("goodsReceipts").catch(() => []),
   ]);
-  const extras = { salesReturns: rowsOf(sr), purchaseReturns: rowsOf(pr), stockAdjustments: rowsOf(adj) };
+  const extras = { salesReturns: rowsOf(sr), purchaseReturns: rowsOf(pr), stockAdjustments: rowsOf(adj), goodsReceipts: rowsOf(grn) };
   return { purchaseInvoices: rowsOf(pur), salesInvoices: rowsOf(sal), deliveryNotes: rowsOf(dn), extras, ...extras };
 }

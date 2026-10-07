@@ -41,6 +41,14 @@ export const SHOP_PULL_COLLECTIONS = [
   "purchaseReturns",
   "stockAdjustments",
   "accountVouchers",
+  "purchaseOrders",
+  "salesOrders",
+  "goodsReceipts",
+  "employees",
+  "employeeDocs",
+  "attendance",
+  "bankReconciliations",
+  "jobOrders",
   "masterLists",
   "users",
 ];
@@ -82,6 +90,11 @@ const IDENTITY_FIELDS = {
   salesReceipts: ["receiptNo"],
   expenses: ["expenseNo"],
   accountVouchers: ["voucherNo"],
+  purchaseOrders: ["orderNo"],
+  salesOrders: ["orderNo"],
+  goodsReceipts: ["grnNo"],
+  employees: ["name"],
+  jobOrders: ["jobNo"],
 };
 
 export function hasRecordIdentity(collectionName, data) {

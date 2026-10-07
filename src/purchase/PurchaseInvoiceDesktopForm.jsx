@@ -6,6 +6,8 @@ import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
 import PartyPickerWindow, { VENDOR_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
+import { PURCHASE_OPTION_DEFAULTS, PURCHASE_OPTION_LABELS, isForeign, rateOf } from "./purchaseOptions.js";
+import { CURRENCIES } from "../reports/taxDomain.js";
 
 const ACCENT = "#c2410c";
 
@@ -94,9 +96,16 @@ export default function PurchaseInvoiceDesktopForm({
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine, onPickVendor,
   onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast,
+  purchaseOptions = PURCHASE_OPTION_DEFAULTS, baseCurrency = "AED", onSaveOptions, sourceNote = "",
 }) {
   const { piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS } = helpers;
   const bn = lang === "bn";
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const foreign = isForeign(form, baseCurrency);
+  const billCur = foreign ? String(form.currency).toUpperCase() : baseCurrency;
+  const fxRate = rateOf(form, baseCurrency);
+  const showRef = purchaseOptions.refNo || !!String(form.refNo || "").trim();
+  const showCurrency = purchaseOptions.multiCurrency || foreign;
 
   const codeRef = useRef(null);
   const vendorRef = useRef(null);
@@ -275,7 +284,10 @@ export default function PurchaseInvoiceDesktopForm({
               {status[lang] || savedInvoice.status}
             </span>
           )}
-          <span style={{ fontSize: 24, fontWeight: 900, color: ACCENT, letterSpacing: 0.5 }}>PURCHASE INVOICE</span>
+          <div style={{ textAlign: "center", lineHeight: 1.1 }}>
+            <span style={{ fontSize: 24, fontWeight: 900, color: ACCENT, letterSpacing: 0.5 }}>PURCHASE INVOICE</span>
+            {sourceNote && <div style={{ fontSize: 11, fontWeight: 800, color: "#0f766e" }}>{sourceNote}</div>}
+          </div>
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
@@ -316,7 +328,36 @@ export default function PurchaseInvoiceDesktopForm({
           <div style={lbl}>Mobile</div>
           <input style={inp()} inputMode="tel" value={form.vendorMobile} onChange={(e) => setField("vendorMobile", e.target.value)} />
         </div>
-        <div />
+        <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
+          {showRef && (
+            <div style={{ width: 130 }}>
+              <div style={lbl}>Ref. No</div>
+              <input style={inp()} value={form.refNo || ""} placeholder={bn ? "PO / চালান নং" : "PO / challan no"} onChange={(e) => setField("refNo", e.target.value)} />
+            </div>
+          )}
+          {showCurrency && (
+            <>
+              <div style={{ width: 96 }}>
+                <div style={lbl}>Currency</div>
+                <select style={inp()} value={foreign ? form.currency : ""} onChange={(e) => { setField("currency", e.target.value); if (!e.target.value) setField("exchangeRate", ""); }}>
+                  <option value="">{baseCurrency}</option>
+                  {CURRENCIES.filter(([c]) => c !== baseCurrency).map(([c]) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              {foreign && (
+                <div style={{ width: 120 }}>
+                  <div style={lbl}>1 {billCur} = ? {baseCurrency}</div>
+                  <input style={inp(fxRate > 0 ? { textAlign: "right", fontWeight: 700 } : { textAlign: "right", borderColor: C.red })} inputMode="decimal" value={form.exchangeRate || ""} placeholder="3.6725"
+                    onChange={(e) => setField("exchangeRate", e.target.value)} />
+                </div>
+              )}
+            </>
+          )}
+          <span style={{ flex: 1 }} />
+          {onSaveOptions && (
+            <button type="button" onClick={() => setOptionsOpen(true)} style={btn("#e7eef9", C.label, { height: 26, whiteSpace: "nowrap" })}>⚙️ Options</button>
+          )}
+        </div>
       </div>
 
       {/* Entry row */}
@@ -363,7 +404,7 @@ export default function PurchaseInvoiceDesktopForm({
             </select>
           </div>
           <div>
-            <div style={lbl}>Unit Cost</div>
+            <div style={lbl}>Unit Cost{foreign ? ` (${billCur})` : ""}</div>
             <input ref={costRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.unitCost}
               onChange={(e) => setCurrent((p) => ({ ...p, unitCost: e.target.value }))}
               onFocus={(e) => e.target.select()}
@@ -384,7 +425,7 @@ export default function PurchaseInvoiceDesktopForm({
               onKeyDown={(e) => enterTo(e, saleRef)} />
           </div>
           <div>
-            <div style={lbl}>Sale Price</div>
+            <div style={lbl}>Sale Price{foreign ? ` (${baseCurrency})` : ""}</div>
             <input ref={saleRef} style={inp({ textAlign: "right", color: C.green, fontWeight: 700 })} inputMode="decimal" value={current.salePrice}
               onChange={(e) => setCurrent((p) => ({ ...p, salePrice: e.target.value }))}
               onFocus={(e) => e.target.select()}
@@ -449,7 +490,10 @@ export default function PurchaseInvoiceDesktopForm({
                 <tr key={it.id} onClick={() => editLine(it)} title={bn ? "এডিট করতে ক্লিক করুন" : "Click to edit"}
                   style={{ cursor: "pointer", background: selected ? C.sel : i % 2 ? C.rowAlt : "#fff" }}>
                   <td style={{ ...td, textAlign: "center" }}>{i + 1}</td>
-                  <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>{it.name}</td>
+                  <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>
+                    {it.name}
+                    {it.batchNo && <span title={bn ? "আলাদা stock (ব্যাচ)" : "Separate stock (batch)"} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#fff", background: "#7c3aed", borderRadius: 8, padding: "0 6px" }}>📦 {it.batchNo}</span>}
+                  </td>
                   <td style={{ ...td, textAlign: "left" }}>{it.code}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.brand}</td>
                   <td style={td}>{it.qty}</td>
@@ -525,8 +569,14 @@ export default function PurchaseInvoiceDesktopForm({
           ))}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "3px 8px", borderRadius: 2 }}>
             <span style={{ fontWeight: 800 }}>TOTAL</span>
-            <span style={{ fontSize: 18, fontWeight: 900 }}>{t.cur || "AED"} {piFmt2(totals.grand)}</span>
+            <span style={{ fontSize: 18, fontWeight: 900 }}>{foreign ? billCur : (t.cur || "AED")} {piFmt2(totals.grand)}</span>
           </div>
+          {foreign && (
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 800, color: fxRate > 0 ? "#0e7490" : C.red }}>
+              <span>= {baseCurrency}</span>
+              <span>{fxRate > 0 ? piFmt2(totals.grand * fxRate) : (bn ? "রেট দিন" : "enter rate")}</span>
+            </div>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 900 }}>
             <span style={{ color: C.green }}>Paid {piFmt2(paid)}</span>
             <span style={{ color: balance > 0.01 ? C.red : C.green }}>Bal. {piFmt2(balance)}</span>
@@ -593,6 +643,12 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
       )}
 
+      {optionsOpen && onSaveOptions && (
+        <div data-si-modal-open="">
+          <PurchaseOptionsModal lang={lang} options={purchaseOptions} onSave={onSaveOptions} toast={toast} onClose={() => setOptionsOpen(false)} />
+        </div>
+      )}
+
       {showSearch && (
         <div data-si-modal-open="">
           <PurchaseSearchModal invoices={invoices} piFmt2={piFmt2} PI_PAY_METHODS={PI_PAY_METHODS} lang={lang}
@@ -601,6 +657,45 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
       )}
     </div>
+  );
+}
+
+function PurchaseOptionsModal({ lang, options, onSave, onClose, toast }) {
+  const bn = lang === "bn";
+  const [draft, setDraft] = useState({ ...options });
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      await onSave(draft);
+      toast?.(bn ? "✅ Purchase Options সেভ হয়েছে — সব ডিভাইসে চালু হবে" : "✅ Purchase Options saved for all devices");
+      onClose();
+    } catch (e) {
+      toast?.(e?.message || String(e), "err");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal title="Purchase Options" width={560} onClose={() => { if (!busy) onClose(); }}>
+      <div style={{ display: "grid", gap: 9 }}>
+        {PURCHASE_OPTION_LABELS.map(([key, en, bnText]) => (
+          <label key={key} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, fontWeight: 700, color: C.label, cursor: "pointer" }}>
+            <input type="checkbox" checked={!!draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.checked }))} style={{ marginTop: 2 }} />
+            <span>{en}<div style={{ fontWeight: 500, fontSize: 11.5, color: "#4b5f86" }}>{bnText}</div></span>
+          </label>
+        ))}
+        <div style={{ fontSize: 11.5, color: "#4b5f86", background: "#eef3fb", border: `1px solid ${C.border}`, padding: "6px 8px", borderRadius: 3 }}>
+          {bn
+            ? "আলাদা stock-এর অপশনগুলো চালু থাকলে, পণ্যের আগের মাল দোকানে থাকা অবস্থায় সাপ্লায়ার / M.R.P / Landing Cost আলাদা হলে বিলে যোগ করার সময় জিজ্ঞেস করবে। হ্যাঁ বললে লাইনটা নতুন ব্যাচ নম্বর পাবে।"
+            : "With the separate-stock options on, adding a line asks when earlier stock is on hand and the vendor / M.R.P / Landing Cost differs. Yes gives the line a new batch number."}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+          <button type="button" onClick={onClose} disabled={busy} style={btn()}>{bn ? "বন্ধ" : "Close"}</button>
+          <button type="button" onClick={save} disabled={busy} style={btn("#15803d", "#fff", { padding: "0 22px" })}>{busy ? "…" : "OK"}</button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

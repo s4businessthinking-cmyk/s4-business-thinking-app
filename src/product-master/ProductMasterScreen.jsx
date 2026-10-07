@@ -588,6 +588,7 @@ export default function ProductMasterScreen({
           onImport={onImportRecords}
           notify={notify}
           replacementMode={replacementActive}
+          products={products}
           onClose={closeImport}
         />
       )}

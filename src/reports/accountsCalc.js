@@ -86,11 +86,13 @@ export function computeAccounts(data, { products = [], shopId, from, to, bn }) {
   const vendorDiscount = paymentsIn.reduce((t, p) => t + n(p.discountAmount), 0);
 
   const expensesIn = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && inRange(dayOf(e.expenseDate), from, to));
-  const expenseTotal = expensesIn.reduce((t, e) => t + n(e.amount), 0);
+  // VAT on an expense bill is claimed back in the VAT return, so only the amount without it is a cost.
+  const expenseCost = (e) => n(e.amount) - Math.max(0, n(e.vatAmount));
+  const expenseTotal = expensesIn.reduce((t, e) => t + expenseCost(e), 0);
   // A bounced expense cheque is still an expense, but the money never left.
   const expensePaid = expensesIn.filter((e) => !(e.method === "cheque" && e.chequeStatus === "bounced")).reduce((t, e) => t + n(e.amount), 0);
   const expenseMap = new Map();
-  expensesIn.forEach((e) => { const k = expenseCategoryLabel(e, bn); expenseMap.set(k, (expenseMap.get(k) || 0) + n(e.amount)); });
+  expensesIn.forEach((e) => { const k = expenseCategoryLabel(e, bn); expenseMap.set(k, (expenseMap.get(k) || 0) + expenseCost(e)); });
   const expenseByCat = [...expenseMap.entries()].sort((a, b) => b[1] - a[1]);
 
   const receivable = liveSales.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);

@@ -8,6 +8,9 @@ const COLLECTION_LABELS = {
   purchasePayments: ["পেমেন্ট ভাউচার (ক্যাশ/চেক)", "Payment vouchers (cash/cheque)"], supplierPayments: ["সাপ্লায়ার পেমেন্ট", "Supplier payments"],
   salesInvoices: ["সেলস ইনভয়েস", "Sales invoices"], salesReceipts: ["রসিদ ভাউচার", "Receipt vouchers"], expenses: ["খরচ", "Expenses"],
   accountVouchers: ["জার্নাল / কন্ট্রা ভাউচার", "Journal / Contra vouchers"],
+  purchaseOrders: ["পারচেজ অর্ডার", "Purchase orders"], salesOrders: ["সেলস অর্ডার", "Sales orders"],
+  goodsReceipts: ["মাল গ্রহণ (DN Received)", "Delivery notes (received)"], employees: ["কর্মচারী", "Employees"], employeeDocs: ["কর্মচারীর ডকুমেন্ট", "Employee documents"],
+  attendance: ["হাজিরা", "Attendance"], bankReconciliations: ["ব্যাংক মেলানো", "Bank reconciliation"], jobOrders: ["জব অর্ডার", "Job orders"],
 };
 
 const fmtDate = (iso, lang) => (iso ? new Date(iso).toLocaleString(lang === "bn" ? "bn-BD" : "en-GB") : "—");

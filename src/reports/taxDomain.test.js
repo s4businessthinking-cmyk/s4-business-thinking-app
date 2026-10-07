@@ -50,6 +50,32 @@ test("VAT summary nets returns and splits standard and no-VAT sales", () => {
   assert.equal(v.purchaseRows[0].trn, "200");
 });
 
+test("VAT on shop expense bills counts as input VAT; no-VAT and cancelled expenses stay out", () => {
+  const data = {
+    salesInvoices: [{ id: "s1", shopId: "x", status: "paid", invoiceDate: "2026-10-02", grandTotal: 210, totalVat: 10 }],
+    purchaseInvoices: [],
+    extras: { salesReturns: [], purchaseReturns: [] },
+    expenses: [
+      { id: "e1", shopId: "x", status: "active", expenseDate: "2026-10-05", expenseNo: "EXP-0001", category: "rent", paidTo: "Landlord", refNo: "R-9", amount: 1050, vatAmount: 50, supplierTrn: "300" },
+      { id: "e2", shopId: "x", status: "active", expenseDate: "2026-10-06", category: "salary", amount: 2000, vatAmount: 0 },
+      { id: "e3", shopId: "x", status: "cancelled", expenseDate: "2026-10-06", category: "electricity", amount: 105, vatAmount: 5 },
+      { id: "e4", shopId: "x", status: "active", expenseDate: "2026-09-30", category: "electricity", amount: 105, vatAmount: 5 },
+      { id: "e5", shopId: "y", status: "active", expenseDate: "2026-10-06", category: "phone", amount: 105, vatAmount: 5 },
+    ],
+  };
+  const v = computeVat(data, { shopId: "x", from: "2026-10-01", to: "2026-12-31" });
+  assert.equal(v.inputVat, 50);
+  assert.equal(v.expenseVat, 50);
+  assert.equal(v.expenseCount, 1);
+  assert.equal(v.stdPurch, 1000);
+  assert.equal(v.noVatPurch, 0);
+  assert.equal(v.payable, -40);
+  assert.deepEqual(
+    [v.purchaseRows[0].no, v.purchaseRows[0].ref, v.purchaseRows[0].party, v.purchaseRows[0].trn, v.purchaseRows[0].isExpense],
+    ["EXP-0001", "R-9", "Landlord", "300", true],
+  );
+});
+
 test("corporate tax: 0% up to the threshold, then the rate; small business relief", () => {
   const settings = { ctThreshold: 375000, ctRate: 9, sbrLimit: 3000000, sbrElected: false };
   assert.equal(corporateTax({ profit: 300000, revenue: 5e6, settings }).tax, 0);

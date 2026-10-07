@@ -82,13 +82,13 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
     { label: `${L("VAT ছাড়া", "Taxable")} (${cur})`, align: "right", w: 110 }, { label: `${tn} (${cur})`, align: "right", w: 90 }, { label: `${L("মোট", "Total")} (${cur})`, align: "right", w: 110 },
   ];
   const billRows = (rows, cashLabel) => rows.map((r) => [
-    fmtDay(r.date), r.isReturn ? `↩ ${r.no}` : r.no, r.ref || "", r.party || cashLabel, r.trn || "", money(r.taxable), money(r.vat), money(r.total),
+    fmtDay(r.date), r.isReturn ? `↩ ${r.no}` : r.isExpense ? `💸 ${r.no}` : r.no, r.ref || "", r.party || cashLabel, r.trn || "", money(r.taxable), money(r.vat), money(r.total),
   ]);
   const billFoot = (rows) => [L("মোট", "Total"), `${rows.length}`, "", "", "", money(rows.reduce((t, r) => t + r.taxable, 0)), money(rows.reduce((t, r) => t + r.vat, 0)), money(rows.reduce((t, r) => t + r.total, 0))];
 
   const tables = !vat ? {} : {
     sales: { title: L(`বিক্রির ${tn} — বিল অনুযায়ী`, `Output ${tn} — Sales bills`), cols: billCols(L("কাস্টমার", "Customer"), L("মূল বিল", "Orig. bill")), rows: billRows(vat.salesRows, L("নগদ কাস্টমার", "Cash customer")), foot: billFoot(vat.salesRows), returns: vat.salesRows.map((r) => r.isReturn) },
-    purchases: { title: L(`ক্রয়ের ${tn} — বিল অনুযায়ী`, `Input ${tn} — Purchase bills`), cols: billCols(L("সাপ্লায়ার", "Supplier"), L("সাপ্লায়ারের বিল", "Supplier bill")), rows: billRows(vat.purchaseRows, "—"), foot: billFoot(vat.purchaseRows), returns: vat.purchaseRows.map((r) => r.isReturn) },
+    purchases: { title: L(`ক্রয় ও খরচের ${tn} — বিল অনুযায়ী`, `Input ${tn} — Purchase & expense bills`), cols: billCols(L("সাপ্লায়ার / কাকে", "Supplier / Paid to"), L("সাপ্লায়ারের বিল", "Supplier bill")), rows: billRows(vat.purchaseRows, "—"), foot: billFoot(vat.purchaseRows), returns: vat.purchaseRows.map((r) => r.isReturn) },
     products: {
       title: L(`পণ্য অনুযায়ী ${tn}`, `${tn} by product`),
       cols: [{ label: L("কোড", "Code"), w: 110 }, { label: L("পণ্য", "Product") }, { label: L("বিক্রি qty", "Sold qty"), align: "right", w: 70 }, { label: L("বিক্রি (VAT ছাড়া)", "Sales taxable"), align: "right", w: 105 }, { label: L(`বিক্রির ${tn}`, `Output ${tn}`), align: "right", w: 90 }, { label: L("ক্রয় qty", "Bought qty"), align: "right", w: 70 }, { label: L("ক্রয় (VAT ছাড়া)", "Purchase taxable"), align: "right", w: 105 }, { label: L(`ক্রয়ের ${tn}`, `Input ${tn}`), align: "right", w: 90 }],
@@ -110,9 +110,10 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
       [`${box(1)}${L(`বিক্রির ${tn}`, `${tn} on sales`)}`, vat.outputVat, true],
       [`${isUae ? "Box 4/5 · " : ""}${L(`${tn} ছাড়া বিক্রি (zero-rated / exempt)`, `Sales without ${tn} (zero-rated / exempt)`)}`, vat.noVatSales],
     ]],
-    [L(`ক্রয় — যে ${tn} আপনি দিয়েছেন (Input)`, `Purchases — ${tn} you paid (Input)`), [
-      [`${box(9)}${L(`${tn} সহ ক্রয় (VAT ছাড়া মূল্য)`, `Standard-rated expenses (taxable value)`)}`, vat.stdPurch],
-      [`${box(9)}${L(`ক্রয়ের ${tn} (ফেরত পাবেন)`, `Recoverable ${tn} on purchases`)}`, vat.inputVat, true],
+    [L(`ক্রয় ও খরচ — যে ${tn} আপনি দিয়েছেন (Input)`, `Purchases & expenses — ${tn} you paid (Input)`), [
+      [`${box(9)}${L(`${tn} সহ ক্রয় ও খরচ (VAT ছাড়া মূল্য)`, `Standard-rated expenses (taxable value)`)}`, vat.stdPurch],
+      ...(vat.expenseVat ? [[L(`   এর মধ্যে দোকানের খরচের ${tn} (${vat.expenseCount}টি বিল)`, `   of which ${tn} on shop expenses (${vat.expenseCount} bills)`), vat.expenseVat]] : []),
+      [`${box(9)}${L(`ক্রয় ও খরচের ${tn} (ফেরত পাবেন)`, `Recoverable ${tn} on purchases & expenses`)}`, vat.inputVat, true],
       [L(`${tn} ছাড়া ক্রয়`, `Purchases without ${tn}`), vat.noVatPurch],
     ]],
     [L("ফলাফল", "Result"), [
@@ -454,8 +455,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
             </div>
             <div className="si-note">
               {L(
-                `বিক্রির ${tn} = confirmed/paid বিক্রির বিলের ${tn} − সেলস রিটার্নের ${tn}। ক্রয়ের ${tn} = পারচেজ বিলের ${tn} − পারচেজ রিটার্নের ${tn}। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর Opening Balance বিল ধরা হয়নি। এই অ্যাপ নিজে সরকারের সাইটে জমা দেয় না — সংখ্যাগুলো আপনি নিজে ফর্মে বসাবেন।`,
-                `Output ${tn} = ${tn} on confirmed/paid sales bills − ${tn} on sales returns. Input ${tn} = ${tn} on purchase bills − ${tn} on purchase returns. Drafts, cancelled bills, quotations, delivery notes and opening-balance bills are not counted. The app does not submit to the government site itself — you enter these numbers in the form.`
+                `বিক্রির ${tn} = confirmed/paid বিক্রির বিলের ${tn} − সেলস রিটার্নের ${tn}। ক্রয়ের ${tn} = পারচেজ বিলের ${tn} + 💸 খরচ পেজে যে খরচে ${tn} লেখা আছে − পারচেজ রিটার্নের ${tn}। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর Opening Balance বিল ধরা হয়নি। এই অ্যাপ নিজে সরকারের সাইটে জমা দেয় না — সংখ্যাগুলো আপনি নিজে ফর্মে বসাবেন।`,
+                `Output ${tn} = ${tn} on confirmed/paid sales bills − ${tn} on sales returns. Input ${tn} = ${tn} on purchase bills + ${tn} entered on 💸 Expenses − ${tn} on purchase returns. Drafts, cancelled bills, quotations, delivery notes and opening-balance bills are not counted. The app does not submit to the government site itself — you enter these numbers in the form.`
               )}
               {vat.missingCustomerTrn > 0 && <div style={{ color: "#b45309", fontWeight: 700, marginTop: 3 }}>⚠ {L(`${vat.missingCustomerTrn}টি Tax Invoice-এ কাস্টমারের TRN নেই — কাস্টমার রেজিস্টার্ড হলে TRN লিখে দিন।`, `${vat.missingCustomerTrn} tax invoice(s) have no customer TRN — add it if the customer is registered.`)}</div>}
               {!shop?.trnNumber && isUae && <div style={{ color: "#b45309", fontWeight: 700, marginTop: 3 }}>⚠ {L("দোকানের TRN দেওয়া নেই — ⚙️ সেটিংস → দোকানের তথ্যে লিখুন।", "Shop TRN is missing — add it in ⚙️ Settings → Shop Info.")}</div>}
@@ -472,6 +473,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
       <div className="si-statusbar">
         {vat && view === "vat" && <span>{L("বিক্রির বিল", "Sales bills")} <b>{vat.salesCount}</b>{vat.salesReturnCount ? ` (+${vat.salesReturnCount} ↩)` : ""}</span>}
         {vat && view === "vat" && <span>{L("ক্রয়ের বিল", "Purchase bills")} <b>{vat.purchCount}</b>{vat.purchReturnCount ? ` (+${vat.purchReturnCount} ↩)` : ""}</span>}
+        {vat && view === "vat" && vat.expenseCount > 0 && <span>{L(`${tn} সহ খরচ`, `Expenses with ${tn}`)} <b>{vat.expenseCount}</b></span>}
         <span>{bn ? TAX_PRESETS[settings.country]?.bn : TAX_PRESETS[settings.country]?.en} · {tn} {settings.rate}% · {monthly ? L("মাসিক", "Monthly") : L("৩ মাস পর পর", "Quarterly")}</span>
       </div>
       {settingsWindow}

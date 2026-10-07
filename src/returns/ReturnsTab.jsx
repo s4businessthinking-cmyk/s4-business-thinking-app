@@ -201,6 +201,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
         items: picked.map((l) => ({
           lineIndex: l.idx, productId: l.it.productId || null, name: l.it.name || "", code: l.it.code || "", brand: l.it.brand || "",
           qty: l.qty, unit: l.it.unit || "Pcs", unitFactor: n2(l.it.unitFactor) || 1, rate: l.rate, amount: l.amount, vatAmt: l.vat,
+          ...(l.it.batchNo ? { batchNo: l.it.batchNo } : {}),
         })),
         subtotal: r2(total - totalVat), totalVat, total,
         appliedToInvoice: appliedNow, refundAmount: refundNow, refundMethod: refundNow > 0 ? refundMethod : "",

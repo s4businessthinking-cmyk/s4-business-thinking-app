@@ -163,8 +163,8 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
             </div>
             <div className="si-note">
               {L(
-                "মোট লাভ = নিট বিক্রি − বিক্রি হওয়া মালের গড় ক্রয়মূল্য (opening stock আর confirmed পারচেজ থেকে, VAT বাদে)। নিট লাভ = মোট লাভ − 💸 খরচ পেজে লেখা দোকানের খরচ। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর পার্টির Opening Balance বিল বিক্রি/ক্রয়ে ধরা হয়নি (তবে বাকিতে ধরা আছে)। বাউন্স হওয়া খরচের চেক টাকা-যাওয়াতে ধরা হয়নি।",
-                "Gross profit = net sales − average purchase cost of goods sold (from opening stock and confirmed purchases, VAT excluded). Net profit = gross profit − shop expenses entered on the 💸 Expenses page. Drafts, cancelled bills, quotations, delivery notes and party opening-balance bills are not counted as sales/purchases (they are in the dues). Bounced expense cheques are not counted as money out."
+                "মোট লাভ = নিট বিক্রি − বিক্রি হওয়া মালের গড় ক্রয়মূল্য (opening stock আর confirmed পারচেজ থেকে, VAT বাদে)। নিট লাভ = মোট লাভ − 💸 খরচ পেজে লেখা দোকানের খরচ (খরচের বিলের VAT বাদে, কারণ সেটা VAT রিটার্নে ফেরত পাওয়া যায়)। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর পার্টির Opening Balance বিল বিক্রি/ক্রয়ে ধরা হয়নি (তবে বাকিতে ধরা আছে)। বাউন্স হওয়া খরচের চেক টাকা-যাওয়াতে ধরা হয়নি।",
+                "Gross profit = net sales − average purchase cost of goods sold (from opening stock and confirmed purchases, VAT excluded). Net profit = gross profit − shop expenses entered on the 💸 Expenses page (without the VAT on expense bills, which is claimed back in the VAT return). Drafts, cancelled bills, quotations, delivery notes and party opening-balance bills are not counted as sales/purchases (they are in the dues). Bounced expense cheques are not counted as money out."
               )}
               {report.unpriced > 0 && <div style={{ color: "#b45309", fontWeight: 700, marginTop: 3 }}>⚠ {L(`${report.unpriced}টি বিক্রির লাইনে প্রোডাক্টের ক্রয়মূল্য নেই, তাই সেগুলোর খরচ 0 ধরা হয়েছে।`, `${report.unpriced} sold line(s) have no purchase cost, so their cost is counted as 0.`)}</div>}
             </div>

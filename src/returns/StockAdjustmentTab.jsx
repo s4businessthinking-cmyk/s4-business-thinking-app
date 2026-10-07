@@ -55,7 +55,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
 
   useEffect(() => {
     if (!shopId) return undefined;
-    const unsub = subscribeShopCollection({ collectionName: "stockAdjustments", shopId, onRows: (list) => setRows(list || []) });
+    const unsub = subscribeShopCollection({ collectionName: "stockAdjustments", shopId, onRows: (list) => setRows((list || []).filter((r) => !r.kind)) });
     return () => { try { unsub?.(); } catch { /* ignore */ } };
   }, [shopId]);
 

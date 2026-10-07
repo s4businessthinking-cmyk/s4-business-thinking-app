@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import Modal from "../Modal";
 import { parseProductMasterFile } from "../importFile";
+import { splitNewRecords } from "../importMatch";
 
 const TARGET_FIELDS = [
   { value: "", label: "-- Ignore --" },
@@ -122,8 +123,11 @@ function autoMap(headers) {
   return mapping;
 }
 
-export default function ImportModal({ onImport, onClose, notify, replacementMode = false }) {
+export default function ImportModal({ onImport, onClose, notify, replacementMode = false, products = [] }) {
   const [step, setStep] = useState("upload");
+  const canSkipExisting = !replacementMode && products.length > 0;
+  const [onlyNew, setOnlyNew] = useState(true);
+  const skipExisting = canSkipExisting && onlyNew;
   const [headers, setHeaders] = useState([]);
   const [rows, setRows] = useState([]);
   const [mapping, setMapping] = useState({});
@@ -146,6 +150,12 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
     });
     return record;
   }), [mapping, rows]);
+
+  const split = useMemo(
+    () => (skipExisting ? splitNewRecords(mappedRecords, products) : null),
+    [skipExisting, mappedRecords, products]
+  );
+  const toImport = split ? split.fresh : mappedRecords.filter((record) => String(record.name || "").trim());
 
   const preview = useMemo(() => {
     const seenCodes = new Set();
@@ -205,9 +215,13 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
     if (new Set(selectedFields).size !== selectedFields.length) {
       return notify("The same Product Master field cannot be mapped more than once", "err");
     }
+    if (!toImport.length) {
+      return notify(skipExisting ? "All products in this file are already in the Product Master — nothing new to import" : "No rows to import", "err");
+    }
     setBusy(true);
     try {
-      setResult(await onImport(mappedRecords.filter((record) => String(record.name || "").trim())));
+      const res = await onImport(toImport);
+      setResult(split ? { ...res, alreadyThere: split.existing.length + split.repeated.length } : res);
       setStep("result");
     } catch (err) {
       notify(err.message || "Import failed", "err");
@@ -238,6 +252,38 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
             <span>Duplicate barcode rows: <strong>{preview.duplicateCodes}</strong></span>
             <span>Invalid JSON values: <strong>{preview.invalidJson}</strong></span>
           </div>
+          {canSkipExisting && (
+            <div className="pm-import-preview" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+              <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 700 }}>
+                <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
+                Only add products that are not in the Product Master yet (existing products, their More Barcodes and rates stay untouched)
+              </label>
+              {split ? (
+                <>
+                  <span>
+                    New: <strong style={{ color: "#15803d" }}>{split.fresh.length}</strong>
+                    {"  ·  "}Already in Product Master (skipped): <strong>{split.existing.length}</strong>
+                    {split.repeated.length > 0 && <>{"  ·  "}Repeated in file: <strong>{split.repeated.length}</strong></>}
+                  </span>
+                  <span className="pm-hint" style={{ margin: 0 }}>A row counts as existing when Product Name + Code/Model match, or its barcode is already used.</span>
+                  {split.fresh.length > 0 && (
+                    <div className="pm-table-wrap" style={{ maxHeight: 160 }}>
+                      <table className="pm-table">
+                        <thead><tr><th style={{ width: 40 }}>#</th><th>New Product Name</th><th>Code / Model</th><th>Barcode</th></tr></thead>
+                        <tbody>
+                          {split.fresh.map((r, i) => (
+                            <tr key={i}><td>{i + 1}</td><td>{r.name}</td><td>{r.code || ""}</td><td>{r.barcode || ""}</td></tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span style={{ color: "#b45309", fontWeight: 700 }}>⚠ Every row will be added as a new product — products already in the master will be duplicated.</span>
+              )}
+            </div>
+          )}
           <div className="pm-table-wrap" style={{ maxHeight: 300 }}>
             <table className="pm-table">
               <thead><tr><th>Source Column</th><th>Sample</th><th>Maps To</th></tr></thead>
@@ -263,7 +309,7 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
           <div className="pm-window-foot">
             <button type="button" className="pm-btn-secondary" onClick={closeSafely} disabled={busy}>Cancel</button>
             <button type="button" className="pm-btn" onClick={commit} disabled={busy}>
-              {busy ? "Importing..." : `Import ${rows.length} rows`}
+              {busy ? "Importing..." : split ? `Import ${split.fresh.length} new products` : `Import ${rows.length} rows`}
             </button>
           </div>
         </>
@@ -274,6 +320,7 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
           <div style={{ display: "flex", gap: 16, fontSize: 12.5, fontWeight: 700 }}>
             <span style={{ color: "#15803d" }}>Created: {result.created}</span>
             <span style={{ color: "#b91c1c" }}>Skipped: {result.skipped}</span>
+            {result.alreadyThere > 0 && <span style={{ color: "#475569" }}>Already in Product Master (left as is): {result.alreadyThere}</span>}
           </div>
           {result.errors?.length > 0 && (
             <div className="pm-table-wrap" style={{ maxHeight: 240 }}>

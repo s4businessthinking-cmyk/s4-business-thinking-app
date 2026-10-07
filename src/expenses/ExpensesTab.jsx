@@ -6,6 +6,7 @@ import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
+import { taxSettingsOf } from "../reports/taxDomain.js";
 
 export const EXPENSE_CATEGORIES = [
   { key: "rent", bn: "দোকান ভাড়া", en: "Rent", icon: "🏠" },
@@ -24,6 +25,21 @@ export const EXPENSE_CATEGORIES = [
   { key: "other", bn: "অন্যান্য", en: "Other", icon: "🧾" },
 ];
 
+export const EMPLOYEE_EXPENSE_CATEGORIES = [
+  { key: "salary", bn: "বেতন", en: "Salary", icon: "👷" },
+  { key: "advance", bn: "অগ্রিম", en: "Advance", icon: "💵" },
+  { key: "overtime", bn: "ওভারটাইম", en: "Overtime", icon: "⏱️" },
+  { key: "bonus", bn: "বোনাস / কমিশন", en: "Bonus / Commission", icon: "🎁" },
+  { key: "allowance", bn: "ভাতা (খাবার/যাতায়াত)", en: "Allowance (food/travel)", icon: "🍱" },
+  { key: "visa", bn: "ভিসা / পারমিট", en: "Visa / Permit", icon: "🛂" },
+  { key: "ticket", bn: "এয়ার টিকিট", en: "Air ticket", icon: "✈️" },
+  { key: "gratuity", bn: "সার্ভিস বেনিফিট / গ্র্যাচুইটি", en: "Gratuity / End of service", icon: "🏁" },
+  { key: "medical", bn: "চিকিৎসা / ইনস্যুরেন্স", en: "Medical / Insurance", icon: "🩺" },
+  { key: "other", bn: "অন্যান্য", en: "Other", icon: "🧾" },
+];
+
+const ALL_CATEGORIES = [...EXPENSE_CATEGORIES, ...EMPLOYEE_EXPENSE_CATEGORIES.filter((c) => !EXPENSE_CATEGORIES.some((x) => x.key === c.key))];
+
 const METHODS = [
   { key: "cash", bn: "নগদ", en: "Cash" },
   { key: "bank_transfer", bn: "ব্যাংক ট্রান্সফার", en: "Bank Transfer" },
@@ -39,20 +55,28 @@ const monthStart = () => { const d = new Date(); return localDay(new Date(d.getF
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 
 export function expenseCategoryLabel(row, bn) {
-  const cat = EXPENSE_CATEGORIES.find((c) => c.key === row?.category);
+  const cat = ALL_CATEGORIES.find((c) => c.key === row?.category);
   if (cat && cat.key !== "other") return `${cat.icon} ${bn ? cat.bn : cat.en}`;
   return `🧾 ${row?.categoryName || (bn ? "অন্যান্য" : "Other")}`;
 }
 
-const emptyForm = () => ({ expenseDate: localDay(), category: "rent", categoryName: "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay() });
+// vatAuto: the VAT box follows the amount until the user types their own VAT figure.
+const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "" });
 
-export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null }) {
+export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null, shop = null, employeeMode = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
+  const taxCfg = useMemo(() => taxSettingsOf(shop), [shop]);
+  const tn = taxCfg.taxName || "VAT";
+  const vatRate = Math.max(0, n(taxCfg.rate));
+  const vatOn = taxCfg.taxApplicable !== "none" && vatRate > 0;
+  const autoVat = (amount) => (vatRate > 0 && n(amount) > 0 ? String(r2((n(amount) * vatRate) / (100 + vatRate))) : "");
   const [rows, setRows] = useState([]);
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(() => localDay());
   const [catFilter, setCatFilter] = useState("");
+  const [empFilter, setEmpFilter] = useState("");
+  const [employees, setEmployees] = useState([]);
   const [search, setSearch] = useState("");
   const [showCancelled, setShowCancelled] = useState(false);
   const [form, setForm] = useState(null);
@@ -69,7 +93,16 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     return () => { try { unsub?.(); } catch { /* ignore */ } };
   }, [shopId]);
 
-  const mine = useMemo(() => rows.filter((r) => r && !r.isDeleted && r.shopId === shopId && (isOwner || r.createdBy === user?.uid)), [rows, shopId, isOwner, user?.uid]);
+  useEffect(() => {
+    if (!shopId) return undefined;
+    const unsub = subscribeShopCollection({ collectionName: "employees", shopId, onRows: (list) => setEmployees((list || []).filter((e) => e && !e.isDeleted && e.shopId === shopId)) });
+    return () => { try { unsub?.(); } catch { /* ignore */ } };
+  }, [shopId]);
+
+  const activeEmployees = useMemo(() => employees.filter((e) => e.status !== "inactive").sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))), [employees]);
+  const empName = (id, fallback = "") => employees.find((e) => e.id === id)?.name || fallback;
+
+  const mine = useMemo(() => rows.filter((r) => r && !r.isDeleted && r.shopId === shopId && (isOwner || r.createdBy === user?.uid) && (!employeeMode || r.employeeId)), [rows, shopId, isOwner, user?.uid, employeeMode]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -77,35 +110,54 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       .filter((r) => (showCancelled || r.status !== "cancelled"))
       .filter((r) => (!from || String(r.expenseDate) >= from) && (!to || String(r.expenseDate) <= to))
       .filter((r) => !catFilter || r.category === catFilter)
-      .filter((r) => !q || [r.expenseNo, r.paidTo, r.note, r.refNo, r.categoryName].some((v) => String(v || "").toLowerCase().includes(q)))
+      .filter((r) => !empFilter || r.employeeId === empFilter)
+      .filter((r) => !q || [r.expenseNo, r.paidTo, r.note, r.refNo, r.categoryName, r.employeeName].some((v) => String(v || "").toLowerCase().includes(q)))
       .sort((a, b) => String(b.expenseDate).localeCompare(String(a.expenseDate)) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  }, [mine, from, to, catFilter, search, showCancelled]);
+  }, [mine, from, to, catFilter, empFilter, search, showCancelled]);
 
   const active = filtered.filter((r) => r.status !== "cancelled");
   const total = active.reduce((t, r) => t + n(r.amount), 0);
+  const vatTotal = active.reduce((t, r) => t + n(r.vatAmount), 0);
+  const showVat = vatOn || mine.some((r) => n(r.vatAmount) > 0);
   const byCategory = useMemo(() => {
     const map = new Map();
     active.forEach((r) => {
       const label = expenseCategoryLabel(r, bn);
-      const cur0 = map.get(label) || { amt: 0, key: EXPENSE_CATEGORIES.some((c) => c.key === r.category) ? r.category : "other" };
+      const cur0 = map.get(label) || { amt: 0, key: ALL_CATEGORIES.some((c) => c.key === r.category) ? r.category : "other" };
       cur0.amt += n(r.amount);
       map.set(label, cur0);
     });
     return [...map.entries()].map(([label, v]) => [label, v.amt, v.key]).sort((a, b) => b[1] - a[1]);
   }, [active, bn]);
+  const byEmployee = useMemo(() => {
+    const map = new Map();
+    active.forEach((r) => {
+      if (!r.employeeId) return;
+      const cur0 = map.get(r.employeeId) || { amt: 0, advance: 0, name: empName(r.employeeId, r.employeeName || "") };
+      cur0.amt += n(r.amount);
+      if (r.category === "advance") cur0.advance += n(r.amount);
+      map.set(r.employeeId, cur0);
+    });
+    return [...map.entries()].map(([id, v]) => ({ id, ...v })).sort((a, b) => b.amt - a.amt);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, employees]);
 
   const nextNo = () => {
     const mx = rows.reduce((m, r) => { const x = String(r.expenseNo || "").match(/EXP-?(\d+)$/i); return x ? Math.max(m, Number(x[1])) : m; }, 0);
     return `EXP-${String(mx + 1).padStart(4, "0")}`;
   };
 
-  const openNew = () => { const f = emptyForm(); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
+  const openNew = () => { const f = { ...emptyForm(employeeMode), employeeId: employeeMode ? empFilter : "" }; if (f.employeeId) f.paidTo = empName(f.employeeId); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
   const openEdit = (r) => {
-    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", amount: String(r.amount ?? ""), method: r.method || "cash", paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay() };
+    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: r.method || "cash", paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "" };
     setEditId(r.id);
     setForm(f);
     setBaseline(JSON.stringify(f));
   };
+
+  // Salary is always paid to someone, so the general Expenses window asks for the employee too.
+  const usesEmployeeCats = (f) => employeeMode || (!!f?.employeeId && !EXPENSE_CATEGORIES.some((c) => c.key === f.category));
+  const showsEmployee = (f) => !!f && (usesEmployeeCats(f) || f.category === "salary");
 
   const save = async () => {
     if (saving || !form) return;
@@ -113,8 +165,13 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     if (!(amount > 0)) { toast?.(L("❌ সঠিক টাকার পরিমাণ লিখুন", "❌ Enter a valid amount"), "err"); return; }
     if (!form.expenseDate) { toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err"); return; }
     if (form.category === "other" && !form.categoryName.trim()) { toast?.(L("❌ খরচের ধরন লিখুন", "❌ Type the expense type"), "err"); return; }
+    const linkEmployee = showsEmployee(form);
+    const oldUnlinked = !!editId && !rows.find((r) => r.id === editId)?.employeeId;
+    if (linkEmployee && !form.employeeId && (employeeMode || (activeEmployees.length > 0 && !oldUnlinked))) { toast?.(L("❌ কর্মচারী বাছুন", "❌ Pick the employee"), "err"); return; }
     const isCheque = form.method === "cheque";
     if (isCheque && !form.chequeDate) { toast?.(L("❌ চেকের তারিখ দিন", "❌ Pick the cheque date"), "err"); return; }
+    const vatAmount = form.hasVat ? r2(form.vatAmount) : 0;
+    if (form.hasVat && !(vatAmount > 0 && vatAmount < amount)) { toast?.(L(`❌ ${tn}-এর পরিমাণ ঠিক করুন — মোট টাকার চেয়ে কম হতে হবে`, `❌ Fix the ${tn} amount — it must be less than the total`), "err"); return; }
     setSaving(true);
     const nowIso = new Date().toISOString();
     const prev = editId ? rows.find((r) => r.id === editId) || {} : {};
@@ -123,6 +180,9 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       amount, method: form.method, paidTo: form.paidTo.trim(), refNo: form.refNo.trim(), note: form.note.trim(),
       chequeNo: isCheque ? form.chequeNo.trim() : "", chequeBank: isCheque ? form.chequeBank.trim() : "", chequeDate: isCheque ? form.chequeDate : "",
       chequeStatus: isCheque ? (prev.method === "cheque" && prev.chequeStatus && prev.chequeDate === form.chequeDate ? prev.chequeStatus : "pending") : "",
+      vatAmount, supplierTrn: form.hasVat ? form.supplierTrn.trim() : "",
+      employeeId: linkEmployee ? form.employeeId || "" : "", employeeName: linkEmployee && form.employeeId ? empName(form.employeeId, prev.employeeName || "") : "",
+      forMonth: linkEmployee && form.employeeId ? form.forMonth || String(form.expenseDate).slice(0, 7) : "",
       updatedAt: nowIso, updatedBy: user?.uid || "",
     };
     try {
@@ -184,13 +244,16 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
 
   const print = () => {
     const cols = [
-      { label: "Date" }, { label: "No" }, { label: L("ধরন", "Type") }, { label: L("কাকে", "Paid To") },
-      { label: L("বিবরণ", "Note") }, { label: L("মাধ্যম", "Mode") }, { label: `${L("টাকা", "Amount")} (${cur})`, align: "right" },
+      { label: "Date" }, { label: "No" }, { label: L("ধরন", "Type") }, { label: employeeMode ? L("কর্মচারী", "Employee") : L("কাকে", "Paid To") },
+      { label: L("বিবরণ", "Note") }, { label: L("মাধ্যম", "Mode") },
+      ...(showVat ? [{ label: `${tn} (${cur})`, align: "right" }] : []),
+      { label: `${L("টাকা", "Amount")} (${cur})`, align: "right" },
     ];
-    const body = active.map((r) => [fmtDay(r.expenseDate), r.expenseNo || "", expenseCategoryLabel(r, false).replace(/^\S+\s/, ""), r.paidTo || "", r.note || "", (METHODS.find((m) => m.key === r.method)?.en) || r.method || "", money(r.amount)]);
+    const body = active.map((r) => [fmtDay(r.expenseDate), r.expenseNo || "", expenseCategoryLabel(r, false).replace(/^\S+\s/, ""), employeeMode ? empName(r.employeeId, r.employeeName || "") : (r.paidTo || ""), [r.forMonth ? `[${r.forMonth}]` : "", r.note || ""].filter(Boolean).join(" "), (METHODS.find((m) => m.key === r.method)?.en) || r.method || "", ...(showVat ? [n(r.vatAmount) > 0 ? money(r.vatAmount) : ""] : []), money(r.amount)]);
     printWithSettings(generateStatementHTML({
-      shopName, title: "EXPENSE REPORT", subtitle: `${from ? fmtDay(from) : "Start"} — ${to ? fmtDay(to) : "Today"}`,
-      cols, rows: body, foot: ["", "", "", "", "", "TOTAL", money(total)],
+      shopName, title: employeeMode ? "EMPLOYEE EXPENSE REPORT" : "EXPENSE REPORT",
+      subtitle: `${from ? fmtDay(from) : "Start"} — ${to ? fmtDay(to) : "Today"}${empFilter ? ` · ${empName(empFilter)}` : ""}`,
+      cols, rows: body, foot: ["", "", "", "", "", "TOTAL", ...(showVat ? [money(vatTotal)] : []), money(total)],
     }), { lang });
   };
 
@@ -240,13 +303,15 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const pendingCheques = active.filter((r) => r.method === "cheque" && (r.chequeStatus || "pending") === "pending");
   const cancelledCount = filtered.length - active.length;
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const setAmount = (v) => setForm((f) => ({ ...f, amount: v, ...(f.hasVat && f.vatAuto ? { vatAmount: autoVat(v) } : {}) }));
+  const toggleVat = (on) => setForm((f) => ({ ...f, hasVat: on, vatAuto: true, vatAmount: on ? autoVat(f.amount) : "", supplierTrn: on ? f.supplierTrn : "" }));
   const fField = (label, control, extra) => (
     <div className="si-field" style={extra}><span className="pm-label">{label}</span>{control}</div>
   );
 
   const toolbar = (
     <div className="si-toolbar">
-      <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন খরচ", "New Expense")}</button>
+      <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {employeeMode ? L("কর্মচারীর খরচ", "Employee Expense") : L("নতুন খরচ", "New Expense")}</button>
       <button type="button" className="pm-btn-secondary" onClick={print} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>
       <span className="si-toolbar-gap" />
       <div className="si-pills">
@@ -264,6 +329,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       <div className="si-kpi"><span>{L("মোট খরচ", "Total expenses")}</span><b style={{ color: "#b91c1c" }}>{cur} {money(total)}</b></div>
       <div className="si-kpi"><span>{L("এন্ট্রি", "Entries")}</span><b>{active.length}</b></div>
       <div className="si-kpi"><span>{L("নগদে", "Paid in cash")}</span><b>{money(cashTotal)}</b></div>
+      {showVat && <div className="si-kpi"><span>{L(`${tn} (ফেরত পাবেন)`, `${tn} (claimable)`)}</span><b style={{ color: "#15803d" }}>{money(vatTotal)}</b></div>}
       <div className="si-kpi"><span>{L("পেন্ডিং চেক", "Pending cheques")}</span><b style={{ color: pendingCheques.length ? "#b45309" : undefined }}>{pendingCheques.length} · {money(pendingCheques.reduce((t, r) => t + n(r.amount), 0))}</b></div>
     </div>
   );
@@ -276,8 +342,14 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       </div>
       <select className="pm-input" style={{ width: mobile ? "100%" : 190 }} value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
         <option value="">{L("সব ধরন", "All types")}</option>
-        {EXPENSE_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.icon} {bn ? c.bn : c.en}</option>)}
+        {(employeeMode ? EMPLOYEE_EXPENSE_CATEGORIES : EXPENSE_CATEGORIES).map((c) => <option key={c.key} value={c.key}>{c.icon} {bn ? c.bn : c.en}</option>)}
       </select>
+      {(employeeMode || employees.length > 0) && (
+        <select className="pm-input" style={{ width: mobile ? "100%" : 190 }} value={empFilter} onChange={(e) => setEmpFilter(e.target.value)}>
+          <option value="">{L("সব কর্মচারী", "All employees")}</option>
+          {employees.map((e) => <option key={e.id} value={e.id}>{e.name}{e.status === "inactive" ? ` (${L("বাদ", "left")})` : ""}</option>)}
+        </select>
+      )}
       <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
     </div>
   );
@@ -294,11 +366,12 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
         <th style={{ width: 74 }}>{L("তারিখ", "Date")}</th>
         <th style={{ width: 78 }}>{L("নং", "No")}</th>
         <th style={{ width: 130 }}>{L("ধরন", "Type")}</th>
-        <th>{L("কাকে", "Paid To")}</th>
+        <th>{employeeMode ? L("কর্মচারী", "Employee") : L("কাকে", "Paid To")}</th>
         <th>{L("বিবরণ", "Note")}</th>
         <th style={{ width: 92 }}>{L("মাধ্যম", "Mode")}</th>
         <th style={{ width: 120 }}>{L("চেক", "Cheque")}</th>
         {isOwner && <th style={{ width: 90 }}>{L("লিখেছেন", "By")}</th>}
+        {showVat && <th style={{ width: 76 }} className="si-num">{tn}</th>}
         <th style={{ width: 96 }} className="si-num">{L("টাকা", "Amount")}</th>
       </tr></thead>
       <tbody>
@@ -309,11 +382,12 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
               <td>{fmtDay(r.expenseDate)}</td>
               <td className="si-strong">{r.expenseNo}</td>
               <td>{catName(r)}</td>
-              <td title={r.paidTo || ""}>{r.paidTo || "—"}</td>
-              <td title={r.note || ""}>{r.refNo ? `[${r.refNo}] ` : ""}{r.note || ""}</td>
+              <td title={r.paidTo || ""}>{r.employeeId ? `👷 ${empName(r.employeeId, r.employeeName || "")}` : (r.paidTo || "—")}</td>
+              <td title={r.note || ""}>{r.forMonth ? `[${r.forMonth}] ` : ""}{r.refNo ? `[${r.refNo}] ` : ""}{r.note || ""}</td>
               <td>{methodName(r)}</td>
               <td>{r.method === "cheque" ? <><span className="si-badge" style={{ color: chequeColor(r.chequeStatus) }}>{chequeLabel(r.chequeStatus)}</span> {fmtDay(r.chequeDate)}</> : ""}</td>
               {isOwner && <td>{r.createdByName || ""}</td>}
+              {showVat && <td className="si-num">{n(r.vatAmount) > 0 ? money(r.vatAmount) : ""}</td>}
               <td className="si-num si-strong" style={cancelled ? { textDecoration: "line-through" } : { color: "#b91c1c" }}>
                 {cancelled && <span className="si-badge" style={{ color: "#6b7280", marginRight: 4, textDecoration: "none" }}>{L("বাতিল", "Cancelled")}</span>}
                 {money(r.amount)}
@@ -334,7 +408,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
           <span style={cancelled ? { textDecoration: "line-through" } : { color: "#b91c1c" }}>{cur} {money(r.amount)}</span>
         </div>
         <div className="si-mrow-sub">
-          <span>{fmtDay(r.expenseDate)} · {r.expenseNo}{r.paidTo ? ` · ${r.paidTo}` : ""}</span>
+          <span>{fmtDay(r.expenseDate)} · {r.expenseNo}{r.employeeId ? ` · 👷 ${empName(r.employeeId, r.employeeName || "")}` : r.paidTo ? ` · ${r.paidTo}` : ""}{n(r.vatAmount) > 0 ? ` · ${tn} ${money(r.vatAmount)}` : ""}</span>
           <span>
             {cancelled ? <span className="si-badge" style={{ color: "#6b7280" }}>{L("বাতিল", "Cancelled")}</span>
               : r.method === "cheque" ? <span className="si-badge" style={{ color: chequeColor(r.chequeStatus) }}>{L("চেক", "Cheque")} · {chequeLabel(r.chequeStatus)}</span>
@@ -367,10 +441,33 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     </div>
   );
 
+  const employeeBox = (
+    <div className="si-box">
+      <table className="pm-table">
+        <thead><tr><th>{L("কর্মচারী", "Employee")}</th><th style={{ width: 80 }} className="si-num">{L("অগ্রিম", "Advance")}</th><th style={{ width: 92 }} className="si-num">{L("মোট", "Total")}</th></tr></thead>
+        <tbody>
+          <tr className={`pm-clickable${!empFilter ? " pm-selected" : ""}`} onClick={() => setEmpFilter("")}>
+            <td className="si-strong">{L("সব কর্মচারী", "All employees")}</td><td className="si-num">{money(byEmployee.reduce((t, e) => t + e.advance, 0))}</td><td className="si-num si-strong">{money(total)}</td>
+          </tr>
+          {byEmployee.map((e) => (
+            <tr key={e.id} className={`pm-clickable${empFilter === e.id ? " pm-selected" : ""}`} onClick={() => setEmpFilter(empFilter === e.id ? "" : e.id)}>
+              <td>👷 {e.name || "—"}</td>
+              <td className="si-num">{e.advance > 0 ? money(e.advance) : ""}</td>
+              <td className="si-num">{money(e.amt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!byEmployee.length && <div className="si-empty">{activeEmployees.length ? L("এই সময়ে কোনো খরচ নেই", "No expenses in this period") : L("আগে Employees মাস্টারে কর্মচারী যোগ করুন", "Add employees in the Employees master first")}</div>}
+    </div>
+  );
+  const sideBox = employeeMode ? employeeBox : categoryBox;
+  const formForEmployee = showsEmployee(form);
+
   const catGrid = form && (
     <div className="si-types" style={{ gridTemplateColumns: "repeat(3, minmax(0,1fr))" }}>
-      {EXPENSE_CATEGORIES.map((c) => (
-        <button key={c.key} type="button" disabled={readOnly} className={`pm-btn-secondary${form.category === c.key ? " is-active" : ""}`} onClick={() => setF("category", c.key)}>
+      {(usesEmployeeCats(form) ? EMPLOYEE_EXPENSE_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
+        <button key={c.key} type="button" disabled={readOnly} className={`pm-btn-secondary${form.category === c.key ? " is-active" : ""}`} onClick={() => setForm((f) => ({ ...f, category: c.key, ...(c.key === "salary" && !f.forMonth ? { forMonth: String(f.expenseDate || localDay()).slice(0, 7) } : {}) }))}>
           {c.icon} {bn ? c.bn : c.en}
         </button>
       ))}
@@ -379,10 +476,44 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
 
   const fields = form && (
     <div className="si-panel-body" style={{ gap: 6 }}>
+      {formForEmployee && (
+        <div className="si-grid2">
+          {fField(`${L("কর্মচারী", "Employee")} *`, (
+            <select className="pm-input" disabled={readOnly} value={form.employeeId} onChange={(e) => { const id = e.target.value; setForm((f) => ({ ...f, employeeId: id, paidTo: id ? empName(id) : f.paidTo })); }}>
+              <option value="">{L("— বাছুন —", "— Pick —")}</option>
+              {(form.employeeId && !activeEmployees.some((e) => e.id === form.employeeId) ? [...activeEmployees, { id: form.employeeId, name: empName(form.employeeId, editRow?.employeeName || form.employeeId) }] : activeEmployees)
+                .map((e) => <option key={e.id} value={e.id}>{e.name}{e.designation ? ` · ${e.designation}` : ""}</option>)}
+            </select>
+          ))}
+          {fField(L("কোন মাসের", "For month"), <input type="month" className="pm-input" disabled={readOnly} value={form.forMonth} onChange={(e) => setF("forMonth", e.target.value)} />)}
+        </div>
+      )}
+      {formForEmployee && !activeEmployees.length && <div className="si-hint" style={{ marginLeft: 0 }}>⚠️ {L("কোনো কর্মচারী নেই — আগে Employees মাস্টারে যোগ করুন", "No employees yet — add them in the Employees master first")}</div>}
       <div className="si-grid2">
-        {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input autoFocus={!mobile && !readOnly} className="pm-input" inputMode="decimal" disabled={readOnly} value={form.amount} placeholder="0.00" onChange={(e) => setF("amount", e.target.value)} style={{ fontWeight: 700, color: "#b91c1c" }} />)}
+        {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input autoFocus={!mobile && !readOnly} className="pm-input" inputMode="decimal" disabled={readOnly} value={form.amount} placeholder="0.00" onChange={(e) => setAmount(e.target.value)} style={{ fontWeight: 700, color: "#b91c1c" }} />)}
         {fField(`${L("তারিখ", "Date")} *`, <input type="date" className="pm-input" disabled={readOnly} value={form.expenseDate} onChange={(e) => setF("expenseDate", e.target.value)} />)}
       </div>
+      {(vatOn || form.hasVat) && (
+        <div className="si-entry">
+          <label className="pm-check" style={{ fontWeight: 700 }}>
+            <input type="checkbox" disabled={readOnly} checked={form.hasVat} onChange={(e) => toggleVat(e.target.checked)} />
+            {L(`এই বিলে ${tn} আছে (Tax Invoice পেয়েছি)`, `This bill includes ${tn} (I have a tax invoice)`)}
+          </label>
+          {form.hasVat && (
+            <>
+              <div className="si-grid2">
+                {fField(`${tn} (${cur}) *`, <input className="pm-input" inputMode="decimal" disabled={readOnly} value={form.vatAmount} placeholder="0.00" onChange={(e) => setForm((f) => ({ ...f, vatAmount: e.target.value, vatAuto: false }))} style={{ fontWeight: 700, color: "#15803d" }} />)}
+                {fField(L("সাপ্লায়ারের TRN", "Supplier TRN"), <input className="pm-input" disabled={readOnly} value={form.supplierTrn} onChange={(e) => setF("supplierTrn", e.target.value)} placeholder={L("বিলে লেখা থাকে", "Printed on the bill")} />)}
+              </div>
+              <div className="si-hint" style={{ marginLeft: 0 }}>
+                {L(`মোট টাকা ${tn} সহ লিখুন। ${tn} ছাড়া খরচ`, `Enter the total including ${tn}. Cost without ${tn}`)}: <b>{cur} {money(n(form.amount) - n(form.vatAmount))}</b>
+                {!readOnly && vatRate > 0 && !form.vatAuto && <> · <button type="button" style={{ background: "none", border: 0, padding: 0, color: "#2563eb", cursor: "pointer" }} onClick={() => setForm((f) => ({ ...f, vatAmount: autoVat(f.amount), vatAuto: true }))}>{L(`${vatRate}% দিয়ে হিসাব করুন`, `Work out at ${vatRate}%`)}</button></>}
+                <br />{L(`এই ${tn} ট্যাক্স পেজের "ক্রয়ের ${tn}"-এ যোগ হবে, সরকারকে কম দিতে হবে।`, `This ${tn} is added to "Input ${tn}" on the Tax page, so you pay the government less.`)}
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {form.category === "other" && fField(`${L("খরচের ধরন", "Expense type")} *`, <input className="pm-input" disabled={readOnly} value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} />)}
       {fField(L("কীভাবে দিলেন", "Paid by"), (
         <div className="si-types" style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}>
@@ -416,7 +547,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     </div>
   );
 
-  const title = !editRow ? L("💸 নতুন খরচ", "💸 New Expense") : readOnly ? `🧾 ${editRow.expenseNo}` : `✏️ ${L("খরচ এডিট", "Edit Expense")} — ${editRow.expenseNo}`;
+  const title = !editRow ? (employeeMode ? L("👷 কর্মচারীর খরচ", "👷 Employee Expense") : L("💸 নতুন খরচ", "💸 New Expense")) : readOnly ? `🧾 ${editRow.expenseNo}` : `✏️ ${L("খরচ এডিট", "Edit Expense")} — ${editRow.expenseNo}`;
   const formWindow = form && (
     <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
       <div className="pm-window" style={{ maxWidth: mobile ? undefined : 780 }}>
@@ -457,7 +588,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title">
-        <strong>💸 {L("দোকানের খরচ", "Shop Expenses")}</strong>
+        <strong>{employeeMode ? `👷 ${L("কর্মচারীর খরচ", "Employee Expenses")}` : `💸 ${L("দোকানের খরচ", "Shop Expenses")}`}</strong>
         <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
       {toolbar}
@@ -466,11 +597,11 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       {mobile ? (
         <div className="si-main is-all">
           <div className="si-box">{filtered.length ? listMobile : emptyBox}</div>
-          {byCategory.length > 0 && <div style={{ marginTop: 6 }}>{categoryBox}</div>}
+          {(employeeMode ? byEmployee.length : byCategory.length) > 0 && <div style={{ marginTop: 6 }}>{sideBox}</div>}
         </div>
       ) : (
         <div className="si-main">
-          {categoryBox}
+          {sideBox}
           <div className="si-box">{filtered.length ? listTable : emptyBox}</div>
         </div>
       )}

@@ -1,4 +1,4 @@
-import { n, r2, dayOf, inRange, liveSalesOf, livePurchasesOf, liveReturnsOf } from "./reportFilters.js";
+import { n, r2, dayOf, inRange, isLive, liveSalesOf, livePurchasesOf, liveReturnsOf } from "./reportFilters.js";
 
 // dueDays: days after the period ends to file and pay; null when the country has no single fixed rule.
 export const TAX_PRESETS = {
@@ -113,6 +113,8 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   const purchases = livePurchasesOf(data.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance" && inPeriod(inv.invoiceDate));
   const salesRet = liveReturnsOf(data.extras?.salesReturns, shopId).filter((r) => inPeriod(r.returnDate));
   const purchRet = liveReturnsOf(data.extras?.purchaseReturns, shopId).filter((r) => inPeriod(r.returnDate));
+  // Only expense bills with VAT on them (rent, electricity, repairs…) are claimable; salary and other no-VAT costs stay out.
+  const expenseBills = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && n(e.vatAmount) > 0 && inPeriod(e.expenseDate));
 
   const salesRows = [
     ...sales.map((inv) => ({
@@ -137,6 +139,10 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
       id: r.id, date: dayOf(r.returnDate), no: r.returnNo || "", ref: r.supplierInvoiceNo || r.invoiceNo || "", party: r.partyName || "",
       trn: vendorById.get(r.partyId)?.trnNumber || "",
       taxable: -r2(n(r.total) - n(r.totalVat)), vat: -r2(r.totalVat), total: -r2(r.total), isReturn: true,
+    })),
+    ...expenseBills.map((e) => ({
+      id: e.id, date: dayOf(e.expenseDate), no: e.expenseNo || "", ref: e.refNo || "", party: e.paidTo || e.categoryName || e.category || "",
+      trn: e.supplierTrn || "", taxable: r2(n(e.amount) - n(e.vatAmount)), vat: r2(e.vatAmount), total: r2(e.amount), isReturn: false, isExpense: true,
     })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.no.localeCompare(b.no));
 
@@ -201,6 +207,7 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     stdPurch: sum(stdPurchRows, "taxable"), noVatPurch: sum(noVatPurchRows, "taxable"),
     outputVat, inputVat, payable: r2(outputVat - inputVat),
     salesCount: sales.length, purchCount: purchases.length, salesReturnCount: salesRet.length, purchReturnCount: purchRet.length,
+    expenseCount: expenseBills.length, expenseVat: sum(purchaseRows.filter((r) => r.isExpense), "vat"),
     missingCustomerTrn: sales.filter((inv) => n(inv.totalVat) > 0 && inv.invoiceType === "tax" && inv.customerId && !(inv.customerTrn || customerById.get(inv.customerId)?.trnNumber)).length,
   };
 }

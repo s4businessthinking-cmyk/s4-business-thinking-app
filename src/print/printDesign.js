@@ -333,7 +333,7 @@ td{padding:5px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:n
 export function layoutAppliesTo(layout, invoice) {
   if (!layout?.enabled) return false;
   if (!invoice) return true;
-  const k = invoice.docKind === "quotation" ? "quotation" : invoice.invoiceType === "delivery" || invoice.docKind === "delivery" ? "delivery" : invoice.invoiceType === "tax" ? "tax" : "regular";
+  const k = invoice.docKind === "quotation" || invoice.docKind === "salesOrder" ? "quotation" : invoice.invoiceType === "delivery" || invoice.docKind === "delivery" ? "delivery" : invoice.invoiceType === "tax" ? "tax" : "regular";
   return layout.appliesTo?.[k] !== false;
 }
 

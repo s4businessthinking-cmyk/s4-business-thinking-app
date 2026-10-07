@@ -85,6 +85,12 @@ const memberConversionUpdate = (c, res, req) =>
   && onlyChanged(res, req, ["status", "convertedInvoiceId", "convertedInvoiceNo", "updatedAt", "updatedBy"])
   && ["open", "confirmed", "converted", "invoiced"].includes(req.status);
 
+const orderLinkUpdate = (c, res, req) =>
+  isShopMember(c, res?.shopId)
+  && req.shopId === res.shopId
+  && onlyChanged(res, req, ["status", "linkedDocs", "receivedQty", "deliveredQty", "convertedInvoiceId", "convertedInvoiceNo", "updatedAt", "updatedBy"])
+  && ["open", "partial", "received", "invoiced", "delivered", "closed"].includes(req.status);
+
 const VOUCHER_MEMBER_FIELDS = ["status", "chequeStatus", "cancelledAt", "cancelledBy", "cancelReason", "clearedAt", "clearedBy", "bouncedAt", "bouncedBy", "updatedAt", "updatedBy", "handover", "chequeReceivedBy", "chequePrintedAt", "chequePrintCount"];
 const PAYMENT_FIELDS = ["amountPaid", "balanceDue", "status", "updatedAt", "updatedBy"];
 const VOUCHER_METHODS = ["cash", "cheque", "bank_transfer", "card"];
@@ -200,7 +206,7 @@ export const RULES = {
     update: async (c, { id, res, req }) => isAuthenticated(c) && (
       res.ownerUid === c.uid
       || res.ownerId === c.uid
-      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastVendorCode", "lastCustomerCode"]))
+      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastSOSerial", "lastGRSerial", "lastJOSerial", "lastPLSerial", "lastPBSerial", "lastVendorCode", "lastCustomerCode"]))
     ),
     delete: async (c, { res }) => isAuthenticated(c) && (res.ownerUid === c.uid || res.ownerId === c.uid),
   },
@@ -387,10 +393,49 @@ export const RULES = {
     del: deny,
   }),
 
+  // Orders and goods received notes: whoever turns one into a bill only moves its status / link fields.
   purchaseOrders: shopScoped({
-    create: async (c, req) => req.createdBy === c.uid,
-    update: ownerOrCreator,
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "managePurchase")),
+    update: async (c, res, req) => (await ownerOrCreator(c, res)) || ((await memberMay(c, res.shopId, "managePurchase")) && orderLinkUpdate(c, res, req)),
     del: ownerOrCreator,
+  }),
+  salesOrders: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageSales")),
+    update: async (c, res, req) => (await ownerOrCreator(c, res)) || ((await memberMay(c, res.shopId, "manageSales")) && orderLinkUpdate(c, res, req)),
+    del: ownerOrCreator,
+  }),
+  goodsReceipts: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "managePurchase")),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
+      || ((await memberMay(c, res.shopId, "managePurchase")) && (
+        (res.createdBy === c.uid && req.createdBy === res.createdBy && res.status !== "invoiced") || orderLinkUpdate(c, res, req))),
+    del: ownerDelete,
+  }),
+
+  employees: shopScoped({
+    create: async (c, req) => memberMay(c, req.shopId, "manageEmployees"),
+    update: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
+    del: ownerDelete,
+  }),
+  employeeDocs: shopScoped({
+    create: async (c, req) => memberMay(c, req.shopId, "manageEmployees"),
+    update: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
+    del: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
+  }),
+  attendance: shopScoped({
+    create: async (c, req) => memberMay(c, req.shopId, "manageEmployees"),
+    update: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
+    del: ownerDelete,
+  }),
+  bankReconciliations: shopScoped({
+    create: async (c, req) => memberMay(c, req.shopId, "bankReconcile"),
+    update: async (c, res) => memberMay(c, res.shopId, "bankReconcile"),
+    del: async (c, res) => memberMay(c, res.shopId, "bankReconcile"),
+  }),
+  jobOrders: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageJobs")),
+    update: async (c, res) => memberMay(c, res.shopId, "manageJobs"),
+    del: ownerDelete,
   }),
 };
 

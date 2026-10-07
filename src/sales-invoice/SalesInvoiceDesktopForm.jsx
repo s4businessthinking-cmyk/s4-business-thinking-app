@@ -152,12 +152,14 @@ export default function SalesInvoiceDesktopForm({
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine,
   onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast,
-  kind = "sales", sourceQuoteNo = "", sourceIsDN = false, onConvertQuote, canDiscount = true, canSeeCost = false,
+  kind = "sales", sourceQuoteNo = "", sourceIsDN = false, sourceKind = "", onConvertQuote, onConvertToDN, canDiscount = true, canSeeCost = false,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
-  const isQuote = kind === "quotation";
+  const isSO = kind === "salesOrder";
+  const isQuote = kind === "quotation" || isSO;
   const isDN = kind === "delivery";
+  const docName = isSO ? "SALES ORDER" : isQuote ? "QUOTATION" : isDN ? "DELIVERY NOTE" : "SALES INVOICE";
   const isDelivery = isDN || (kind === "sales" && form.invoiceType === "delivery");
   const isTax = form.invoiceType === "tax" && !isDelivery;
   const isCash = form.paymentMethod === "cash";
@@ -364,7 +366,7 @@ export default function SalesInvoiceDesktopForm({
       {/* Header */}
       <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 150px", gap: 8, padding: "8px 10px 4px", background: C.panel }}>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
-          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, textDecoration: "underline", padding: "2px 0" }}>{isQuote ? "Quotation No" : isDN ? "DN No" : "Bill No"}</div>
+          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, textDecoration: "underline", padding: "2px 0" }}>{isSO ? "Order No" : isQuote ? "Quotation No" : isDN ? "DN No" : "Bill No"}</div>
           <div style={{ textAlign: "center", fontSize: 16, fontWeight: 900, color: "#111", padding: "4px 0" }}>{invoiceNo || "—"}</div>
         </div>
         <div style={{ position: "relative", border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
@@ -384,10 +386,10 @@ export default function SalesInvoiceDesktopForm({
             )}
           </div>
           <div style={{ textAlign: "center", lineHeight: 1.1 }}>
-            <span style={{ fontSize: 24, fontWeight: 900, color: isQuote ? "#b45309" : isDN ? "#6d28d9" : "#111", letterSpacing: 0.5 }}>{isQuote ? "QUOTATION" : isDN ? "DELIVERY NOTE" : "SALES INVOICE"}</span>
+            <span style={{ fontSize: 24, fontWeight: 900, color: isSO ? "#0e7490" : isQuote ? "#b45309" : isDN ? "#6d28d9" : "#111", letterSpacing: 0.5 }}>{docName}</span>
             {sourceQuoteNo && (
-              <div style={{ fontSize: 11, fontWeight: 800, color: sourceIsDN ? "#6d28d9" : "#b45309" }}>
-                {sourceIsDN ? (bn ? "ডেলিভারি নোট থেকে" : "From Delivery Note") : (bn ? "কোটেশন থেকে" : "From Quotation")}: {sourceQuoteNo}
+              <div style={{ fontSize: 11, fontWeight: 800, color: sourceIsDN ? "#6d28d9" : sourceKind === "salesOrder" ? "#0e7490" : sourceKind === "jobOrder" ? "#c2410c" : "#b45309" }}>
+                {sourceIsDN ? (bn ? "ডেলিভারি নোট থেকে" : "From Delivery Note") : sourceKind === "salesOrder" ? (bn ? "সেলস অর্ডার থেকে" : "From Sales Order") : sourceKind === "jobOrder" ? (bn ? "জব কার্ড থেকে" : "From Job Card") : (bn ? "কোটেশন থেকে" : "From Quotation")}: {sourceQuoteNo}
               </div>
             )}
           </div>
@@ -455,7 +457,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         {isQuote ? (
           <div style={{ maxWidth: 170 }}>
-            <div style={lbl}>Valid Until</div>
+            <div style={lbl}>{isSO ? "Delivery By" : "Valid Until"}</div>
             <input type="date" style={inp()} value={form.validUntil || ""} onChange={(e) => setField("validUntil", e.target.value)} />
           </div>
         ) : <div />}
@@ -605,7 +607,7 @@ export default function SalesInvoiceDesktopForm({
                 <tr key={it.id} onClick={() => editLine(it)} title={bn ? "এডিট করতে ক্লিক করুন" : "Click to edit"}
                   style={{ cursor: "pointer", background: selected ? C.sel : i % 2 ? C.rowAlt : "#fff" }}>
                   <td style={{ ...td, textAlign: "center" }}>{i + 1}</td>
-                  <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>{it.name}</td>
+                  <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>{it.name}{it.batchNo && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#7c3aed" }}>[{it.batchNo}]</span>}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.code}</td>
                   <td style={td}>{it.qty}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.unit}</td>
@@ -734,6 +736,10 @@ export default function SalesInvoiceDesktopForm({
           <button type="button" onClick={() => setShowSearch(true)} style={btn()}>🔍 {bn ? "খুঁজুন" : "Search"}</button>
           <button type="button" disabled={!savedInvoice} onClick={() => savedInvoice && onPrintInvoice(savedInvoice)}
             style={btn("#e7eef9", C.label, { opacity: savedInvoice ? 1 : 0.5 })}>🖨️ {bn ? "প্রিন্ট" : "Print"}</button>
+          {onConvertToDN && savedInvoice && ["draft", "open"].includes(savedInvoice.status) && (
+            <button type="button" onClick={() => onConvertToDN(savedInvoice)} disabled={saving}
+              style={btn("#6d28d9", "#fff")}>🚚 {bn ? "ডেলিভারি নোট বানান" : "Make Delivery Note"}</button>
+          )}
           {onConvertQuote && savedInvoice && (isQuote ? ["draft", "open"] : isDN ? ["confirmed"] : []).includes(savedInvoice.status) && (
             <button type="button" onClick={() => onConvertQuote(savedInvoice)} disabled={saving}
               style={btn("#15803d", "#fff")}>🧾 {bn ? "সেলস ইনভয়েস বানান" : "Convert to Invoice"}</button>
