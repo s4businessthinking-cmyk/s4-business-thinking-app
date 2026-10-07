@@ -18,6 +18,7 @@ export const AUDIT_COLLECTION_LABELS = {
   salesReturns: { bn: "সেলস রিটার্ন", en: "Sales Return" },
   purchaseReturns: { bn: "পারচেজ রিটার্ন", en: "Purchase Return" },
   stockAdjustments: { bn: "স্টক সমন্বয়", en: "Stock Adjustment" },
+  accountVouchers: { bn: "জার্নাল / কন্ট্রা", en: "Journal / Contra" },
   expenses: { bn: "খরচ", en: "Expense" },
   branchTransfers: { bn: "ব্রাঞ্চ ট্রান্সফার", en: "Branch Transfer" },
   products: { bn: "পণ্য", en: "Product" },

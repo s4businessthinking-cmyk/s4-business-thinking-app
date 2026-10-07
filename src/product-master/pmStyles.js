@@ -351,6 +351,7 @@ textarea.pm-input { resize: vertical; }
   min-height: 0;
   display: grid;
   grid-template-rows: auto 23px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px;
   padding: 10px 16px 0;
 }
@@ -449,7 +450,7 @@ textarea.pm-input { resize: vertical; }
   outline: none;
 }
 .pm-search-grid-wrap:focus { box-shadow: 0 0 0 2px #3b91a5; }
-.pm-search-result-row { display: flex; gap: 6px; min-height: 0; }
+.pm-search-result-row { display: flex; gap: 6px; min-height: 0; min-width: 0; }
 .pm-search-result-row > .pm-search-grid-wrap { flex: 1; min-width: 0; }
 .pm-search-embedded .pm-search-result-row { flex: 1; }
 .pm-search-photo {

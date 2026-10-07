@@ -82,6 +82,11 @@ clearStaleShellWebCache()
     }
   });
 
+if (typeof window !== "undefined" && window.S4Desktop?.dialog) {
+  window.alert = (message) => { window.S4Desktop.dialog.alert(message); };
+  window.confirm = (message) => window.S4Desktop.dialog.confirm(message);
+}
+
 // Ctrl+A outside a text field would highlight the whole UI (menus, buttons, grids).
 if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e) => {

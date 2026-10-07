@@ -200,7 +200,7 @@ export const RULES = {
     update: async (c, { id, res, req }) => isAuthenticated(c) && (
       res.ownerUid === c.uid
       || res.ownerId === c.uid
-      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastVendorCode", "lastCustomerCode"]))
+      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastVendorCode", "lastCustomerCode"]))
     ),
     delete: async (c, { res }) => isAuthenticated(c) && (res.ownerUid === c.uid || res.ownerId === c.uid),
   },
@@ -268,6 +268,12 @@ export const RULES = {
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))),
+  }),
+  // Journal and contra vouchers are a record only; they never touch bills or stock.
+  accountVouchers: shopScoped({
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "accountVouchers")),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
+      || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "accountVouchers"))),
   }),
   stockAdjustments: shopScoped({
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "stockAdjust")),

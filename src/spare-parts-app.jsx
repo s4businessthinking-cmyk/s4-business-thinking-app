@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import {
   createUserWithEmailAndPassword,
   signOut,
@@ -99,10 +99,12 @@ import PartyFolderList, { FolderToggle, groupInvoicesByParty } from "./invoices/
 import { PM_CSS } from "./product-master/pmStyles";
 import { SI_CSS, SI_STATUS_COLOR, PM_TH, usePmMobile } from "./sales-invoice/siSkin.js";
 import MobileMenuDrawer from "./dashboard/MobileMenuDrawer.jsx";
+import SideMenuGroups from "./dashboard/SideMenuGroups.jsx";
+import { groupMenuItems } from "./dashboard/menuGroups.js";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "./components/WindowChrome.jsx";
 import PrintSettingsWindow from "./print/PrintSettingsWindow.jsx";
 import { loadPrintSettings, docSettingsFor, paperCss, printHtmlDocument, printWithSettings, canPickPrinter } from "./print/printSettings.js";
-import { applyDesign, loadPrintDesign, layoutAppliesTo, renderLayoutDocument, amountInWords, generateStatementHTML, SAMPLE_DATA } from "./print/printDesign.js";
+import { applyDesign, loadPrintDesign, layoutAppliesTo, renderLayoutDocument, amountInWords, generateStatementHTML, SAMPLE_DATA, shopHeaderExtras } from "./print/printDesign.js";
 import { useChequeDueNotifications } from "./dashboard/chequeNotifications.js";
 import VendorChequeWizard from "./vouchers/VendorChequeWizard.jsx";
 import OwnerPinModal from "./auth/OwnerPinModal.jsx";
@@ -124,9 +126,12 @@ import CustomerMasterScreen, { EMPTY_CUSTOMER } from "./customer-master/Customer
 import { syncOpeningBill, isOpeningBill } from "./utils/openingBill.js";
 import { isBranchTransferBill } from "./branch-transfer/branchTransferDomain.js";
 import ReturnsTab, { returnsAsLedgerVouchers } from "./returns/ReturnsTab.jsx";
+import VouchersTab from "./vouchers/VouchersTab.jsx";
 import StockAdjustmentTab from "./returns/StockAdjustmentTab.jsx";
 import AuditLogTab from "./returns/AuditLogTab.jsx";
 import ProfitLossReport from "./reports/ProfitLossReport.jsx";
+import TaxReport from "./reports/TaxReport.jsx";
+import ShopInfoSettings from "./settings/ShopInfoSettings.jsx";
 import ExpensesTab from "./expenses/ExpensesTab.jsx";
 import {
   BranchTransferSettingsPanel,
@@ -326,6 +331,7 @@ const PERMISSIONS_LIST = [
   { key: "cancelInvoices",   bn: "ইনভয়েস / রিসিট বাতিল ও ডিলিট", en: "Cancel / Delete Invoices & Receipts" },
   { key: "manageReturns",    bn: "সেলস / পারচেজ রিটার্ন করা",   en: "Sales / Purchase Returns" },
   { key: "stockAdjust",      bn: "স্টক সমন্বয় (কম/বেশি) করা",   en: "Stock Adjustment" },
+  { key: "accountVouchers",  bn: "জার্নাল / কন্ট্রা ভাউচার",      en: "Journal / Contra Vouchers" },
 ];
 
 const DEFAULT_PERMISSIONS = {
@@ -355,6 +361,7 @@ const DEFAULT_PERMISSIONS = {
   manageVendors: false,
   manageReturns: false,
   stockAdjust: false,
+  accountVouchers: false,
 };
 
 // ─── TRANSLATIONS ────────────────────────────────────────────
@@ -3269,11 +3276,12 @@ function generatePaymentVoucherHTML(voucherIn, shopIn, lang, opts={}) {
   `).join("");
   const design = opts.design || loadPrintDesign();
   const layout = design.layout.voucher;
-  const vTitle = isReceipt?(isBn?"রিসিট ভাউচার":"RECEIPT VOUCHER"):(isBn?"পেমেন্ট ভাউচার":"PAYMENT VOUCHER");
+  const vTitle = opts.title || (isReceipt?(isBn?"রিসিট ভাউচার":"RECEIPT VOUCHER"):(isBn?"পেমেন্ট ভাউচার":"PAYMENT VOUCHER"));
   if (!opts.noLayout && layout?.enabled) {
     const isRef = voucher.method==="bank_transfer"||voucher.method==="card";
     const fields = {
       shopName:shop?.companyName||"", shopAddress:[shop?.area,shop?.countryName].filter(Boolean).join(", "), shopPhone:shop?.mobile||"",
+      shopNameAr:shop?.companyNameAr||"",
       title:vTitle, voucherNo:voucher.paymentNo||"", date:voucher.paymentDate||"", partyName:voucher.vendorName||"", method:methodLabel||"",
       amount:piFmt2(voucher.totalAmount), amountWords:amountInWords(voucher.totalAmount, cur),
       chequeNo:isCheque?(voucher.chequeNo||""):"", chequeBank:isCheque?(voucher.chequeBank||""):isRef?(voucher.refBank||""):"",
@@ -3284,7 +3292,7 @@ function generatePaymentVoucherHTML(voucherIn, shopIn, lang, opts={}) {
   }
   return applyDesign(`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${isReceipt?"Receipt":"Payment"} Voucher - ${voucher.paymentNo}</title>
+<title>${opts.title||`${isReceipt?"Receipt":"Payment"} Voucher`} - ${voucher.paymentNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -3322,9 +3330,10 @@ body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;fon
 <div class="receipt">
   <div class="hdr">
     <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
+    ${shopHeaderExtras(shop).arabic}
     <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
     ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
-    <div class="title-row"><span class="rc-title">${isReceipt?(isBn?"রিসিট ভাউচার":"Receipt Voucher"):(isBn?"পেমেন্ট ভাউচার":"Payment Voucher")}</span><span class="rc-no">${voucher.paymentNo}</span></div>
+    <div class="title-row"><span class="rc-title">${opts.title||(isReceipt?(isBn?"রিসিট ভাউচার":"Receipt Voucher"):(isBn?"পেমেন্ট ভাউচার":"Payment Voucher"))}</span><span class="rc-no">${voucher.paymentNo}</span></div>
   </div>
   <div class="body">
     <div class="info-grid">
@@ -3396,6 +3405,19 @@ function designPreviewHtml(kind, style, shop, lang, showCode, colorPrint) {
 
 function printPaymentVoucher(voucher, shop, lang) {
   printWithSettings(generatePaymentVoucherHTML(voucher, shop, lang), { lang });
+}
+
+const SI_PAY_TO_VOUCHER_METHOD = { cash:"cash", bank:"bank_transfer", cheque:"cheque", card:"card" };
+// Money taken with the bill itself (not through receipt vouchers or credit notes), printed as a receipt for the customer.
+function printMoneyReceipt(inv, amount, shop, lang) {
+  const receipt = {
+    receiptNo:inv.invoiceNo, receiptDate:inv.invoiceDate, customerName:inv.customerName||"Walk-in",
+    method:SI_PAY_TO_VOUCHER_METHOD[inv.paymentMethod]||"cash", totalAmount:amount,
+    chequeNo:inv.chequeNo||"", chequeBank:inv.chequeBank||"", chequeDate:inv.chequeDate||"",
+    collectedByName:inv.salesmanName||inv.createdByName||"",
+    allocations:[{ invoiceNo:inv.invoiceNo, invoiceDate:inv.invoiceDate, amount }],
+  };
+  printWithSettings(generatePaymentVoucherHTML(receipt, shop, lang, { title:lang==="bn"?"মানি রিসিট":"MONEY RECEIPT" }), { lang });
 }
 
 const toVoucherView = (v, kind) => ({
@@ -3521,7 +3543,7 @@ function pushOrdersNow() {
     .finally(() => off.syncNow?.().catch(err => console.warn("[S4 Sync] order sync failed", err)));
 }
 
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
@@ -3887,6 +3909,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     if (openNewVendor) piPickVendor(openNewVendor);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNewRequest]);
+  useEffect(()=>{
+    if (!voucherRequest) return;
+    onVoucherHandled?.();
+    if (!canVendorPayments || piView==="form") return;
+    setPiSubTab("payments");
+    setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voucherRequest]);
 
   // ── Active (non-cancelled) voucher allocations that touch a given invoice — for the read-only trail on Invoice Detail ──
   const getRelatedPayments = (invoiceId) => payments
@@ -5458,6 +5488,7 @@ function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opt
     const noMoney = isQuote || isDelivery;
     const fields = {
       shopName:shop?.companyName||"", shopAddress:[shop?.area,shop?.countryName].filter(Boolean).join(", "), shopPhone:shop?.mobile||"",
+      shopNameAr:shop?.companyNameAr||"", shopLicense:shop?.tradeLicenseNumber||"", shopEmail:shop?.email||"",
       shopTrn:isTax?(shop?.trnNumber||shop?.vatNumber||""):"", title, invoiceNo:invoice.invoiceNo||"", date:invoice.invoiceDate||"", time:timeText,
       customerName:invoice.customerName||"", customerMobile:invoice.customerMobile||"", customerAddress:invoice.customerAddress||"",
       customerTrn:isTax?(invoice.customerTrn||""):"", customerCode:invoice.customerCode||"", refNo:invoice.refNo||"", salesman:ps.printSalesman?(invoice.salesmanName||""):"",
@@ -5572,7 +5603,7 @@ ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
   <button onclick="window.print()" style="padding:10px 28px;background:${grandBg};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
-<div class="invoice"><div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div><div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>
+<div class="invoice"><div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>
 <div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>${metaHTML?`<div style="margin:-4px 0 12px;font-size:12px;color:#374151">${metaHTML}</div>`:""}
 ${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
 ${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
@@ -5908,7 +5939,7 @@ async function migrateLegacyDeliveryNotes(rows) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const siPerm = (key) => isOwner || { ...DEFAULT_PERMISSIONS, ...(profile?.permissions||{}) }[key] === true;
@@ -6208,6 +6239,12 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     siOpenNew(openNewCustomer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNewRequest]);
+  useEffect(()=>{
+    if (!voucherRequest) return;
+    onVoucherHandled?.();
+    if (kind==="sales") setReceiptWin({});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voucherRequest]);
   // Quotation → new sales invoice: same customer, items and discounts, fresh invoice number and today's date.
   useEffect(()=>{
     if (isQuote || !quoteToConvert) return;
@@ -7259,6 +7296,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const canPay=!isQuote&&!isInvCash&&["confirmed","partial"].includes(inv.status);
     const canConvert=!!onConvertQuote&&((isQuote&&["draft","open"].includes(inv.status))||(isDN&&inv.status==="confirmed"));
     const related = kind==="sales" ? receipts.filter(r=>(r.allocations||[]).some(a=>a.invoiceId===inv.id)) : [];
+    const paidOnBill = kind!=="sales" || ["draft","cancelled"].includes(inv.status) ? 0 : siR2(siN2(inv.amountPaid)
+      - related.filter(r=>r.status!=="cancelled").reduce((s,r)=>s+siN2((r.allocations||[]).find(a=>a.invoiceId===inv.id)?.amount),0)
+      - billReturns.filter(r=>r.status!=="cancelled"&&r.invoiceId===inv.id).reduce((s,r)=>s+siN2(r.appliedToInvoice),0));
     const typeLabel = { regular:t.si_regular, tax:t.si_tax, delivery:t.si_delivery }[inv.invoiceType] || inv.invoiceType || "-";
     const vRow = (label, value, opts={}) => (
       <div className="pm-form-row">
@@ -7376,6 +7416,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         <div className="si-actions">
           <button type="button" className="pm-btn-secondary" onClick={back}>← {bnL?"তালিকা":"List"}</button>
           <button type="button" className="pm-btn pm-btn--primary" onClick={()=>siPrint(inv)}>🖨️ {bnL?"প্রিন্ট":"Print"}</button>
+          {paidOnBill>0.01&&<button type="button" className="pm-btn" onClick={()=>printMoneyReceipt(inv, paidOnBill, shop, lang)} title={bnL?"বিলের সাথে নেওয়া টাকার রশিদ":"Receipt for the money taken with this bill"}>🧾 {bnL?"মানি রিসিট":"Money Receipt"}</button>}
           {canConvert&&<button type="button" className="pm-btn" onClick={()=>onConvertQuote(inv)}>🧾 {bnL?"ইনভয়েসে রূপান্তর":"Convert to Invoice"}</button>}
           {canEdit&&<button type="button" className="pm-btn" onClick={()=>siOpenEdit(inv)}>✏️ {bnL?"এডিট":"Edit"}</button>}
           {canPay&&kind==="sales"&&<button type="button" className="pm-btn" onClick={()=>setReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })}>💰 {bnL?"টাকা গ্রহণ":"Receive Payment"}</button>}
@@ -7681,112 +7722,6 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         </button>
         <button type="button" className="pm-btn-secondary" onClick={siSaveDraft} disabled={siSaving}>{bnL?"ড্রাফট সেভ":"Save Draft"}</button>
         <button type="button" className="pm-btn pm-btn--danger" onClick={closeForm}>{bnL?"বাতিল":"Cancel"}</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── SHOP INFO SETTINGS ──────────────────────────────────────
-function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast, onShopUpdated, readOnly=false }) {
-  const [shopEdit, setShopEdit] = useState({
-    companyName: localShop.companyName||"",
-    trnNumber:   localShop.trnNumber||"",
-    vatNumber:   localShop.vatNumber||"",
-    mobile:      localShop.mobile||"",
-    email:       localShop.email||"",
-    area:        localShop.area||"",
-  });
-  const [shopSaving, setShopSaving] = useState(false);
-
-  useEffect(() => {
-    setShopEdit({
-      companyName: localShop.companyName||"",
-      trnNumber:   localShop.trnNumber||"",
-      vatNumber:   localShop.vatNumber||"",
-      mobile:      localShop.mobile||"",
-      email:       localShop.email||"",
-      area:        localShop.area||"",
-    });
-  }, [localShop]);
-
-  const saveShop = async () => {
-    if (readOnly) {
-      return toast(lang==="bn"?"শুধু মালিক দোকানের তথ্য বদলাতে পারবেন":"Only the owner can edit shop info","err");
-    }
-    if (!shopEdit.companyName.trim()) {
-      return toast(lang==="bn"?"দোকানের নাম দিন":"Shop name is required","err");
-    }
-
-    setShopSaving(true);
-    try {
-      const updated = await saveShopRecord(
-        shopId,
-        {
-          companyName: shopEdit.companyName.trim(),
-          trnNumber: shopEdit.trnNumber.trim(),
-          vatNumber: shopEdit.vatNumber.trim(),
-          mobile: shopEdit.mobile.trim(),
-          email: shopEdit.email.trim(),
-          area: shopEdit.area.trim(),
-          ownerName: localShop.ownerName || profile?.personName || "",
-        },
-        { ownerUid: user?.uid || localShop.ownerUid, profile, user }
-      );
-      onShopUpdated?.(updated);
-      toast(lang==="bn"?"✅ দোকানের তথ্য আপডেট হয়েছে!":"✅ Shop info updated!");
-    } catch(e) {
-      toast(e.message||String(e),"err");
-    } finally {
-      setShopSaving(false);
-    }
-  };
-
-  const sinp = { padding:"10px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtPrimary, fontSize:14, outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
-  const slbl = { fontSize:10, color:th.txtMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:0.4, marginBottom:4, display:"block" };
-  const fieldProps = readOnly ? { readOnly:true, disabled:true } : {};
-
-  return (
-    <div style={s.card}>
-      <div style={s.settingsLbl}>{lang==="bn"?"🏢 দোকানের তথ্য":"🏢 Shop Info"}</div>
-      {readOnly&&(
-        <div style={{ fontSize:12, color:th.txtMuted, marginBottom:12 }}>
-          {lang==="bn"?"শুধু দেখার জন্য — সম্পাদনা শুধু মালিক করতে পারবেন":"View only — only the owner can edit shop info"}
-        </div>
-      )}
-      <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-        <div>
-          <span style={slbl}>{lang==="bn"?"দোকানের নাম":"Shop Name"}</span>
-          <input style={sinp} {...fieldProps} value={shopEdit.companyName} onChange={e=>setShopEdit(p=>({...p,companyName:e.target.value}))} />
-        </div>
-        <div>
-          <span style={slbl}>{lang==="bn"?"TRN নম্বর (Tax Registration)":"TRN Number (Tax Registration)"}</span>
-          <input style={{ ...sinp, borderColor:shopEdit.trnNumber?"#f59e0b":th.borderMid, fontFamily:"monospace" }} placeholder="100XXXXXXXXX" {...fieldProps} value={shopEdit.trnNumber} onChange={e=>setShopEdit(p=>({...p,trnNumber:e.target.value}))} />
-          {shopEdit.trnNumber&&<div style={{ fontSize:10, color:"#f59e0b", marginTop:4, fontWeight:700 }}>✅ {lang==="bn"?"Tax Invoice এ দেখাবে":"Shows in Tax Invoice"}</div>}
-        </div>
-        <div>
-          <span style={slbl}>{lang==="bn"?"VAT নম্বর":"VAT Number"}</span>
-          <input style={{ ...sinp, fontFamily:"monospace" }} placeholder="VAT Number" {...fieldProps} value={shopEdit.vatNumber} onChange={e=>setShopEdit(p=>({...p,vatNumber:e.target.value}))} />
-        </div>
-        <div>
-          <span style={slbl}>{lang==="bn"?"মোবাইল":"Mobile"}</span>
-          <input style={sinp} inputMode="tel" {...fieldProps} value={shopEdit.mobile} onChange={e=>setShopEdit(p=>({...p,mobile:e.target.value}))} />
-        </div>
-        <div>
-          <span style={slbl}>{lang==="bn"?"ইমেইল":"Email"}</span>
-          <input style={sinp} inputMode="email" {...fieldProps} value={shopEdit.email} onChange={e=>setShopEdit(p=>({...p,email:e.target.value}))} />
-        </div>
-        <div>
-          <span style={slbl}>{lang==="bn"?"এলাকা / শহর":"Area / City"}</span>
-          <input style={sinp} {...fieldProps} value={shopEdit.area} onChange={e=>setShopEdit(p=>({...p,area:e.target.value}))} />
-        </div>
-        <div style={{ paddingTop:8, borderTop:`1px solid ${th.border}`, fontSize:12, color:th.txtMuted }}>
-          👤 {lang==="bn"?"মালিক":"Owner"}: {localShop.ownerName}
-        </div>
-        {!readOnly&&(
-          <button onClick={saveShop} disabled={shopSaving} style={{ padding:"12px", borderRadius:10, border:"none", background:shopSaving?"#1e3a5f":"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:14, fontWeight:700, cursor:shopSaving?"not-allowed":"pointer" }}>
-            {shopSaving?"...":(lang==="bn"?"✅ সেভ করুন":"✅ Save")}
-          </button>
-        )}
       </div>
     </div>
   );
@@ -9317,10 +9252,12 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
     { key:"pdc",      icon:"📃", label:lang==="bn"?"PDC চেক":"PDC",           badge:null },
     { key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses",          badge:null },
+    { key:"vouchers", icon:"🧾", label:lang==="bn"?"ভাউচার":"Vouchers",       badge:null },
     { key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null },
     { key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null },
     { key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null },
     { key:"accounts", icon:"📊", label:lang==="bn"?"হিসাব নিকাশ":"Accounts",  badge:null },
+    { key:"tax",      icon:"🏛️", label:lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT", badge:null },
     { key:"auditLog", icon:"🕵️", label:lang==="bn"?"অডিট লগ":"Audit Log",   badge:null },
     ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
@@ -9334,6 +9271,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     ...(staffQuickNavKeys.includes("cheque") ? [{ key:"cheque", icon:"🖨️", label:lang==="bn"?"চেক":"Cheque", badge:null }] : []),
     ...(staffQuickNavKeys.includes("pdc") ? [{ key:"pdc", icon:"📃", label:lang==="bn"?"PDC চেক":"PDC", badge:null }] : []),
     ...(staffQuickNavKeys.includes("expenses") ? [{ key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("vouchers") ? [{ key:"vouchers", icon:"🧾", label:lang==="bn"?"ভাউচার":"Vouchers", badge:null }] : []),
     ...(staffQuickNavKeys.includes("salesReturn") ? [{ key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null }] : []),
     ...(staffQuickNavKeys.includes("purchaseReturn") ? [{ key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null }] : []),
     ...(staffQuickNavKeys.includes("stockAdjust") ? [{ key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null }] : []),
@@ -9559,8 +9497,15 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
       )}
 
       <div style={sectionTitle}><span>{t.dashQuickNav}</span></div>
-      <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(6, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?10:8, marginBottom:!isDesktop?18:0 }}>
-        {navItems.map(quickCard)}
+      <div style={{ display:"flex", flexDirection:"column", gap:isDesktop?10:8, marginBottom:!isDesktop?18:0 }}>
+        {groupMenuItems(navItems.map(item=>[item.key,item]), lang).map(g=>(
+          <div key={g.key}>
+            {g.label&&<div style={{ fontSize:11, fontWeight:900, letterSpacing:0.4, textTransform:"uppercase", color:isLightDash?"#1e3a8a":"#cbd5e1", margin:"2px 2px 6px" }}>{g.icon} {g.label}</div>}
+            <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(6, minmax(0,1fr))":"repeat(3, minmax(0,1fr))", gap:isDesktop?10:8 }}>
+              {g.items.map(([,item])=>quickCard(item))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {!isDesktop && (
@@ -9916,6 +9861,10 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
     window.addEventListener("keydown", onProductMasterShortcut);
     return () => window.removeEventListener("keydown", onProductMasterShortcut);
   }, [isOwner, perms.viewProducts]);
+
+  // Vouchers screen tiles open the receipt / payment window inside Sales / Purchase.
+  const [siVoucherReq,setSiVoucherReq] = useState(0);
+  const [piVoucherReq,setPiVoucherReq] = useState(0);
 
   // Global desktop shortcut: F3 opens a new purchase invoice.
   const [piNewReq,setPiNewReq] = useState(0);
@@ -12946,6 +12895,7 @@ const startEditOrder = (order) => {
   );
 
   const canStaffSupplierArea = can("viewVendors") || can("viewSupplierLedger") || can("vendorPayments") || can("managePurchase");
+  const canStaffVouchers = can("accountVouchers") || can("manageSales") || can("vendorPayments") || can("manageReturns");
   const staffQuickNavKeys = isOwner
     ? []
     : [
@@ -12956,6 +12906,7 @@ const startEditOrder = (order) => {
         ...(can("printCheques") ? ["cheque"] : []),
         ...(can("managePdc") ? ["pdc"] : []),
         ...(can("manageExpenses") ? ["expenses"] : []),
+        ...(canStaffVouchers ? ["vouchers"] : []),
         ...(can("manageReturns") ? ["salesReturn","purchaseReturn"] : []),
         ...(can("stockAdjust") ? ["stockAdjust"] : []),
         "settings",
@@ -12980,7 +12931,7 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["delivery",t.tabDelivery],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["delivery",t.tabDelivery],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
@@ -12991,6 +12942,7 @@ const startEditOrder = (order) => {
         ...(can("printCheques")?[["cheque",t.tabCheque]]:[]),
         ...(can("managePdc")?[["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"]]:[]),
         ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"]]:[]),
+        ...(canStaffVouchers?[["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"]]:[]),
         ...(can("manageReturns")?[["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn]]:[]),
         ...(can("stockAdjust")?[["stockAdjust",returnTabLabels.stockAdjust]]:[]),
         ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),
@@ -14230,6 +14182,8 @@ const startEditOrder = (order) => {
           openNewRequest={piNewReq}
           openNewVendor={piNewVendor}
           onOpenNewHandled={()=>{ setPiNewReq(0); setPiNewVendor(null); }}
+          voucherRequest={piVoucherReq}
+          onVoucherHandled={()=>setPiVoucherReq(0)}
         />
       )}
 
@@ -14249,6 +14203,8 @@ const startEditOrder = (order) => {
           openNewRequest={tab==="sales" ? siNewReq : 0}
           openNewCustomer={siNewCustomer}
           onOpenNewHandled={()=>{ setSiNewReq(0); setSiNewCustomer(null); }}
+          voucherRequest={tab==="sales" ? siVoucherReq : 0}
+          onVoucherHandled={()=>setSiVoucherReq(0)}
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
           customers={customers} products={products}
@@ -14294,6 +14250,16 @@ const startEditOrder = (order) => {
           cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} />
       )}
 
+      {tab==="vouchers"&&(isOwner||canStaffVouchers)&&(
+        <VouchersTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
+          canJournal={isOwner||can("accountVouchers")} cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""}
+          makeNo={makeShopNo} leaveGuard={billLeaveGuard} customers={customers} vendors={vendors} banks={UAE_BANKS.map(b=>b.name)}
+          onOpenReceipts={(isOwner||can("manageSales")) ? ()=>{ setTab("sales"); setSiVoucherReq(Date.now()); } : undefined}
+          onOpenPayments={canStaffSupplierArea&&(isOwner||can("vendorPayments")) ? ()=>{ setTab("purchase"); setPiVoucherReq(Date.now()); } : undefined}
+          onOpenDebitNote={(isOwner||can("manageReturns")) ? ()=>setTab("purchaseReturn") : undefined}
+          onOpenCreditNote={(isOwner||can("manageReturns")) ? ()=>setTab("salesReturn") : undefined} />
+      )}
+
       {(tab==="salesReturn"||tab==="purchaseReturn")&&(isOwner||can("manageReturns"))&&(
         <ReturnsTab key={tab} kind={tab==="salesReturn"?"sales":"purchase"} lang={lang} th={th} shopId={shopId} user={user} profile={profile}
           isOwner={isOwner} canManage={isOwner||can("manageReturns")} cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast}
@@ -14315,6 +14281,11 @@ const startEditOrder = (order) => {
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} />
       )}
       {tab==="accounts"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব নিকাশ (Accounts) লক করা":"Accounts are locked")}
+      {tab==="tax"&&isOwner&&ownerUnlocked&&(
+        <TaxReport lang={lang} shopId={shopId} shop={localShop} user={user} products={products} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
+      )}
+      {tab==="tax"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ট্যাক্স / VAT লক করা":"Tax / VAT is locked")}
 
       {tab==="branchTransfer"&&canUseBranchTransfer&&(
         <BranchTransferWorkspace
@@ -14351,6 +14322,19 @@ const startEditOrder = (order) => {
         ].filter(Boolean);
         const openItem = (it)=>{ if (it.action) it.action(); else setSettingsPage(it.id); };
         const current = items.find(it=>it.id===stPage);
+        const settingGroups = [
+          { key:"company", label:bnS?"🏢 অ্যাকাউন্ট ও দোকান":"🏢 Account & Company", ids:["profile","shop","pin","license"] },
+          { key:"team", label:bnS?"👥 টিম":"👥 Team", ids:["team","invite","positions"] },
+          { key:"features", label:bnS?"🧩 ফিচার":"🧩 Features", ids:["orderModule","branchTransfer","wastyle"] },
+          { key:"display", label:bnS?"🎨 দেখা ও প্রিন্ট":"🎨 Display & Print", ids:["print","theme","language"] },
+          { key:"data", label:bnS?"💾 ডেটা ও সিস্টেম":"💾 Data & System", ids:["backup","sync","update"] },
+          { key:"help", label:bnS?"❓ সাহায্য":"❓ Help", ids:["help"] },
+        ].map(g=>({ ...g, items:g.ids.map(id=>items.find(it=>it.id===id)).filter(Boolean) }))
+          .concat([{ key:"other", label:"", items:items.filter(it=>!["profile","shop","pin","license","team","invite","positions","orderModule","branchTransfer","wastyle","print","theme","language","backup","sync","update","help"].includes(it.id)) }])
+          .filter(g=>g.items.length);
+        const groupHead = (label, first) => label && (
+          <div style={{ fontSize:11, fontWeight:900, letterSpacing:0.4, textTransform:"uppercase", color:th.txtMuted, padding:isDesktop?"10px 10px 4px":"4px 4px 6px", marginTop:first?0:(isDesktop?4:14), borderTop:!first&&isDesktop?`1px solid ${th.border}`:"none" }}>{label}</div>
+        );
         return (
         <div style={isDesktop?{ ...s.desktopPanel, maxWidth:1240 }:s.panel}>
           {isDesktop&&<style dangerouslySetInnerHTML={{ __html:`
@@ -14379,11 +14363,16 @@ const startEditOrder = (order) => {
               <aside className="st-side">
                 <div className="st-side-head">⚙️ {plain(t.settingsTitle)}</div>
                 <div className="st-list">
-                  {items.map(it=>(
-                    <button key={it.id} type="button" className={`st-item${stPage===it.id?" is-active":""}`} onClick={()=>openItem(it)} title={it.sub}>
-                      <span className="st-ic">{it.icon}</span>
-                      <span className="st-tx"><b>{it.label}</b><small>{it.sub}</small></span>
-                    </button>
+                  {settingGroups.map((g,gi)=>(
+                    <Fragment key={g.key}>
+                      {groupHead(g.label, gi===0)}
+                      {g.items.map(it=>(
+                        <button key={it.id} type="button" className={`st-item${stPage===it.id?" is-active":""}`} onClick={()=>openItem(it)} title={it.sub}>
+                          <span className="st-ic">{it.icon}</span>
+                          <span className="st-tx"><b>{it.label}</b><small>{it.sub}</small></span>
+                        </button>
+                      ))}
+                    </Fragment>
                   ))}
                 </div>
                 <button type="button" className="st-out" onClick={handleLogout}>🚪 {t.logout}</button>
@@ -14391,15 +14380,20 @@ const startEditOrder = (order) => {
             ) : !settingsPage&&(
               <>
                 <div style={s.secTitle}>{t.settingsTitle}</div>
-                {items.map(it=>(
-                  <button key={it.id} style={s.settingsRow} onClick={()=>openItem(it)}>
-                    <span style={s.settingsRowIcon}>{it.icon}</span>
-                    <div style={{ flex:1 }}>
-                      <div style={s.settingsRowLabel}>{it.label}</div>
-                      <div style={s.settingsRowSub}>{it.sub}</div>
-                    </div>
-                    {it.id!=="sync"&&<span style={s.settingsArrow}>›</span>}
-                  </button>
+                {settingGroups.map((g,gi)=>(
+                  <Fragment key={g.key}>
+                    {groupHead(g.label, gi===0)}
+                    {g.items.map(it=>(
+                      <button key={it.id} style={s.settingsRow} onClick={()=>openItem(it)}>
+                        <span style={s.settingsRowIcon}>{it.icon}</span>
+                        <div style={{ flex:1 }}>
+                          <div style={s.settingsRowLabel}>{it.label}</div>
+                          <div style={s.settingsRowSub}>{it.sub}</div>
+                        </div>
+                        {it.id!=="sync"&&<span style={s.settingsArrow}>›</span>}
+                      </button>
+                    ))}
+                  </Fragment>
                 ))}
                 <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
               </>
@@ -14834,15 +14828,15 @@ const startEditOrder = (order) => {
       {isDesktop ? (
         <div style={s.desktopLayout}>
           {!(pageMax && tab!=="dashboard") && <div style={s.sidebar}>
-            <div style={s.sideNav}>
-              {visibleTabs.map(([k,label])=>(
-                <button key={k} style={{ ...s.sideTab, ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
+            <SideMenuGroups items={visibleTabs} activeKey={tab} lang={lang}
+              colors={{ head:th.txtPrimary, headBg:th.bgInp, line:th.borderMid }}
+              renderItem={(k,label)=>(
+                <button style={{ ...s.sideTab, padding:"8px 12px", ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
                   <span style={{ flex:1, textAlign:"left" }}>{label}</span>
                   {TAB_SHORTCUT_KEYS[k]&&<span style={{ ...s.sideKey, ...(tab===k?s.sideKeyA:{}) }}>{TAB_SHORTCUT_KEYS[k]}</span>}
                   {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.sideBadge}>{unread}</span>}
                 </button>
-              ))}
-            </div>
+              )} />
             <div style={{ flex:1 }} />
             <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
               {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":syncState==="reconnecting"?"🟠 Reconnecting...":"🟡 Connecting..."}

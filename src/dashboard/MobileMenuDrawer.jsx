@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import SideMenuGroups from "./SideMenuGroups.jsx";
 
 export default function MobileMenuDrawer({
   open, onClose, items, activeKey, onSelect, unreadKey, unread = 0,
@@ -47,24 +48,26 @@ export default function MobileMenuDrawer({
             style={{ border: 0, background: "transparent", color: c.muted, fontSize: 22, lineHeight: 1, cursor: "pointer", padding: 2 }}>✕</button>
         </div>
 
-        <nav style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
-          {items.map(([key, label]) => {
-            const active = key === activeKey;
-            return (
-              <button key={key} onClick={() => { onSelect(key); onClose(); }}
-                style={{
-                  width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "12px 12px", marginBottom: 2,
-                  borderRadius: 10, border: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-                  fontSize: 14, fontWeight: active ? 900 : 700,
-                  background: active ? c.active : "transparent", color: active ? "#fff" : c.text,
-                }}>
-                <span style={{ flex: 1 }}>{label}</span>
-                {key === unreadKey && unread > 0 && (
-                  <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "1px 8px", fontSize: 11, fontWeight: 900 }}>{unread}</span>
-                )}
-              </button>
-            );
-          })}
+        <nav style={{ flex: 1, overflowY: "auto", padding: "4px 8px 8px" }}>
+          <SideMenuGroups items={items} activeKey={activeKey} lang={lang} compact
+            colors={{ head: c.muted, headBg: c.hover, line: c.border }}
+            renderItem={(key, label) => {
+              const active = key === activeKey;
+              return (
+                <button onClick={() => { onSelect(key); onClose(); }}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "11px 12px 11px 16px",
+                    borderRadius: 10, border: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                    fontSize: 14, fontWeight: active ? 900 : 700,
+                    background: active ? c.active : "transparent", color: active ? "#fff" : c.text,
+                  }}>
+                  <span style={{ flex: 1 }}>{label}</span>
+                  {key === unreadKey && unread > 0 && (
+                    <span style={{ background: "#ef4444", color: "#fff", borderRadius: 999, padding: "1px 8px", fontSize: 11, fontWeight: 900 }}>{unread}</span>
+                  )}
+                </button>
+              );
+            }} />
         </nav>
 
         <div style={{ borderTop: `1px solid ${c.border}`, padding: "10px 12px 14px" }}>

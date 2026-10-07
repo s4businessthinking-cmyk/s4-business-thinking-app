@@ -1,6 +1,10 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("S4Desktop", {
+  dialog: {
+    alert: (message) => ipcRenderer.sendSync("s4-dialog:show", "alert", String(message ?? "")),
+    confirm: (message) => ipcRenderer.sendSync("s4-dialog:show", "confirm", String(message ?? "")) === true,
+  },
   backup: {
     getFolder: () => ipcRenderer.invoke("s4-backup:get-folder"),
     chooseFolder: () => ipcRenderer.invoke("s4-backup:choose-folder"),

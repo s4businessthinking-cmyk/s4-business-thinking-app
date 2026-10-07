@@ -7,6 +7,7 @@ const COLLECTION_LABELS = {
   companies: ["কোম্পানি", "Companies"], orders: ["অর্ডার", "Orders"], purchaseInvoices: ["পারচেজ ইনভয়েস", "Purchase invoices"],
   purchasePayments: ["পেমেন্ট ভাউচার (ক্যাশ/চেক)", "Payment vouchers (cash/cheque)"], supplierPayments: ["সাপ্লায়ার পেমেন্ট", "Supplier payments"],
   salesInvoices: ["সেলস ইনভয়েস", "Sales invoices"], salesReceipts: ["রসিদ ভাউচার", "Receipt vouchers"], expenses: ["খরচ", "Expenses"],
+  accountVouchers: ["জার্নাল / কন্ট্রা ভাউচার", "Journal / Contra vouchers"],
 };
 
 const fmtDate = (iso, lang) => (iso ? new Date(iso).toLocaleString(lang === "bn" ? "bn-BD" : "en-GB") : "—");

@@ -23,6 +23,16 @@ function createWindow() {
   });
   // The default menu bar grabs F10 on Windows, which the invoice screen needs for product search.
   win.removeMenu();
+  // On Windows the page can lose keyboard focus while the window stays active, so text boxes stop taking input.
+  win.on("focus", () => win.webContents.focus());
+  // Websites (tax portal, WhatsApp) open in the user's own browser where their logins are saved; print previews stay in-app.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url) && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url)) {
+      shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
 
   if (!app.isPackaged) {
     win.loadURL(process.env.S4_DEV_URL || "http://localhost:5173");
@@ -32,11 +42,41 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  setupDialogIpc();
   setupBackupIpc();
   setupPrintIpc();
   createWindow();
   setupAutoUpdater();
 });
+
+// The renderer's built-in alert()/confirm() leave text boxes unable to take keyboard input on Windows,
+// so they are routed here and focus is handed back to the page once the box closes.
+function setupDialogIpc() {
+  ipcMain.on("s4-dialog:show", (event, kind, message) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const isConfirm = kind === "confirm";
+    const options = {
+      type: isConfirm ? "question" : "info",
+      title: "S4 Business Thinking",
+      message: String(message ?? ""),
+      buttons: isConfirm ? ["OK", "Cancel"] : ["OK"],
+      defaultId: 0,
+      cancelId: isConfirm ? 1 : 0,
+      noLink: true,
+    };
+    let choice = isConfirm ? 1 : 0;
+    try {
+      choice = win ? dialog.showMessageBoxSync(win, options) : dialog.showMessageBoxSync(options);
+    } finally {
+      event.returnValue = isConfirm ? choice === 0 : true;
+      setTimeout(() => {
+        if (!win || win.isDestroyed()) return;
+        win.focus();
+        win.webContents.focus();
+      }, 0);
+    }
+  });
+}
 
 function setupBackupIpc() {
   const settingsFile = () => path.join(app.getPath("userData"), "backup-settings.json");

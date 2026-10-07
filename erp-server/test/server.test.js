@@ -405,6 +405,15 @@ test("rules: vendors, returns, stock adjustments, audit log and master lists fol
   assert.equal((await commit(sales.idToken, [set("stockAdjustments", "rsa1", sa)])).status, 200);
   assert.equal((await commit(sales.idToken, [{ op: "update", collection: "shops", id: "shop1", data: { lastSASerial: 1 } }])).status, 200);
 
+  const jv = { shopId: "shop1", voucherType: "journal", voucherNo: "JV-0001", totalAmount: 10, status: "active", lines: [], createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("accountVouchers", "rjv1", jv)])).status, 403, "journal needs accountVouchers");
+  assert.equal((await perms({ accountVouchers: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [set("accountVouchers", "rjv1", jv)])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("accountVouchers", "rjv2", { ...jv, voucherNo: "JV-0002", createdBy: owner.uid })])).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("accountVouchers", "rjv2", { status: "cancelled" })])).status, 403, "staff cancel only their own vouchers");
+  assert.equal((await commit(sales.idToken, [upd("accountVouchers", "rjv1", { status: "cancelled" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "shops", id: "shop1", data: { lastJVSerial: 1, lastCVSerial: 1 } }])).status, 200);
+
   const log = { shopId: "shop1", action: "cancel", collection: "salesReturns", byUid: sales.uid };
   assert.equal((await commit(sales.idToken, [set("auditLogs", "ra1", { ...log, byUid: owner.uid })])).status, 403, "cannot log as someone else");
   assert.equal((await commit(sales.idToken, [set("auditLogs", "ra1", log)])).status, 200);

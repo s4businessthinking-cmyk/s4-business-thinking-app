@@ -2,47 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineList } from "../offline/offlineRepository";
-import { computeStockMap, loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
-import { itemBaseQty } from "../inventory/unitConversion";
+import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
-import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
+import { computeAccounts, r2 } from "./accountsCalc.js";
 
-const LIVE = ["confirmed", "paid", "partial"];
-const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
-const r2 = (v) => Math.round((n(v) + Number.EPSILON) * 100) / 100;
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const monthStart = () => { const d = new Date(); return localDay(new Date(d.getFullYear(), d.getMonth(), 1)); };
-const dayOf = (v) => String(v || "").slice(0, 10);
-const inRange = (d, from, to) => (!from || d >= from) && (!to || d <= to);
-const isLive = (doc, shopId) => doc && !doc.isDeleted && !doc.deleted && (!shopId || !doc.shopId || doc.shopId === shopId);
-
-// Weighted average purchase cost per base unit up to a date: opening stock at its rate plus every confirmed purchase (VAT excluded).
-function averageCosts(products, purchases, upTo) {
-  const acc = new Map();
-  (products || []).forEach((p) => {
-    const q = n(p.openingStock);
-    const rate = n(p.openingRate) || n(p.landingCost);
-    acc.set(p.id, { qty: q > 0 ? q : 0, value: q > 0 ? q * rate : 0, fallback: n(p.landingCost) || n(p.averageCost) || rate });
-  });
-  const productById = new Map((products || []).map((p) => [p.id, p]));
-  purchases.forEach((inv) => {
-    if (upTo && dayOf(inv.invoiceDate) > upTo) return;
-    (inv.items || []).forEach((it) => {
-      if (!it?.productId || !acc.has(it.productId)) return;
-      const q = itemBaseQty(it, productById.get(it.productId));
-      if (q <= 0) return;
-      const net = n(it.lineTotal) - n(it.taxAmt);
-      const a = acc.get(it.productId);
-      a.qty += q;
-      a.value += net > 0 ? net : 0;
-    });
-  });
-  const out = new Map();
-  acc.forEach((a, id) => out.set(id, a.qty > 0 && a.value > 0 ? a.value / a.qty : a.fallback));
-  return out;
-}
 
 export default function ProfitLossReport({ lang = "en", th, s, shopId, products = [], shopName = "", cur = "AED", isDesktop }) {
   const bn = lang === "bn";
@@ -69,87 +36,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, []);
 
-  const report = useMemo(() => {
-    if (!data) return null;
-    const liveSales = data.salesInvoices.filter((inv) => isLive(inv, shopId) && LIVE.includes(inv.status) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
-    const sales = liveSales.filter((inv) => inv.source !== "openingBalance");
-    const livePurchases = data.purchaseInvoices.filter((inv) => isLive(inv, shopId) && LIVE.includes(inv.status) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
-    // A party's opening balance is money owed from before, not a sale or purchase of goods.
-    const purchases = livePurchases.filter((inv) => inv.source !== "openingBalance");
-    const receipts = data.receipts.filter((r) => isLive(r, shopId) && r.status !== "cancelled");
-    const payments = data.payments.filter((p) => isLive(p, shopId) && p.status !== "cancelled");
-    const productById = new Map(products.map((p) => [p.id, p]));
-    const avg = averageCosts(products, purchases, to);
-
-    const salesIn = sales.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to));
-    const purchIn = purchases.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to));
-
-    const liveReturns = (list) => (list || []).filter((r) => isLive(r, shopId) && r.status !== "cancelled");
-    const salesRet = liveReturns(data.extras?.salesReturns);
-    const purchRet = liveReturns(data.extras?.purchaseReturns);
-    const salesRetIn = salesRet.filter((r) => inRange(dayOf(r.returnDate), from, to));
-    const purchRetIn = purchRet.filter((r) => inRange(dayOf(r.returnDate), from, to));
-    const salesReturnTotal = salesRetIn.reduce((t, r) => t + n(r.total), 0);
-    const salesReturnVat = salesRetIn.reduce((t, r) => t + n(r.totalVat), 0);
-    const purchReturnTotal = purchRetIn.reduce((t, r) => t + n(r.total), 0);
-    const purchReturnVat = purchRetIn.reduce((t, r) => t + n(r.totalVat), 0);
-
-    const grossSales = salesIn.reduce((t, inv) => t + n(inv.grandTotal), 0);
-    const vatOut = salesIn.reduce((t, inv) => t + n(inv.totalVat), 0) - salesReturnVat;
-    const netSales = grossSales - salesReturnTotal - vatOut;
-    let cogs = 0;
-    let unpriced = 0;
-    salesIn.forEach((inv) => (inv.items || []).forEach((it) => {
-      if (!it?.productId) return;
-      const cost = avg.get(it.productId) || 0;
-      if (!cost) unpriced += 1;
-      cogs += itemBaseQty(it, productById.get(it.productId)) * cost;
-    }));
-    salesRetIn.forEach((r) => (r.items || []).forEach((it) => {
-      if (!it?.productId) return;
-      cogs -= itemBaseQty(it, productById.get(it.productId)) * (avg.get(it.productId) || 0);
-    }));
-    const grossProfit = netSales - cogs;
-
-    const grossPurch = purchIn.reduce((t, inv) => t + n(inv.grandTotal), 0);
-    const vatIn = purchIn.reduce((t, inv) => t + n(inv.totalTax), 0) - purchReturnVat;
-
-    const allocSum = (vouchers, id) => vouchers.reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
-    const appliedSum = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((t, r) => t + n(r.appliedToInvoice), 0);
-    const cashOnSales = salesIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(receipts, inv.id) - appliedSum(salesRet, inv.id)), 0);
-    const receiptsIn = receipts.filter((r) => inRange(dayOf(r.receiptDate || r.createdAt), from, to)).reduce((t, r) => t + n(r.totalAmount), 0);
-    const cashOnPurch = purchIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(payments, inv.id) - appliedSum(purchRet, inv.id)), 0);
-    const refundsPaid = salesRetIn.reduce((t, r) => t + n(r.refundAmount), 0);
-    const refundsReceived = purchRetIn.reduce((t, r) => t + n(r.refundAmount), 0);
-    const paymentsIn = payments.filter((p) => inRange(dayOf(p.paymentDate || p.createdAt), from, to));
-    const paymentsOut = paymentsIn.reduce((t, p) => t + n(p.chequeAmount ?? p.totalAmount), 0);
-    const vendorDiscount = paymentsIn.reduce((t, p) => t + n(p.discountAmount), 0);
-
-    const expensesIn = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && inRange(dayOf(e.expenseDate), from, to));
-    const expenseTotal = expensesIn.reduce((t, e) => t + n(e.amount), 0);
-    // A bounced expense cheque is still an expense, but the money never left.
-    const expensePaid = expensesIn.filter((e) => !(e.method === "cheque" && e.chequeStatus === "bounced")).reduce((t, e) => t + n(e.amount), 0);
-    const expenseMap = new Map();
-    expensesIn.forEach((e) => { const k = expenseCategoryLabel(e, bn); expenseMap.set(k, (expenseMap.get(k) || 0) + n(e.amount)); });
-    const expenseByCat = [...expenseMap.entries()].sort((a, b) => b[1] - a[1]);
-
-    const receivable = liveSales.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
-    const payable = livePurchases.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
-    const stock = computeStockMap(products, data.purchaseInvoices, data.salesInvoices, shopId, data.deliveryNotes, data.extras);
-    let stockValue = 0;
-    stock.forEach((q, id) => { if (q > 0) stockValue += q * (avg.get(id) || 0); });
-
-    return {
-      count: salesIn.length, purchCount: purchIn.length, grossSales, vatOut, netSales, cogs, grossProfit,
-      margin: netSales > 0 ? (grossProfit / netSales) * 100 : 0, unpriced,
-      grossPurch, vatIn, netPurch: grossPurch - purchReturnTotal - vatIn, vatPayable: vatOut - vatIn,
-      salesReturnTotal, salesReturnCount: salesRetIn.length, purchReturnTotal, purchReturnCount: purchRetIn.length,
-      moneyIn: cashOnSales + receiptsIn + refundsReceived, cashOnSales, receiptsIn, refundsReceived,
-      moneyOut: cashOnPurch + paymentsOut + expensePaid + refundsPaid, cashOnPurch, paymentsOut, refundsPaid, expensePaid,
-      receivable, payable, stockValue,
-      expenseTotal, expenseByCat, expenseCount: expensesIn.length, vendorDiscount, netProfit: grossProfit + vendorDiscount - expenseTotal,
-    };
-  }, [data, products, shopId, from, to, bn]);
+  const report = useMemo(() => computeAccounts(data, { products, shopId, from, to, bn }), [data, products, shopId, from, to, bn]);
 
   const L = (bnText, enText) => (bn ? bnText : enText);
   const sections = report ? [

@@ -32,7 +32,8 @@ export const INVOICE_KINDS = [
 export const LAYOUT_FIELDS = {
   invoice: [
     ["shopName", "Shop name", "দোকানের নাম"], ["shopAddress", "Shop address", "দোকানের ঠিকানা"], ["shopPhone", "Shop phone", "দোকানের ফোন"],
-    ["shopTrn", "Shop TRN/VAT", "দোকানের TRN/VAT"], ["title", "Document title", "শিরোনাম (Tax Invoice…)"],
+    ["shopTrn", "Shop TRN/VAT", "দোকানের TRN/VAT"], ["shopNameAr", "Shop name (Arabic)", "দোকানের আরবি নাম"],
+    ["shopLicense", "Shop license no", "দোকানের লাইসেন্স নং"], ["shopEmail", "Shop email", "দোকানের ইমেইল"], ["title", "Document title", "শিরোনাম (Tax Invoice…)"],
     ["invoiceNo", "Invoice no", "ইনভয়েস নং"], ["date", "Date", "তারিখ"], ["time", "Time", "সময়"],
     ["customerName", "Customer name", "কাস্টমারের নাম"], ["customerMobile", "Customer mobile", "কাস্টমারের মোবাইল"],
     ["customerAddress", "Customer address", "কাস্টমারের ঠিকানা"], ["customerTrn", "Customer TRN", "কাস্টমারের TRN"],
@@ -47,7 +48,7 @@ export const LAYOUT_FIELDS = {
   ],
   voucher: [
     ["shopName", "Shop name", "দোকানের নাম"], ["shopAddress", "Shop address", "দোকানের ঠিকানা"], ["shopPhone", "Shop phone", "দোকানের ফোন"],
-    ["title", "Document title", "শিরোনাম"], ["voucherNo", "Voucher no", "ভাউচার নং"], ["date", "Date", "তারিখ"],
+    ["shopNameAr", "Shop name (Arabic)", "দোকানের আরবি নাম"], ["title", "Document title", "শিরোনাম"], ["voucherNo", "Voucher no", "ভাউচার নং"], ["date", "Date", "তারিখ"],
     ["partyName", "Customer / Vendor", "কাস্টমার / ভেন্ডর"], ["method", "Payment method", "পদ্ধতি"],
     ["amount", "Amount", "পরিমাণ"], ["amountWords", "Amount in words", "কথায় টাকার অঙ্ক"],
     ["chequeNo", "Cheque no", "চেক নং"], ["chequeBank", "Bank", "ব্যাংক"], ["chequeDate", "Cheque date", "চেকের তারিখ"],
@@ -277,6 +278,15 @@ th{padding:5px!important}td{padding:4px 5px!important}.totals-row{padding:4px 10
   return css;
 }
 
+// Extra shop header lines from Shop Info for the built-in invoice/voucher documents.
+export function shopHeaderExtras(shop) {
+  return {
+    arabic: shop?.companyNameAr ? `<div class="shop-sub" dir="rtl" style="font-size:14px;font-weight:800">${esc(shop.companyNameAr)}</div>` : "",
+    details: [shop?.tradeLicenseNumber ? `License: ${esc(shop.tradeLicenseNumber)}` : "", shop?.fax ? `Fax: ${esc(shop.fax)}` : "", shop?.email ? esc(shop.email) : ""]
+      .filter(Boolean).map((x) => `<div class="shop-sub">${x}</div>`).join(""),
+  };
+}
+
 // Applies the chosen template, logo, header note and footer text to a built-in document.
 export function applyDesign(html, kind, styleOverride) {
   const style = styleOverride || loadPrintDesign().style[kind] || STYLE_DEFAULT;
@@ -398,6 +408,7 @@ export const SAMPLE_DATA = {
   invoice: {
     fields: {
       shopName: "S4 Auto Spare Parts", shopAddress: "Industrial Area 4, Sharjah", shopPhone: "+971 50 000 0000", shopTrn: "100000000000003",
+      shopNameAr: "اس فور لقطع غيار السيارات", shopLicense: "CN-1234567", shopEmail: "info@s4parts.ae",
       title: "TAX INVOICE", invoiceNo: "SI-0001", date: "04/10/2026", time: "10:30", customerName: "Al Noor Garage", customerMobile: "+971 55 111 2222",
       customerAddress: "Ajman", customerTrn: "100222333000003", customerCode: "C-0001", refNo: "LPO-778", salesman: "Rahim", payment: "Credit", userName: "Admin",
       deliveryNo: "DN-0005", vehicleNo: "SHJ 12345", validUntil: "15/10/2026", totalQty: "7",
@@ -412,7 +423,7 @@ export const SAMPLE_DATA = {
   },
   voucher: {
     fields: {
-      shopName: "S4 Auto Spare Parts", shopAddress: "Industrial Area 4, Sharjah", shopPhone: "+971 50 000 0000", title: "RECEIPT VOUCHER",
+      shopName: "S4 Auto Spare Parts", shopAddress: "Industrial Area 4, Sharjah", shopPhone: "+971 50 000 0000", shopNameAr: "اس فور لقطع غيار السيارات", title: "RECEIPT VOUCHER",
       voucherNo: "RV-0012", date: "04/10/2026", partyName: "Al Noor Garage", method: "Cheque", amount: "1,500.00", amountWords: amountInWords(1500),
       chequeNo: "004512", chequeBank: "Emirates NBD", chequeDate: "10/10/2026", refNo: "", note: "Against old bills", collectedBy: "Rahim",
     },
