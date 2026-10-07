@@ -373,6 +373,21 @@ test("rules: sales bills, receipts and customers follow the staff permissions", 
   assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "rpi1", data: { status: "cancelled" } }])).status, 403);
 });
 
+test("rules: partners and partner money are owner-only", async () => {
+  assert.equal((await commit(owner.idToken, [set("partners", "pt1", { shopId: "shop1", name: "Karim", sharePercent: 40 })])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("partnerEntries", "pe1", { shopId: "shop1", kind: "capitalIn", partnerId: "pt1", amount: 5000 })])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("partners", "pt2", { shopId: "shop1", name: "Me", sharePercent: 99 })])).status, 403);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "partnerEntries", id: "pe1", data: { amount: 1 } }])).status, 403);
+  assert.equal((await api("/v1/db/get", { collection: "partners", id: "pt1" }, sales.idToken)).status, 403);
+  assert.equal((await api("/v1/db/query", { collection: "partnerEntries", filters: [["shopId", "==", "shop1"]] }, sales.idToken)).docs.length, 0);
+  assert.equal((await api("/v1/db/query", { collection: "partnerEntries", filters: [["shopId", "==", "shop1"]] }, owner.idToken)).docs.length, 1);
+  assert.equal((await commit(owner.idToken, [{ op: "update", collection: "partnerEntries", id: "pe1", data: { status: "cancelled" } }])).status, 200);
+  assert.equal((await commit(outsider.idToken, [set("partners", "pt3", { shopId: "shop1", name: "X" })])).status, 403);
+  assert.equal((await commit(owner.idToken, [set("partnerDocs", "pd1", { shopId: "shop1", partnerId: "pt1", label: "ID", file: "data:image/png;base64,AA" })])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "partnerDocs", id: "pd1" }, sales.idToken)).status, 403);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "partnerDocs", id: "pd1" }])).status, 403);
+});
+
 test("rules: vendors, returns, stock adjustments, audit log and master lists follow the staff permissions", async () => {
   const none = { managePurchase: false, manageVendors: false, manageReturns: false, stockAdjust: false, manageProducts: false };
   const perms = (p) => commit(owner.idToken, [set("users", sales.uid, { permissions: { ...none, ...p } }, true)]);

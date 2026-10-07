@@ -140,6 +140,9 @@ import PurchaseDocsTab from "./purchase/PurchaseDocsTab.jsx";
 import EmployeesTab from "./employees/EmployeesTab.jsx";
 import AttendanceTab from "./employees/AttendanceTab.jsx";
 import BankRecTab from "./accounts/BankRecTab.jsx";
+import PartnersTab from "./partners/PartnersTab.jsx";
+import { usePartnerAlerts } from "./partners/usePartnerAlerts.js";
+import { partnerAlertText } from "./partners/partners.js";
 import JobCardTab from "./jobcard/JobCardTab.jsx";
 import AuditLogTab from "./returns/AuditLogTab.jsx";
 import ProfitLossReport from "./reports/ProfitLossReport.jsx";
@@ -9455,6 +9458,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     { key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null },
     { key:"accounts", icon:"📊", label:lang==="bn"?"হিসাব নিকাশ":"Accounts",  badge:null },
     { key:"tax",      icon:"🏛️", label:lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT", badge:null },
+    { key:"partners", icon:"🤝", label:lang==="bn"?"পার্টনার":"Partners",      badge:null },
     { key:"auditLog", icon:"🕵️", label:lang==="bn"?"অডিট লগ":"Audit Log",   badge:null },
     ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
@@ -10636,6 +10640,9 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const employeeAlertList = useEmployeeAlerts({
     shopId, enabled: isOwner || can("manageEmployees"), shopCountry: localShop?.country || "",
     lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("employees"); },
+  });
+  const partnerAlertList = usePartnerAlerts({
+    shopId, enabled: isOwner, shop: localShop, lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("partners"); },
   });
   const openEmployeeAlert = (a) => {
     setSettingsPage(null);
@@ -12930,6 +12937,10 @@ const startEditOrder = (order) => {
       const txt = employeeAlertText(a, lang==="bn", t.cur||"AED");
       return { key:`emp-${a.key}`, icon:txt.icon, tone:a.tone==="danger"?"danger":undefined, title:txt.title, sub:txt.sub, onClick:()=>openEmployeeAlert(a) };
     }),
+    ...partnerAlertList.map(a => {
+      const txt = partnerAlertText(a, lang==="bn", t.cur||"AED");
+      return { key:`partner-${a.key}`, icon:txt.icon, tone:a.tone==="danger"?"danger":undefined, title:txt.title, sub:txt.sub, onClick:()=>{ setSettingsPage(null); setTab("partners"); } };
+    }),
     ...(orderModuleEnabled && unread>0 ? [{
       key:"orders", icon:"📋", count:unread,
       title:lang==="bn"?`${unread}টি নতুন অর্ডার`:`${unread} new order(s)`,
@@ -13124,6 +13135,7 @@ const startEditOrder = (order) => {
     attendance: lang==="bn"?"🗓️ হাজিরা খাতা":"🗓️ Attendance Register",
     bankRec: lang==="bn"?"🏦 ব্যাংক মেলানো":"🏦 Bank Reconciliation",
     jobCard: lang==="bn"?"🔧 জব কার্ড":"🔧 Job Card",
+    partners: lang==="bn"?"🤝 পার্টনার ও লাভের ভাগ":"🤝 Partners",
   };
   const returnTabLabels = {
     salesReturn: lang==="bn"?"↩️ সেলস রিটার্ন":"↩️ Sales Return",
@@ -13135,7 +13147,7 @@ const startEditOrder = (order) => {
   };
 
   const visibleTabs = isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
@@ -14535,6 +14547,11 @@ const startEditOrder = (order) => {
           shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
       )}
       {tab==="tax"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ট্যাক্স / VAT লক করা":"Tax / VAT is locked")}
+      {tab==="partners"&&isOwner&&ownerUnlocked&&(
+        <PartnersTab lang={lang} shopId={shopId} user={user} profile={profile} cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""}
+          shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} products={products} alerts={partnerAlertList} />
+      )}
+      {tab==="partners"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"পার্টনারের হিসাব লক করা":"Partners are locked")}
 
       {tab==="branchTransfer"&&canUseBranchTransfer&&(
         <BranchTransferWorkspace

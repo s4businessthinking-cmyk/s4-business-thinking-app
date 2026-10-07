@@ -158,6 +158,13 @@ const shopScoped = ({ create, update, del } = {}) => ({
   delete: async (c, { res }) => sameShopByResource(c, res) && (del ? await del(c, res) : isOwnerOfShop(c, res.shopId)),
 });
 const appendOnly = () => ({ ...shopScoped(), update: deny, delete: deny });
+// Partner money is private to the owner: staff can neither read nor write it.
+const ownerOnly = () => ({
+  read: async (c, { res }) => sameShopByResource(c, res) && isOwnerOfShop(c, res.shopId),
+  create: async (c, { req }) => sameShopByRequest(c, req) && isOwnerOfShop(c, req.shopId),
+  update: async (c, { res, req }) => sameShopByResource(c, res) && req.shopId === res.shopId && isOwnerOfShop(c, res.shopId),
+  delete: async (c, { res }) => sameShopByResource(c, res) && isOwnerOfShop(c, res.shopId),
+});
 const ownerDelete = (c, res) => isOwnerOfShop(c, res.shopId);
 const ownerOrCreator = async (c, res) => (await isOwnerOfShop(c, res.shopId)) || res.createdBy === c.uid;
 
@@ -437,6 +444,9 @@ export const RULES = {
     update: async (c, res) => memberMay(c, res.shopId, "manageJobs"),
     del: ownerDelete,
   }),
+  partners: ownerOnly(),
+  partnerEntries: ownerOnly(),
+  partnerDocs: ownerOnly(),
 };
 
 export async function allowed(ctx, op, collection, args) {

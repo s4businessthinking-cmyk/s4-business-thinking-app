@@ -65,6 +65,20 @@ test("bank refunds on returns and bank lines of journal / contra vouchers are in
   assert.equal(by["accountVouchers:v2:1"].amount, 500);
 });
 
+test("partner money through the bank is included; cash, reinvest and profit shares are not", () => {
+  const tx = collectBankTransactions({
+    partnerEntries: [
+      { id: "pe1", shopId: "A", status: "active", kind: "capitalIn", method: "bank_transfer", amount: 10000, date: "2026-10-01", partnerName: "Karim" },
+      { id: "pe2", shopId: "A", status: "active", kind: "payout", method: "cheque", amount: 900, date: "2026-10-05", partnerName: "Karim" },
+      { id: "pe3", shopId: "A", status: "active", kind: "drawing", method: "cash", amount: 50, date: "2026-10-05" },
+      { id: "pe4", shopId: "A", status: "active", kind: "reinvest", amount: 70, date: "2026-10-05" },
+      { id: "pe5", shopId: "A", status: "cancelled", kind: "capitalOut", method: "card", amount: 30, date: "2026-10-05" },
+      { id: "pe6", shopId: "A", status: "active", kind: "distribution", allocations: [], periodTo: "2026-09-30" },
+    ],
+  }, "A");
+  assert.deepEqual(tx.map((t) => [t.key, t.dir, t.amount]), [["partnerEntries:pe1", "in", 10000], ["partnerEntries:pe2", "out", 900]]);
+});
+
 test("items cleared after the as-of date stay uncleared", () => {
   const tx = collectBankTransactions(data, "A");
   const rec = reconcile(tx, new Map([["expenses:e1", "2026-10-09"]]), { opening: 0, asOf: "2026-10-06" });

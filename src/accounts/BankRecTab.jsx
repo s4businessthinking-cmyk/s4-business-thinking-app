@@ -17,7 +17,7 @@ const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const COL_LABEL = {
   salesInvoices: ["সেলস বিল", "Sales bill"], purchaseInvoices: ["পারচেজ বিল", "Purchase bill"], salesReceipts: ["রিসিপ্ট", "Receipt"],
   purchasePayments: ["পেমেন্ট", "Payment"], expenses: ["খরচ", "Expense"], bankReconciliations: ["ব্যাংক এন্ট্রি", "Bank entry"],
-  salesReturns: ["সেলস রিটার্ন রিফান্ড", "Sales return refund"], purchaseReturns: ["পারচেজ রিটার্ন রিফান্ড", "Purchase return refund"], accountVouchers: ["জার্নাল / কন্ট্রা", "Journal / Contra"],
+  salesReturns: ["সেলস রিটার্ন রিফান্ড", "Sales return refund"], purchaseReturns: ["পারচেজ রিটার্ন রিফান্ড", "Purchase return refund"], accountVouchers: ["জার্নাল / কন্ট্রা", "Journal / Contra"], partnerEntries: ["পার্টনারের লেনদেন", "Partner money"],
 };
 const ENTRY_TYPES = [
   { key: "charge", dir: "out", bn: "ব্যাংক চার্জ", en: "Bank charge" },
@@ -45,10 +45,10 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses"), offlineList("accountVouchers").catch(() => [])])
-      .then(([rows, rc, pm, ex, av]) => {
+    Promise.all([loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses"), offlineList("accountVouchers").catch(() => []), offlineList("partnerEntries").catch(() => [])])
+      .then(([rows, rc, pm, ex, av, pe]) => {
         if (cancelled) return;
-        setData({ salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [], receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), vouchers: rowsOf(av) });
+        setData({ salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [], receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), vouchers: rowsOf(av), partnerEntries: rowsOf(pe) });
       })
       .catch((err) => console.warn("[S4 bank rec] load failed", err));
     return () => { cancelled = true; };

@@ -61,6 +61,13 @@ export function collectBankTransactions(data, shopId) {
         party: [other, v.narration].filter(Boolean).join(" · "), date: day(v.voucherDate), ref: v.refNo || "" });
     });
   });
+  const PARTNER_DIR = { capitalIn: "in", capitalOut: "out", drawing: "out", payout: "out" };
+  const PARTNER_NO = { capitalIn: "CAPITAL IN", capitalOut: "CAPITAL OUT", drawing: "DRAWING", payout: "PAID TO PARTNER" };
+  (data?.partnerEntries || []).forEach((p) => {
+    if (!live(p, shopId) || !PARTNER_DIR[p.kind]) return;
+    push({ col: "partnerEntries", id: p.id, dir: PARTNER_DIR[p.kind], method: p.method, amount: p.amount, no: PARTNER_NO[p.kind], party: p.partnerName || "",
+      date: day(p.date), ref: p.refNo || "" });
+  });
   (data?.bankEntries || []).forEach((b) => {
     if (!live(b, shopId)) return;
     out.push({ col: "bankReconciliations", id: b.id, key: `bankReconciliations:${b.id}`, dir: b.direction === "in" ? "in" : "out", method: "bank_transfer", amount: r2(b.amount),

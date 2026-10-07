@@ -49,6 +49,9 @@ export const SHOP_PULL_COLLECTIONS = [
   "attendance",
   "bankReconciliations",
   "jobOrders",
+  "partners",
+  "partnerEntries",
+  "partnerDocs",
   "masterLists",
   "users",
 ];
@@ -95,6 +98,7 @@ const IDENTITY_FIELDS = {
   goodsReceipts: ["grnNo"],
   employees: ["name"],
   jobOrders: ["jobNo"],
+  partners: ["name"],
 };
 
 export function hasRecordIdentity(collectionName, data) {

@@ -6,7 +6,7 @@ import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
-import { compressImage } from "../vouchers/chequeDocs.js";
+import { readDocFile, readProfilePhoto, openDocFile } from "../utils/docFiles.js";
 import { saveShopRecord } from "../offline/shopService";
 import { alertText } from "./employeeAlerts.js";
 import { NATIONALITIES, SALARY_PARTS, countryRule, isExpat, grossSalary, expiringItems, serviceLength } from "./employeeProfile.js";
@@ -16,8 +16,6 @@ const r2 = (v) => Math.round((n(v) + Number.EPSILON) * 100) / 100;
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
-const MAX_PDF_BYTES = 1.5 * 1024 * 1024;
-
 const PAYERS = [["company", "কোম্পানি দেবে", "Company"], ["employee", "কর্মচারী দেবে", "Employee"], ["shared", "দুজনে ভাগ করে", "Shared"]];
 const DOC_TYPES = [
   ["passport", "পাসপোর্ট কপি", "Passport copy"], ["visa", "ভিসা কপি", "Visa copy"], ["residentId", "রেসিডেন্স আইডি (সামনে/পেছনে)", "Residence ID (front/back)"],
@@ -268,21 +266,12 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
   const pickPhoto = async (file) => {
     if (!file) return;
     if (!String(file.type || "").startsWith("image/")) { toast?.(L("❌ শুধু ছবি দেওয়া যাবে", "❌ Only images"), "err"); return; }
-    try { const data = await compressImage(file, { maxSide: 360, quality: 0.7 }); setForm((f) => ({ ...f, photo: data })); }
+    try { const data = await readProfilePhoto(file); setForm((f) => ({ ...f, photo: data })); }
     catch { toast?.(L("❌ ছবিটা পড়া গেল না", "❌ Could not read the image"), "err"); }
   };
-  const readFile = (file) => new Promise((resolve, reject) => {
-    if (String(file.type || "").startsWith("image/")) { compressImage(file, { maxSide: 1500, quality: 0.68 }).then(resolve, reject); return; }
-    if (file.type !== "application/pdf") { reject(new Error(L("শুধু ছবি বা PDF দেওয়া যাবে", "Only images or PDF files"))); return; }
-    if (file.size > MAX_PDF_BYTES) { reject(new Error(L("PDF ১.৫ MB-এর বেশি — ছোট করে দিন বা ছবি তুলে দিন", "PDF is over 1.5 MB — shrink it or attach a photo instead"))); return; }
-    const rd = new FileReader();
-    rd.onload = () => resolve(rd.result);
-    rd.onerror = () => reject(new Error("read failed"));
-    rd.readAsDataURL(file);
-  });
   const pickDocFile = async (file) => {
     if (!file) return;
-    try { const data = await readFile(file); setDocForm((d) => ({ ...d, file: data, fileName: file.name, fileType: file.type })); }
+    try { const data = await readDocFile(file, L); setDocForm((d) => ({ ...d, file: data, fileName: file.name, fileType: file.type })); }
     catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); }
   };
   const saveDoc = async () => {
@@ -316,25 +305,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
       toast?.(`❌ ${e?.message || e}`, "err");
     }
   };
-  const openDoc = (d) => {
-    const src = String(d.file || "");
-    if (src.startsWith("data:application/pdf")) {
-      const bin = atob(src.split(",")[1] || "");
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-      window.open(URL.createObjectURL(new Blob([bytes], { type: "application/pdf" })), "_blank");
-      return;
-    }
-    if (!/^data:image\/(png|jpeg|webp);base64,/.test(src)) return;
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.title = d.label || "Document";
-    const img = w.document.createElement("img");
-    img.src = src;
-    img.style.cssText = "max-width:100%;display:block;margin:0 auto";
-    w.document.body.style.margin = "0";
-    w.document.body.appendChild(img);
-  };
+  const openDoc = openDocFile;
 
   const printProfile = (r) => {
     const c = { expat: isExpat(r, shopCountry), rule };

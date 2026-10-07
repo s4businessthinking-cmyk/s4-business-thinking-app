@@ -7,6 +7,7 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { taxSettingsOf } from "../reports/taxDomain.js";
+import { partnerDirectoryOf, matchPartnerName, PARTNER_BLOCKED_EXPENSE_CATEGORIES } from "../partners/partners.js";
 
 export const EXPENSE_CATEGORIES = [
   { key: "rent", bn: "দোকান ভাড়া", en: "Rent", icon: "🏠" },
@@ -61,7 +62,8 @@ export function expenseCategoryLabel(row, bn) {
 }
 
 // vatAuto: the VAT box follows the amount until the user types their own VAT figure.
-const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "" });
+const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "", partnerId: "", partnerUse: "", partnerPaid: "shop", enteredBy: "" });
+const ENTERED_BY_KEY = "s4_expense_entered_by";
 
 export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null, shop = null, employeeMode = false }) {
   const bn = lang === "bn";
@@ -101,6 +103,11 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
 
   const activeEmployees = useMemo(() => employees.filter((e) => e.status !== "inactive").sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))), [employees]);
   const empName = (id, fallback = "") => employees.find((e) => e.id === id)?.name || fallback;
+  const partnerDirectory = useMemo(() => partnerDirectoryOf(shop), [shop]);
+  const partnerName = (id, fallback = "") => partnerDirectory.find((p) => p.id === id)?.name || fallback;
+  // Partners share the owner login, so the login alone can't tell which of them wrote the entry.
+  const showEnteredBy = isOwner && partnerDirectory.length > 0;
+  const byName = (r) => r.enteredByName || r.createdByName || "";
 
   const mine = useMemo(() => rows.filter((r) => r && !r.isDeleted && r.shopId === shopId && (isOwner || r.createdBy === user?.uid) && (!employeeMode || r.employeeId)), [rows, shopId, isOwner, user?.uid, employeeMode]);
 
@@ -147,9 +154,10 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     return `EXP-${String(mx + 1).padStart(4, "0")}`;
   };
 
-  const openNew = () => { const f = { ...emptyForm(employeeMode), employeeId: employeeMode ? empFilter : "" }; if (f.employeeId) f.paidTo = empName(f.employeeId); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
+  const lastEnteredBy = () => { try { const id = localStorage.getItem(`${ENTERED_BY_KEY}:${shopId}`) || ""; return partnerDirectory.some((p) => p.id === id) ? id : ""; } catch { return ""; } };
+  const openNew = () => { const f = { ...emptyForm(employeeMode), employeeId: employeeMode ? empFilter : "", enteredBy: showEnteredBy ? lastEnteredBy() : "" }; if (f.employeeId) f.paidTo = empName(f.employeeId); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
   const openEdit = (r) => {
-    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: r.method || "cash", paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "" };
+    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: !r.method || r.method === "partner" ? "cash" : r.method, paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "", partnerId: r.partnerId || "", partnerUse: r.partnerId ? "shop" : "", partnerPaid: r.paidByPartner ? "own" : "shop", enteredBy: r.enteredBy || "" };
     setEditId(r.id);
     setForm(f);
     setBaseline(JSON.stringify(f));
@@ -159,16 +167,73 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const usesEmployeeCats = (f) => employeeMode || (!!f?.employeeId && !EXPENSE_CATEGORIES.some((c) => c.key === f.category));
   const showsEmployee = (f) => !!f && (usesEmployeeCats(f) || f.category === "salary");
 
+  const enteredByFields = (prev = {}) => {
+    if (!form.enteredBy) return { enteredBy: prev.enteredBy || "", enteredByName: prev.enteredByName || "" };
+    try { localStorage.setItem(`${ENTERED_BY_KEY}:${shopId}`, form.enteredBy); } catch { /* storage blocked */ }
+    return { enteredBy: form.enteredBy, enteredByName: partnerName(form.enteredBy, prev.enteredByName || "") };
+  };
+
+  // A partner taking money for themselves is a drawing: it comes off their profit share and never lowers the profit.
+  const saveAsDrawing = async () => {
+    const amount = r2(form.amount);
+    if (!(amount > 0)) { toast?.(L("❌ সঠিক টাকার পরিমাণ লিখুন", "❌ Enter a valid amount"), "err"); return; }
+    if (showEnteredBy && !form.enteredBy) { toast?.(L("❌ খরচের হিসাব কে লিখছেন, বাছুন", "❌ Pick who is entering this expense"), "err"); return; }
+    if (!isOwner) { toast?.(L("❌ এটা খরচ নয়। পার্টনার নিজের জন্য নিলে মালিক পার্টনার পাতায় \"অগ্রিম তোলা\" লিখবেন — মালিককে জানান।", "❌ This isn't an expense. When a partner takes money for themselves the owner records a drawing on the Partners page — tell the owner."), "err"); return; }
+    setSaving(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const payload = {
+        shopId, kind: "drawing", partnerId: form.partnerId, partnerName: partnerName(form.partnerId), amount, date: form.expenseDate, method: form.method,
+        refNo: [form.refNo.trim(), form.method === "cheque" ? form.chequeNo.trim() : ""].filter(Boolean).join(" · "), note: form.note.trim(), status: "active",
+        ...enteredByFields(), createdBy: user?.uid || "", createdByName: profile?.personName || "", createdAt: nowIso, updatedAt: nowIso, updatedBy: user?.uid || "",
+      };
+      const res = await offlineCreate("partnerEntries", payload);
+      logAudit({ shopId, user, profile, action: "create", collection: "partnerEntries", docId: res.documentId, docNo: "Drawing", amount, note: payload.partnerName });
+      if (editRow && editRow.status !== "cancelled") {
+        const patch = { status: "cancelled", cancelledAt: nowIso, cancelledBy: user?.uid || "", cancelReason: "Moved to partner drawing", updatedAt: nowIso, updatedBy: user?.uid || "" };
+        await offlineUpdate("expenses", editRow.id, { ...editRow, ...patch });
+        setRows((list) => list.map((r) => (r.id === editRow.id ? { ...r, ...patch } : r)));
+        logAudit({ shopId, user, profile, action: "cancel", collection: "expenses", docId: editRow.id, docNo: editRow.expenseNo, amount: editRow.amount, note: "Moved to partner drawing" });
+      }
+      toast?.(L(`✅ ${payload.partnerName}-এর অগ্রিম তোলা হিসেবে সেভ হয়েছে (খরচে নয়)`, `✅ Saved as ${payload.partnerName}'s drawing (not an expense)`));
+      setForm(null);
+      setEditId(null);
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
+    } catch (e) {
+      toast?.(`❌ ${e?.message || e}`, "err");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const save = async () => {
     if (saving || !form) return;
     const amount = r2(form.amount);
     if (!(amount > 0)) { toast?.(L("❌ সঠিক টাকার পরিমাণ লিখুন", "❌ Enter a valid amount"), "err"); return; }
     if (!form.expenseDate) { toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err"); return; }
     if (form.category === "other" && !form.categoryName.trim()) { toast?.(L("❌ খরচের ধরন লিখুন", "❌ Type the expense type"), "err"); return; }
-    const linkEmployee = showsEmployee(form);
+    if (showEnteredBy && !form.enteredBy) { toast?.(L("❌ খরচের হিসাব কে লিখছেন, বাছুন", "❌ Pick who is entering this expense"), "err"); return; }
+    let partnerId = employeeMode ? "" : form.partnerId;
+    if (partnerId && !form.partnerUse) { toast?.(L("❌ পার্টনার টাকাটা কিসের জন্য নিলেন — দোকানের কাজে নাকি নিজের কাজে, বাছুন", "❌ Pick what the partner took the money for — shop work or personal use"), "err"); return; }
+    if (partnerId && form.partnerUse === "personal") { await saveAsDrawing(); return; }
+    if (partnerId && PARTNER_BLOCKED_EXPENSE_CATEGORIES.has(form.category)) { toast?.(L("❌ পার্টনারের বেতন / অগ্রিম / বোনাস খরচ নয় — এটা লাভ ভাগে আসে। পার্টনার পাতায় লিখুন।", "❌ A partner's salary / advance / bonus isn't an expense — it comes from the profit split. Record it on the Partners page."), "err"); return; }
+    if (!partnerId && !employeeMode && !form.employeeId) {
+      const hit = matchPartnerName(form.paidTo, partnerDirectory);
+      if (hit) {
+        if (!window.confirm(L(`"${hit.name}" একজন পার্টনার।\n\nটাকাটা কি দোকানের কাজে খরচ হয়েছে?\nOK = হ্যাঁ, দোকানের খরচ\nCancel = না, ফিরে গিয়ে ঠিক করব`, `"${hit.name}" is a partner.\n\nWas this money spent on shop work?\nOK = yes, a shop expense\nCancel = no, go back and fix it`))) {
+          setForm((f) => ({ ...f, partnerId: hit.id, partnerUse: "" }));
+          return;
+        }
+        if (PARTNER_BLOCKED_EXPENSE_CATEGORIES.has(form.category)) { toast?.(L("❌ পার্টনারের বেতন / অগ্রিম / বোনাস খরচ নয় — এটা লাভ ভাগে আসে।", "❌ A partner's salary / advance / bonus isn't an expense — it comes from the profit split."), "err"); return; }
+        partnerId = hit.id;
+      }
+    }
+    const ownPocket = !!partnerId && form.partnerPaid === "own";
+    const method = ownPocket ? "partner" : form.method;
+    const linkEmployee = !partnerId && showsEmployee(form);
     const oldUnlinked = !!editId && !rows.find((r) => r.id === editId)?.employeeId;
     if (linkEmployee && !form.employeeId && (employeeMode || (activeEmployees.length > 0 && !oldUnlinked))) { toast?.(L("❌ কর্মচারী বাছুন", "❌ Pick the employee"), "err"); return; }
-    const isCheque = form.method === "cheque";
+    const isCheque = method === "cheque";
     if (isCheque && !form.chequeDate) { toast?.(L("❌ চেকের তারিখ দিন", "❌ Pick the cheque date"), "err"); return; }
     const vatAmount = form.hasVat ? r2(form.vatAmount) : 0;
     if (form.hasVat && !(vatAmount > 0 && vatAmount < amount)) { toast?.(L(`❌ ${tn}-এর পরিমাণ ঠিক করুন — মোট টাকার চেয়ে কম হতে হবে`, `❌ Fix the ${tn} amount — it must be less than the total`), "err"); return; }
@@ -177,7 +242,9 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     const prev = editId ? rows.find((r) => r.id === editId) || {} : {};
     const body = {
       expenseDate: form.expenseDate, category: form.category, categoryName: form.category === "other" ? form.categoryName.trim() : "",
-      amount, method: form.method, paidTo: form.paidTo.trim(), refNo: form.refNo.trim(), note: form.note.trim(),
+      amount, method, paidTo: form.paidTo.trim() || (partnerId ? partnerName(partnerId) : ""), refNo: form.refNo.trim(), note: form.note.trim(),
+      partnerId: partnerId || "", partnerName: partnerId ? partnerName(partnerId, prev.partnerName || "") : "", paidByPartner: ownPocket,
+      ...enteredByFields(prev),
       chequeNo: isCheque ? form.chequeNo.trim() : "", chequeBank: isCheque ? form.chequeBank.trim() : "", chequeDate: isCheque ? form.chequeDate : "",
       chequeStatus: isCheque ? (prev.method === "cheque" && prev.chequeStatus && prev.chequeDate === form.chequeDate ? prev.chequeStatus : "pending") : "",
       vatAmount, supplierTrn: form.hasVat ? form.supplierTrn.trim() : "",
@@ -246,14 +313,15 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     const cols = [
       { label: "Date" }, { label: "No" }, { label: L("ধরন", "Type") }, { label: employeeMode ? L("কর্মচারী", "Employee") : L("কাকে", "Paid To") },
       { label: L("বিবরণ", "Note") }, { label: L("মাধ্যম", "Mode") },
+      ...(showEnteredBy ? [{ label: "By" }] : []),
       ...(showVat ? [{ label: `${tn} (${cur})`, align: "right" }] : []),
       { label: `${L("টাকা", "Amount")} (${cur})`, align: "right" },
     ];
-    const body = active.map((r) => [fmtDay(r.expenseDate), r.expenseNo || "", expenseCategoryLabel(r, false).replace(/^\S+\s/, ""), employeeMode ? empName(r.employeeId, r.employeeName || "") : (r.paidTo || ""), [r.forMonth ? `[${r.forMonth}]` : "", r.note || ""].filter(Boolean).join(" "), (METHODS.find((m) => m.key === r.method)?.en) || r.method || "", ...(showVat ? [n(r.vatAmount) > 0 ? money(r.vatAmount) : ""] : []), money(r.amount)]);
+    const body = active.map((r) => [fmtDay(r.expenseDate), r.expenseNo || "", expenseCategoryLabel(r, false).replace(/^\S+\s/, ""), employeeMode ? empName(r.employeeId, r.employeeName || "") : (r.partnerId ? `Partner: ${r.partnerName || r.paidTo || ""}` : r.paidTo || ""), [r.forMonth ? `[${r.forMonth}]` : "", r.note || ""].filter(Boolean).join(" "), r.method === "partner" ? "Partner's pocket" : (METHODS.find((m) => m.key === r.method)?.en) || r.method || "", ...(showEnteredBy ? [byName(r)] : []), ...(showVat ? [n(r.vatAmount) > 0 ? money(r.vatAmount) : ""] : []), money(r.amount)]);
     printWithSettings(generateStatementHTML({
       shopName, title: employeeMode ? "EMPLOYEE EXPENSE REPORT" : "EXPENSE REPORT",
       subtitle: `${from ? fmtDay(from) : "Start"} — ${to ? fmtDay(to) : "Today"}${empFilter ? ` · ${empName(empFilter)}` : ""}`,
-      cols, rows: body, foot: ["", "", "", "", "", "TOTAL", ...(showVat ? [money(vatTotal)] : []), money(total)],
+      cols, rows: body, foot: ["", "", "", "", "", ...(showEnteredBy ? [""] : []), "TOTAL", ...(showVat ? [money(vatTotal)] : []), money(total)],
     }), { lang });
   };
 
@@ -296,7 +364,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   ];
   const activeQuick = quick.find(([, , f, t]) => f === from && t === to)?.[0];
   const catName = (r) => expenseCategoryLabel(r, bn).replace(/^\S+\s/, "");
-  const methodName = (r) => (METHODS.find((m) => m.key === r.method)?.[bn ? "bn" : "en"]) || r.method || "";
+  const methodName = (r) => (r.method === "partner" ? L("পার্টনারের পকেট", "Partner's pocket") : (METHODS.find((m) => m.key === r.method)?.[bn ? "bn" : "en"]) || r.method || "");
   const chequeLabel = (st) => (st === "cleared" ? L("ক্লিয়ার", "Cleared") : st === "bounced" ? L("বাউন্স", "Bounced") : L("পেন্ডিং", "Pending"));
   const chequeColor = (st) => (st === "cleared" ? "#15803d" : st === "bounced" ? "#b91c1c" : "#b45309");
   const cashTotal = active.filter((r) => r.method === "cash").reduce((t, r) => t + n(r.amount), 0);
@@ -382,11 +450,11 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
               <td>{fmtDay(r.expenseDate)}</td>
               <td className="si-strong">{r.expenseNo}</td>
               <td>{catName(r)}</td>
-              <td title={r.paidTo || ""}>{r.employeeId ? `👷 ${empName(r.employeeId, r.employeeName || "")}` : (r.paidTo || "—")}</td>
+              <td title={r.paidTo || ""}>{r.employeeId ? `👷 ${empName(r.employeeId, r.employeeName || "")}` : r.partnerId ? `🤝 ${r.partnerName || r.paidTo || ""}` : (r.paidTo || "—")}</td>
               <td title={r.note || ""}>{r.forMonth ? `[${r.forMonth}] ` : ""}{r.refNo ? `[${r.refNo}] ` : ""}{r.note || ""}</td>
               <td>{methodName(r)}</td>
               <td>{r.method === "cheque" ? <><span className="si-badge" style={{ color: chequeColor(r.chequeStatus) }}>{chequeLabel(r.chequeStatus)}</span> {fmtDay(r.chequeDate)}</> : ""}</td>
-              {isOwner && <td>{r.createdByName || ""}</td>}
+              {isOwner && <td>{byName(r)}</td>}
               {showVat && <td className="si-num">{n(r.vatAmount) > 0 ? money(r.vatAmount) : ""}</td>}
               <td className="si-num si-strong" style={cancelled ? { textDecoration: "line-through" } : { color: "#b91c1c" }}>
                 {cancelled && <span className="si-badge" style={{ color: "#6b7280", marginRight: 4, textDecoration: "none" }}>{L("বাতিল", "Cancelled")}</span>}
@@ -408,14 +476,14 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
           <span style={cancelled ? { textDecoration: "line-through" } : { color: "#b91c1c" }}>{cur} {money(r.amount)}</span>
         </div>
         <div className="si-mrow-sub">
-          <span>{fmtDay(r.expenseDate)} · {r.expenseNo}{r.employeeId ? ` · 👷 ${empName(r.employeeId, r.employeeName || "")}` : r.paidTo ? ` · ${r.paidTo}` : ""}{n(r.vatAmount) > 0 ? ` · ${tn} ${money(r.vatAmount)}` : ""}</span>
+          <span>{fmtDay(r.expenseDate)} · {r.expenseNo}{r.employeeId ? ` · 👷 ${empName(r.employeeId, r.employeeName || "")}` : r.partnerId ? ` · 🤝 ${r.partnerName || r.paidTo || ""}` : r.paidTo ? ` · ${r.paidTo}` : ""}{n(r.vatAmount) > 0 ? ` · ${tn} ${money(r.vatAmount)}` : ""}</span>
           <span>
             {cancelled ? <span className="si-badge" style={{ color: "#6b7280" }}>{L("বাতিল", "Cancelled")}</span>
               : r.method === "cheque" ? <span className="si-badge" style={{ color: chequeColor(r.chequeStatus) }}>{L("চেক", "Cheque")} · {chequeLabel(r.chequeStatus)}</span>
                 : methodName(r)}
           </span>
         </div>
-        {r.note && <div className="si-mrow-sub"><span>{r.note}</span></div>}
+        {(r.note || (isOwner && byName(r))) && <div className="si-mrow-sub"><span>{r.note}</span>{isOwner && byName(r) && <span>✍️ {byName(r)}</span>}</div>}
       </button>
     );
   });
@@ -462,7 +530,57 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     </div>
   );
   const sideBox = employeeMode ? employeeBox : categoryBox;
-  const formForEmployee = showsEmployee(form);
+  const formPartner = !employeeMode && !!form?.partnerId;
+  const formForEmployee = showsEmployee(form) && !formPartner;
+  const formOwnPocket = formPartner && form.partnerUse === "shop" && form.partnerPaid === "own";
+  const formPersonal = formPartner && form.partnerUse === "personal";
+  const paidToPartner = form && !employeeMode && !form.partnerId && !form.employeeId ? matchPartnerName(form.paidTo, partnerDirectory) : null;
+  const choice = (active, onClick, label, color) => (
+    <button type="button" disabled={readOnly} className={`pm-btn-secondary${active ? " is-active" : ""}`} onClick={onClick} style={active && color ? { borderColor: color, color } : undefined}>{label}</button>
+  );
+  const partnerBox = form && !employeeMode && (partnerDirectory.length > 0 || form.partnerId) && (
+    <div className="si-entry">
+      {fField(L("পার্টনার টাকা নিয়েছেন / দিয়েছেন?", "Did a partner take / pay this money?"), (
+        <select className="pm-input" disabled={readOnly} value={form.partnerId} onChange={(e) => { const id = e.target.value; setForm((f) => ({ ...f, partnerId: id, partnerUse: id ? (f.partnerId === id ? f.partnerUse : "") : "", partnerPaid: "shop", ...(id && !f.paidTo.trim() ? { paidTo: partnerName(id) } : {}) })); }}>
+          <option value="">{L("— না, পার্টনার নয় —", "— No, not a partner —")}</option>
+          {(form.partnerId && !partnerDirectory.some((p) => p.id === form.partnerId) ? [...partnerDirectory, { id: form.partnerId, name: editRow?.partnerName || form.partnerId }] : partnerDirectory)
+            .map((p) => <option key={p.id} value={p.id}>🤝 {p.name}</option>)}
+        </select>
+      ))}
+      {formPartner && (
+        <>
+          <span className="pm-label">{L("টাকাটা কিসের জন্য? *", "What was the money for? *")}</span>
+          <div className="si-types" style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}>
+            {choice(form.partnerUse === "shop", () => setF("partnerUse", "shop"), L("🏪 দোকানের কাজে", "🏪 Shop work"), "#15803d")}
+            {choice(form.partnerUse === "personal", () => setF("partnerUse", "personal"), L("👤 নিজের কাজে", "👤 Personal use"), "#b91c1c")}
+          </div>
+          {form.partnerUse === "shop" && (
+            <>
+              <span className="pm-label">{L("টাকা কে দিল?", "Whose money paid it?")}</span>
+              <div className="si-types" style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))" }}>
+                {choice(form.partnerPaid === "shop", () => setF("partnerPaid", "shop"), L("💰 দোকানের টাকা থেকে", "💰 The shop's money"))}
+                {choice(form.partnerPaid === "own", () => setF("partnerPaid", "own"), L("🫴 পার্টনার নিজের পকেট থেকে", "🫴 Partner's own pocket"))}
+              </div>
+              <div className="si-hint" style={{ marginLeft: 0, color: "#15803d" }}>
+                ✔ {form.partnerPaid === "own"
+                  ? L("দোকানের খরচ হিসেবে সেভ হবে। দোকানের নগদ বা ব্যাংক থেকে টাকা কমবে না, আর এই টাকা পার্টনারের পাওনায় যোগ হবে — পরে তাকে ফেরত দেবেন।", "Saved as a shop expense. The shop's cash or bank doesn't go down, and the amount is added to what the business owes the partner — pay it back later.")
+                  : L("দোকানের খরচ হিসেবে সেভ হবে, সাথে লেখা থাকবে কোন পার্টনার খরচ করেছেন।", "Saved as a shop expense, noting which partner spent it.")}
+              </div>
+              {PARTNER_BLOCKED_EXPENSE_CATEGORIES.has(form.category) && <div className="si-hint" style={{ marginLeft: 0, color: "#b91c1c" }}>⛔ {L("পার্টনারের বেতন / অগ্রিম / বোনাস খরচ নয় — এটা লাভ ভাগে আসে। অন্য খরচের ধরন বাছুন।", "A partner's salary / advance / bonus isn't an expense — it comes from the profit split. Pick another expense type.")}</div>}
+            </>
+          )}
+          {formPersonal && (
+            <div className="si-hint" style={{ marginLeft: 0, color: "#b91c1c" }}>
+              ⛔ {L("নিজের কাজে নেওয়া টাকা দোকানের খরচ নয়, তাই খরচে সেভ হবে না।", "Money taken for personal use is not a shop expense, so it won't be saved as one.")}{" "}
+              {isOwner
+                ? L("নিচের বোতামে এটা পার্টনারের \"অগ্রিম তোলা\" হিসেবে সেভ হবে — তার লাভের ভাগ থেকে কেটে যাবে।", "The button below saves it as the partner's drawing — it comes off their profit share.")
+                : L("মালিককে জানান, তিনি পার্টনার পাতায় \"অগ্রিম তোলা\" হিসেবে লিখবেন।", "Tell the owner — they record it as a drawing on the Partners page.")}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 
   const catGrid = form && (
     <div className="si-types" style={{ gridTemplateColumns: "repeat(3, minmax(0,1fr))" }}>
@@ -476,6 +594,13 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
 
   const fields = form && (
     <div className="si-panel-body" style={{ gap: 6 }}>
+      {showEnteredBy && fField(`✍️ ${L("খরচের হিসাব কে লিখছেন?", "Who is entering this expense?")} *`, (
+        <select className="pm-input" disabled={readOnly} value={form.enteredBy} onChange={(e) => setF("enteredBy", e.target.value)} style={!form.enteredBy ? { borderColor: "#b45309" } : undefined}>
+          <option value="">{L("— বাছুন —", "— Pick —")}</option>
+          {(form.enteredBy && !partnerDirectory.some((p) => p.id === form.enteredBy) ? [...partnerDirectory, { id: form.enteredBy, name: editRow?.enteredByName || form.enteredBy }] : partnerDirectory)
+            .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      ))}
       {formForEmployee && (
         <div className="si-grid2">
           {fField(`${L("কর্মচারী", "Employee")} *`, (
@@ -515,14 +640,15 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
         </div>
       )}
       {form.category === "other" && fField(`${L("খরচের ধরন", "Expense type")} *`, <input className="pm-input" disabled={readOnly} value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} />)}
-      {fField(L("কীভাবে দিলেন", "Paid by"), (
+      {partnerBox}
+      {!formOwnPocket && fField(L("কীভাবে দিলেন", "Paid by"), (
         <div className="si-types" style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}>
           {METHODS.map((m) => (
             <button key={m.key} type="button" disabled={readOnly} className={`pm-btn-secondary${form.method === m.key ? " is-active" : ""}`} onClick={() => setF("method", m.key)}>{bn ? m.bn : m.en}</button>
           ))}
         </div>
       ))}
-      {form.method === "cheque" && (
+      {form.method === "cheque" && !formOwnPocket && (
         <div className="si-entry">
           <div className="si-grid2">
             {fField(L("চেক নং", "Cheque No"), <input className="pm-input" disabled={readOnly} value={form.chequeNo} onChange={(e) => setF("chequeNo", e.target.value)} />)}
@@ -537,10 +663,16 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
         {fField(L("কাকে দিলেন", "Paid to"), <input className="pm-input" disabled={readOnly} value={form.paidTo} onChange={(e) => setF("paidTo", e.target.value)} />)}
         {fField(L("রেফারেন্স / বিল নং", "Ref / Bill No"), <input className="pm-input" disabled={readOnly} value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} />)}
       </div>
+      {paidToPartner && !readOnly && (
+        <div className="si-hint" style={{ marginLeft: 0, color: "#b45309" }}>
+          ⚠️ {L(`"${paidToPartner.name}" একজন পার্টনার। তিনি টাকা নিয়ে থাকলে পার্টনার বাছুন — নিজের কাজে নিলে এটা খরচ নয়।`, `"${paidToPartner.name}" is a partner. If they took the money, pick the partner — personal use is not an expense.`)}{" "}
+          <button type="button" style={{ background: "none", border: 0, padding: 0, color: "#2563eb", cursor: "pointer", fontWeight: 700 }} onClick={() => setForm((f) => ({ ...f, partnerId: paidToPartner.id, partnerUse: "", partnerPaid: "shop" }))}>{L("পার্টনার বাছুন", "Pick partner")}</button>
+        </div>
+      )}
       {fField(L("বিবরণ", "Note"), <textarea className="pm-input" disabled={readOnly} rows={2} value={form.note} onChange={(e) => setF("note", e.target.value)} style={{ height: mobile ? 64 : 44 }} />)}
       {editRow && (
         <div className="si-hint" style={{ marginLeft: 0 }}>
-          {editRow.expenseNo}{editRow.createdByName ? ` · ${L("লিখেছেন", "By")} ${editRow.createdByName}` : ""}
+          {editRow.expenseNo}{byName(editRow) ? ` · ${L("লিখেছেন", "By")} ${byName(editRow)}` : ""}
           {editRow.status === "cancelled" ? ` · ${L("বাতিল করা হয়েছে", "Cancelled")}` : ""}
         </div>
       )}
@@ -574,8 +706,8 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
           <span className="si-toolbar-gap" />
           <button type="button" className="pm-btn-secondary" disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
           {!readOnly && (
-            <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={save}>
-              {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editRow ? L("আপডেট", "Update") : L("সেভ", "Save")} (Ctrl+S)`}
+            <button type="button" className="pm-btn pm-btn--primary" disabled={saving || (formPersonal && !isOwner)} onClick={save}>
+              {saving ? L("সেভ হচ্ছে…", "Saving…") : formPersonal ? `👛 ${L("অগ্রিম তোলা হিসেবে সেভ", "Save as partner drawing")}` : `💾 ${editRow ? L("আপডেট", "Update") : L("সেভ", "Save")} (Ctrl+S)`}
             </button>
           )}
         </div>
