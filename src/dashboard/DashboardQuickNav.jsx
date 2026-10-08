@@ -1,149 +1,80 @@
 import React from "react";
 import { groupMenuItems } from "./menuGroups.js";
 
+const MIN_CARD = 110;
+
 /**
- * Grouped quick-launch tiles on the dashboard (Masters / Transaction / …).
+ * Grouped quick-launch cards on the dashboard (Masters / Transaction / …).
  * navItems: [{ key, icon, label, badge? }]
  */
 export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDash, th, setTab, title }) {
-  const tuples = navItems.map((n) => [n.key, n.label]);
   const metaByKey = Object.fromEntries(navItems.map((n) => [n.key, n]));
-  const groups = groupMenuItems(tuples, lang).filter((g) => g.key !== "home" && g.items.length);
+  const groups = groupMenuItems(navItems.map((n) => [n.key, n.label]), lang).filter((g) => g.items.length);
 
-  const groupShell = {
-    borderRadius: 16,
-    padding: isDesktop ? "14px 14px 12px" : "12px 10px 10px",
+  const glassCard = {
     background: isLightDash
-      ? "linear-gradient(160deg, rgba(255,255,255,0.97), rgba(241,245,255,0.94))"
-      : "linear-gradient(160deg, rgba(30,41,59,0.88), rgba(15,23,42,0.82))",
-    border: isLightDash ? "1px solid rgba(59,130,246,0.14)" : "1px solid rgba(148,163,184,0.22)",
-    boxShadow: isLightDash ? "0 8px 24px rgba(30,64,175,0.08)" : "0 10px 28px rgba(2,6,23,0.28)",
+      ? "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(239,246,255,0.96))"
+      : "linear-gradient(145deg, rgba(30,41,59,0.92), rgba(15,23,42,0.86))",
+    border: isLightDash ? "1px solid rgba(59,130,246,0.18)" : "1px solid rgba(148,163,184,0.25)",
+    boxShadow: isLightDash ? "0 12px 28px rgba(30,64,175,0.10)" : "0 14px 35px rgba(2,6,23,0.32)",
+    backdropFilter: "blur(14px)",
   };
 
-  const headerStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
-    paddingBottom: 8,
-    borderBottom: isLightDash ? "1px solid rgba(59,130,246,0.12)" : "1px solid rgba(148,163,184,0.18)",
-  };
-
-  const tile = (item) => {
-    const count = item.badge > 0 ? item.badge : null;
-    return (
-      <button
-        key={item.key}
-        type="button"
-        onClick={() => setTab(item.key)}
-        style={{
-          borderRadius: 12,
-          padding: isDesktop ? "10px 12px" : "9px 10px",
-          minHeight: isDesktop ? 56 : 52,
-          cursor: "pointer",
-          fontFamily: "inherit",
-          textAlign: "left",
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          width: "100%",
-          boxSizing: "border-box",
-          background: isLightDash ? "rgba(255,255,255,0.85)" : "rgba(51,65,85,0.45)",
-          border: isLightDash ? "1px solid rgba(148,163,184,0.25)" : "1px solid rgba(71,85,105,0.5)",
-          color: th.txtPrimary,
-          transition: "transform .12s ease, box-shadow .12s ease",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-1px)";
-          e.currentTarget.style.boxShadow = isLightDash ? "0 6px 16px rgba(59,130,246,0.12)" : "0 6px 16px rgba(0,0,0,0.25)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "";
-          e.currentTarget.style.boxShadow = "";
-        }}
-      >
-        <span
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 18,
-            background: isLightDash ? "linear-gradient(145deg,#eff6ff,#dbeafe)" : "linear-gradient(145deg,#334155,#1e293b)",
-          }}
-        >
-          {item.icon}
+  const card = (item) => (
+    <button
+      key={item.key}
+      type="button"
+      onClick={() => setTab(item.key)}
+      style={{
+        ...glassCard,
+        borderRadius: 16,
+        padding: isDesktop ? "14px 8px" : "12px 6px",
+        height: isDesktop ? 104 : 92,
+        boxSizing: "border-box",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        position: "relative",
+        color: th.txtPrimary,
+        minWidth: 0,
+      }}
+    >
+      {item.badge > 0 && (
+        <span style={{ position: "absolute", top: 8, right: 8, background: "linear-gradient(135deg,#fb7185,#ef4444)", color: "#fff", borderRadius: 999, padding: "2px 8px", fontSize: 10, fontWeight: 900, boxShadow: "0 8px 18px rgba(239,68,68,0.35)" }}>
+          {item.badge}
         </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span
-            style={{
-              display: "block",
-              fontSize: isDesktop ? 13 : 12,
-              fontWeight: 800,
-              color: th.txtPrimary,
-              lineHeight: 1.25,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {item.label}
-          </span>
-          {count != null && (
-            <span style={{ display: "block", fontSize: 10, fontWeight: 700, color: th.txtMuted, marginTop: 2 }}>
-              {count.toLocaleString()}
-            </span>
-          )}
-        </span>
-      </button>
-    );
-  };
+      )}
+      <span style={{ fontSize: isDesktop ? 28 : 25, lineHeight: 1, filter: "drop-shadow(0 8px 14px rgba(96,165,250,0.28))" }}>{item.icon}</span>
+      <span style={{ fontSize: isDesktop ? 13 : 12, fontWeight: 800, color: th.txtSecondary, textAlign: "center", lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {item.label}
+      </span>
+    </button>
+  );
 
   return (
     <div style={{ marginBottom: isDesktop ? 0 : 18 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          margin: "12px 2px 10px",
-          color: th.txtPrimary,
-          fontSize: isDesktop ? 12 : 11,
-          fontWeight: 900,
-          textTransform: "uppercase",
-          letterSpacing: 0.7,
-        }}
-      >
-        <span>{title}</span>
+      <div style={{ margin: "12px 2px 8px", color: th.txtPrimary, fontSize: isDesktop ? 12 : 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.7 }}>
+        {title}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: isDesktop ? 12 : 10 }}>
+      <div style={isDesktop
+        ? { display: "flex", flexWrap: "wrap", columnGap: 18, rowGap: 14 }
+        : { display: "flex", flexDirection: "column", gap: 12 }}>
         {groups.map((g) => (
-          <div key={g.key} style={groupShell}>
+          <div key={g.key} style={isDesktop ? { flex: `${g.items.length} 1 ${g.items.length * MIN_CARD + (g.items.length - 1) * 10}px`, minWidth: 0 } : undefined}>
             {g.label && (
-              <div style={headerStyle}>
-                <span style={{ fontSize: 16 }}>{g.icon}</span>
-                <span style={{ flex: 1, fontSize: 12, fontWeight: 900, letterSpacing: 0.35, textTransform: "uppercase", color: isLightDash ? "#1e40af" : "#e2e8f0" }}>
-                  {g.label.replace(/\s*\([^)]*\)\s*/g, "").trim() || g.label}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 2px 8px" }}>
+                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 0.4, textTransform: "uppercase", color: isLightDash ? "#1e3a8a" : "#cbd5e1", whiteSpace: "nowrap" }}>
+                  {g.icon} {g.label}
                 </span>
-                <span style={{ fontSize: 10, fontWeight: 800, color: th.txtMuted, padding: "2px 8px", borderRadius: 999, background: isLightDash ? "rgba(59,130,246,0.08)" : "rgba(148,163,184,0.12)" }}>
-                  {g.items.length}
-                </span>
+                <span style={{ flex: 1, height: 1, background: isLightDash ? "rgba(59,130,246,0.18)" : "rgba(148,163,184,0.22)" }} />
               </div>
             )}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: isDesktop ? "repeat(auto-fill, minmax(168px, 1fr))" : "repeat(2, minmax(0, 1fr))",
-                gap: isDesktop ? 8 : 6,
-              }}
-            >
-              {g.items.map(([key]) => {
-                const item = metaByKey[key];
-                return item ? tile(item) : null;
-              })}
+            <div style={{ display: "grid", gridTemplateColumns: isDesktop ? `repeat(auto-fit, minmax(${MIN_CARD}px, 1fr))` : "repeat(3, minmax(0, 1fr))", gap: isDesktop ? 10 : 8 }}>
+              {g.items.map(([key]) => (metaByKey[key] ? card(metaByKey[key]) : null))}
             </div>
           </div>
         ))}
