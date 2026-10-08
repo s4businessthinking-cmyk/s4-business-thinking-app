@@ -1,3 +1,4 @@
+import { journalPlByAccount, journalPlTotal } from "./journalPl.js";
 import { n, r2, dayOf, inRange, isLive, liveSalesOf, livePurchasesOf, liveReturnsOf } from "./reportFilters.js";
 
 // dueDays: days after the period ends to file and pay; null when the country has no single fixed rule.
@@ -199,6 +200,10 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     .map((p) => ({ ...p, salesTaxable: r2(p.salesTaxable), salesVat: r2(p.salesVat), purchTaxable: r2(p.purchTaxable), purchVat: r2(p.purchVat), soldQty: r2(p.soldQty), boughtQty: r2(p.boughtQty) }))
     .sort((a, b) => b.salesVat - a.salesVat || b.purchVat - a.purchVat);
 
+  const journalVouchers = (data.accountVouchers || data.extras?.accountVouchers || []).filter((v) => isLive(v, shopId));
+  const journalPl = journalPlByAccount(journalVouchers, shopId, from, to);
+  const journalExpensePl = journalPlTotal(journalPl);
+
   const outputVat = sum(salesRows, "vat");
   const inputVat = sum(purchaseRows, "vat");
   return {
@@ -208,6 +213,7 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     outputVat, inputVat, payable: r2(outputVat - inputVat),
     salesCount: sales.length, purchCount: purchases.length, salesReturnCount: salesRet.length, purchReturnCount: purchRet.length,
     expenseCount: expenseBills.length, expenseVat: sum(purchaseRows.filter((r) => r.isExpense), "vat"),
+    journalExpensePl,
     missingCustomerTrn: sales.filter((inv) => n(inv.totalVat) > 0 && inv.invoiceType === "tax" && inv.customerId && !(inv.customerTrn || customerById.get(inv.customerId)?.trnNumber)).length,
   };
 }

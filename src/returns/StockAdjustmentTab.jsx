@@ -9,6 +9,11 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
+import { countDraftKey, countSheetRows, countSummary, groupValues } from "./stockCount.js";
+
+function readCountDraft(shopId) {
+  try { return JSON.parse(localStorage.getItem(countDraftKey(shopId)) || "null") || null; } catch { return null; }
+}
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const fq = (v) => String(parseFloat(n2(v).toFixed(4)));
@@ -49,9 +54,26 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
   const [lines, setLines] = useState([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [counted, setCounted] = useState({});
+  const [countDate, setCountDate] = useState(localDay());
+  const [countBy, setCountBy] = useState("");
+  const [countVal, setCountVal] = useState("");
+  const [countQ, setCountQ] = useState("");
+  const [onlyInStock, setOnlyInStock] = useState(false);
+  const [onlyDiff, setOnlyDiff] = useState(false);
+  const [countLimit, setCountLimit] = useState(300);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile, view);
+
+  useEffect(() => {
+    if (view !== "count") return;
+    try {
+      const hasAny = Object.values(counted).some((v) => String(v ?? "").trim() !== "");
+      if (hasAny) localStorage.setItem(countDraftKey(shopId), JSON.stringify({ date: countDate, counted, savedAt: new Date().toISOString() }));
+      else localStorage.removeItem(countDraftKey(shopId));
+    } catch { /* storage full or blocked */ }
+  }, [view, counted, countDate, shopId]);
 
   useEffect(() => {
     if (!shopId) return undefined;
@@ -72,7 +94,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
   useEscapeKey(() => { if (leaveOk()) { setSel(null); setView("list"); } }, { enabled: view !== "list", level: view === "form" ? 2 : 1 });
 
   useEffect(() => {
-    if (view !== "form") return undefined;
+    if (view !== "form" && view !== "count") return undefined;
     let cancelled = false;
     loadInvoiceRows()
       .then((r) => { if (!cancelled) setStockMap(computeStockMap(products, r.purchaseInvoices, r.salesInvoices, shopId, r.deliveryNotes, r.extras)); })
@@ -147,6 +169,77 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     } finally {
       setSaving(false);
     }
+  };
+
+  const openCount = () => {
+    const draft = readCountDraft(shopId);
+    setCounted(draft?.counted || {});
+    setCountDate(draft?.date || localDay());
+    setCountQ(""); setOnlyDiff(false);
+    if (draft?.counted && Object.keys(draft.counted).length) {
+      toast?.(L(`📋 আগের অসমাপ্ত গণনা খোলা হলো (${Object.keys(draft.counted).length}টি পণ্য)`, `📋 Resumed the unfinished count (${Object.keys(draft.counted).length} items)`));
+    }
+    setView("count");
+  };
+
+  const saveCount = async () => {
+    if (saving) return;
+    if (!countDate) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
+    if (!stockMap) return toast?.(L("⏳ স্টক এখনো লোড হচ্ছে, একটু পরে সেভ করুন", "⏳ Stock is still loading, save again in a moment"), "err");
+    const sum = countSummary(products, counted, stockOf);
+    const negative = Object.entries(counted).find(([, v]) => String(v ?? "").trim() !== "" && n2(v) < 0);
+    if (negative) return toast?.(L("❌ গোনা সংখ্যা মাইনাস হতে পারে না", "❌ Counted quantity can't be negative"), "err");
+    if (!sum.entered) return toast?.(L("❌ অন্তত একটা পণ্যের গোনা সংখ্যা লিখুন", "❌ Enter the count for at least one product"), "err");
+    if (!sum.diffs.length) {
+      if (!window.confirm(L(`${sum.entered}টি পণ্য গোনা হয়েছে, সব সিস্টেমের সাথে মিলে গেছে — কোনো সমন্বয় লাগবে না। গণনাটা শেষ করে মুছে দেব?`, `${sum.entered} items counted and all match the system — no adjustment needed. Finish and clear this count?`))) return;
+      setCounted({}); try { localStorage.removeItem(countDraftKey(shopId)); } catch { /* ignore */ }
+      setView("list");
+      return;
+    }
+    if (!window.confirm(L(
+      `${sum.entered}টি পণ্য গোনা হয়েছে। ${sum.diffs.length}টিতে পার্থক্য: ${sum.short}টি কম, ${sum.extra}টি বেশি। এগুলো একটা স্টক সমন্বয় হিসেবে সেভ হবে আর স্টক গোনা সংখ্যার সমান হয়ে যাবে। চালিয়ে যাবেন?`,
+      `${sum.entered} items counted. ${sum.diffs.length} differ: ${sum.short} short, ${sum.extra} extra. They will be saved as one stock adjustment and stock will match the count. Continue?`
+    ))) return;
+    setSaving(true);
+    try {
+      const adjustNo = await makeNo("lastSASerial", "SA", rows.map((r) => r.adjustNo));
+      const nowIso = new Date().toISOString();
+      const payload = {
+        shopId, adjustNo, adjustDate: countDate, reason: "count", physicalCount: true,
+        note: L(`ফিজিক্যাল স্টক গণনা · ${sum.entered}টি পণ্য গোনা`, `Physical stock count · ${sum.entered} items counted`), status: "confirmed",
+        countedItems: sum.entered,
+        items: sum.diffs.map((d) => ({
+          productId: d.product.id, name: d.product.name || "", code: d.product.code || "", unit: d.product.unit || d.product.baseUnit || "Pcs", unitFactor: 1,
+          direction: d.diff > 0 ? "in" : "out", qty: Math.abs(d.diff), stockBefore: d.system, countedQty: d.counted,
+        })),
+        createdAt: nowIso, createdBy: user?.uid || "", createdByName: profile?.personName || "",
+      };
+      const res = await offlineCreate("stockAdjustments", payload);
+      const created = { ...res.data, id: res.documentId };
+      logAudit({ shopId, user, profile, action: "create", collection: "stockAdjustments", docId: created.id, docNo: adjustNo, note: `Physical count · ${payload.items.length} difference(s)` });
+      setRows((list) => [created, ...list.filter((r) => r.id !== created.id)]);
+      setCounted({}); try { localStorage.removeItem(countDraftKey(shopId)); } catch { /* ignore */ }
+      toast?.(L(`✅ ${adjustNo} সেভ হয়েছে — স্টক গোনা সংখ্যার সাথে মিলিয়ে দেওয়া হলো`, `✅ ${adjustNo} saved — stock now matches the count`));
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
+      setSel(created); setView("detail");
+    } catch (e) {
+      toast?.(`❌ ${e?.message || e}`, "err");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const printCountSheet = (sheetRows, withNumbers) => {
+    const cols = [{ label: "#" }, { label: "Item" }, { label: "Code" }, { label: "Rack" }, { label: "System", align: "right" }, { label: "Counted", align: "right" }, { label: "Diff", align: "right" }];
+    const body = sheetRows.map((p, i) => {
+      const sys = stockOf(p.id);
+      const c = counted[p.id];
+      const has = withNumbers && String(c ?? "").trim() !== "";
+      const diff = has && sys != null ? parseFloat((n2(c) - sys).toFixed(4)) : null;
+      return [String(i + 1), p.name || "", p.code || "", p.rackLocation || "", sys == null ? "—" : fq(sys), has ? fq(c) : "____________", diff == null ? "" : `${diff > 0 ? "+" : ""}${fq(diff)}`];
+    });
+    const subtitle = [countDate, countBy && countVal ? `${countVal}` : "", withNumbers ? "Count result" : "Blank count sheet"].filter(Boolean).join(" · ");
+    printWithSettings(generateStatementHTML({ shopName, title: "PHYSICAL STOCK COUNT", subtitle, cols, rows: body }), { lang });
   };
 
   const canCancel = (r) => r.status !== "cancelled" && (isOwner || (canManage && r.createdBy === user?.uid));
@@ -352,6 +445,132 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     ));
   }
 
+  if (view === "count") {
+    const groupOpts = countBy ? groupValues(products, countBy) : [];
+    const sheetAll = countSheetRows(products, { by: countBy, value: countVal, q: countQ, onlyInStock, stockOf });
+    const diffOf = (p) => {
+      const c = counted[p.id];
+      const sys = stockOf(p.id);
+      if (String(c ?? "").trim() === "" || sys == null) return null;
+      return parseFloat((n2(c) - sys).toFixed(4));
+    };
+    const sheet = onlyDiff ? sheetAll.filter((p) => { const d = diffOf(p); return d != null && Math.abs(d) > 1e-9; }) : sheetAll;
+    const shown = sheet.slice(0, countLimit);
+    const sum = countSummary(products, counted, stockOf);
+    const setC = (id, v) => setCounted((c) => ({ ...c, [id]: v }));
+    const diffCell = (p) => {
+      const d = diffOf(p);
+      if (d == null) return <span className="si-muted">—</span>;
+      if (Math.abs(d) < 1e-9) return <span style={{ color: "#15803d", fontWeight: 700 }}>✓ {L("মিলেছে", "OK")}</span>;
+      return <span style={{ color: d < 0 ? "#b91c1c" : "#15803d", fontWeight: 800 }}>{d > 0 ? "+" : "−"}{fq(Math.abs(d))}</span>;
+    };
+    const onCountKey = (e, idx) => {
+      if (e.key !== "Enter" && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      e.preventDefault();
+      const next = rootRef.current?.querySelector(`[data-count-idx="${idx + (e.key === "ArrowUp" ? -1 : 1)}"]`);
+      if (next) { next.focus(); next.select?.(); }
+    };
+    const countInput = (p, idx) => (
+      <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" data-count-idx={idx}
+        value={counted[p.id] ?? ""} onChange={(e) => setC(p.id, e.target.value)} onKeyDown={(e) => onCountKey(e, idx)}
+        placeholder={L("গোনা", "Count")} style={{ textAlign: "right" }} />
+    );
+
+    return shell(L("📋 ফিজিক্যাল স্টক গণনা", "📋 Physical Stock Count"), L("⚖️ স্টক সমন্বয়", "⚖️ Stock Adjustment"), (
+      <>
+        <div className="si-toolbar">
+          <input type="date" className="pm-input" style={{ width: 130 }} value={countDate} onChange={(e) => setCountDate(e.target.value)} />
+          <select className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130 }} value={countBy} onChange={(e) => { setCountBy(e.target.value); setCountVal(""); }}>
+            <option value="">{L("সব পণ্য", "All products")}</option>
+            <option value="company">{L("কোম্পানি / ব্র্যান্ড ধরে", "By company / brand")}</option>
+            <option value="category">{L("ক্যাটাগরি ধরে", "By category")}</option>
+            <option value="rack">{L("র‍্যাক ধরে", "By rack")}</option>
+          </select>
+          {countBy && (
+            <select className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 170 }} value={countVal} onChange={(e) => setCountVal(e.target.value)}>
+              <option value="">{L("— বেছে নিন —", "— Pick —")}</option>
+              {groupOpts.map((g) => <option key={g} value={g}>{g}</option>)}
+            </select>
+          )}
+          <div className="si-search" style={{ minWidth: 160, flex: 1 }}>
+            <input className="pm-input" value={countQ} onChange={(e) => setCountQ(e.target.value)} placeholder={L("নাম, কোড বা বারকোড…", "Name, code or barcode…")} />
+            {countQ && <button type="button" onClick={() => setCountQ("")}>✕</button>}
+          </div>
+          <label className="pm-check"><input type="checkbox" checked={onlyInStock} onChange={(e) => setOnlyInStock(e.target.checked)} /> {L("শুধু যেগুলোর স্টক আছে", "Only items in stock")}</label>
+          <label className="pm-check"><input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> {L("শুধু পার্থক্য", "Only differences")}</label>
+        </div>
+        <div className="si-kpis">
+          <div className="si-kpi"><span>{L("তালিকায়", "On sheet")}</span><b>{sheet.length}</b></div>
+          <div className="si-kpi"><span>{L("গোনা হয়েছে", "Counted")}</span><b>{sum.entered}</b></div>
+          <div className="si-kpi"><span>{L("কম পাওয়া", "Short")}</span><b style={{ color: "#b91c1c" }}>{sum.short}{sum.shortValue > 0 ? ` · ${fq(sum.shortValue)}` : ""}</b></div>
+          <div className="si-kpi"><span>{L("বেশি পাওয়া", "Extra")}</span><b style={{ color: "#15803d" }}>{sum.extra}{sum.extraValue > 0 ? ` · ${fq(sum.extraValue)}` : ""}</b></div>
+        </div>
+        <div className="si-main is-all">
+          <div className="si-box">
+            {!stockMap && <div className="si-empty">⏳ {L("স্টক লোড হচ্ছে…", "Loading stock…")}</div>}
+            {stockMap && !sheet.length && <div className="si-empty">{L("এই ফিল্টারে কোনো পণ্য নেই", "No products for this filter")}</div>}
+            {stockMap && sheet.length > 0 && (mobile ? shown.map((p, idx) => (
+              <div key={p.id} className="si-mrow" style={{ cursor: "default" }}>
+                <div className="si-mrow-top"><span>{p.name}</span>{diffCell(p)}</div>
+                <div className="si-mrow-sub"><span>{[p.code, p.rackLocation].filter(Boolean).join(" · ")}</span><span>{L("সিস্টেম", "System")} <b>{stockOf(p.id) == null ? "…" : fq(stockOf(p.id))}</b> {p.unit || ""}</span></div>
+                <div style={{ marginTop: 4 }}>{countInput(p, idx)}</div>
+              </div>
+            )) : (
+              <table className="pm-table">
+                <thead><tr>
+                  <th style={{ width: 36 }} className="si-center">#</th>
+                  <th>{L("পণ্য", "Item")}</th>
+                  <th style={{ width: 120 }}>{L("কোড", "Code")}</th>
+                  <th style={{ width: 90 }}>{L("র‍্যাক", "Rack")}</th>
+                  <th style={{ width: 100 }} className="si-num">{L("সিস্টেম স্টক", "System")}</th>
+                  <th style={{ width: 120 }} className="si-num">{L("গুনে পাওয়া", "Counted")}</th>
+                  <th style={{ width: 100 }} className="si-num">{L("পার্থক্য", "Difference")}</th>
+                  <th style={{ width: 60 }}>{L("একক", "Unit")}</th>
+                </tr></thead>
+                <tbody>
+                  {shown.map((p, idx) => (
+                    <tr key={p.id} className={diffOf(p) ? "is-editing" : undefined}>
+                      <td className="si-center">{idx + 1}</td>
+                      <td className="si-strong" title={p.name}>{p.name}</td>
+                      <td>{p.code || ""}</td>
+                      <td>{p.rackLocation || ""}</td>
+                      <td className="si-num">{stockOf(p.id) == null ? "…" : fq(stockOf(p.id))}</td>
+                      <td style={{ padding: "1px 2px" }}>{countInput(p, idx)}</td>
+                      <td className="si-num">{diffCell(p)}</td>
+                      <td>{p.unit || ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ))}
+            {sheet.length > shown.length && (
+              <div style={{ padding: 8, textAlign: "center" }}>
+                <button type="button" className="pm-btn-secondary" onClick={() => setCountLimit((x) => x + 300)}>
+                  {L(`আরও দেখাও (${sheet.length - shown.length}টি বাকি)`, `Show more (${sheet.length - shown.length} left)`)}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
+          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+          <button type="button" className="pm-btn-secondary" disabled={!stockMap} onClick={() => printCountSheet(sheet, false)}>🖨️ {L("খালি গণনা শীট", "Blank count sheet")}</button>
+          <button type="button" className="pm-btn-secondary" disabled={!stockMap || !sum.entered} onClick={() => printCountSheet(sheet, true)}>🖨️ {L("ফলাফল প্রিন্ট", "Print result")}</button>
+          {sum.entered > 0 && (
+            <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => {
+              if (window.confirm(L("সব গোনা সংখ্যা মুছে নতুন করে শুরু করবেন?", "Clear all counted numbers and start over?"))) setCounted({});
+            }}>🧹 {L("মুছে নতুন", "Clear")}</button>
+          )}
+          <span className="si-hint">💾 {L("গোনা সংখ্যা এই ডিভাইসে নিজে থেকে সেভ থাকে — পরে এসে বাকিটা গুনতে পারবেন", "Counts are kept on this device — you can come back and finish later")}</span>
+          <span className="si-toolbar-gap" />
+          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !stockMap || !sum.entered} onClick={saveCount}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : `✅ ${L(`গণনা শেষ — ${sum.diffs.length}টি পার্থক্য সমন্বয় করুন`, `Finish — adjust ${sum.diffs.length} difference(s)`)}`}
+          </button>
+        </div>
+      </>
+    ));
+  }
+
   if (view === "detail" && sel) {
     const r = rows.find((x) => x.id === sel.id) || sel;
     const afterOf = (it) => (it.stockBefore == null ? null : n2(it.stockBefore) + (it.direction === "out" ? -n2(it.qty) : n2(it.qty)));
@@ -439,6 +658,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     <>
       <div className="si-toolbar">
         {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন সমন্বয়", "New Adjustment")}</button>}
+        {canManage && <button type="button" className="pm-btn-secondary" onClick={openCount}>📋 {L("ফিজিক্যাল স্টক গণনা", "Physical stock count")}{readCountDraft(shopId) ? " •" : ""}</button>}
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (

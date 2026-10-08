@@ -38,13 +38,34 @@ export async function notifyMobileAppReady() {
   }
 }
 
-export async function applyMobileOtaUpdate({ version, bundleUrl }) {
+async function sha256HexFromUrl(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("MOBILE_OTA_FETCH_FAILED");
+  const buf = await res.arrayBuffer();
+  const hash = await crypto.subtle.digest("SHA-256", buf);
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function verifyBundleDigest(bundleUrl, sha256Url) {
+  if (!sha256Url) return false;
+  const [expectedRaw, actual] = await Promise.all([
+    fetch(sha256Url).then((r) => r.text()),
+    sha256HexFromUrl(bundleUrl),
+  ]);
+  const expected = String(expectedRaw || "").trim().toLowerCase().replace(/^sha256\s*/i, "").split(/\s+/)[0];
+  return expected.length === 64 && expected === actual;
+}
+
+export async function applyMobileOtaUpdate({ version, bundleUrl, bundleSha256Url = null }) {
   const updater = await getCapacitorUpdater();
   if (!updater) {
     throw new Error("MOBILE_OTA_UNSUPPORTED");
   }
   if (!bundleUrl || !version) {
     throw new Error("MOBILE_OTA_INVALID");
+  }
+  if (!(await verifyBundleDigest(bundleUrl, bundleSha256Url))) {
+    throw new Error("MOBILE_OTA_DIGEST_MISMATCH");
   }
 
   const downloaded = await updater.download({
@@ -99,9 +120,15 @@ export async function runMobileAutoUpdate({
       );
     }
 
+    if (!update.bundleSha256Url) {
+      console.warn("[S4 OTA] skipped — release has no bundle.sha256 sidecar");
+      return { ok: true, applied: false, update, reason: "NO_DIGEST" };
+    }
+
     await applyMobileOtaUpdate({
       version: update.latestVersion,
       bundleUrl: update.bundleUrl,
+      bundleSha256Url: update.bundleSha256Url,
     });
 
     if (!silent && toast) {

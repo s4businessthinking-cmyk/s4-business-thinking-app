@@ -11,7 +11,7 @@ const COLLECTION_LABELS = {
   purchaseOrders: ["পারচেজ অর্ডার", "Purchase orders"], salesOrders: ["সেলস অর্ডার", "Sales orders"],
   goodsReceipts: ["মাল গ্রহণ (DN Received)", "Delivery notes (received)"], employees: ["কর্মচারী", "Employees"], employeeDocs: ["কর্মচারীর ডকুমেন্ট", "Employee documents"],
   attendance: ["হাজিরা", "Attendance"], bankReconciliations: ["ব্যাংক মেলানো", "Bank reconciliation"], jobOrders: ["জব অর্ডার", "Job orders"],
-  partners: ["পার্টনার", "Partners"], partnerEntries: ["পার্টনারের লেনদেন", "Partner entries"], partnerDocs: ["পার্টনারের ডকুমেন্ট", "Partner documents"],
+  partners: ["পার্টনার", "Partners"], partnerEntries: ["পার্টনারের লেনদেন", "Partner entries"], partnerDocs: ["পার্টনারের ডকুমেন্ট", "Partner documents"], reminders: ["রিমাইন্ডার", "Reminders"],
 };
 
 const fmtDate = (iso, lang) => (iso ? new Date(iso).toLocaleString(lang === "bn" ? "bn-BD" : "en-GB") : "—");

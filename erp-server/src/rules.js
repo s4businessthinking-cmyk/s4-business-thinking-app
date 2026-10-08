@@ -3,6 +3,7 @@
 // (Firestore `resource.data`) and `req` the document after the write
 // (`request.resource.data`). Unknown collections are denied, as in Firestore.
 import { deepEqual } from "./util.js";
+import { LOCKED_COLLECTIONS, dayOf, periodLockBlocks } from "./periodLock.js";
 
 export async function makeRuleContext(uid, loadDoc) {
   const cache = new Map();
@@ -105,6 +106,7 @@ const validVoucher = (req, noField, partyField) =>
   && req.allocations.length > 0
   && req.status === "active";
 
+const REMINDER_DONE_FIELDS = ["status", "dueDate", "doneAt", "doneBy", "doneByName", "lastDoneAt", "snoozedUntil", "updatedAt", "updatedBy", "history"];
 const PDC_FIELDS = ["chequeDate", "chequeDateBefore", "chequePostponedAt", "chequePostponedBy"];
 
 // Cancelling a voucher or bouncing its cheque gives money back to the bills, so it needs `reversePerm`
@@ -150,14 +152,30 @@ async function orderCreatedByCaller(c, req) {
   return !!order && order.shopId === req.shopId && order.createdBy === c.uid;
 }
 
-// Generic shop-scoped collection: members read/create/update, owner deletes.
-const shopScoped = ({ create, update, del } = {}) => ({
-  read: async (c, { res }) => sameShopByResource(c, res),
+async function memberCanViewShopDoc(c, res, viewPerm) {
+  if (!sameShopByResource(c, res)) return false;
+  if (await isOwnerOfShop(c, res.shopId)) return true;
+  if (!viewPerm) return true;
+  const perms = Array.isArray(viewPerm) ? viewPerm : [viewPerm];
+  for (const p of perms) {
+    if (await memberMay(c, res.shopId, p)) return true;
+  }
+  return false;
+}
+
+// Generic shop-scoped collection: optional view permission on read; owner deletes by default.
+const shopScoped = ({ view, create, update, del } = {}) => ({
+  read: async (c, args) => memberCanViewShopDoc(c, args.res, view),
   create: async (c, { req }) => sameShopByRequest(c, req) && (create ? await create(c, req) : true),
-  update: async (c, { res, req }) => sameShopByResource(c, res) && (update ? await update(c, res, req) : true),
+  update: async (c, { res, req }) => sameShopByResource(c, res) && req.shopId === res.shopId && (update ? await update(c, res, req) : true),
   delete: async (c, { res }) => sameShopByResource(c, res) && (del ? await del(c, res) : isOwnerOfShop(c, res.shopId)),
 });
-const appendOnly = () => ({ ...shopScoped(), update: deny, delete: deny });
+const appendOnly = (view = "viewProducts") => ({
+  read: async (c, args) => memberCanViewShopDoc(c, args.res, view),
+  create: async (c, { req }) => sameShopByRequest(c, req),
+  update: deny,
+  delete: deny,
+});
 // Partner money is private to the owner: staff can neither read nor write it.
 const ownerOnly = () => ({
   read: async (c, { res }) => sameShopByResource(c, res) && isOwnerOfShop(c, res.shopId),
@@ -208,7 +226,11 @@ export const RULES = {
   },
 
   shops: {
-    read: async (c, { id, list }) => !list || isShopMember(c, id),
+    read: async (c, { id, list, res }) => {
+      if (list) return isShopMember(c, id);
+      const shopId = res?.shopId ?? id;
+      return isShopMember(c, shopId);
+    },
     create: async (c, { req }) => isAuthenticated(c) && req.ownerUid === c.uid,
     update: async (c, { id, res, req }) => isAuthenticated(c) && (
       res.ownerUid === c.uid
@@ -240,14 +262,27 @@ export const RULES = {
     delete: async (c, { res }) => isAuthenticated(c) && (await isOwnerOfShop(c, res.shopId)),
   },
 
-  orders: shopScoped({ create: async (c, req) => req.createdBy === c.uid }),
-  companies: shopScoped(),
-
-  products: shopScoped({
-    create: async (c, req) => (await canManageProducts(c, req.shopId)) && productCatalogWriteAllowed(c, req.shopId, req),
-    update: async (c, res, req) => (await canManageProducts(c, res.shopId)) && productCatalogWriteAllowed(c, res.shopId, req),
-    del: async (c, res) => (await isOwnerOfShop(c, res.shopId)) && (await legacyOrMaintenanceDeleteAllowed(c, res.shopId)),
+  orders: shopScoped({
+    view: "sendOrder",
+    create: async (c, req) => req.createdBy === c.uid,
+    update: async (c, res, req) => {
+      if (req.createdBy !== undefined && req.createdBy !== res.createdBy) return false;
+      if (await isOwnerOfShop(c, res.shopId)) return true;
+      return res.createdBy === c.uid;
+    },
   }),
+  companies: shopScoped({
+    view: ["sendOrder", "manageCompanies"],
+    create: async (c, req) => await memberMay(c, req.shopId, "manageCompanies"),
+    update: async (c, res) => await memberMay(c, res.shopId, "manageCompanies"),
+  }),
+
+  products: {
+    read: async (c, { res }) => memberCanViewShopDoc(c, res, "viewProducts"),
+    create: async (c, { req }) => (await canManageProducts(c, req.shopId)) && productCatalogWriteAllowed(c, req.shopId, req),
+    update: async (c, { res, req }) => (await canManageProducts(c, res.shopId)) && productCatalogWriteAllowed(c, res.shopId, req),
+    delete: async (c, { res }) => (await isOwnerOfShop(c, res.shopId)) && (await legacyOrMaintenanceDeleteAllowed(c, res.shopId)),
+  },
 
   productMaintenance: {
     read: async (c, { id }) => isShopMember(c, id),
@@ -256,39 +291,49 @@ export const RULES = {
     delete: deny,
   },
 
-  inventory: shopScoped(),
+  inventory: shopScoped({ view: "viewProducts" }),
   stockMovements: appendOnly(),
-  stockBalances: shopScoped(),
+  stockBalances: shopScoped({ view: "viewProducts" }),
   inventory_movements: appendOnly(),
-  stock_balances: shopScoped(),
+  stock_balances: shopScoped({ view: "viewProducts" }),
   stock_ledger: appendOnly(),
-  purchases: shopScoped(),
-  sales: shopScoped(),
-  customers: shopScoped({ del: async (c, res) => memberMay(c, res.shopId, "manageCustomers") }),
-  suppliers: shopScoped({ del: async () => true }),
+  purchases: shopScoped({ view: "managePurchase" }),
+  sales: shopScoped({ view: "manageSales" }),
+  customers: shopScoped({
+    view: "manageCustomers",
+    create: async (c, req) => await memberMay(c, req.shopId, "manageCustomers"),
+    update: async (c, res) => await memberMay(c, res.shopId, "manageCustomers"),
+    del: async (c, res) => await memberMay(c, res.shopId, "manageCustomers"),
+  }),
+  suppliers: shopScoped({ view: ["viewVendors", "managePurchase"], del: ownerDelete }),
   vendors: shopScoped({
+    view: ["viewVendors", "managePurchase"],
     create: async (c, req) => (await memberMay(c, req.shopId, "manageVendors")) || (await memberMay(c, req.shopId, "managePurchase")),
     update: async (c, res) => memberMay(c, res.shopId, "manageVendors"),
   }),
 
   // Returns and stock adjustments: created by staff with the permission; only the owner or the creator may cancel.
   salesReturns: shopScoped({
+    view: "manageReturns",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))),
   }),
   purchaseReturns: shopScoped({
+    view: "manageReturns",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))),
   }),
   // Journal and contra vouchers are a record only; they never touch bills or stock.
   accountVouchers: shopScoped({
+    view: "accountVouchers",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "accountVouchers")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "accountVouchers"))),
   }),
   stockAdjustments: shopScoped({
+    view: "stockAdjust",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "stockAdjust")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "stockAdjust"))),
@@ -300,12 +345,14 @@ export const RULES = {
     delete: deny,
   },
   masterLists: shopScoped({
+    view: "viewProducts",
     create: async (c, req) => canManageProducts(c, req.shopId),
     update: async (c, res) => canManageProducts(c, res.shopId),
     del: deny,
   }),
 
   purchaseInvoices: shopScoped({
+    view: "managePurchase",
     create: async (c, req) => (await isOwnerOfShop(c, req.shopId))
       || (req.createdBy === c.uid && (
         (await memberMay(c, req.shopId, "managePurchase"))
@@ -320,19 +367,26 @@ export const RULES = {
   }),
 
   purchasePayments: shopScoped({
+    view: "vendorPayments",
     create: async (c, req) => req.createdBy === c.uid && validVoucher(req, "paymentNo", "vendorName"),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId)) || voucherMemberUpdate(c, res, req, "vendorPayments"),
   }),
 
   salesReceipts: shopScoped({
+    view: "manageSales",
     create: async (c, req) => req.createdBy === c.uid && validVoucher(req, "receiptNo", "customerName"),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId)) || voucherMemberUpdate(c, res, req, "cancelInvoices"),
   }),
 
-  supplierPayments: shopScoped(),
-  chequeHandovers: shopScoped({ del: ownerDelete }),
+  supplierPayments: shopScoped({
+    view: "vendorPayments",
+    create: async (c, req) => req.createdBy === c.uid && validVoucher(req, "paymentNo", "supplierName"),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId)) || voucherMemberUpdate(c, res, req, "vendorPayments"),
+  }),
+  chequeHandovers: shopScoped({ view: "vendorPayments", del: ownerDelete }),
 
   salesInvoices: shopScoped({
+    view: "manageSales",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageSales")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (await salesCreatorUpdate(c, res, req))
@@ -341,19 +395,25 @@ export const RULES = {
   }),
 
   quotations: shopScoped({
-    create: async (c, req) => req.createdBy === c.uid,
+    view: "manageSales",
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageSales")),
     update: async (c, res, req) => (await ownerOrCreator(c, res)) || memberConversionUpdate(c, res, req),
     del: ownerOrCreator,
   }),
 
   deliveryNotes: shopScoped({
-    create: async (c, req) => req.createdBy === c.uid || (await isOwnerOfShop(c, req.shopId)),
+    view: "manageSales",
+    create: async (c, req) => (req.createdBy === c.uid || (await isOwnerOfShop(c, req.shopId))) && (await memberMay(c, req.shopId, "manageSales")),
     update: async (c, res, req) => (await ownerOrCreator(c, res)) || memberConversionUpdate(c, res, req),
     del: ownerOrCreator,
   }),
 
-  expenses: shopScoped(),
-  settings: { ...shopScoped(), delete: deny },
+  expenses: shopScoped({
+    view: "manageExpenses",
+    create: async (c, req) => await memberMay(c, req.shopId, "manageExpenses"),
+    update: async (c, res) => await memberMay(c, res.shopId, "manageExpenses"),
+  }),
+  settings: { ...ownerOnly(), delete: deny },
 
   branchTransferSettings: shopScoped({
     create: async (c, req) => isOwnerOfShop(c, req.shopId),
@@ -369,17 +429,22 @@ export const RULES = {
 
   branchTransfers: shopScoped({
     create: async (c, req) => canSendBranchTransfer(c, req.shopId),
-    update: async (c, res, req) => (await canSendBranchTransfer(c, res.shopId)) || (
-      (await canReceiveBranchTransfer(c, res.shopId))
-      && isBranchTransferReceiver(c, res)
-      && req.shopId === res.shopId
-      && req.branchId === res.branchId
-      && onlyChanged(res, req, [
-        "status", "receipts", "purchaseInvoiceIds", "invoiceStatus", "receiptSummary", "receivedAt", "receivedBy",
-        "receivedByName", "updatedAt", "updatedBy", "updatedByName", "_offline_updated_at", "_cloud_collection",
-        "_cloud_document_id", "_cloud_synced_at", "_cloud_sync_status",
-      ])
-    ),
+    update: async (c, res, req) => {
+      const receiverUpdate = (await canReceiveBranchTransfer(c, res.shopId))
+        && isBranchTransferReceiver(c, res)
+        && req.shopId === res.shopId
+        && req.branchId === res.branchId
+        && onlyChanged(res, req, [
+          "status", "receipts", "purchaseInvoiceIds", "invoiceStatus", "receiptSummary", "receivedAt", "receivedBy",
+          "receivedByName", "updatedAt", "updatedBy", "updatedByName", "_offline_updated_at", "_cloud_collection",
+          "_cloud_document_id", "_cloud_synced_at", "_cloud_sync_status",
+        ]);
+      if (receiverUpdate) return true;
+      if (await isOwnerOfShop(c, res.shopId)) return req.shopId === res.shopId;
+      if (!(await canSendBranchTransfer(c, res.shopId))) return false;
+      if (["partially_received", "discrepancy", "received"].includes(res.status)) return false;
+      return req.shopId === res.shopId;
+    },
     del: async (c, res) => (await isOwnerOfShop(c, res.shopId)) && ["draft", "cancelled"].includes(res.status),
   }),
 
@@ -402,16 +467,19 @@ export const RULES = {
 
   // Orders and goods received notes: whoever turns one into a bill only moves its status / link fields.
   purchaseOrders: shopScoped({
+    view: "managePurchase",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "managePurchase")),
     update: async (c, res, req) => (await ownerOrCreator(c, res)) || ((await memberMay(c, res.shopId, "managePurchase")) && orderLinkUpdate(c, res, req)),
     del: ownerOrCreator,
   }),
   salesOrders: shopScoped({
+    view: "manageSales",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageSales")),
     update: async (c, res, req) => (await ownerOrCreator(c, res)) || ((await memberMay(c, res.shopId, "manageSales")) && orderLinkUpdate(c, res, req)),
     del: ownerOrCreator,
   }),
   goodsReceipts: shopScoped({
+    view: "managePurchase",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "managePurchase")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || ((await memberMay(c, res.shopId, "managePurchase")) && (
@@ -420,26 +488,31 @@ export const RULES = {
   }),
 
   employees: shopScoped({
+    view: "manageEmployees",
     create: async (c, req) => memberMay(c, req.shopId, "manageEmployees"),
     update: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
     del: ownerDelete,
   }),
   employeeDocs: shopScoped({
+    view: "manageEmployees",
     create: async (c, req) => memberMay(c, req.shopId, "manageEmployees"),
     update: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
     del: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
   }),
   attendance: shopScoped({
+    view: "manageEmployees",
     create: async (c, req) => memberMay(c, req.shopId, "manageEmployees"),
     update: async (c, res) => memberMay(c, res.shopId, "manageEmployees"),
     del: ownerDelete,
   }),
   bankReconciliations: shopScoped({
+    view: "bankReconcile",
     create: async (c, req) => memberMay(c, req.shopId, "bankReconcile"),
     update: async (c, res) => memberMay(c, res.shopId, "bankReconcile"),
     del: async (c, res) => memberMay(c, res.shopId, "bankReconcile"),
   }),
   jobOrders: shopScoped({
+    view: "manageJobs",
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageJobs")),
     update: async (c, res) => memberMay(c, res.shopId, "manageJobs"),
     del: ownerDelete,
@@ -447,12 +520,32 @@ export const RULES = {
   partners: ownerOnly(),
   partnerEntries: ownerOnly(),
   partnerDocs: ownerOnly(),
+  // Private reminders are seen by their writer only; anyone they are meant for may tick them off.
+  reminders: {
+    read: async (c, { res }) => sameShopByResource(c, res) && (!res.private || res.createdBy === c.uid),
+    create: async (c, { req }) => sameShopByRequest(c, req) && req.createdBy === c.uid,
+    update: async (c, { res, req }) => sameShopByResource(c, res) && req.shopId === res.shopId && req.createdBy === res.createdBy
+      && (!res.private || res.createdBy === c.uid)
+      && (res.createdBy === c.uid || (await isOwnerOfShop(c, res.shopId))
+        || ((!res.assignedTo || res.assignedTo === c.uid) && onlyChanged(res, req, REMINDER_DONE_FIELDS))),
+    delete: async (c, { res }) => sameShopByResource(c, res) && (res.createdBy === c.uid || (!res.private && (await isOwnerOfShop(c, res.shopId)))),
+  },
 };
+
+async function periodOpen(ctx, op, collection, { res, req } = {}) {
+  if (op === "read" || !LOCKED_COLLECTIONS[collection]) return true;
+  const shopId = res?.shopId ?? req?.shopId;
+  if (!has(shopId)) return true;
+  const shop = await ctx.get("shops", shopId);
+  const lockDate = dayOf(shop?.periodLock?.lockDate);
+  return !periodLockBlocks({ collection, op, before: res || null, after: op === "delete" ? null : req || null, lockDate });
+}
 
 export async function allowed(ctx, op, collection, args) {
   const rule = RULES[collection]?.[op];
   if (!rule) return false;
   try {
+    if (!(await periodOpen(ctx, op, collection, args))) return false;
     return (await rule(ctx, args)) === true;
   } catch {
     return false;

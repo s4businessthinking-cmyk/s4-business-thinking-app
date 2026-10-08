@@ -23,14 +23,25 @@ export function compareVersions(left, right) {
   return 0;
 }
 
-function pickAndroidBundleUrl(assets) {
+function pickAndroidBundleAsset(assets) {
   const list = Array.isArray(assets) ? assets : [];
-
   return (
-    list.find((asset) => /-bundle\.zip$/i.test(asset?.name || ""))?.browser_download_url ||
-    list.find((asset) => /bundle\.zip$/i.test(asset?.name || ""))?.browser_download_url ||
+    list.find((asset) => /-bundle\.zip$/i.test(asset?.name || "")) ||
+    list.find((asset) => /bundle\.zip$/i.test(asset?.name || "")) ||
     null
   );
+}
+
+function pickAndroidBundleUrl(assets) {
+  return pickAndroidBundleAsset(assets)?.browser_download_url || null;
+}
+
+function pickAndroidBundleSha256Url(assets) {
+  const bundle = pickAndroidBundleAsset(assets);
+  if (!bundle?.name) return null;
+  const shaName = String(bundle.name).replace(/\.zip$/i, ".sha256");
+  const list = Array.isArray(assets) ? assets : [];
+  return list.find((a) => String(a?.name || "").toLowerCase() === shaName.toLowerCase())?.browser_download_url || null;
 }
 
 function pickAndroidApkUrl(assets) {
@@ -146,6 +157,7 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
   const { release, latestVersion } = picked;
   const platform = getReleasePlatform();
   const bundleUrl = platform === "android" ? pickAndroidBundleUrl(release.assets) : null;
+  const bundleSha256Url = platform === "android" ? pickAndroidBundleSha256Url(release.assets) : null;
   const apkUrl = platform === "android" ? pickAndroidApkUrl(release.assets) : null;
   const downloadUrl = pickAssetUrl(release.assets, platform);
 
@@ -157,6 +169,7 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
     platform,
     downloadUrl,
     bundleUrl,
+    bundleSha256Url,
     apkUrl,
     releaseUrl: release.html_url || "",
     releaseNotes: release.body || "",

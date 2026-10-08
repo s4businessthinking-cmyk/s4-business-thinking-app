@@ -1,7 +1,8 @@
 import { computeStockMap } from "../inventory/stockFromInvoices";
 import { itemBaseQty } from "../inventory/unitConversion";
 import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
-import { n, dayOf, inRange, isLive, liveSalesOf, livePurchasesOf, liveReturnsOf } from "./reportFilters.js";
+import { journalPlByAccount, journalPlTotal } from "./journalPl.js";
+import { n, dayOf, inRange, isLive, liveSalesOf, livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 
 export { r2 } from "./reportFilters.js";
 
@@ -88,11 +89,17 @@ export function computeAccounts(data, { products = [], shopId, from, to, bn }) {
   const expensesIn = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && inRange(dayOf(e.expenseDate), from, to));
   // VAT on an expense bill is claimed back in the VAT return, so only the amount without it is a cost.
   const expenseCost = (e) => n(e.amount) - Math.max(0, n(e.vatAmount));
-  const expenseTotal = expensesIn.reduce((t, e) => t + expenseCost(e), 0);
-  // A bounced expense cheque is still an expense, but the money never left.
-  const expensePaid = expensesIn.filter((e) => !(e.method === "cheque" && e.chequeStatus === "bounced")).reduce((t, e) => t + n(e.amount), 0);
+  const journalVouchers = (data.accountVouchers || data.extras?.accountVouchers || []).filter((v) => isLive(v, shopId));
+  const journalPl = journalPlByAccount(journalVouchers, shopId, from, to);
+  const journalExpenseTotal = journalPlTotal(journalPl);
+
+  const expenseTotal = r2(expensesIn.reduce((t, e) => t + expenseCost(e), 0) + journalExpenseTotal);
+  // Bounced cheques and partner-pocket payments do not reduce shop cash.
+  const expensePaid = expensesIn.filter((e) => !(e.method === "cheque" && e.chequeStatus === "bounced") && e.method !== "partner")
+    .reduce((t, e) => t + n(e.amount), 0);
   const expenseMap = new Map();
   expensesIn.forEach((e) => { const k = expenseCategoryLabel(e, bn); expenseMap.set(k, (expenseMap.get(k) || 0) + expenseCost(e)); });
+  journalPl.forEach((amt, ac) => { expenseMap.set(ac, r2((expenseMap.get(ac) || 0) + amt)); });
   const expenseByCat = [...expenseMap.entries()].sort((a, b) => b[1] - a[1]);
 
   const receivable = liveSales.reduce((t, inv) => t + Math.max(0, n(inv.balanceDue)), 0);
@@ -109,6 +116,7 @@ export function computeAccounts(data, { products = [], shopId, from, to, bn }) {
     moneyIn: cashOnSales + receiptsIn + refundsReceived, cashOnSales, receiptsIn, refundsReceived,
     moneyOut: cashOnPurch + paymentsOut + expensePaid + refundsPaid, cashOnPurch, paymentsOut, refundsPaid, expensePaid,
     receivable, payable, stockValue,
-    expenseTotal, expenseByCat, expenseCount: expensesIn.length, vendorDiscount, netProfit: grossProfit + vendorDiscount - expenseTotal,
+    expenseTotal, expenseByCat, expenseCount: expensesIn.length, journalExpenseTotal, vendorDiscount,
+    netProfit: grossProfit + vendorDiscount - expenseTotal,
   };
 }

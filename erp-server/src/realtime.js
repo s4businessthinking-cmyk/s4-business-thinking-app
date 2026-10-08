@@ -40,6 +40,10 @@ export function attachRealtime({ server, store, auth, path = "/v1/realtime" }) {
     }, 10000);
 
     ws.on("pong", () => { conn.alive = true; });
+    ws.on("error", (err) => {
+      console.warn("[S4 Realtime] websocket error", err?.message || err);
+      try { ws.close(1011, "server error"); } catch { /* already closed */ }
+    });
     ws.on("close", () => {
       clearTimeout(authTimer);
       conns.delete(conn);

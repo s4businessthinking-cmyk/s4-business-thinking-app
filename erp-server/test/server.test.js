@@ -388,6 +388,40 @@ test("rules: partners and partner money are owner-only", async () => {
   assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "partnerDocs", id: "pd1" }])).status, 403);
 });
 
+test("rules: the accounting period lock blocks old-dated changes", async () => {
+  const lock = (lockDate) => commit(owner.idToken, [set("shops", "shop1", { periodLock: { lockDate } }, true)]);
+  const exp = (id, expenseDate, extra = {}) => set("expenses", id, { shopId: "shop1", expenseDate, amount: 50, category: "rent", status: "active", createdBy: owner.uid, ...extra });
+  assert.equal((await commit(owner.idToken, [exp("plx1", "2025-12-20")])).status, 200);
+  assert.equal((await lock("2025-12-31")).status, 200);
+  try {
+    assert.equal((await commit(owner.idToken, [exp("plx2", "2025-12-30")])).status, 403, "new entry in a closed period");
+    assert.equal((await commit(owner.idToken, [exp("plx3", "2026-01-02")])).status, 200);
+    assert.equal((await commit(owner.idToken, [{ op: "update", collection: "expenses", id: "plx1", data: { amount: 10 } }])).status, 403, "edit in a closed period");
+    assert.equal((await commit(owner.idToken, [{ op: "update", collection: "expenses", id: "plx1", data: { status: "cancelled" } }])).status, 403, "cancel in a closed period");
+    assert.equal((await commit(owner.idToken, [{ op: "update", collection: "expenses", id: "plx3", data: { expenseDate: "2025-12-01" } }])).status, 403, "moving into a closed period");
+    assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "expenses", id: "plx1" }])).status, 403);
+    assert.equal((await commit(owner.idToken, [{ op: "update", collection: "expenses", id: "plx1", data: { note: "checked" } }])).status, 200, "harmless notes stay open");
+  } finally {
+    assert.equal((await lock("")).status, 200);
+  }
+  assert.equal((await commit(owner.idToken, [{ op: "update", collection: "expenses", id: "plx1", data: { amount: 10 } }])).status, 200);
+});
+
+test("rules: reminders — private ones stay with their writer, assignees may tick them off", async () => {
+  const rem = (id, extra) => set("reminders", id, { shopId: "shop1", title: "Rent", dueDate: "2026-10-07", status: "open", createdBy: owner.uid, ...extra });
+  assert.equal((await commit(owner.idToken, [rem("rm1", { assignedTo: sales.uid })])).status, 200);
+  assert.equal((await commit(owner.idToken, [rem("rm2", { private: true })])).status, 200);
+  assert.equal((await commit(sales.idToken, [rem("rm3", {})])).status, 403, "createdBy must be the caller");
+  assert.equal((await commit(sales.idToken, [rem("rm3", { createdBy: sales.uid })])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "reminders", id: "rm2" }, sales.idToken)).status, 403);
+  const listed = await api("/v1/db/query", { collection: "reminders", filters: [["shopId", "==", "shop1"]] }, sales.idToken);
+  assert.deepEqual(listed.docs.map((d) => d.id).sort(), ["rm1", "rm3"]);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "reminders", id: "rm1", data: { status: "done", doneBy: sales.uid } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "reminders", id: "rm1", data: { title: "Changed" } }])).status, 403);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "reminders", id: "rm1" }])).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "reminders", id: "rm3" }])).status, 200);
+});
+
 test("rules: vendors, returns, stock adjustments, audit log and master lists follow the staff permissions", async () => {
   const none = { managePurchase: false, manageVendors: false, manageReturns: false, stockAdjust: false, manageProducts: false };
   const perms = (p) => commit(owner.idToken, [set("users", sales.uid, { permissions: { ...none, ...p } }, true)]);

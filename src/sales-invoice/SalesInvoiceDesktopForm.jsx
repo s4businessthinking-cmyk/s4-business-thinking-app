@@ -694,7 +694,7 @@ export default function SalesInvoiceDesktopForm({
             <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
               placeholder="+ / -" onChange={(e) => setField("adjustment", e.target.value)} />
           ), 128)}
-          {field("Round Off", (
+          {field(bn ? "রাউন্ড অফ" : "Round Off", (
             <div style={{ display: "flex", gap: 4 }}>
               <input style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
                 title={canDiscount ? "" : (bn ? "অনুমতি ছাড়া শুধু ১ পর্যন্ত কমানো যাবে" : "Without discount permission only up to 1 can be rounded down")}

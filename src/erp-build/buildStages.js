@@ -13,6 +13,7 @@ export function getDashboardUrl() {
 
 export function isErpDashboardRoute() {
   if (typeof window === "undefined") return false;
+  if (!import.meta.env.DEV) return false;
   const params = new URLSearchParams(window.location.search);
   return params.has("erp-dashboard") || window.location.hash === "#erp-build";
 }

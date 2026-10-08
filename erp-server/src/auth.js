@@ -59,6 +59,11 @@ export function createTokens(secret) {
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const LOCAL_EMAIL_DOMAIN = "@s4local.app";
+
+function acceptablePassword(password) {
+  const s = String(password || "");
+  return s.length >= 6 && /[A-Za-z]/.test(s) && /\d/.test(s);
+}
 const SIGNUP_CODE_TTL_MS = 10 * 60 * 1000;
 const SIGNUP_RESEND_GAP_MS = 60 * 1000;
 
@@ -139,7 +144,7 @@ export function createAuthService({ db, cfg, sendMail = null }) {
     async signUp({ email, password, code }, ip = "", { byShopOwner = false } = {}) {
       const e = normEmail(email);
       if (!EMAIL_RE.test(e)) fail("invalid-argument", "auth/invalid-email");
-      if (String(password || "").length < 6) fail("invalid-argument", "auth/weak-password");
+      if (!acceptablePassword(password)) fail("invalid-argument", "auth/weak-password");
       throttle(`signup:${ip}`);
       if (await db.findAccountByEmail(e)) fail("already-exists", "auth/email-already-in-use");
       if (needsSignupCode(e) && !byShopOwner) takeSignupCode(e, code);
@@ -162,7 +167,9 @@ export function createAuthService({ db, cfg, sendMail = null }) {
     async refresh({ refreshToken }) {
       const [id, secret] = String(refreshToken || "").split(".");
       const session = id && secret ? await db.getSession(id) : null;
-      if (!session || session.tokenHash !== sha256(secret) || session.expiresAt < new Date().toISOString()) {
+      const want = Buffer.from(sha256(secret));
+      const have = Buffer.from(String(session?.tokenHash || ""));
+      if (!session || want.length !== have.length || !crypto.timingSafeEqual(want, have) || session.expiresAt < new Date().toISOString()) {
         fail("unauthenticated", "auth/session-expired");
       }
       const account = await db.findAccountByUid(session.uid);
@@ -186,7 +193,7 @@ export function createAuthService({ db, cfg, sendMail = null }) {
       const account = await db.findAccountByUid(uid);
       if (!account) fail("unauthenticated", "auth/user-not-found");
       if (!(await verifyPassword(String(password || ""), account.passwordHash))) fail("unauthenticated", "auth/wrong-password");
-      if (String(newPassword || "").length < 6) fail("invalid-argument", "auth/weak-password");
+      if (!acceptablePassword(newPassword)) fail("invalid-argument", "auth/weak-password");
       await db.setPassword(uid, await hashPassword(newPassword), new Date().toISOString());
       await db.deleteSessionsForUid(uid);
       return issue(account);

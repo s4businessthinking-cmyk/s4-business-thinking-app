@@ -109,6 +109,8 @@ const PRESET_POSITIONS_BN = ["সিনিয়র সেলসম্যান"
 export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwner, canManage, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, leaveGuard = null, alerts = [], focus = null, onFocusHandled, onOpenAlert }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
+  const canSeeSalary = isOwner;
+  const maskSalary = (v) => (canSeeSalary ? v : "—");
   const shopCountry = shop?.country || "";
   const rule = countryRule(shopCountry);
   const [rows, setRows] = useState([]);
@@ -174,6 +176,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
 
   const openNew = () => { const f = { ...emptyForm(), code: nextCode() }; setEditId(null); setForm(f); setSection("basic"); setNewPos(null); setBaseline(JSON.stringify(f)); };
   const openEdit = (r, sec = "basic") => {
+    if (sec === "pay" && !canSeeSalary) sec = "basic";
     const f = { ...emptyForm(), ...Object.fromEntries([...ALL_FIELDS.map((x) => x.k), "photo"].map((k) => [k, r[k] == null ? "" : String(r[k])])) };
     if (!f.status) f.status = "active";
     if (!f.payMethod) f.payMethod = "cash";
@@ -218,6 +221,13 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
     body.name = name;
     body.status = form.status === "inactive" ? "inactive" : "active";
     body.photo = form.photo || "";
+    if (editRow && !canSeeSalary) {
+      const payFields = SECTIONS.find((s) => s.key === "pay")?.fields || [];
+      payFields.forEach((f) => {
+        const v = editRow[f.k];
+        body[f.k] = f.t === "money" ? r2(v) : String(v ?? "").trim();
+      });
+    }
     body.salary = grossSalary(body);
     body.nationality = NATIONALITIES.find((x) => x.code === body.nationalityCode)?.en || "";
     body.updatedAt = nowIso;
@@ -323,7 +333,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
         else if (f.t === "nationality") v = NATIONALITIES.find((x) => x.code === v)?.en || v;
         rowsOut.push([label, String(v)]);
       });
-      if (s.key === "pay") rowsOut.push(["Gross monthly salary", `${cur} ${money(grossSalary(r))}`]);
+      if (s.key === "pay" && canSeeSalary) rowsOut.push(["Gross monthly salary", `${cur} ${money(grossSalary(r))}`]);
     });
     const docsOf = liveDocs.filter((d) => d.employeeId === r.id);
     if (docsOf.length) { rowsOut.push(["— DOCUMENTS ON FILE —", ""]); docsOf.forEach((d) => rowsOut.push([d.label, [d.number, d.expiryDate ? `expires ${fmtDay(d.expiryDate)}` : ""].filter(Boolean).join(" · ")])); }
@@ -332,7 +342,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
 
   const printList = () => {
     const cols = [{ label: "Code" }, { label: "Name" }, { label: "Designation" }, { label: "Mobile" }, { label: "Nationality" }, { label: "Visa / ID expiry" }, { label: "Joined" }, { label: `Salary (${cur})`, align: "right" }];
-    const body = filtered.map((r) => [r.code || "", `${r.name}${r.status === "inactive" ? " (Left)" : ""}`, r.designation || "", r.mobile || "", r.nationality || "", fmtDay(isExpat(r, shopCountry) ? r.visaExpiry || r.residentIdExpiry : r.localIdExpiry), fmtDay(r.joinDate), money(grossSalary(r))]);
+    const body = filtered.map((r) => [r.code || "", `${r.name}${r.status === "inactive" ? " (Left)" : ""}`, r.designation || "", r.mobile || "", r.nationality || "", fmtDay(isExpat(r, shopCountry) ? r.visaExpiry || r.residentIdExpiry : r.localIdExpiry), fmtDay(r.joinDate), canSeeSalary && grossSalary(r) > 0 ? money(grossSalary(r)) : "—"]);
     printWithSettings(generateStatementHTML({ shopName, title: "EMPLOYEE LIST", subtitle: fmtDay(today), cols, rows: body, foot: ["", "", "", "", "", "", "TOTAL", money(filtered.filter((r) => r.status !== "inactive").reduce((t, r) => t + grossSalary(r), 0))] }), { lang });
   };
 
@@ -391,6 +401,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
   const fieldLabel = (f) => (bn ? (f.bnFn ? f.bnFn(ctx) : f.bn) : (f.enFn ? f.enFn(ctx) : f.en));
   const renderField = (f) => {
     if (f.show && !f.show(form, ctx)) return null;
+    if (section === "pay" && !canSeeSalary && (f.t === "money" || ["payMethod", "salaryDay", "bankName", "bankAccount", "otRate"].includes(f.k))) return null;
     const label = f.t === "money" ? `${fieldLabel(f)} (${cur})` : fieldLabel(f);
     let control;
     if (f.t === "select") control = <select className="pm-input" disabled={readOnly} value={form[f.k]} onChange={(e) => setF(f.k, e.target.value)}>{f.opts.map((o) => <option key={o[0]} value={o[0]}>{bn ? o[1] : o[2]}</option>)}</select>;
@@ -513,14 +524,14 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
               <b>{form.name || L("নতুন কর্মচারী", "New employee")}</b>
               <span className="si-muted" style={{ fontSize: 12 }}>
                 <span className="si-badge" style={{ color: ctx.expat ? "#7c3aed" : "#0e7490" }}>{ctx.expat ? L("প্রবাসী — ভিসায়", "Foreign worker — on visa") : L("দেশি — ভিসা লাগে না", "Local — no visa")}</span>
-                {gross > 0 ? ` · ${L("মোট বেতন", "Gross")} ${cur} ${money(gross)}` : ""}
+                {canSeeSalary && gross > 0 ? ` · ${L("মোট বেতন", "Gross")} ${cur} ${money(gross)}` : ""}
                 {svc ? ` · ${L("চাকরির বয়স", "Service")} ${svc.years}${L("ব", "y")} ${svc.months}${L("মা", "m")}` : ""}
               </span>
               {form.photo && !readOnly && <button type="button" onClick={() => setF("photo", "")} style={{ border: 0, background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11, padding: 0, textAlign: "left" }}>{L("ছবি সরান", "Remove photo")}</button>}
             </div>
           </div>
           <div className="si-pills" style={{ marginBottom: 6, flexWrap: "wrap" }}>
-            {SECTIONS.map((s) => <button key={s.key} type="button" className={`pm-btn-secondary${section === s.key ? " is-active" : ""}`} onClick={() => setSection(s.key)}>{s.icon} {bn ? s.bn : s.en}</button>)}
+            {SECTIONS.filter((s) => canSeeSalary || s.key !== "pay").map((s) => <button key={s.key} type="button" className={`pm-btn-secondary${section === s.key ? " is-active" : ""}`} onClick={() => setSection(s.key)}>{s.icon} {bn ? s.bn : s.en}</button>)}
             <button type="button" className={`pm-btn-secondary${section === "docs" ? " is-active" : ""}`} onClick={() => setSection("docs")}>📎 {L("ডকুমেন্ট / ছবি", "Documents")}{editId ? ` (${empDocs.length})` : ""}</button>
           </div>
           {section === "docs" ? docsPanel : (
@@ -535,7 +546,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(2, minmax(0,1fr))", gap: 6 }}>
                 {sec.fields.map(renderField)}
               </div>
-              {section === "pay" && (
+              {section === "pay" && canSeeSalary && (
                 <div className="si-hint" style={{ marginLeft: 0 }}>
                   {L("মোট মাসিক বেতন", "Gross monthly salary")}: <b>{cur} {money(gross)}</b> — {L("হাজিরা খাতায় এই বেতন দিয়েই পাওনা হিসাব হবে।", "the Attendance Register works out pay from this figure.")}
                   {rule.payroll === "WPS" && form.payMethod !== "wps" && ctx.expat ? ` ${L("আমিরাত/সৌদিতে প্রবাসীদের বেতন সাধারণত WPS-এ দিতে হয়।", "In the Gulf, foreign workers' pay usually has to go through WPS.")}` : ""}
@@ -585,7 +596,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
               <td>{r.mobile}</td>
               <td>{NATIONALITIES.find((x) => x.code === r.nationalityCode)?.[bn ? "bn" : "en"] || r.nationality || ""} <span className="si-badge" style={{ color: expat ? "#7c3aed" : "#0e7490" }}>{expat ? L("প্রবাসী", "Expat") : L("দেশি", "Local")}</span></td>
               <td>{fmtDay(exp)}</td>
-              <td className="si-num">{grossSalary(r) > 0 ? money(grossSalary(r)) : ""}</td>
+              <td className="si-num">{maskSalary(grossSalary(r) > 0 ? money(grossSalary(r)) : "")}</td>
               <td className="si-num">{paidThisMonth.get(r.id) ? money(paidThisMonth.get(r.id)) : ""}</td>
             </tr>
           );
@@ -596,7 +607,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
 
   const listMobile = filtered.map((r) => (
     <button key={r.id} type="button" className="si-mrow" onClick={() => openEdit(r)} style={r.status === "inactive" ? { opacity: 0.6 } : undefined}>
-      <div className="si-mrow-top"><span>{r.photo ? <img src={r.photo} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", verticalAlign: "middle", marginRight: 4 }} /> : "👷 "}{r.name}</span><span>{grossSalary(r) > 0 ? `${cur} ${money(grossSalary(r))}` : ""}</span></div>
+      <div className="si-mrow-top"><span>{r.photo ? <img src={r.photo} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", verticalAlign: "middle", marginRight: 4 }} /> : "👷 "}{r.name}</span><span>{canSeeSalary && grossSalary(r) > 0 ? `${cur} ${money(grossSalary(r))}` : ""}</span></div>
       <div className="si-mrow-sub">
         <span>{[r.code, r.designation, r.mobile].filter(Boolean).join(" · ")}</span>
         <span>{r.status === "inactive" ? L("চলে গেছেন", "Left") : expiryBadge(nextExpiry(r))}</span>
@@ -645,7 +656,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
       <div className="si-kpis">
         <div className="si-kpi"><span>{L("কর্মরত", "Working")}</span><b>{activeList.length}</b></div>
         <div className="si-kpi"><span>{L("প্রবাসী / দেশি", "Expat / Local")}</span><b>{expatCount} / {activeList.length - expatCount}</b></div>
-        <div className="si-kpi"><span>{L("মোট মাসিক বেতন", "Total monthly salary")}</span><b>{cur} {money(salaryTotal)}</b></div>
+        {canSeeSalary && <div className="si-kpi"><span>{L("মোট মাসিক বেতন", "Total monthly salary")}</span><b>{cur} {money(salaryTotal)}</b></div>}
         <div className="si-kpi"><span>{L("এই মাসে দেওয়া", "Paid this month")}</span><b style={{ color: "#b91c1c" }}>{cur} {money(paidTotal)}</b></div>
         <button type="button" className="si-kpi" onClick={() => setShowExpiry((v) => !v)} style={{ cursor: "pointer", border: urgent ? "1px solid #f59e0b" : undefined, background: showExpiry ? "#fef3c7" : undefined, font: "inherit", textAlign: "left" }}>
           <span>🔔 {L("নোটিফিকেশন", "Alerts")}</span><b style={{ color: urgent ? "#b45309" : undefined }}>{alerts.length}{urgent ? ` (${urgent} ${L("জরুরি", "urgent")})` : ""} ▾</b>

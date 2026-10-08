@@ -16,6 +16,7 @@ import {
   getDirtyLocalRecords,
   purgeCleanLocalRecords,
 } from "./sqliteDb";
+import { LOCKED_COLLECTIONS, activePeriodLock, assertPeriodOpen } from "../accounts/periodLock.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -36,6 +37,11 @@ export async function offlineCreate(collectionName, data = {}) {
     id: documentId,
     _offline_created_at: data._offline_created_at || nowIso(),
   });
+
+  if (activePeriodLock() && LOCKED_COLLECTIONS[collectionName]) {
+    const existing = await offlineGetById(collectionName, documentId);
+    assertPeriodOpen(collectionName, existing?.data ? "update" : "create", existing?.data || null, record);
+  }
 
   await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
@@ -67,19 +73,23 @@ export async function offlineCreate(collectionName, data = {}) {
 
 export async function offlineUpdate(collectionName, documentId, patch = {}) {
   const existing = await offlineGetById(collectionName, documentId);
+  const stamp = nowIso();
 
   const record = safeData({
     ...(existing?.data || {}),
     ...patch,
     id: documentId,
+    _offline_updated_at: stamp,
   });
+
+  assertPeriodOpen(collectionName, "update", existing?.data || null, record);
 
   await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
   const syncResult = await enqueueSync(collectionName, documentId, "UPDATE", {
     collectionName,
     documentId,
-    data: record,
+    data: { ...patch, id: documentId, _offline_updated_at: stamp },
   });
 
   if (!syncResult?.ok) {
@@ -109,6 +119,7 @@ export async function offlinePatch(collectionName, documentId, patch = {}, base 
   const existing = await offlineGetById(collectionName, documentId);
   const stamp = nowIso();
   const record = { ...(existing?.data || base || {}), ...patch, id: documentId, _offline_updated_at: stamp };
+  assertPeriodOpen(collectionName, "update", existing?.data || base || null, record);
 
   await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
@@ -137,6 +148,8 @@ export async function offlineUpsert(collectionName, documentId, data = {}) {
     _offline_created_at:
       existing?.data?._offline_created_at || data._offline_created_at || nowIso(),
   });
+
+  assertPeriodOpen(collectionName, existing?.data ? "update" : "create", existing?.data || null, record);
 
   await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
 
@@ -167,6 +180,11 @@ export async function offlineUpsert(collectionName, documentId, data = {}) {
 }
 
 export async function offlineRemove(collectionName, documentId) {
+  if (activePeriodLock() && LOCKED_COLLECTIONS[collectionName]) {
+    const existing = await offlineGetById(collectionName, documentId);
+    assertPeriodOpen(collectionName, "delete", existing?.data || null, null);
+  }
+
   await deleteLocalRecord(collectionName, documentId, { skipPersist: true });
 
   const syncResult = await enqueueSync(collectionName, documentId, "DELETE", {

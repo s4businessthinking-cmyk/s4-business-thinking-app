@@ -29,11 +29,14 @@ export const config = {
   },
 };
 
+const WEAK_JWT = /dev-only|change-me|test-secret/i;
+
 export function assertConfig(cfg = config) {
-  if (cfg.production && cfg.jwtSecret.length < 32) {
+  const secret = String(cfg.jwtSecret || "");
+  if (cfg.production && (secret.length < 32 || WEAK_JWT.test(secret))) {
     throw new Error("JWT_SECRET must be set to at least 32 random characters in production.");
   }
-  if (!cfg.jwtSecret) {
+  if (!secret) {
     cfg.jwtSecret = "dev-only-insecure-secret-change-me-0123456789";
   }
 }

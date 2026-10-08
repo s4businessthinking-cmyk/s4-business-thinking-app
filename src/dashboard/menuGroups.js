@@ -7,7 +7,7 @@ export const MENU_GROUPS = [
   { key: "transaction", icon: "🧾", bn: "লেনদেন (Transaction)", en: "Transaction", tabs: ["purchaseOrder", "salesOrder", "delivery", "goodsReceipt", "branchTransfer", "stockAdjust", "loosen", "bundle", "purchase", "sales", "purchaseReturn", "salesReturn", "employeeExpense", "attendance", "quotation", "jobCard"] },
   { key: "accounts", icon: "💰", bn: "হিসাব (Accounts)", en: "Accounts", tabs: ["vouchers", "expenses", "cheque", "pdc", "bankRec", "partners"] },
   { key: "reports", icon: "📊", bn: "রিপোর্ট (Reports)", en: "Reports", tabs: ["accounts", "tax", "auditLog"] },
-  { key: "utilities", icon: "🛠️", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["settings"] },
+  { key: "utilities", icon: "🛠️", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["labels", "reminders", "calculator", "settings"] },
 ];
 
 // items: [[tabKey, label], …] already filtered by permission; empty groups are dropped, unknown tabs go to Utilities.

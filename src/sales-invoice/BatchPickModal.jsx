@@ -10,6 +10,7 @@ export default function BatchPickModal({ lang = "en", product, choices, onPick, 
   const unit = product?.unit || "Pcs";
 
   useEffect(() => {
+    if (!choices?.length) return undefined;
     const onKey = (e) => {
       if (e.key === "ArrowDown") { e.preventDefault(); setActive((i) => (i + 1) % choices.length); }
       else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => (i - 1 + choices.length) % choices.length); }

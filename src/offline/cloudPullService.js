@@ -52,8 +52,16 @@ export const SHOP_PULL_COLLECTIONS = [
   "partners",
   "partnerEntries",
   "partnerDocs",
+  "reminders",
   "masterLists",
   "users",
+  "auditLogs",
+  "branchTransferSettings",
+  "branches",
+  "branchTransfers",
+  "branchTransferReceipts",
+  "branchStockBalances",
+  "branchStockMovements",
 ];
 
 export const SHOP_PULL_ONLY_COLLECTIONS = ["stock_ledger"];

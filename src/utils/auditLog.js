@@ -30,6 +30,7 @@ export const AUDIT_COLLECTION_LABELS = {
   partners: { bn: "পার্টনার", en: "Partner" },
   partnerEntries: { bn: "পার্টনারের লেনদেন", en: "Partner Entry" },
   partnerDocs: { bn: "পার্টনারের ডকুমেন্ট", en: "Partner Document" },
+  reminders: { bn: "রিমাইন্ডার", en: "Reminder" },
   expenses: { bn: "খরচ", en: "Expense" },
   branchTransfers: { bn: "ব্রাঞ্চ ট্রান্সফার", en: "Branch Transfer" },
   products: { bn: "পণ্য", en: "Product" },

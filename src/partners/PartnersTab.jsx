@@ -25,8 +25,15 @@ const emptyPartner = () => ({ ...Object.fromEntries(PARTNER_FIELDS.map((f) => [f
 const PARTNER_KEYS = [...PARTNER_FIELDS.map((f) => f.k), "photo"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-export default function PartnersTab({ lang = "en", shopId, user, profile, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, products = [], alerts = [] }) {
+export default function PartnersTab({ lang = "en", shopId, user, profile, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, products = [], alerts = [], isOwner = false }) {
   const bn = lang === "bn";
+  if (!isOwner) {
+    return (
+      <div className="pm-card" style={{ padding: 16 }}>
+        {bn ? "পার্টনার ও লাভ-ভাগ শুধু মালিক দেখতে পারেন।" : "Partners and profit sharing are owner-only."}
+      </div>
+    );
+  }
   const L = (b, e) => (bn ? b : e);
   const settings = partnerSettingsOf(shop);
   const today = localDay();

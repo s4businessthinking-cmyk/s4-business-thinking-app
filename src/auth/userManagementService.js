@@ -450,7 +450,7 @@ async function resolveLocalUserForMember(memberId, localUserId = "") {
 
 export async function updateShopMemberPermissions(
   memberId,
-  { permissions, position, localUserId, memberRecord = null } = {}
+  { permissions, position, localUserId, memberRecord = null, extra = null } = {}
 ) {
   const localUser = await resolveLocalUserForMember(memberId, localUserId);
   const docId = localUser?.firebaseUid || memberId;
@@ -470,8 +470,9 @@ export async function updateShopMemberPermissions(
       personName: localUser?.personName || memberRecord?.personName || "",
       username: localUser?.username || memberRecord?.username || "",
       email: localUser?.email || memberRecord?.email || "",
-      permissions,
+      ...(permissions !== undefined ? { permissions } : {}),
       ...(position ? { position } : {}),
+      ...(extra || {}),
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
