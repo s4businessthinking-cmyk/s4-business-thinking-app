@@ -46,17 +46,17 @@ async function sha256HexFromUrl(url) {
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function verifyBundleDigest(bundleUrl, sha256Url) {
-  if (!sha256Url) return false;
+async function verifyBundleDigest(bundleUrl, sha256Url, sha256Hex = null) {
+  if (!sha256Url && !sha256Hex) return false;
   const [expectedRaw, actual] = await Promise.all([
-    fetch(sha256Url).then((r) => r.text()),
+    sha256Hex ? Promise.resolve(sha256Hex) : fetch(sha256Url).then((r) => r.text()),
     sha256HexFromUrl(bundleUrl),
   ]);
-  const expected = String(expectedRaw || "").trim().toLowerCase().replace(/^sha256\s*/i, "").split(/\s+/)[0];
+  const expected = String(expectedRaw || "").trim().toLowerCase().replace(/^sha256[:\s]*/i, "").split(/\s+/)[0];
   return expected.length === 64 && expected === actual;
 }
 
-export async function applyMobileOtaUpdate({ version, bundleUrl, bundleSha256Url = null }) {
+export async function applyMobileOtaUpdate({ version, bundleUrl, bundleSha256Url = null, bundleSha256 = null }) {
   const updater = await getCapacitorUpdater();
   if (!updater) {
     throw new Error("MOBILE_OTA_UNSUPPORTED");
@@ -64,7 +64,7 @@ export async function applyMobileOtaUpdate({ version, bundleUrl, bundleSha256Url
   if (!bundleUrl || !version) {
     throw new Error("MOBILE_OTA_INVALID");
   }
-  if (!(await verifyBundleDigest(bundleUrl, bundleSha256Url))) {
+  if (!(await verifyBundleDigest(bundleUrl, bundleSha256Url, bundleSha256))) {
     throw new Error("MOBILE_OTA_DIGEST_MISMATCH");
   }
 
@@ -120,8 +120,8 @@ export async function runMobileAutoUpdate({
       );
     }
 
-    if (!update.bundleSha256Url) {
-      console.warn("[S4 OTA] skipped — release has no bundle.sha256 sidecar");
+    if (!update.bundleSha256Url && !update.bundleSha256) {
+      console.warn("[S4 OTA] skipped — release has no bundle checksum");
       return { ok: true, applied: false, update, reason: "NO_DIGEST" };
     }
 
@@ -129,6 +129,7 @@ export async function runMobileAutoUpdate({
       version: update.latestVersion,
       bundleUrl: update.bundleUrl,
       bundleSha256Url: update.bundleSha256Url,
+      bundleSha256: update.bundleSha256,
     });
 
     if (!silent && toast) {

@@ -44,6 +44,12 @@ function pickAndroidBundleSha256Url(assets) {
   return list.find((a) => String(a?.name || "").toLowerCase() === shaName.toLowerCase())?.browser_download_url || null;
 }
 
+function pickAndroidBundleSha256(assets) {
+  const digest = String(pickAndroidBundleAsset(assets)?.digest || "").trim().toLowerCase();
+  const hex = digest.replace(/^sha256:/, "");
+  return /^[0-9a-f]{64}$/.test(hex) ? hex : null;
+}
+
 function pickAndroidApkUrl(assets) {
   const list = Array.isArray(assets) ? assets : [];
 
@@ -158,6 +164,7 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
   const platform = getReleasePlatform();
   const bundleUrl = platform === "android" ? pickAndroidBundleUrl(release.assets) : null;
   const bundleSha256Url = platform === "android" ? pickAndroidBundleSha256Url(release.assets) : null;
+  const bundleSha256 = platform === "android" ? pickAndroidBundleSha256(release.assets) : null;
   const apkUrl = platform === "android" ? pickAndroidApkUrl(release.assets) : null;
   const downloadUrl = pickAssetUrl(release.assets, platform);
 
@@ -170,6 +177,7 @@ export async function checkGitHubUpdate(currentVersion = APP_VERSION) {
     downloadUrl,
     bundleUrl,
     bundleSha256Url,
+    bundleSha256,
     apkUrl,
     releaseUrl: release.html_url || "",
     releaseNotes: release.body || "",

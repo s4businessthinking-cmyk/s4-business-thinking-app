@@ -121,6 +121,8 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
       await applyMobileOtaUpdate({
         version: result.latestVersion,
         bundleUrl: result.bundleUrl,
+        bundleSha256Url: result.bundleSha256Url,
+        bundleSha256: result.bundleSha256,
       });
     } catch (applyError) {
       setError(txt.otaFailed);
