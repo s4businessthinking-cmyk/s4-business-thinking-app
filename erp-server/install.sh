@@ -57,6 +57,11 @@ if [ "$(swapon --show --noheadings | wc -l)" -eq 0 ] && [ ! -f /swapfile ]; then
   grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
+if docker ps -a --format '{{.Names}}' | grep -qx s4erp; then
+  say "Replacing existing s4erp container (keeps MySQL data; only the app image is renewed)"
+  docker rm -f s4erp
+fi
+
 say "Building and starting the S4 ERP server"
 $DC up -d --build
 
