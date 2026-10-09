@@ -112,6 +112,7 @@ function useMobileLayout() {
 export default function VendorMasterScreen({
   t, lang, shopId, user, vendors, toast, cur = "AED",
   canEdit = false, canDelete = false, canPurchase = false, actorName = "", leaveGuard, onClose, onGoToPurchase, renderImport, nextCode,
+  focusPartyId = null, onFocusPartyHandled,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -171,6 +172,16 @@ export default function VendorMasterScreen({
     setSelectedId(v?.id || null);
     seenSelected.current = !!v;
   };
+
+  useEffect(() => {
+    if (!focusPartyId) return;
+    const v = vendors.find((x) => x.id === focusPartyId);
+    if (v) {
+      loadVendor(v);
+      if (isMobile) setMobileTab("details");
+    }
+    onFocusPartyHandled?.();
+  }, [focusPartyId, vendors, isMobile, onFocusPartyHandled]);
 
   // The list keeps the open vendor in sync when another device edits or deletes it.
   // A just-created vendor is not in the list yet, so only a vendor that was listed can go missing.

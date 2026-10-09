@@ -1337,7 +1337,7 @@ function BranchStockView({ lang, mobile, stockRows, shopStock, branches, branchI
             `${overCount}টা পণ্যের Branch স্টক দোকানের মোট স্টকের চেয়ে বেশি দেখাচ্ছে। সাধারণত পণ্য Branch-এ পাঠানোর পর তার Purchase delete করলে এমন হয়। Purchase ভুল করে delete হলে আবার এন্ট্রি দিন, আর পণ্য সত্যিই না থাকলে Branch-এ যাওয়া Transfer-টা দেখুন।`,
             `${overCount} product(s) show more stock at the branch than the shop's total. This usually means the purchase was deleted after the goods were sent to the branch. If it was deleted by mistake, enter it again; if the goods really are not there, check the transfer that sent them.`
           )}
-        </div>
+    </div>
       )}
       <div className="si-kpis">
         <div className="si-kpi"><span>{L("পণ্য", "Products")}</span><b>{rows.length}</b></div>

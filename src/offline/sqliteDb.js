@@ -603,7 +603,7 @@ export async function getLocalRecords(collectionName) {
   }));
 }
 
-export async function enqueueSync(collectionName, documentId, operation, payload) {
+export async function enqueueSync(collectionName, documentId, operation, payload, options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -624,7 +624,7 @@ export async function enqueueSync(collectionName, documentId, operation, payload
     ]
   );
 
-  await persist();
+  if (!options.skipPersist) await persist();
 
   if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUED_EVENT));
 
@@ -797,7 +797,7 @@ export async function getFailingSyncGroups(limit = 20) {
  * serializations. This does all the row writes in one open transaction-like
  * pass and persists once at the end.
  */
-export async function bulkEnqueueUpsert(collectionName, records = []) {
+export async function bulkEnqueueUpsert(collectionName, records = [], options = {}) {
   await bootOfflineSqlite();
 
   const now = new Date().toISOString();
@@ -844,7 +844,7 @@ export async function bulkEnqueueUpsert(collectionName, records = []) {
   }
 
   if (queued > 0) {
-    await persist();
+    if (!options.skipPersist) await persist();
     if (typeof window !== "undefined") window.dispatchEvent(new Event(SYNC_QUEUED_EVENT));
   }
 

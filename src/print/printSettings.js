@@ -111,7 +111,7 @@ export async function printHtmlDocument(html, { preview = true, lang = "en", pri
       return;
     }
     w.addEventListener("load", () => {
-      setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 400);
+      setTimeout(() => { w.print(); URL.revokeObjectURL(url); }, 120);
     });
     return;
   }
@@ -122,7 +122,7 @@ export async function printHtmlDocument(html, { preview = true, lang = "en", pri
     setTimeout(() => {
       try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch {}
       setTimeout(() => { frame.remove(); URL.revokeObjectURL(url); }, 60000);
-    }, 400);
+    }, 120);
   };
   document.body.appendChild(frame);
 }

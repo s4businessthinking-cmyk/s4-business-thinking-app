@@ -29,7 +29,7 @@ function safeData(data) {
   };
 }
 
-export async function offlineCreate(collectionName, data = {}) {
+export async function offlineCreate(collectionName, data = {}, options = {}) {
   const documentId = data.id || data.uid || data.docId || uuidv4();
 
   const record = safeData({
@@ -49,7 +49,7 @@ export async function offlineCreate(collectionName, data = {}) {
     collectionName,
     documentId,
     data: record,
-  });
+  }, { skipPersist: !!options.deferPersist });
 
   if (!syncResult?.ok) {
     console.error(
@@ -71,7 +71,7 @@ export async function offlineCreate(collectionName, data = {}) {
   };
 }
 
-export async function offlineUpdate(collectionName, documentId, patch = {}) {
+export async function offlineUpdate(collectionName, documentId, patch = {}, options = {}) {
   const existing = await offlineGetById(collectionName, documentId);
   const stamp = nowIso();
 
@@ -90,7 +90,7 @@ export async function offlineUpdate(collectionName, documentId, patch = {}) {
     collectionName,
     documentId,
     data: { ...patch, id: documentId, _offline_updated_at: stamp },
-  });
+  }, { skipPersist: !!options.deferPersist });
 
   if (!syncResult?.ok) {
     console.error(
@@ -115,7 +115,7 @@ export async function offlineUpdate(collectionName, documentId, patch = {}) {
 // Like offlineUpdate, but only the patched fields are uploaded (merged on the server), so a stale
 // local copy can never overwrite fields that another device changed meanwhile.
 // `base` is the caller's copy of the document, used locally when it is not cached on this device.
-export async function offlinePatch(collectionName, documentId, patch = {}, base = null) {
+export async function offlinePatch(collectionName, documentId, patch = {}, base = null, options = {}) {
   const existing = await offlineGetById(collectionName, documentId);
   const stamp = nowIso();
   const record = { ...(existing?.data || base || {}), ...patch, id: documentId, _offline_updated_at: stamp };
@@ -127,7 +127,7 @@ export async function offlinePatch(collectionName, documentId, patch = {}, base 
     collectionName,
     documentId,
     data: { ...patch, id: documentId, _offline_updated_at: stamp },
-  });
+  }, { skipPersist: !!options.deferPersist });
 
   if (!syncResult?.ok) {
     throw new Error(
@@ -224,10 +224,11 @@ export async function offlineList(collectionName) {
 }
 
 // Many records in one local transaction + one database write (imports).
-export async function offlineBulkUpsert(collectionName, records = []) {
+export async function offlineBulkUpsert(collectionName, records = [], options = {}) {
   return bulkEnqueueUpsert(
     collectionName,
-    records.map((data) => ({ documentId: data.id, data: safeData(data) }))
+    records.map((data) => ({ documentId: data.id, data: safeData(data) })),
+    options,
   );
 }
 

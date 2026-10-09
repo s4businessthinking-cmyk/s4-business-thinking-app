@@ -262,6 +262,8 @@ td{border-bottom:1px dotted #555!important}tbody tr:nth-child(even){background:#
   if (t.key === "bold") {
     css += `.hdr{background:${ac}!important;color:#fff!important;padding:26px 24px!important}.hdr *{color:#fff!important}
 .shop-name{font-size:26px!important}.inv-title,.rc-title{font-size:30px!important}
+.receipt .hdr{padding:10px 14px!important}.receipt .shop-name{font-size:15px!important}.receipt .rc-title{font-size:14px!important}
+.receipt .amount-val{font-size:16px!important}
 thead tr{background:#111!important;color:#fff!important}.grand-row{background:${ac}!important;padding:16px!important}.gv{font-size:22px!important}
 .invoice,.receipt{border:3px solid ${ac}!important}.footer{color:${ac}!important;border-top-color:${ac}!important}`;
   }
@@ -275,6 +277,33 @@ th{padding:5px!important}td{padding:4px 5px!important}.totals-row{padding:4px 10
   if (scale !== 100) css += `.invoice,.receipt{zoom:${scale / 100}}`;
   if (!style.showSignatures) css += ".sigs,.recv-grid{display:none!important}";
   if (style.logo) css += `.s4-logo{display:block;max-height:${parseInt(style.logoSize, 10) || 56}px;max-width:200px;margin-bottom:6px}`;
+  css += `@media print{
+@page{size:A4;margin:8mm 10mm}
+body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:economy;print-color-adjust:economy}
+.receipt,.invoice{border:1px solid #000!important;border-radius:0!important;box-shadow:none!important;max-width:100%!important}
+.hdr{padding:3mm 4mm!important;background:#fff!important;color:#000!important;background-image:none!important}
+.hdr *,.rc-title,.rc-no,.shop-name,.shop-sub{color:#000!important}
+.shop-name{font-size:12pt!important}.shop-sub{font-size:8.5pt!important;line-height:1.25!important}
+.rc-title,.inv-title{font-size:12pt!important;letter-spacing:0!important}
+.rc-no,.inv-no{font-size:9.5pt!important;opacity:1!important}
+.title-row{margin-top:2px!important;padding-top:2px!important;border-top:1px solid #ccc!important}
+.body{padding:3mm 4mm!important}
+.info-grid{gap:2mm!important;margin-bottom:3mm!important}
+.info-box{padding:1.5mm 2.5mm!important;border-radius:0!important}
+.info-label{font-size:7.5pt!important;margin-bottom:0!important;letter-spacing:0!important}
+.info-value{font-size:9.5pt!important}
+.amount-box{padding:2mm 3mm!important;margin-bottom:3mm!important;border-width:1px!important}
+.amount-label{font-size:8pt!important}.amount-val{font-size:13pt!important;margin-top:0!important}
+.cheque-box,.pay-box{padding:2mm 3mm!important;margin-bottom:3mm!important;border-radius:0!important}
+.cheque-row{padding:0.5px 0!important;font-size:9pt!important}
+.alloc-table{margin-bottom:3mm!important}
+.alloc-table th,.alloc-table td{padding:1.5mm 2mm!important;font-size:9pt!important}
+.alloc-table thead{display:table-header-group}
+.note-box{padding:2mm 3mm!important;margin-bottom:3mm!important;font-size:9pt!important}
+.sigs{margin-top:5mm!important;padding-top:2mm!important;gap:8mm!important}
+.sig-line{margin-top:14mm!important;padding-top:2px!important;font-size:8.5pt!important}
+.footer{padding:2mm!important;font-size:8pt!important;background:#fff!important}
+}`;
   return css;
 }
 

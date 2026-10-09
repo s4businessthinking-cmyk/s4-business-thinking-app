@@ -48,6 +48,7 @@ import {
   offlineDirtyRecords,
   offlinePurgeCleanLocal,
 } from "./offline/offlineRepository";
+import { persistOfflineDb } from "./offline/sqliteDb.js";
 import {
   loadCachedShop,
   saveCachedShop,
@@ -101,6 +102,7 @@ import { SI_CSS, SI_STATUS_COLOR, PM_TH, usePmMobile } from "./sales-invoice/siS
 import MobileMenuDrawer from "./dashboard/MobileMenuDrawer.jsx";
 import SideMenuGroups from "./dashboard/SideMenuGroups.jsx";
 import DashboardQuickNav from "./dashboard/DashboardQuickNav.jsx";
+import AppGlobalSearch from "./dashboard/AppGlobalSearch.jsx";
 import { groupMenuItems } from "./dashboard/menuGroups.js";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "./components/WindowChrome.jsx";
 import PrintSettingsWindow from "./print/PrintSettingsWindow.jsx";
@@ -118,6 +120,7 @@ import { startAutoBackup } from "./backup/backupService.js";
 import { saveTextFile } from "./utils/saveTextFile.js";
 import { ProductTypeaheadInput } from "./components/ProductTypeaheadInput.jsx";
 import SalesInvoiceDesktopForm from "./sales-invoice/SalesInvoiceDesktopForm.jsx";
+import ProductInvoiceEntryInfo from "./sales-invoice/ProductInvoiceEntryInfo.jsx";
 import PurchaseInvoiceDesktopForm from "./purchase/PurchaseInvoiceDesktopForm.jsx";
 import { purchaseOptionsOf, rateOf, isForeign, lineToBase, batchReasons, nextBatchNo } from "./purchase/purchaseOptions.js";
 import { computeStockMap, loadInvoiceRows } from "./inventory/stockFromInvoices";
@@ -247,12 +250,13 @@ async function applyInvoiceStockEffect({
   const sig = (inv) => JSON.stringify((inv?.items || []).map((it) => [it.productId || "", Number(it.qty) || 0, it.unit || "", Number(it.unitFactor) || 1, Number(it[unitCostKey]) || 0]));
   if (oldAffects && newAffects && sig(oldInvoice) === sig(newInvoice)) return;
 
-  const runLine = async (it, movementType) => {
+  const ledgerRows = [];
+  const collectLine = (it, movementType) => {
     const qty = itemBaseQty(it);
     if (!it?.productId || qty <= 0) return;
     const factor = Number(it.unitFactor) > 0 ? Number(it.unitFactor) : 1;
     try {
-      await createStockLedgerEntry({
+      ledgerRows.push(buildStockLedgerEntry({
         productId: it.productId,
         shopId,
         quantity: qty,
@@ -261,18 +265,20 @@ async function applyInvoiceStockEffect({
         referenceId: invoiceId,
         unitCost: (Number(it[unitCostKey]) || 0) / factor,
         actor,
-      });
+      }));
     } catch (err) {
       console.warn(`[S4 Stock] ${movementType} ledger entry failed`, it.productId, err);
     }
   };
 
   if (oldAffects) {
-    for (const it of (oldInvoice.items || [])) await runLine(it, reverseType);
+    for (const it of (oldInvoice.items || [])) collectLine(it, reverseType);
   }
   if (newAffects) {
-    for (const it of (newInvoice.items || [])) await runLine(it, applyType);
+    for (const it of (newInvoice.items || [])) collectLine(it, applyType);
   }
+  if (!ledgerRows.length) return;
+  await offlineBulkUpsert(STOCK_COLLECTIONS.STOCK_LEDGER, ledgerRows, { skipPersist: true });
 }
 
 function mergeProductCatalog(cloudRows = [], localRows = []) {
@@ -3323,59 +3329,72 @@ function generatePaymentVoucherHTML(voucherIn, shopIn, lang, opts={}) {
     const items = (voucher.allocations||[]).map(a=>({ invoiceNo:docNo(a), ourNo:a.invoiceNo||"", invoiceDate:a.invoiceDate||"", amount:piFmt2(a.amount) }));
     return renderLayoutDocument(layout, "voucher", { fields, items, logo:design.style.voucher?.logo }, { title:`${vTitle} - ${voucher.paymentNo}`, bn:isBn });
   }
+  const docTitle = opts.title || (isReceipt ? (isBn ? "রিসিট ভাউচার" : "Receipt Voucher") : (isBn ? "পেমেন্ট ভাউচার" : "Payment Voucher"));
+  const partyLabel = isReceipt ? (isBn ? "গ্রহণ করা হয়েছে" : "Received From") : (isBn ? "প্রদান করা হয়েছে" : "Paid To");
+  const amountLabel = isBn ? "সর্বমোট" : (isReceipt ? "Total Received" : "Total Paid");
   return applyDesign(`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${opts.title||`${isReceipt?"Receipt":"Payment"} Voucher`} - ${voucher.paymentNo}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
+<title>${docTitle} - ${voucher.paymentNo}</title>
 <style>
+@page{size:A4;margin:10mm 12mm}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
-.receipt{max-width:600px;margin:0 auto;border:2px solid #f97316;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
-.hdr{background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;padding:18px 22px}
-.shop-name{font-size:19px;font-weight:900}
-.shop-sub{font-size:11px;opacity:0.85;margin-top:3px}
-.title-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.3)}
-.rc-title{font-size:18px;font-weight:900;letter-spacing:1px}
-.rc-no{font-size:13px;font-weight:700;opacity:0.95}
-.body{padding:20px 22px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.info-box{background:#f9fafb;border-radius:8px;padding:10px 13px;border:1px solid #e5e7eb}
-.info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:700;margin-bottom:3px}
-.info-value{font-size:14px;font-weight:700;color:#111}
-.amount-box{background:#f0fdf4;border:2px solid #22c55e;border-radius:10px;padding:16px;text-align:center;margin-bottom:16px}
-.amount-label{font-size:11px;color:#15803d;font-weight:700;text-transform:uppercase}
-.amount-val{font-size:32px;font-weight:900;color:#15803d;margin-top:4px}
-.cheque-box{background:#eef2ff;border:1px solid #6366f1;border-radius:10px;padding:13px;margin-bottom:16px}
-.cheque-row{display:flex;justify-content:space-between;padding:5px 0;font-size:12px}
-.alloc-table{width:100%;border-collapse:collapse;margin-bottom:16px}
-.alloc-table th{background:#f9fafb;text-align:left;font-size:10px;text-transform:uppercase;color:#6b7280;padding:8px 10px;border-bottom:2px solid #e5e7eb}
-.alloc-table td{padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:12px}
-.note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:16px;font-size:12px;color:#92400e}
-.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px;padding-top:14px;border-top:1px dashed #e5e7eb}
-.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
-.footer{text-align:center;padding:11px 22px;background:#f9fafb;border-top:2px solid #f97316;font-size:11px;color:#f97316;font-weight:700}
+body{font-family:'Segoe UI',Tahoma,Arial,'Noto Sans Bengali',sans-serif;font-size:12px;color:#111;background:#fff;padding:12px}
+.receipt{max-width:720px;margin:0 auto;border:1px solid #374151;border-radius:4px;overflow:hidden}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 14px;border-bottom:2px solid #111;background:#f8fafc;color:#111}
+.hdr-left{flex:1;min-width:0}
+.hdr-right{text-align:right;flex-shrink:0}
+.shop-name{font-size:15px;font-weight:900;line-height:1.2}
+.shop-sub{font-size:10px;color:#475569;margin-top:2px;line-height:1.35}
+.title-row{display:flex;justify-content:flex-end;align-items:baseline;gap:10px;margin-top:6px}
+.rc-title{font-size:14px;font-weight:900;letter-spacing:0.3px;text-transform:uppercase}
+.rc-no{font-size:12px;font-weight:800;font-family:Consolas,monospace}
+.body{padding:10px 14px}
+.meta-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;font-size:11px}
+.meta-row .info-box{padding:5px 8px}
+.info-box{background:#fff;border:1px solid #cbd5e1;border-radius:2px}
+.info-label{font-size:9px;text-transform:uppercase;color:#64748b;font-weight:700;margin-bottom:1px}
+.info-value{font-size:12px;font-weight:700;color:#111;line-height:1.3}
+.amount-box{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid #111;padding:6px 10px;margin-bottom:8px;background:#fafafa}
+.amount-label{font-size:10px;font-weight:800;text-transform:uppercase;color:#334155}
+.amount-val{font-size:16px;font-weight:900;color:#111;font-family:Consolas,monospace}
+.cheque-box{border:1px solid #94a3b8;background:#f8fafc;padding:5px 8px;margin-bottom:8px;font-size:11px}
+.cheque-row{display:flex;justify-content:space-between;gap:8px;padding:2px 0}
+.cheque-row span:first-child{color:#475569;font-weight:600}
+.cheque-row span:last-child{font-weight:700;text-align:right}
+.alloc-table{width:100%;border-collapse:collapse;margin-bottom:8px;font-size:11px}
+.alloc-table th{background:#e2e8f0;text-align:left;font-size:9px;text-transform:uppercase;color:#334155;padding:4px 6px;border:1px solid #94a3b8}
+.alloc-table td{padding:4px 6px;border:1px solid #cbd5e1;vertical-align:top}
+.alloc-table tbody tr:nth-child(even){background:#f8fafc}
+.note-box{border:1px solid #cbd5e1;padding:5px 8px;margin-bottom:8px;font-size:11px;color:#334155}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;padding-top:8px;border-top:1px dashed #94a3b8}
+.sig-line{border-top:1px solid #64748b;margin-top:28px;padding-top:4px;font-size:10px;color:#475569;text-align:center}
+.footer{text-align:center;padding:6px 14px;border-top:1px solid #cbd5e1;font-size:9px;color:#64748b;font-weight:600}
 @media print{body{padding:0}.no-print{display:none!important}.receipt{border-radius:0;box-shadow:none}}
 </style></head><body>
-<div class="no-print" style="text-align:center;margin-bottom:14px">
-  <button onclick="window.print()" style="padding:10px 28px;background:#ea580c;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
-  <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
+<div class="no-print" style="text-align:center;margin-bottom:10px">
+  <button onclick="window.print()" style="padding:8px 22px;background:#1e40af;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;margin-right:6px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
+  <button onclick="window.close()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
 <div class="receipt">
   <div class="hdr">
-    <div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>
-    ${shopHeaderExtras(shop).arabic}
-    <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>
-    ${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}
-    <div class="title-row"><span class="rc-title">${opts.title||(isReceipt?(isBn?"রিসিট ভাউচার":"Receipt Voucher"):(isBn?"পেমেন্ট ভাউচার":"Payment Voucher"))}</span><span class="rc-no">${voucher.paymentNo}</span></div>
+    <div class="hdr-left">
+      <div class="shop-name">${shop?.companyName||"Shop"}</div>
+      ${shopHeaderExtras(shop).arabic}
+      <div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}${shop?.mobile?` · ${shop.mobile}`:""}</div>
+      ${shopHeaderExtras(shop).details}
+    </div>
+    <div class="hdr-right">
+      <div class="title-row"><span class="rc-title">${docTitle}</span><span class="rc-no">${voucher.paymentNo}</span></div>
+    </div>
   </div>
   <div class="body">
-    <div class="info-grid">
-      <div class="info-box"><div class="info-label">📅 ${isBn?"তারিখ":"Date"}</div><div class="info-value">${voucher.paymentDate}</div></div>
-      <div class="info-box"><div class="info-label">💳 ${isBn?"পদ্ধতি":"Method"}</div><div class="info-value">${PI_VOUCHER_METHODS[voucher.method]?.icon||""} ${methodLabel}</div></div>
-      <div class="info-box" style="grid-column:1/3"><div class="info-label">${isReceipt?(isBn?"👤 গ্রহণ করা হয়েছে":"👤 Received From"):(isBn?"🏭 প্রদান করা হয়েছে":"🏭 Paid To")}</div><div class="info-value">${voucher.vendorName||"—"}</div></div>
+    <div class="meta-row">
+      <div class="info-box"><div class="info-label">${isBn?"তারিখ":"Date"}</div><div class="info-value">${voucher.paymentDate}</div></div>
+      <div class="info-box"><div class="info-label">${isBn?"পদ্ধতি":"Method"}</div><div class="info-value">${PI_VOUCHER_METHODS[voucher.method]?.icon||""} ${methodLabel}</div></div>
+      <div class="info-box"><div class="info-label">${partyLabel}</div><div class="info-value">${voucher.vendorName||"—"}</div></div>
     </div>
     <div class="amount-box">
-      <div class="amount-label">${isBn?"সর্বমোট পরিমাণ":(isReceipt?"Total Amount Received":"Total Amount Paid")}</div>
+      <div class="amount-label">${amountLabel}</div>
       <div class="amount-val">${cur} ${piFmt2(voucher.totalAmount)}</div>
     </div>
     ${isCheque?`<div class="cheque-box">
@@ -3576,7 +3595,7 @@ function pushOrdersNow() {
     .finally(() => off.syncNow?.().catch(err => console.warn("[S4 Sync] order sync failed", err)));
 }
 
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, onShopUpdated, purchaseSource=null, onPurchaseSourceHandled }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, onShopUpdated, purchaseSource=null, onPurchaseSourceHandled, openInvoiceId=null, onOpenInvoiceHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
@@ -4436,13 +4455,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const nowIso = new Date().toISOString();
     const priorInvoice = editInvoiceId ? invoices.find(inv => inv.id === editInvoiceId) : null;
     let savedId;
+    const deferPersist = { deferPersist: true };
 
     if (editInvoiceId) {
       const result = await offlinePatch("purchaseInvoices", editInvoiceId, {
         ...payload,
         updatedAt: nowIso,
         updatedBy: user?.uid || "",
-      }, priorInvoice);
+      }, priorInvoice, deferPersist);
 
       const updated = { ...result.data, id: editInvoiceId };
       savedId = editInvoiceId;
@@ -4458,7 +4478,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         ...payload,
         createdAt: nowIso,
         updatedAt: nowIso,
-      });
+      }, deferPersist);
 
       const created = { ...result.data, id: result.documentId };
       savedId = result.documentId;
@@ -4479,7 +4499,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     });
 
     if (!editInvoiceId) bumpShopPiSerial(payload.invoiceNo);
-    if (STOCK_AFFECTING_INVOICE_STATUSES.includes(payload.status)) await piUpdateProductCosts(payload);
+    if (STOCK_AFFECTING_INVOICE_STATUSES.includes(payload.status)) await piUpdateProductCosts(payload, deferPersist);
+
+    await persistOfflineDb();
 
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
@@ -4489,7 +4511,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
 
   // A confirmed purchase becomes the product's latest cost, and a sale price typed on the line updates the product's price.
-  const piUpdateProductCosts = async (payload) => {
+  const piUpdateProductCosts = async (payload, persistOpts = {}) => {
     if (!can("manageProducts")) return;
     const nowIso = new Date().toISOString();
     for (const it of payload.items || []) {
@@ -4516,7 +4538,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           if (Math.abs(sale - (Number(prod[priceKey]) || 0)) > 0.0001) patch[priceKey] = String(sale);
         }
         if (!Object.keys(patch).length) continue;
-        await offlinePatch("products", it.productId, { ...patch, updatedAt: nowIso }, prod);
+        await offlinePatch("products", it.productId, { ...patch, updatedAt: nowIso }, prod, persistOpts);
       } catch (err) {
         console.warn("[S4 PI] product cost update failed", it.productId, err);
       }
@@ -4740,6 +4762,15 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const piRowDue = (inv) => ["cancelled","draft"].includes(inv.status) || isBranchTransferBill(inv) ? 0 : Math.max(0, piN2(inv.grandTotal) - piN2(inv.amountPaid));
   const piBtTag = (inv) => isBranchTransferBill(inv) ? <span className="si-badge" style={{ color:"#0e7490", marginLeft:4 }} title={bnL?"Branch Transfer — মোট/বাকিতে ধরা হয় না":"Branch Transfer — not in totals/dues"}>🚚 Branch</span> : null;
   const piOpenInvoice = (inv) => { if (!piLeaveMinOk()) return; setSelInvoice(inv); setPiView("detail"); };
+  useEffect(() => {
+    if (!openInvoiceId) return;
+    onOpenInvoiceHandled?.();
+    const inv = invoices.find((i) => i.id === openInvoiceId);
+    if (!inv) return;
+    setPiSubTab("invoices");
+    piOpenInvoice(inv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openInvoiceId, invoices]);
   const piRootStyle = piFitH && !piMobile ? { height:piFitH } : undefined;
   const piMatchBlock = (inv) => {
     const q = piSearch.trim();
@@ -5331,6 +5362,14 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
               {fField(t.pi_brand, <input className="pm-input" value={piCurrent.brand} onChange={e=>setPiCurrent(p=>({...p,brand:e.target.value}))} />)}
             </div>
             {piCurrent.productId && <StockBadge product={products.find(pr=>pr.id===piCurrent.productId)} products={products} shopId={shopId} refreshKey={invoices} lang={lang} />}
+            {piCurrent.productId && (
+              <ProductInvoiceEntryInfo
+                product={products.find((pr) => pr.id === piCurrent.productId)}
+                lang={lang}
+                fmt={piFmt2}
+                canSeeCost={canManagePurchase || can("manageProducts")}
+              />
+            )}
             <div className="si-grid3" style={{ gridTemplateColumns:"minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)" }}>
               {fField(t.pi_qty, <input className="pm-input" style={{ textAlign:"center" }} inputMode="decimal" placeholder="0" value={piCurrent.qty}
                 ref={piQtyRef} onChange={e=>setPiCurrent(p=>({...p,qty:e.target.value}))} onKeyDown={enterAdd} />)}
@@ -6035,7 +6074,7 @@ async function migrateLegacyDeliveryNotes(rows) {
 }
 
 // ── SALES INVOICE TAB (main) ──
-function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onConvertToDN, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled }) {
+function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onConvertToDN, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, openInvoiceId=null, onOpenInvoiceHandled }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const siPerm = (key) => isOwner || { ...DEFAULT_PERMISSIONS, ...(profile?.permissions||{}) }[key] === true;
@@ -6773,13 +6812,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const nowIso = new Date().toISOString();
     const priorInvoice = editInvId ? invoices.find(inv => inv.id === editInvId) : null;
     let savedInvoice;
+    const deferPersist = { deferPersist: true };
 
     if (editInvId) {
       const result = await offlineUpdate(COL, editInvId, {
         ...payload,
         updatedAt: nowIso,
         updatedBy: user?.uid || "",
-      });
+      }, deferPersist);
 
       savedInvoice = { ...result.data, id: editInvId };
       setInvoices(prev => prev.map(inv => inv.id === editInvId ? savedInvoice : inv));
@@ -6794,7 +6834,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         ...payload,
         createdAt: nowIso,
         updatedAt: nowIso,
-      });
+      }, deferPersist);
 
       savedInvoice = { ...result.data, id: result.documentId };
       setInvoices(prev => [savedInvoice, ...prev]);
@@ -6813,6 +6853,8 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       shopId,
       actor: { uid: user?.uid, personName: profile?.personName },
     });
+
+    await persistOfflineDb();
 
     if (!editInvId) bumpShopSiSerial(payload.invoiceNo);
 
@@ -7232,6 +7274,13 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     });
   };
   const siOpenInvoice = (inv) => { if (!siLeaveMinOk()) return; setSelInv(inv); setSiView("detail"); };
+  useEffect(() => {
+    if (!openInvoiceId || kind !== "sales") return;
+    onOpenInvoiceHandled?.();
+    const inv = invoices.find((i) => i.id === openInvoiceId);
+    if (inv) siOpenInvoice(inv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openInvoiceId, invoices, kind]);
   const siDocTitle = isSO ? (bnL?"সেলস অর্ডার":"SALES ORDER") : isQuote ? (bnL?"কোটেশন":"QUOTATION") : isDN ? (bnL?"ডেলিভারি নোট":"DELIVERY NOTE") : (bnL?"সেলস ইনভয়েস":"SALES INVOICE");
   const siRootStyle = siFitH && !siMobile ? { height:siFitH } : undefined;
 
@@ -7754,6 +7803,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
               const inBill = [...siLines.filter(it=>it.productId===siCurrent.productId && it.id!==siEditLineId), siCurrent].reduce((sum,it)=>sum+itemBaseQty(it, prod),0);
               return <StockBadge product={prod} products={products} shopId={shopId} refreshKey={invoices} lang={lang} extraQty={editInvId ? 0 : inBill} />;
             })()}
+            {siCurrent.productId && (
+              <ProductInvoiceEntryInfo
+                product={siFindProduct(siCurrent.productId)}
+                lang={lang}
+                fmt={siFmt2}
+                canSeeCost={canSeeCost}
+              />
+            )}
             {siCurrent.productId && (()=>{
               const spec = salesSpecs(siFindProduct(siCurrent.productId));
               return spec ? (
@@ -9378,7 +9435,7 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
 }
 
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu }) {
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu, globalSearchCan, onGlobalSearchNavigate }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
@@ -9623,6 +9680,19 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
             {statusCards.map(c=>statCard(c))}
           </div>
         </>
+      )}
+
+      {isDesktop && globalSearchCan && onGlobalSearchNavigate && (
+        <AppGlobalSearch
+          lang={lang}
+          th={th}
+          glassCard={glassCard}
+          products={products}
+          customers={customers}
+          vendors={vendors}
+          can={globalSearchCan}
+          onNavigate={onGlobalSearchNavigate}
+        />
       )}
 
       {isOwner && !moneyLocked && (
@@ -11418,6 +11488,75 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     setPmEditId(p.id);
     setPmShowAdd(true);
   };
+
+  const [globalOpenSalesInvoiceId, setGlobalOpenSalesInvoiceId] = useState(null);
+  const [globalOpenPurchaseInvoiceId, setGlobalOpenPurchaseInvoiceId] = useState(null);
+  const [globalFocusCustomerId, setGlobalFocusCustomerId] = useState(null);
+  const [globalFocusVendorId, setGlobalFocusVendorId] = useState(null);
+
+  const globalSearchCan = useMemo(() => ({
+    products: isOwner || can("viewProducts"),
+    customers: isOwner,
+    vendors: isOwner || can("viewVendors") || can("manageVendors"),
+    sales: isOwner || can("manageSales"),
+    purchase: isOwner || can("managePurchase"),
+  }), [isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageSales, perms.managePurchase]);
+  const globalSearchCanAny = useMemo(
+    () => Object.values(globalSearchCan).some(Boolean),
+    [globalSearchCan],
+  );
+
+  const handleGlobalSearchNavigate = useCallback((hit) => {
+    const goTab = (next) => {
+      if (tabRef.current !== next && billLeaveGuard.current && !billLeaveGuard.current.leave()) return false;
+      setTabState(next);
+      return true;
+    };
+    if (hit.kind === "product") {
+      const p = products.find((x) => x.id === hit.id);
+      if (!p || !(isOwner || can("viewProducts"))) return;
+      if (!goTab("products")) return;
+      startProductEdit(p);
+      return;
+    }
+    if (hit.kind === "customer") {
+      if (!isOwner) return;
+      if (!goTab("customers")) return;
+      setGlobalFocusCustomerId(hit.id);
+      return;
+    }
+    if (hit.kind === "vendor") {
+      if (!(isOwner || can("viewVendors") || can("manageVendors"))) return;
+      if (!goTab("vendors")) return;
+      setGlobalFocusVendorId(hit.id);
+      return;
+    }
+    if (hit.kind === "salesInvoice") {
+      if (!(isOwner || can("manageSales"))) return;
+      if (!goTab("sales")) return;
+      setGlobalOpenSalesInvoiceId(hit.id);
+      return;
+    }
+    if (hit.kind === "purchaseInvoice") {
+      if (!(isOwner || can("managePurchase"))) return;
+      if (!goTab("purchase")) return;
+      setGlobalOpenPurchaseInvoiceId(hit.id);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [products, isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageSales, perms.managePurchase]);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return;
+      if (String(event.key).toLowerCase() !== "k") return;
+      if (document.querySelector("[data-si-modal-open]")) return;
+      event.preventDefault();
+      if (isDesktop && tabRef.current !== "dashboard") setTabState("dashboard");
+      window.dispatchEvent(new CustomEvent("s4-focus-global-search"));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isDesktop]);
 
   const collectProductBarcodes = (p) => [
     p.barcode,
@@ -13664,6 +13803,8 @@ const startEditOrder = (order) => {
           onLockMoney={()=>setOwnerUnlocked(false)}
           toast={toast}
           onOpenMenu={()=>setMenuOpen(true)}
+          globalSearchCan={globalSearchCan}
+          onGlobalSearchNavigate={handleGlobalSearchNavigate}
         />
       )}
       {tab==="dashboard"&&(isOwner||can("viewProducts"))&&(
@@ -14483,6 +14624,8 @@ const startEditOrder = (order) => {
           canEdit canDelete canSales
           actorName={profile?.personName||""}
           leaveGuard={billLeaveGuard}
+          focusPartyId={globalFocusCustomerId}
+          onFocusPartyHandled={()=>setGlobalFocusCustomerId(null)}
           onClose={()=>setTab("dashboard")}
           nextCode={()=>nextPartyCode(shopId, "customers", customers)}
           onGoToSales={(customer)=>{
@@ -14507,6 +14650,8 @@ const startEditOrder = (order) => {
           shopId={shopId} user={user}
           vendors={vendors} toast={toast} canDelete={isOwner} canEdit={isOwner||can("manageVendors")}
           leaveGuard={billLeaveGuard}
+          focusPartyId={globalFocusVendorId}
+          onFocusPartyHandled={()=>setGlobalFocusVendorId(null)}
           onClose={()=>setTab("dashboard")}
           nextCode={()=>nextPartyCode(shopId, "vendors", vendors)}
           canPurchase={isOwner||can("managePurchase")}
@@ -14550,6 +14695,8 @@ const startEditOrder = (order) => {
           onVoucherHandled={()=>setPiVoucherReq(0)}
           purchaseSource={purchaseSource}
           onPurchaseSourceHandled={()=>setPurchaseSource(null)}
+          openInvoiceId={globalOpenPurchaseInvoiceId}
+          onOpenInvoiceHandled={()=>setGlobalOpenPurchaseInvoiceId(null)}
         />
       )}
 
@@ -14581,6 +14728,8 @@ const startEditOrder = (order) => {
           onOpenNewHandled={()=>{ setSiNewReq(0); setSiNewCustomer(null); }}
           voucherRequest={tab==="sales" ? siVoucherReq : 0}
           onVoucherHandled={()=>setSiVoucherReq(0)}
+          openInvoiceId={tab === "sales" ? globalOpenSalesInvoiceId : null}
+          onOpenInvoiceHandled={()=>setGlobalOpenSalesInvoiceId(null)}
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
           customers={customers} products={products}
@@ -15262,7 +15411,21 @@ const startEditOrder = (order) => {
     <div style={s.root}>
       <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme}
         shopName={localShop?.companyName||""} personName={profile.personName||""}
-        rightSlot={<NotificationBell lang={lang} theme={theme} items={notificationItems} />}
+        rightSlot={(
+          <>
+            {!isDesktop && erpSkin && globalSearchCanAny && (
+              <button
+                type="button"
+                aria-label={lang === "bn" ? "সার্চ" : "Search"}
+                onClick={() => window.dispatchEvent(new CustomEvent("s4-focus-global-search"))}
+                style={{ border: "none", background: "transparent", fontSize: 20, lineHeight: 1, padding: "2px 6px", cursor: "pointer" }}
+              >
+                🔎
+              </button>
+            )}
+            <NotificationBell lang={lang} theme={theme} items={notificationItems} />
+          </>
+        )}
         onBack={!isDesktop && tab!=="dashboard" ? goBack : null} />
 
       {isDesktop ? (
@@ -15304,6 +15467,33 @@ const startEditOrder = (order) => {
               <strong>{String((visibleTabs.find(([k])=>k===tab)||[])[1]||tab).replace(/^[^\p{L}\p{N}]+/u,"")}</strong>
               <span>{new Date().toLocaleDateString(lang==="bn"?"bn-BD":"en-GB",{ day:"numeric", month:"short", year:"numeric" })}</span>
             </div>
+          )}
+          {globalSearchCanAny && (tab === "products" || pmOverSales) && (
+            <AppGlobalSearch
+              lang={lang}
+              th={th}
+              glassCard={{ background: th.bgCard, border: `1px solid ${th.border}` }}
+              products={products}
+              customers={customers}
+              vendors={vendors}
+              can={globalSearchCan}
+              onNavigate={handleGlobalSearchNavigate}
+              isMobile
+              showBar={false}
+            />
+          )}
+          {globalSearchCanAny && tab !== "products" && !pmOverSales && (
+            <AppGlobalSearch
+              lang={lang}
+              th={th}
+              glassCard={{ background: th.bgCard, border: `1px solid ${th.border}` }}
+              products={products}
+              customers={customers}
+              vendors={vendors}
+              can={globalSearchCan}
+              onNavigate={handleGlobalSearchNavigate}
+              isMobile
+            />
           )}
           {tabContent}
         </div>

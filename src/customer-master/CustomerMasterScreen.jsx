@@ -74,6 +74,7 @@ function masterCustomerTypes(shopId) {
 export default function CustomerMasterScreen({
   t, lang, shopId, user, customers, team = [], toast, cur = "AED",
   canEdit = false, canDelete = false, canSales = false, actorName = "", leaveGuard, onClose, onGoToSales, renderImport, nextCode,
+  focusPartyId = null, onFocusPartyHandled,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -134,6 +135,16 @@ export default function CustomerMasterScreen({
     setSelectedId(c?.id || null);
     seenSelected.current = !!c;
   };
+
+  useEffect(() => {
+    if (!focusPartyId) return;
+    const c = customers.find((x) => x.id === focusPartyId);
+    if (c) {
+      loadCustomer(c);
+      if (isMobile) setMobileTab("details");
+    }
+    onFocusPartyHandled?.();
+  }, [focusPartyId, customers, isMobile, onFocusPartyHandled]);
 
   // The list keeps the open customer in sync when another device edits or deletes it.
   const seenSelected = useRef(false);
