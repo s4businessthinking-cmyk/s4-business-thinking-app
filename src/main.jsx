@@ -4,8 +4,8 @@ import App from "./spare-parts-app.jsx";
 import ErpBuildDashboard from "./erp-build/ErpBuildDashboard.jsx";
 import { isErpDashboardRoute } from "./erp-build/buildStages.js";
 import { startOfflineEngine } from "./offline/offlineBoot";
-import { notifyMobileAppReady, runMobileAutoUpdate } from "./update/mobileOtaService.js";
-import { APP_VERSION, checkGitHubUpdate } from "./update/githubUpdateService.js";
+import S4BootErrorBoundary from "./components/S4BootErrorBoundary.jsx";
+import S4UiReadyGate from "./components/S4UiReadyGate.jsx";
 
 async function clearStaleShellWebCache() {
   const isNative =
@@ -64,22 +64,10 @@ async function setupWebPwaAutoReload() {
 
 clearStaleShellWebCache()
   .then(() => setupWebPwaAutoReload())
-  .finally(async () => {
-    startOfflineEngine();
-    await notifyMobileAppReady();
-
-    const runSilentMobileUpdate = () =>
-      runMobileAutoUpdate({
-        checkGitHubUpdate,
-        APP_VERSION,
-        silent: true,
-      }).catch(() => {});
-
-    runSilentMobileUpdate();
-    // Re-check periodically while the app stays open (WhatsApp-style background update).
-    if (typeof window !== "undefined") {
-      window.setInterval(runSilentMobileUpdate, 30 * 60 * 1000);
-    }
+  .finally(() => {
+    startOfflineEngine().catch((error) => {
+      console.error("[S4 Offline] engine start failed (app will still open)", error);
+    });
   });
 
 if (typeof window !== "undefined" && window.S4Desktop?.dialog) {
@@ -102,6 +90,10 @@ const RootApp = isErpDashboardRoute() ? ErpBuildDashboard : App;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <RootApp />
+    <S4BootErrorBoundary>
+      <S4UiReadyGate>
+        <RootApp />
+      </S4UiReadyGate>
+    </S4BootErrorBoundary>
   </React.StrictMode>
 );

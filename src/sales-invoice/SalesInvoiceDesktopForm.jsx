@@ -38,10 +38,7 @@ export const btn = (bg = "#e7eef9", color = C.label, extra = {}) => ({
 export const th = { padding: "4px 6px", background: C.head, color: "#fff", fontSize: 12, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap", position: "sticky", top: 0 };
 export const td = { padding: "3px 6px", fontSize: 12.5, textAlign: "right", borderBottom: `1px solid #d3deef`, whiteSpace: "nowrap", color: "#0f172a" };
 
-export function splitRack(rackLocation) {
-  const parts = String(rackLocation || "").split("/").map((v) => v.trim());
-  return { rack: parts[0] || "", floor: parts[1] || "", bin: parts[2] || "" };
-}
+export { splitRack } from "./rackLocation.js";
 
 export function productBarcodeUnit(product, key) {
   if (!product || !key) return null;

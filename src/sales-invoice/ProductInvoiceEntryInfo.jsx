@@ -1,5 +1,5 @@
 import React from "react";
-import { splitRack } from "./SalesInvoiceDesktopForm.jsx";
+import { splitRack } from "./rackLocation.js";
 
 /**
  * Product cost + rack/floor/bin strip (desktop invoice forms show this under the entry row).

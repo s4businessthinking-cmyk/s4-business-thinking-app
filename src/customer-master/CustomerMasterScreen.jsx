@@ -89,6 +89,7 @@ export default function CustomerMasterScreen({
   const [saving, setSaving] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const rootRef = useRef(null);
+  const seenSelected = useRef(false);
   const [fitHeight, setFitHeight] = useState(null);
 
   // On PC the screen fills exactly the space below the window title, so the page never scrolls.
@@ -147,7 +148,6 @@ export default function CustomerMasterScreen({
   }, [focusPartyId, customers, isMobile, onFocusPartyHandled]);
 
   // The list keeps the open customer in sync when another device edits or deletes it.
-  const seenSelected = useRef(false);
   const selectedCustomer = selectedId ? customers.find((c) => c.id === selectedId) : null;
   useEffect(() => {
     if (!selectedId || dirty) return;

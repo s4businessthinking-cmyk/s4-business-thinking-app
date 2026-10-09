@@ -9682,7 +9682,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
         </>
       )}
 
-      {isDesktop && globalSearchCan && onGlobalSearchNavigate && (
+      {isDesktop && onGlobalSearchNavigate && globalSearchCan && Object.values(globalSearchCan).some(Boolean) && (
         <AppGlobalSearch
           lang={lang}
           th={th}

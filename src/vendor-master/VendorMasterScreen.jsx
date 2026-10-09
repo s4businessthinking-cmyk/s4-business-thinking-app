@@ -126,6 +126,7 @@ export default function VendorMasterScreen({
   const [saving, setSaving] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const rootRef = useRef(null);
+  const seenSelected = useRef(false);
   const [fitHeight, setFitHeight] = useState(null);
 
   // On PC the screen fills exactly the space below the window title, so the page never scrolls.
@@ -185,7 +186,6 @@ export default function VendorMasterScreen({
 
   // The list keeps the open vendor in sync when another device edits or deletes it.
   // A just-created vendor is not in the list yet, so only a vendor that was listed can go missing.
-  const seenSelected = useRef(false);
   const selectedVendor = selectedId ? vendors.find((v) => v.id === selectedId) : null;
   useEffect(() => {
     if (!selectedId || dirty) return;
