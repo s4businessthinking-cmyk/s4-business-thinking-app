@@ -9,6 +9,7 @@ import { listShopRecords } from "../branch-transfer/branchTransferService";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
 import { printWithSettings } from "../print/printSettings.js";
+import { splitRack } from "./rackLocation.js";
 
 const CURRENCIES = ["AED", "USD", "SAR", "OMR", "QAR", "KWD", "BHD", "INR", "BDT", "EUR"];
 
@@ -38,7 +39,7 @@ export const btn = (bg = "#e7eef9", color = C.label, extra = {}) => ({
 export const th = { padding: "4px 6px", background: C.head, color: "#fff", fontSize: 12, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap", position: "sticky", top: 0 };
 export const td = { padding: "3px 6px", fontSize: 12.5, textAlign: "right", borderBottom: `1px solid #d3deef`, whiteSpace: "nowrap", color: "#0f172a" };
 
-export { splitRack } from "./rackLocation.js";
+export { splitRack };
 
 export function productBarcodeUnit(product, key) {
   if (!product || !key) return null;
