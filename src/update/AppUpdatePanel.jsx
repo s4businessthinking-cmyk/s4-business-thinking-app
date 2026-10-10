@@ -46,7 +46,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           needInternet: "Internet সংযোগ লাগবে",
           checkFailed: "আপডেট check করা যায়নি। Internet চালু আছে কিনা দেখুন।",
           webStaleHint:
-            "এটা ওয়েবসাইট (Chrome)। PC আর ফোন আলাদা কপি সেভ করে — তাই PC-তে 1.0.78, ফোনে 1.0.67 দেখতে পারেন। APK লাগবে না।",
+            "এটা ওয়েবসাইট (Chrome)। PC আর ফোন আলাদা কপি সেভ করে — তাই দুই জায়গায় আলাদা version দেখাতে পারে। APK লাগবে না।",
           webReload: "সার্ভার থেকে নতুন ভার্সন লোড করুন",
           webReloading: "লোড হচ্ছে...",
           webFootnote:
@@ -77,7 +77,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           needInternet: "Internet connection required",
           checkFailed: "Could not check for updates. Please verify your internet connection.",
           webStaleHint:
-            "This is the website in Chrome. PC and phone each keep their own saved copy — so PC can show 1.0.78 while the phone still runs 1.0.67. No APK needed.",
+            "This is the website in Chrome. PC and phone each keep their own saved copy — so the two can show different versions for a while. No APK needed.",
           webReload: "Load latest from server",
           webReloading: "Loading...",
           webFootnote:
