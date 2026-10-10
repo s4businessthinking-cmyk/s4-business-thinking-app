@@ -83,10 +83,9 @@ say "Health"
 curl -fsS http://127.0.0.1:8710/health
 echo ""
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/deploy-website.sh" ]; then
+if [ -f "${DIR}/deploy-website.sh" ]; then
   say "Website (GitHub release bundle → aaPanel web root)"
-  bash "${SCRIPT_DIR}/deploy-website.sh"
+  bash "${DIR}/deploy-website.sh"
 else
   echo "Tip: run deploy-website.sh to sync erp.s4businessthinking.com to latest release."
 fi
