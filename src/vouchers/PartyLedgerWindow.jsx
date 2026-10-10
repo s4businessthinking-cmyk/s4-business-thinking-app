@@ -414,10 +414,11 @@ export default function PartyLedgerWindow({
     if (party && design.layout.statement?.enabled) {
       const items = stmtRows.map((e) => ({
         date: e.opening ? "" : (e.monthly ? e.type : fmtDate(e.date)),
-        type: e.vType || e.type || "", no: e.no || "", ref: e.ref || "", particulars: String(e.particulars || ""),
+        type: e.vType || e.type || "", no: e.no || "",
+        ref: showDn ? (e.meta?.dn || e.ref || "") : (e.ref || ""),
+        particulars: String(e.particulars || ""),
         debit: dr(e) ? f2(dr(e)) : "", credit: cr(e) ? f2(cr(e)) : "",
         balance: showBalanceInPrint && showBalance ? balText(e.run) : "",
-        ref: showDn ? (e.meta?.dn || e.ref || "") : (e.ref || ""),
       }));
       const fields = {
         shopName, title: `${partyLabel.toUpperCase()} STATEMENT`, partyName: party.code ? `${party.name} (${party.code})` : party.name, partyMobile: party.mobile || "", period,

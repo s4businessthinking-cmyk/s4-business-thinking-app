@@ -3549,6 +3549,15 @@ function formatPartyCode(kind, n, tag = "") {
   return `${PARTY_CODE[kind].prefix}-${String(n).padStart(4, "0")}${tag ? `-${tag}` : ""}`;
 }
 
+function mergePartyRow(prev, row, nameKey) {
+  const id = row?.id;
+  if (!id) return prev;
+  const ix = prev.findIndex((p) => p.id === id);
+  const merged = { ...(ix >= 0 ? prev[ix] : {}), ...row, id };
+  const next = ix >= 0 ? prev.map((p, i) => (i === ix ? merged : p)) : [...prev, merged];
+  return next.sort((a, b) => String(a[nameKey] || "").localeCompare(String(b[nameKey] || "")));
+}
+
 // Next vendor/customer code (V-0001 / C-0001). Offline codes carry the device tag so they can't clash.
 async function nextPartyCode(shopId, kind, records = []) {
   const { field, serial } = PARTY_CODE[kind];
@@ -10265,6 +10274,32 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const [copyState,setCopyState]=useState(false);
   const [vendors, setVendors] = useState([]);
   const [customers, setCustomers] = useState([]);
+  const reloadCustomersFromOffline = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const local = await offlineList("customers");
+      const docs = (local.records || [])
+        .map((r) => ({ id: r.document_id || r.data?.id, ...(r.data || r) }))
+        .filter((c) => c.shopId === shopId)
+        .sort((a, b) => (a.customerName || "").localeCompare(b.customerName || ""));
+      setCustomers(docs);
+    } catch (err) {
+      console.warn("[S4] customers reload failed", err);
+    }
+  }, [shopId]);
+  const reloadVendorsFromOffline = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const local = await offlineList("vendors");
+      const docs = (local.records || [])
+        .map((r) => ({ id: r.document_id || r.data?.id, ...(r.data || r) }))
+        .filter((v) => v.shopId === shopId)
+        .sort((a, b) => (a.vendorName || "").localeCompare(b.vendorName || ""));
+      setVendors(docs);
+    } catch (err) {
+      console.warn("[S4] vendors reload failed", err);
+    }
+  }, [shopId]);
 const [showVendorModal, setShowVendorModal] = useState(false);
 
 const [vendorForm, setVendorForm] = useState(emptyVendor);
@@ -14696,6 +14731,8 @@ const startEditOrder = (order) => {
           leaveGuard={billLeaveGuard}
           focusPartyId={globalFocusCustomerId}
           onFocusPartyHandled={()=>setGlobalFocusCustomerId(null)}
+          onPartySaved={(row)=>setCustomers((prev)=>mergePartyRow(prev, row, "customerName"))}
+          onPartyRemoved={(id)=>setCustomers((prev)=>prev.filter((c)=>c.id!==id))}
           onClose={()=>setTab("dashboard")}
           nextCode={()=>nextPartyCode(shopId, "customers", customers)}
           onGoToSales={(customer)=>{
@@ -14706,10 +14743,10 @@ const startEditOrder = (order) => {
           }}
           renderImport={(close)=>(
             <ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
-              type="customer" columnMap={CM_IMPORT_COLUMNS} defaultFields={{ ...EMPTY_CUSTOMER, customerType:"Customer", status:"active", country:"UAE", paymentType:"credit" }}
+              type="customer" columnMap={CM_IMPORT_COLUMNS} defaultFields={{ ...EMPTY_CUSTOMER, customerType:"Customer", status:"active", country:"UAE", paymentType:"cash" }}
               collection="customers"
               onClose={close}
-              onImported={(n)=>{ close(); toast(`✅ ${n} ${lang==="bn"?"জন কাস্টমার ইমপোর্ট হয়েছে":"customers imported!"}`); }} />
+              onImported={(n)=>{ close(); toast(`✅ ${n} ${lang==="bn"?"জন কাস্টমার ইমপোর্ট হয়েছে":"customers imported!"}`); reloadCustomersFromOffline(); }} />
           )}
         />
       )}
@@ -14722,6 +14759,8 @@ const startEditOrder = (order) => {
           leaveGuard={billLeaveGuard}
           focusPartyId={globalFocusVendorId}
           onFocusPartyHandled={()=>setGlobalFocusVendorId(null)}
+          onPartySaved={(row)=>setVendors((prev)=>mergePartyRow(prev, row, "vendorName"))}
+          onPartyRemoved={(id)=>setVendors((prev)=>prev.filter((v)=>v.id!==id))}
           onClose={()=>setTab("dashboard")}
           nextCode={()=>nextPartyCode(shopId, "vendors", vendors)}
           canPurchase={isOwner||can("managePurchase")}
@@ -14737,7 +14776,7 @@ const startEditOrder = (order) => {
               type="vendor" columnMap={VM_IMPORT_COLUMNS} defaultFields={{ ...emptyVendor, status:"active", country:"UAE" }}
               collection="vendors"
               onClose={close}
-              onImported={(n)=>{ close(); toast(`✅ ${n} ${lang==="bn"?"জন ভেন্ডর ইমপোর্ট হয়েছে":"vendors imported!"}`); }} />
+              onImported={(n)=>{ close(); toast(`✅ ${n} ${lang==="bn"?"জন ভেন্ডর ইমপোর্ট হয়েছে":"vendors imported!"}`); reloadVendorsFromOffline(); }} />
           )}
         />
       )}

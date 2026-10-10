@@ -118,7 +118,7 @@ function useMobileLayout() {
 export default function VendorMasterScreen({
   t, lang, shopId, user, vendors, toast, cur = "AED",
   canEdit = false, canDelete = false, canPurchase = false, actorName = "", leaveGuard, onClose, onGoToPurchase, renderImport, nextCode,
-  focusPartyId = null, onFocusPartyHandled,
+  focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -287,6 +287,7 @@ export default function VendorMasterScreen({
       setForm(saved);
       setBaseline(JSON.stringify(saved));
       setSelectedId(savedId);
+      onPartySaved?.({ id: savedId, ...payload });
       if (openingChanged || (selectedId === null && num(payload.openingBalance) > 0)) {
         try { await syncOpeningBill(savedId, payload); }
         catch (err) { toast(err.message || String(err), "err"); }
@@ -322,6 +323,7 @@ export default function VendorMasterScreen({
       await offlineRemove("vendors", selectedId);
       toast(t.vm_deleted, "err");
       logAudit({ shopId, user, action: "delete", collection: "vendors", docId: selectedId, docNo: form.vendorName });
+      onPartyRemoved?.(selectedId);
       loadVendor(null);
       if (isMobile) setMobileTab("list");
       if (navigator.onLine) {

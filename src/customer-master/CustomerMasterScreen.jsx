@@ -74,7 +74,7 @@ function masterCustomerTypes(shopId) {
 export default function CustomerMasterScreen({
   t, lang, shopId, user, customers, team = [], toast, cur = "AED",
   canEdit = false, canDelete = false, canSales = false, actorName = "", leaveGuard, onClose, onGoToSales, renderImport, nextCode,
-  focusPartyId = null, onFocusPartyHandled,
+  focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -259,6 +259,7 @@ export default function CustomerMasterScreen({
       setForm(saved);
       setBaseline(JSON.stringify(saved));
       setSelectedId(savedId);
+      onPartySaved?.({ id: savedId, ...payload });
       if (openingChanged || (selectedId === null && num(payload.openingBalance) > 0)) {
         try { await syncOpening(savedId, payload); }
         catch (err) { toast(err.message || String(err), "err"); }
@@ -294,6 +295,7 @@ export default function CustomerMasterScreen({
       await offlineRemove("customers", selectedId);
       toast(t.cm_deleted, "err");
       logAudit({ shopId, user, action: "delete", collection: "customers", docId: selectedId, docNo: form.customerName });
+      onPartyRemoved?.(selectedId);
       loadCustomer(null);
       if (isMobile) setMobileTab("list");
       if (navigator.onLine) {
