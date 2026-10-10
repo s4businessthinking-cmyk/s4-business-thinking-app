@@ -9,6 +9,48 @@ const n2 = (v) => parseFloat(v) || 0;
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
 const norm = (v) => String(v ?? "").trim().toLowerCase();
 const METHOD = { cash: "Cash", cheque: "Cheque", bank_transfer: "Bank Transfer", card: "Card", credit: "Credit" };
+const voucherFilterOptions = (isCustomer, bn) => (bn
+  ? [{ id: "all", label: "সব" }, { id: "bill", label: isCustomer ? "বিক্রয়" : "ক্রয়" }, { id: "settle", label: isCustomer ? "রসিদ" : "পেমেন্ট" }, { id: "opening", label: "ওপেনিং" }]
+  : [{ id: "all", label: "All" }, { id: "bill", label: isCustomer ? "Sales" : "Purchase" }, { id: "settle", label: isCustomer ? "Receipt" : "Payment" }, { id: "opening", label: "Opening" }]);
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const monthTitle = (ym) => { const [y, m] = String(ym).split("-"); return `${MONTH_NAMES[(parseInt(m, 10) || 1) - 1]} ${y}`; };
+const ledgerOptsKey = (mode) => `s4-party-ledger-opts-${mode}`;
+const loadLedgerOpts = (mode) => {
+  try { return JSON.parse(localStorage.getItem(ledgerOptsKey(mode)) || "{}"); } catch { return {}; }
+};
+const billNarration = (inv, isCustomer, merge) => {
+  const raw = inv?.raw || inv;
+  if (!raw) return "";
+  const vat = n2(raw.totalVat ?? raw.totalTax);
+  const gt = n2(raw.grandTotal ?? inv.total);
+  const ex = Math.max(0, gt - vat);
+  const lines = [];
+  if (merge) lines.push("As per details");
+  const head = isCustomer ? "SALES" : "PURCHASE";
+  lines.push(`${head} : ${f2(ex)} Cr`);
+  if (vat > 0.01) lines.push(`${isCustomer ? "OUTPUT VAT 5%" : "INPUT VAT"} : ${f2(vat)} Cr`);
+  const ref = raw.deliveryNoteNo || raw.supplierInvoiceNo || inv.ref || raw.refNo || "";
+  if (ref) lines.push(ref);
+  return { text: lines.join("\n"), ref };
+};
+const entryPassesFilters = (e, { voucherFilter, includePdc }) => {
+  if (!includePdc && e.isPdc) return false;
+  if (voucherFilter === "opening") return e.kind === "opening";
+  if (voucherFilter === "bill") return e.kind === "bill";
+  if (voucherFilter === "settle") return e.kind === "direct" || e.kind === "voucher";
+  return true;
+};
+const sumFiltered = (list, from, to, filters) => {
+  let opening = 0, bill = 0, settle = 0, count = 0;
+  list.forEach((e) => {
+    if (!entryPassesFilters(e, filters)) return;
+    const d = String(e.date).slice(0, 10);
+    if (from && d < from) { opening += e.bill - e.settle; return; }
+    if (to && d > to) return;
+    bill += e.bill; settle += e.settle; if (e.kind === "bill" || e.kind === "opening") count++;
+  });
+  return { opening, bill, settle, count, closing: opening + bill - settle };
+};
 
 // Old-ERP style party ledger. Customers: bills are Debit, receipts Credit. Suppliers: bills Credit, payments Debit.
 // invoices: [{ id, no, date, partyId, partyName, partyMobile, total, paid, status, ref, method, raw }]
@@ -22,11 +64,26 @@ export default function PartyLedgerWindow({
   const partyLabel = isCustomer ? "Customer" : "Supplier";
   const settleLabel = isCustomer ? "Receipt" : "Payment";
 
+  const savedOpts = useMemo(() => loadLedgerOpts(mode), [mode]);
   const [partyKey, setPartyKey] = useState(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [onlyDue, setOnlyDue] = useState(false);
+  const [voucherFilter, setVoucherFilter] = useState(savedOpts.voucherFilter || "all");
+  const [includePdc, setIncludePdc] = useState(!!savedOpts.includePdc);
+  const [monthly, setMonthly] = useState(!!savedOpts.monthly);
+  const [showNarration, setShowNarration] = useState(savedOpts.showNarration !== false);
+  const [showBalanceInPrint, setShowBalanceInPrint] = useState(savedOpts.showBalanceInPrint !== false);
+  const [mergeEntries, setMergeEntries] = useState(!!savedOpts.mergeEntries);
+  const persistLedgerOpts = () => {
+    try {
+      localStorage.setItem(ledgerOptsKey(mode), JSON.stringify({
+        voucherFilter, includePdc, monthly, showNarration, showBalanceInPrint, mergeEntries,
+      }));
+    } catch { /* ignore */ }
+  };
   const win = useWindowState();
+  const ledgerFilters = useMemo(() => ({ voucherFilter, includePdc }), [voucherFilter, includePdc]);
   useEscapeKey(() => onClose?.(), { enabled: !win.min, level: 2 });
 
   // One key per party: by id when known, otherwise by name; name-only rows join a same-named id party.
@@ -74,18 +131,38 @@ export default function PartyLedgerWindow({
       const state = due < 0.01 ? "Paid" : n2(inv.paid) > 0.01 ? `Partial (due ${f2(due)})` : "Unpaid";
       const dueDate = due >= 0.01 ? String(inv.raw?.dueDate || "").slice(0, 10) : "";
       const dueText = dueDate ? `Due ${fmtDate(dueDate)}${dueDate < todayIso() ? " — OVERDUE" : ""}` : "";
-      const type = inv.raw?.source === "openingBalance" ? "Opening Balance" : (isCustomer ? "Sales Bill" : "Purchase Bill");
-      push(k, { key: `i-${inv.id}`, date: inv.date || "", seq: 0, type, no: inv.no, ref: inv.ref || "", particulars: [METHOD[inv.method] || inv.method, state, dueText].filter(Boolean).join(" · "), bill: n2(inv.total), settle: 0, open: () => onOpenInvoice?.(inv.raw) });
+      const isOpening = inv.raw?.source === "openingBalance";
+      const type = isOpening ? "Opening Balance" : (isCustomer ? "Sales Bill" : "Purchase Bill");
+      const vType = isOpening ? "Opening" : (isCustomer ? "Sales" : "Purchase");
+      const kind = isOpening ? "opening" : "bill";
+      push(k, {
+        key: `i-${inv.id}`, invId: inv.id, inv, date: inv.date || "", seq: 0, kind, vType, type, no: inv.no, ref: inv.ref || "",
+        particulars: [METHOD[inv.method] || inv.method, state, dueText].filter(Boolean).join(" · "),
+        bill: n2(inv.total), settle: 0, open: () => onOpenInvoice?.(inv.raw),
+      });
       const direct = n2(inv.paid) - (allocByInv.get(inv.id) || 0);
       if (direct > 0.01) {
-        push(k, { key: `d-${inv.id}`, date: inv.date || "", seq: 1, type: isCustomer ? "Received on Bill" : "Paid on Bill", no: inv.no, ref: inv.ref || "", particulars: METHOD[inv.method] || inv.method || "", bill: 0, settle: direct, open: () => onOpenInvoice?.(inv.raw) });
+        push(k, {
+          key: `d-${inv.id}`, invId: inv.id, date: inv.date || "", seq: 1, kind: "direct",
+          vType: isCustomer ? "Receipt" : "Payment", type: isCustomer ? "Received on Bill" : "Paid on Bill",
+          no: inv.no, ref: inv.ref || "", particulars: METHOD[inv.method] || inv.method || "",
+          bill: 0, settle: direct, open: () => onOpenInvoice?.(inv.raw),
+        });
       }
     });
     const refById = new Map(invoices.map((i) => [i.id, i.ref]));
     live.forEach((v) => {
       const allocs = v.allocations || [];
       const supRefs = isCustomer ? "" : allocs.map((a) => a.supplierInvoiceNo || refById.get(a.invoiceId) || "").filter(Boolean).join(", ");
-      push(keyOf(v), { key: `v-${v.id}`, date: v.date || "", seq: 2, type: v.typeLabel || settleLabel, no: v.no, ref: supRefs || v.ref || "", particulars: [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · "), bill: 0, settle: n2(v.amount), open: onOpenVoucher ? () => onOpenVoucher(v.raw) : null });
+      const raw = v.raw || {};
+      const chequeDate = raw.method === "cheque" ? String(raw.chequeDate || "").slice(0, 10) : "";
+      const isPdc = raw.method === "cheque" && chequeDate && chequeDate > todayIso();
+      push(keyOf(v), {
+        key: `v-${v.id}`, date: v.date || "", seq: 2, kind: "voucher", isPdc,
+        vType: isCustomer ? "Receipt" : "Payment", type: v.typeLabel || settleLabel, no: v.no, ref: supRefs || v.ref || "",
+        particulars: [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · "),
+        bill: 0, settle: n2(v.amount), open: onOpenVoucher ? () => onOpenVoucher(v.raw) : null,
+      });
     });
     out.forEach((list) => {
       const seen = new Map();
@@ -129,12 +206,48 @@ export default function PartyLedgerWindow({
   const statement = useMemo(() => {
     if (!party) return null;
     const list = entriesByParty.get(party.key) || [];
-    const s = sumUp(list);
-    let run = s.opening;
-    const rows = list.filter((e) => inRange(String(e.date).slice(0, 10))).map((e) => { run += e.bill - e.settle; return { ...e, run }; });
+    const s = sumFiltered(list, from, to, ledgerFilters);
+    let rows = list.filter((e) => entryPassesFilters(e, ledgerFilters) && inRange(String(e.date).slice(0, 10)));
+    if (mergeEntries && !monthly) {
+      const directByInv = new Map();
+      rows.forEach((e) => { if (e.kind === "direct" && e.invId) directByInv.set(e.invId, (directByInv.get(e.invId) || 0) + e.settle); });
+      rows = rows.filter((e) => e.kind !== "direct").map((e) => {
+        if (e.kind === "bill" && e.invId && directByInv.has(e.invId)) {
+          const extra = directByInv.get(e.invId);
+          return { ...e, settle: e.settle + extra, mergedSettle: extra };
+        }
+        return e;
+      });
+    }
+    if (showNarration && !monthly) {
+      rows = rows.map((e) => {
+        if ((e.kind === "bill" || e.kind === "opening") && e.inv) {
+          const { text, ref } = billNarration(e.inv, isCustomer, mergeEntries);
+          return { ...e, particulars: text, narrRef: ref || "" };
+        }
+        return e;
+      });
+    }
+    if (monthly) {
+      const byMonth = new Map();
+      rows.forEach((e) => {
+        const ym = String(e.date).slice(0, 7) || "—";
+        if (!byMonth.has(ym)) byMonth.set(ym, { bill: 0, settle: 0 });
+        const b = byMonth.get(ym);
+        b.bill += e.bill; b.settle += e.settle;
+      });
+      let run = s.opening;
+      rows = [...byMonth.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([ym, v]) => {
+        run += v.bill - v.settle;
+        return { key: `m-${ym}`, monthly: true, date: `${ym}-01`, vType: "", type: monthTitle(ym), particulars: "", bill: v.bill, settle: v.settle, run };
+      });
+    } else {
+      let run = s.opening;
+      rows = rows.map((e) => { run += e.bill - e.settle; return { ...e, run }; });
+    }
     return { ...s, rows };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [party, entriesByParty, from, to]);
+  }, [party, entriesByParty, from, to, ledgerFilters, mergeEntries, showNarration, monthly, isCustomer]);
 
   const balText = (v) => {
     if (Math.abs(v) < 0.005) return "0.00";
@@ -160,27 +273,50 @@ export default function PartyLedgerWindow({
     { key: "set", label: isCustomer ? "Received" : "Paid", width: 100, align: "right", render: (r) => f2(r.settle) },
     { key: "bal", label: "Balance", width: 110, align: "right", bold: true, render: (r) => balText(r.closing), color: (r) => (r.closing > 0.01 ? C.red : C.green) },
   ];
-  const stmtCols = [
+  const renderParticulars = (e) => {
+    if (!e.particulars) return "";
+    const text = String(e.particulars);
+    if (!text.includes("\n")) return text;
+    return text.split("\n").map((line, i) => (
+      <div key={i} style={{ color: e.narrRef && line === e.narrRef ? C.red : (e.dup && i === 0 ? C.red : undefined) }}>{line}</div>
+    ));
+  };
+  const stmtCols = monthly ? [
+    { key: "month", label: "Month", width: 140, render: (e) => (e.opening ? e.type : (e.monthly ? e.type : monthTitle(String(e.date).slice(0, 7)))) },
+    { key: "part", label: "Particulars", width: 280, wrap: true, render: (e) => (e.opening ? e.particulars : "") },
+    { key: "dr", label: "Debit", width: 100, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") },
+    { key: "cr", label: "Credit", width: 100, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") },
+    { key: "bal", label: "Balance", width: 120, align: "right", bold: true, render: (e) => balText(e.run) },
+  ] : [
     { key: "date", label: "Date", width: 82, render: (e) => (e.opening ? "" : fmtDate(e.date)) },
-    { key: "type", label: "Type", width: 115, render: (e) => e.type },
-    { key: "no", label: "Doc No", width: 85, bold: true, render: (e) => e.no || "" },
-    { key: "ref", label: isCustomer ? "Ref / DN No" : "Vendor Inv No", width: 110, render: (e) => e.ref || "" },
-    { key: "part", label: "Particulars", width: 180, render: (e) => e.particulars || "", color: (e) => (e.dup ? C.red : undefined) },
-    { key: "dr", label: "Debit", width: 90, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") },
-    { key: "cr", label: "Credit", width: 90, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") },
+    { key: "vtype", label: "V.Type", width: 72, render: (e) => e.vType || e.type || "" },
+    { key: "no", label: "V.No.", width: 72, bold: true, render: (e) => e.no || "" },
+    { key: "part", label: "Particulars", width: 220, wrap: true, render: renderParticulars, color: (e) => (e.dup ? C.red : undefined) },
+    { key: "dr", label: "Debit", width: 88, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") },
+    { key: "cr", label: "Credit", width: 88, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") },
     { key: "bal", label: "Balance", width: 110, align: "right", bold: true, render: (e) => balText(e.run) },
   ];
   const stmtRows = statement ? [
-    ...(from ? [{ key: "opening", opening: true, type: "Opening Balance", no: "", particulars: `before ${fmtDate(from)}`, bill: 0, settle: 0, run: statement.opening }] : []),
+    ...(from ? [{
+      key: "opening", opening: true, vType: "", type: "Opening Balance", no: "", particulars: `before ${fmtDate(from)}`,
+      bill: 0, settle: 0, run: statement.opening,
+    }] : []),
     ...statement.rows,
   ] : [];
+  const stmtColsForPrint = showBalanceInPrint ? stmtCols : stmtCols.filter((c) => c.key !== "bal");
 
   const totals = party
     ? { bill: statement.bill, settle: statement.settle, closing: statement.closing }
     : summary.reduce((a, r) => ({ bill: a.bill + r.bill, settle: a.settle + r.settle, closing: a.closing + r.closing }), { bill: 0, settle: 0, closing: 0 });
 
+  const cellForPrint = (c, r) => {
+    if (c.key === "part") return String(r.particulars ?? "");
+    const v = c.render(r);
+    return typeof v === "object" && v !== null ? String(r.particulars ?? "") : String(v ?? "");
+  };
   const printLedger = () => {
-    const cols = party ? stmtCols : summaryCols;
+    persistLedgerOpts();
+    const cols = party ? stmtColsForPrint : summaryCols;
     const rows = party ? stmtRows : summary;
     const period = from || to ? `${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "Today"}` : "All dates";
     const totalDr = isCustomer || !party ? totals.bill : totals.settle;
@@ -188,8 +324,10 @@ export default function PartyLedgerWindow({
     const design = loadPrintDesign();
     if (party && design.layout.statement?.enabled) {
       const items = stmtRows.map((e) => ({
-        date: e.opening ? "" : fmtDate(e.date), type: e.type || "", no: e.no || "", ref: e.ref || "", particulars: e.particulars || "",
-        debit: dr(e) ? f2(dr(e)) : "", credit: cr(e) ? f2(cr(e)) : "", balance: balText(e.run),
+        date: e.opening ? "" : (e.monthly ? e.type : fmtDate(e.date)),
+        type: e.vType || e.type || "", no: e.no || "", ref: e.ref || "", particulars: String(e.particulars || ""),
+        debit: dr(e) ? f2(dr(e)) : "", credit: cr(e) ? f2(cr(e)) : "",
+        balance: showBalanceInPrint ? balText(e.run) : "",
       }));
       const fields = {
         shopName, title: `${partyLabel.toUpperCase()} STATEMENT`, partyName: party.code ? `${party.name} (${party.code})` : party.name, partyMobile: party.mobile || "", period,
@@ -198,11 +336,12 @@ export default function PartyLedgerWindow({
       printWithSettings(renderLayoutDocument(design.layout.statement, "statement", { fields, items, logo: design.style.statement?.logo }, { title: fields.title, bn }));
       return;
     }
-    const foot = cols.map((c, i) => (i === cols.length - 4 ? "TOTAL" : i === cols.length - 3 ? f2(totalDr) : i === cols.length - 2 ? f2(totalCr) : i === cols.length - 1 ? balText(totals.closing) : ""));
+    const totalIdx = { dr: cols.findIndex((c) => c.key === "dr"), cr: cols.findIndex((c) => c.key === "cr"), bal: cols.findIndex((c) => c.key === "bal") };
+    const foot = cols.map((c, i) => (i === totalIdx.dr - 1 ? "TOTAL" : i === totalIdx.dr ? f2(totalDr) : i === totalIdx.cr ? f2(totalCr) : i === totalIdx.bal ? balText(totals.closing) : ""));
     printWithSettings(generateStatementHTML({
       shopName, title: party ? `${partyLabel.toUpperCase()} STATEMENT` : `${partyLabel.toUpperCase()} LEDGER SUMMARY`, subtitle: period,
       partyLine: party ? [party.code, party.name, party.mobile].filter(Boolean).join(" · ") : "",
-      cols: cols.map((c) => ({ label: c.label, align: c.align })), rows: rows.map((r) => cols.map((c) => String(c.render(r) ?? ""))), foot,
+      cols: cols.map((c) => ({ label: c.label, align: c.align })), rows: rows.map((r) => cols.map((c) => cellForPrint(c, r))), foot,
     }, design.style.statement));
   };
 
@@ -243,6 +382,36 @@ export default function PartyLedgerWindow({
               </label>
             )}
           </div>
+
+          {party && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "8px 10px", background: "#e8f0fb", border: `1px solid ${C.border}`, borderRadius: 3 }}>
+              <span style={{ ...lbl, width: 88 }}>{bn ? "ভাউচার" : "Voucher Type"}</span>
+              <select style={inp({ width: 120 })} value={voucherFilter} onChange={(e) => setVoucherFilter(e.target.value)}>
+                {voucherFilterOptions(isCustomer, bn).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+              </select>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={includePdc} onChange={(e) => setIncludePdc(e.target.checked)} />
+                {bn ? "পোস্ট-ডেটেড চেক" : "Include post-dated cheques"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
+                {bn ? "মাসিক" : "Monthly"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: monthly ? "not-allowed" : "pointer", opacity: monthly ? 0.45 : 1 }}>
+                <input type="checkbox" checked={showNarration} disabled={monthly} onChange={(e) => setShowNarration(e.target.checked)} />
+                {bn ? "ন্যারেশন" : "Show Narration"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showBalanceInPrint} onChange={(e) => setShowBalanceInPrint(e.target.checked)} />
+                {bn ? "প্রিন্টে ব্যালান্স" : "Show Balance in Print"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: monthly ? "not-allowed" : "pointer", opacity: monthly ? 0.45 : 1 }}>
+                <input type="checkbox" checked={mergeEntries} disabled={monthly} onChange={(e) => setMergeEntries(e.target.checked)} />
+                {bn ? "একত্রিত এন্ট্রি" : "Merge Multiple Entries"}
+              </label>
+              <button type="button" onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "দেখুন" : "View"}</button>
+            </div>
+          )}
 
           {party && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

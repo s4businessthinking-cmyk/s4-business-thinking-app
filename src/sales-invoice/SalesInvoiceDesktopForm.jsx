@@ -854,7 +854,10 @@ export function GridTable({ columns, rows, rowKey, onRowDoubleClick, minRows = 1
             title={onRowDoubleClick ? "Double click to open" : undefined}
             style={{ cursor: onRowDoubleClick ? "pointer" : "default", background: i === 0 ? "#dbe6f5" : "#fff" }}>
             {columns.map((c) => (
-              <td key={c.key} style={{ ...td, textAlign: c.align || "left", overflow: "hidden", textOverflow: "ellipsis", borderRight: "1px solid #d3deef", fontWeight: c.bold ? 700 : 400, color: c.color?.(r) || td.color }}>
+              <td key={c.key} style={{
+                ...td, textAlign: c.align || "left", borderRight: "1px solid #d3deef", fontWeight: c.bold ? 700 : 400, color: c.color?.(r) || td.color,
+                ...(c.wrap ? { whiteSpace: "pre-wrap", overflow: "visible", textOverflow: "clip", verticalAlign: "top" } : { overflow: "hidden", textOverflow: "ellipsis" }),
+              }}>
                 {c.render(r)}
               </td>
             ))}
