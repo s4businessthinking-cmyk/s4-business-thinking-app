@@ -11493,6 +11493,7 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [globalOpenPurchaseInvoiceId, setGlobalOpenPurchaseInvoiceId] = useState(null);
   const [globalFocusCustomerId, setGlobalFocusCustomerId] = useState(null);
   const [globalFocusVendorId, setGlobalFocusVendorId] = useState(null);
+  const [globalFocusProductId, setGlobalFocusProductId] = useState(null);
 
   const globalSearchCan = useMemo(() => ({
     products: isOwner || can("viewProducts"),
@@ -11513,10 +11514,12 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       return true;
     };
     if (hit.kind === "product") {
-      const p = products.find((x) => x.id === hit.id);
-      if (!p || !(isOwner || can("viewProducts"))) return;
+      if (!(isOwner || can("viewProducts"))) return;
+      if (!products.some((x) => x.id === hit.id)) return;
       if (!goTab("products")) return;
-      startProductEdit(p);
+      // Tab-change effect clears pm form; open product after switch (like customer/vendor focus).
+      if (tabRef.current === "products") startProductEdit(products.find((x) => x.id === hit.id));
+      else setGlobalFocusProductId(hit.id);
       return;
     }
     if (hit.kind === "customer") {
@@ -11544,6 +11547,13 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [products, isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageSales, perms.managePurchase]);
+
+  useEffect(() => {
+    if (!globalFocusProductId || tab !== "products") return;
+    const p = products.find((x) => x.id === globalFocusProductId);
+    setGlobalFocusProductId(null);
+    if (p) startProductEdit(p);
+  }, [globalFocusProductId, tab, products]);
 
   useEffect(() => {
     const onKey = (event) => {
