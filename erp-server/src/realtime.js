@@ -150,11 +150,14 @@ export function attachRealtime({ server, store, auth, path = "/v1/realtime" }) {
 
   const makeReadCheck = (ctx, evt) => {
     const readable = {};
-    return async (list) => {
-      if (!evt.after) return false;
-      if (!(list in readable)) readable[list] = await store.canRead(ctx, evt.collection, evt.id, evt.after, list);
-      return readable[list];
+    const check = async (data, list, cacheKey) => {
+      if (!data) return false;
+      if (!(cacheKey in readable)) readable[cacheKey] = await store.canRead(ctx, evt.collection, evt.id, data, list);
+      return readable[cacheKey];
     };
+    const canReadAs = (list) => check(evt.after, list, `after:${list}`);
+    canReadAs.before = (list) => check(evt.before, list, `before:${list}`);
+    return canReadAs;
   };
 
   async function applyEvent(conn, subId, sub, evt, canReadAs) {
@@ -166,13 +169,20 @@ export function attachRealtime({ server, store, auth, path = "/v1/realtime" }) {
     if (now) {
       change = { type: was ? "modified" : "added", id: evt.id, data: evt.after, version: evt.version, updateTime: evt.updateTime };
       sub.ids.add(evt.id);
-    } else if (was) {
+    } else if (was && (await sameDocAsListed(sub, evt, canReadAs))) {
       change = { type: "removed", id: evt.id };
       sub.ids.delete(evt.id);
     }
     if (!change) return;
     if (!conn.pending.has(subId)) conn.pending.set(subId, []);
     conn.pending.get(subId).push(change);
+  }
+
+  // Another shop's document can share this id; only drop the listed doc when the change was to it.
+  async function sameDocAsListed(sub, evt, canReadAs) {
+    if (!evt.before) return false;
+    if (sub.kind === "doc") return canReadAs.before(false);
+    return matchesQuery(sub.q, evt.id, evt.before) && (await canReadAs.before(true));
   }
 
   const inOrder = createMutex();

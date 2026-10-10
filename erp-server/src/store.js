@@ -89,7 +89,21 @@ const shopIdForRow = (collection, id, data) => {
   return typeof data?.shopId === "string" ? data.shopId : null;
 };
 
-const toWire = (row) => ({ id: row.id, data: row.data, version: row.version, updateTime: row.updatedAt });
+// Two shops can hold documents with the same id (e.g. the same product catalogue imported into
+// both). The first shop keeps the plain id; a later shop's copy is stored as "<shopId>::<id>"
+// and is always exposed to clients under the plain id.
+const SCOPE_SEP = "::";
+const MAX_PHYSICAL_ID = 191;
+const scopable = (collection) => !SINGLE_DOC_PER_SHOP.has(collection) && !UNSCOPED_LIST_COLLECTIONS.has(collection);
+const scopedId = (shopId, id) => `${shopId}${SCOPE_SEP}${id}`;
+const fitsScoped = (shopId, id) => scopedId(shopId, id).length <= MAX_PHYSICAL_ID;
+const logicalId = (row) => {
+  const prefix = row.shopId ? `${row.shopId}${SCOPE_SEP}` : "";
+  return prefix && row.id.startsWith(prefix) ? row.id.slice(prefix.length) : row.id;
+};
+const userShopOf = (ctx) => (typeof ctx?.user?.shopId === "string" && ctx.user.shopId ? ctx.user.shopId : null);
+
+const toWire = (row) => ({ id: logicalId(row), data: row.data, version: row.version, updateTime: row.updatedAt });
 
 export function createStore({ db }) {
   const bus = new EventEmitter();
@@ -103,10 +117,18 @@ export function createStore({ db }) {
     return allowed(ctx, "read", collection, { id, res: data, list });
   }
 
+  async function resolveReadRow(ctx, collection, id) {
+    const plain = await db.getDoc(collection, id);
+    const shop = userShopOf(ctx);
+    if (!shop || !scopable(collection) || !fitsScoped(shop, id)) return plain;
+    if (plain && (!plain.shopId || plain.shopId === shop)) return plain;
+    return (await db.getDoc(collection, scopedId(shop, id))) || plain;
+  }
+
   async function getDocument(uid, collection, id) {
     checkPath(collection, id);
-    const row = await db.getDoc(collection, id);
     const ctx = await ctxFor(uid);
+    const row = await resolveReadRow(ctx, collection, String(id));
     if (!(await canRead(ctx, collection, id, row?.data ?? null))) fail("permission-denied", "Missing or insufficient permissions.");
     return row ? toWire(row) : null;
   }
@@ -124,7 +146,8 @@ export function createStore({ db }) {
     const rows = await candidateRows(q);
     const visible = [];
     for (const row of rows) {
-      if (matchesQuery(q, row.id, row.data) && (await canRead(context, q.collection, row.id, row.data, true))) visible.push(toWire(row));
+      const id = logicalId(row);
+      if (matchesQuery(q, id, row.data) && (await canRead(context, q.collection, id, row.data, true))) visible.push(toWire(row));
     }
     const sorted = sortDocs(q, visible);
     return q.limit ? sorted.slice(0, q.limit) : sorted;
@@ -138,11 +161,15 @@ export function createStore({ db }) {
 
     return lock(async () => {
       const ctx = await ctxFor(uid);
+      const userShop = userShopOf(ctx);
       const now = new Date().toISOString();
+      const withScoped = (collection, id) =>
+        userShop && scopable(collection) && fitsScoped(userShop, id) ? [id, scopedId(userShop, id)] : [id];
 
       for (const p of preconditions || []) {
         checkPath(p.collection, p.id);
-        const row = await db.getDoc(p.collection, p.id);
+        const [plainId, sId] = withScoped(p.collection, String(p.id));
+        const row = (sId && (await db.getDoc(p.collection, sId))) || (await db.getDoc(p.collection, plainId));
         if ((row ? row.version : 0) !== Number(p.version || 0)) fail("aborted", "Document changed during transaction; retry.");
       }
 
@@ -151,23 +178,38 @@ export function createStore({ db }) {
       const idsByCollection = new Map();
       for (const w of writes) {
         checkPath(w.collection, w.id);
-        const key = `${w.collection}/${w.id}`;
-        if (existing.has(key)) continue;
-        existing.set(key, null);
-        if (!idsByCollection.has(w.collection)) idsByCollection.set(w.collection, []);
-        idsByCollection.get(w.collection).push(String(w.id));
+        for (const id of withScoped(w.collection, String(w.id))) {
+          const key = `${w.collection}/${id}`;
+          if (existing.has(key)) continue;
+          existing.set(key, null);
+          if (!idsByCollection.has(w.collection)) idsByCollection.set(w.collection, []);
+          idsByCollection.get(w.collection).push(id);
+        }
       }
       for (const [collection, ids] of idsByCollection) {
         for (const row of await db.getDocs(collection, ids)) existing.set(`${collection}/${row.id}`, row);
       }
 
+      // A shop's own copy wins; a set that claims the writer's shop on an id another shop owns
+      // starts that copy instead of being rejected as a takeover.
+      const physicalIdFor = (w) => {
+        const id = String(w.id);
+        const [, sId] = withScoped(w.collection, id);
+        if (!sId) return id;
+        if (existing.get(`${w.collection}/${sId}`)) return sId;
+        const plain = existing.get(`${w.collection}/${id}`);
+        if (plain?.shopId && plain.shopId !== userShop && w.op === "set" && w.data?.shopId === userShop) return sId;
+        return id;
+      };
+
       const staged = new Map();
       for (const w of writes) {
-        const key = `${w.collection}/${w.id}`;
+        const physicalId = physicalIdFor(w);
+        const key = `${w.collection}/${physicalId}`;
         let entry = staged.get(key);
         if (!entry) {
           const row = existing.get(key);
-          entry = { collection: w.collection, id: String(w.id), row, after: row ? row.data : null };
+          entry = { collection: w.collection, id: String(w.id), physicalId, row, after: row ? row.data : null };
           staged.set(key, entry);
         }
         if (w.op === "delete") {
@@ -199,14 +241,14 @@ export function createStore({ db }) {
         const puts = [];
         for (const c of changes) {
           if (c.op === "delete") {
-            await t.deleteDoc(c.collection, c.id);
+            await t.deleteDoc(c.collection, c.physicalId);
             out.push({ collection: c.collection, id: c.id, version: 0 });
             continue;
           }
           const version = (c.row ? c.row.version : 0) + 1;
           puts.push({
             collection: c.collection,
-            id: c.id,
+            id: c.physicalId,
             shopId: shopIdForRow(c.collection, c.id, c.after),
             data: c.after,
             version,
@@ -219,17 +261,16 @@ export function createStore({ db }) {
         return out;
       });
 
-      const versions = new Map(results.map((r) => [`${r.collection}/${r.id}`, r.version]));
-      for (const c of changes) {
+      changes.forEach((c, i) => {
         bus.emit("change", {
           collection: c.collection,
           id: c.id,
           before: c.before,
           after: c.after,
-          version: versions.get(`${c.collection}/${c.id}`) || 0,
+          version: results[i]?.version || 0,
           updateTime: now,
         });
-      }
+      });
       return { commitTime: now, results };
     });
   }
@@ -253,7 +294,7 @@ export function createStore({ db }) {
     for (const name of Object.keys(RULES)) {
       const rows = SINGLE_DOC_PER_SHOP.has(name) ? [await db.getDoc(name, shopId)].filter(Boolean) : await db.listDocs(name, shopId);
       if (!rows.length) continue;
-      collections[name] = rows.map((r) => ({ id: r.id, data: r.data }));
+      collections[name] = rows.map((r) => ({ id: logicalId(r), data: r.data }));
       documentCount += rows.length;
     }
     return { format: BACKUP_FORMAT, version: 1, shopId, createdAt: new Date().toISOString(), documentCount, collections };
@@ -284,16 +325,21 @@ export function createStore({ db }) {
             skipped += 1;
             continue;
           }
-          const row = await db.getDoc(collection, id);
+          let physicalId = id;
+          let row = await db.getDoc(collection, id);
           if (row && row.shopId !== shopId) {
-            skipped += 1;
-            continue;
+            if (!scopable(collection) || !fitsScoped(shopId, id)) {
+              skipped += 1;
+              continue;
+            }
+            physicalId = scopedId(shopId, id);
+            row = await db.getDoc(collection, physicalId);
           }
           if (row && deepEqual(row.data, d.data)) {
             unchanged += 1;
             continue;
           }
-          plan.push({ collection, id, row, data: d.data });
+          plan.push({ collection, id, physicalId, row, data: d.data });
         }
       }
 
@@ -301,7 +347,7 @@ export function createStore({ db }) {
         const out = [];
         for (const p of plan) {
           const version = (p.row ? p.row.version : 0) + 1;
-          await t.putDoc({ collection: p.collection, id: p.id, shopId, data: p.data, version, createdAt: p.row ? p.row.createdAt : now, updatedAt: now });
+          await t.putDoc({ collection: p.collection, id: p.physicalId, shopId, data: p.data, version, createdAt: p.row ? p.row.createdAt : now, updatedAt: now });
           out.push(version);
         }
         return out;

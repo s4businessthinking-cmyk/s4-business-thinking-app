@@ -173,6 +173,26 @@ test("products: bulk sync without productCatalogEpoch when maintenance epoch is 
   );
 });
 
+test("products: two shops can hold the same product id without overwriting each other", async () => {
+  const other = outsider;
+  assert.equal((await commit(owner.idToken, [set("products", "same-1", { shopId: "shop1", name: "Shop1 Pad" })])).status, 200);
+  assert.equal((await commit(other.idToken, [set("products", "same-1", { shopId: "shop2", name: "ShopC Pad" }, true)])).status, 200);
+  assert.equal((await commit(other.idToken, [set("products", "same-1", { shopId: "shop2", name: "ShopC Pad v2" }, true)])).status, 200);
+
+  const mine = await api("/v1/db/query", { collection: "products", filters: [["shopId", "==", "shop2"]] }, other.idToken);
+  assert.deepEqual(mine.docs.map((d) => [d.id, d.data.name]), [["same-1", "ShopC Pad v2"]]);
+  assert.equal((await api("/v1/db/get", { collection: "products", id: "same-1" }, other.idToken)).doc.data.name, "ShopC Pad v2");
+  assert.equal((await api("/v1/db/get", { collection: "products", id: "same-1" }, owner.idToken)).doc.data.name, "Shop1 Pad");
+
+  const theirs = await api("/v1/db/query", { collection: "products", filters: [["shopId", "==", "shop1"]] }, owner.idToken);
+  assert.equal(theirs.docs.find((d) => d.id === "same-1").data.name, "Shop1 Pad");
+
+  assert.equal((await commit(other.idToken, [{ op: "delete", collection: "products", id: "same-1" }])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "products", id: "same-1" }, owner.idToken)).doc.data.name, "Shop1 Pad");
+  const afterDelete = await api("/v1/db/query", { collection: "products", filters: [["shopId", "==", "shop2"]] }, other.idToken);
+  assert.equal(afterDelete.docs.length, 0);
+});
+
 test("rules: a username entry cannot be taken over by another account", async () => {
   const entry = { username: "rahim", shopId: "shop1", authEmail: "owner@shop.com", firebaseUid: owner.uid };
   assert.equal((await commit(owner.idToken, [set("staffLoginIndex", "rahim", entry)])).status, 200);
@@ -328,8 +348,8 @@ test("backup: owner exports and restores own shop only", async () => {
   });
   const result = await res.json();
   assert.equal(res.status, 200);
-  assert.equal(result.restored, 2);
-  assert.equal(result.skipped, 2);
+  assert.equal(result.restored, 3, "oc1 is restored as shop1's own copy; shop2's oc1 is untouched");
+  assert.equal(result.skipped, 1);
 
   const after = await api("/v1/db/query", { collection: "customers", filters: [["shopId", "==", "shop1"]] }, owner.idToken);
   const byId = Object.fromEntries(after.docs.map((d) => [d.id, d.data]));
