@@ -232,7 +232,10 @@ export function createStore({ db }) {
         if (!before && !e.after) continue;
         const op = !before ? "create" : e.after ? "update" : "delete";
         const ok = await allowed(ctx, op, e.collection, { id: e.id, res: before, req: e.after });
-        if (!ok) fail("permission-denied", `Missing or insufficient permissions (${op} ${e.collection}/${e.id}).`);
+        if (!ok) {
+          const docShop = (e.after || before)?.shopId ?? "none";
+          fail("permission-denied", `Missing or insufficient permissions (${op} ${e.collection}/${e.id}, shopId ${docShop}).`);
+        }
         changes.push({ ...e, before, op });
       }
 
