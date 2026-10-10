@@ -49,6 +49,17 @@ const CORS = {
 
 const gzipAsync = promisify(zlib.gzip);
 
+// A device stuck on a rejected write retries it every few seconds; log each distinct denial once a minute.
+const deniedLoggedAt = new Map();
+function logDenied(path, message) {
+  const key = `${path} ${message}`;
+  const now = Date.now();
+  if (now - (deniedLoggedAt.get(key) || 0) < 60000) return;
+  if (deniedLoggedAt.size > 2000) deniedLoggedAt.clear();
+  deniedLoggedAt.set(key, now);
+  console.warn("[S4 ERP] denied", path, message);
+}
+
 async function send(req, res, status, body) {
   let payload = Buffer.from(JSON.stringify(body), "utf8");
   const headers = { ...CORS, "Content-Type": "application/json; charset=utf-8", Vary: "Accept-Encoding" };
@@ -129,6 +140,7 @@ export function createHttpServer({ cfg, auth, store, pinReset }) {
         return;
       }
       if (error instanceof ApiError) {
+        if (error.code === "permission-denied") logDenied(url.pathname, error.message);
         await send(req, res, error.status, { error: { code: error.code, message: error.message } });
         return;
       }
