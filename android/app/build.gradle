@@ -35,8 +35,8 @@ android {
         applicationId "com.s4businessthinking.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10079
-        versionName "1.0.79"
+        versionCode 10080
+        versionName "1.0.80"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         aaptOptions {
