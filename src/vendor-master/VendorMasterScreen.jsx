@@ -4,8 +4,14 @@ import { offlineCreate, offlineList, offlineRemove, offlineUpdate } from "../off
 import { syncOpeningBill as syncPartyOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
 
+const PAY = {
+  cash:   { bn:"নগদ",    en:"Cash" },
+  credit: { bn:"ক্রেডিট", en:"Credit" },
+};
+
 export const EMPTY_VENDOR = {
   vendorName:"", vendorCode:"", category:"", status:"active",
+  paymentType:"cash",
   contactPerson:"",
   mobileNumber:"", phoneNumber:"", whatsappNumber:"", fax:"", email:"",
   address:"", emirate:"", area:"", city:"", country:"", mapLink:"",
@@ -85,7 +91,7 @@ const toForm = (v) => Object.fromEntries(Object.keys(EMPTY_VENDOR).map((k) => {
   const raw = v?.[k];
   if (NUMBER_FIELDS.includes(k)) return [k, Number(raw) ? String(raw) : ""];
   return [k, raw == null ? "" : String(raw)];
-}).concat([["status", v?.status || "active"]]));
+}).concat([["status", v?.status || "active"], ["paymentType", v?.paymentType || "cash"]]));
 
 const num = (v) => {
   const n = Number(String(v ?? "").replace(/,/g, ""));
@@ -261,6 +267,7 @@ export default function VendorMasterScreen({
     });
     payload.vendorName = name;
     payload.status = form.status || "active";
+    payload.paymentType = form.paymentType || "cash";
 
     const openingChanged = num(form.openingBalance) !== num(JSON.parse(baseline).openingBalance);
 
@@ -412,6 +419,12 @@ export default function VendorMasterScreen({
               {row(L("ফ্যাক্স", "Fax"), "fax", { inputMode: "tel" })}
             </>)}
             {panel(L("ক্রেডিট ও নোট", "Credit & Notes"), <>
+              <div className="pm-form-row">
+                <label className="pm-label">{L("পেমেন্ট ধরন", "Payment Type")}</label>
+                <select className="pm-input" value={form.paymentType || "cash"} onChange={(e) => upd("paymentType", e.target.value)}>
+                  {Object.keys(PAY).map((p) => <option key={p} value={p}>{L(PAY[p].bn, PAY[p].en)}</option>)}
+                </select>
+              </div>
               {row(`${L("ক্রেডিট লিমিট", "Credit Limit")} (${cur})`, "creditLimit", { inputMode: "decimal" })}
               {row(`${L("শুরুর ব্যালেন্স", "Opening Bal.")} (${cur})`, "openingBalance", { inputMode: "decimal" })}
               {row(L("পেমেন্ট শর্ত (দিন)", "Credit Days"), "paymentTerms", { inputMode: "numeric" })}

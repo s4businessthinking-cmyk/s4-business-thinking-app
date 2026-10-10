@@ -3643,6 +3643,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   const [editInvoiceId,setEditInvoiceId] = useState(null);
   const piSnapRef = useRef(null);
   const [piLedgerHidden,setPiLedgerHidden] = useState(false);
+  const [piNavReturn,setPiNavReturn] = useState(null); // null | "ledger"
 
   // ── Vendor Payment Voucher state (Cash/Cheque, partial payment against open invoices) ──
   const [payments,setPayments]         = useState([]);       // all vouchers for this shop (live)
@@ -4333,6 +4334,19 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
   const piLeaveUnsavedOk = () =>
     !piIsDirty() || window.confirm(lang==="bn"?"এই বিলের পরিবর্তন সেভ হয়নি। তবুও চলে যাবেন?":"This bill has unsaved changes. Leave anyway?");
+  const piLeaveDetail = () => {
+    setSelInvoice(null);
+    setPiView("list");
+    if (piNavReturn === "ledger") {
+      setPiSubTab("ledger");
+      setPiLedgerHidden(false);
+      setPiNavReturn(null);
+    }
+  };
+  const piApplyVendorPayment = (vendor) => {
+    const pm = (vendor?.paymentType || "cash") === "credit" ? "credit" : "cash";
+    setPiForm((p) => ({ ...p, paymentMethod: pm, amountPaid: pm === "credit" ? "" : p.amountPaid }));
+  };
   // Phone back / header back steps out one level at a time instead of leaving Purchase.
   useEffect(()=>{
     const inPayment = piSubTab==="payments" && pmtView!=="list";
@@ -4342,9 +4356,15 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       leave: () => piView!=="form" || piLeaveUnsavedOk(),
       back: () => {
         if (piView==="form") { if (piLeaveUnsavedOk()) setPiView("list"); }
-        else if (piView==="detail") { setPiView("list"); setSelInvoice(null); }
-        else if (inPayment) { setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); }
-        else setPiOpenParty(null);
+        else if (piView==="detail") { piLeaveDetail(); }
+        else if (inPayment) {
+          setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null);
+          if (piNavReturn === "ledger") {
+            setPiSubTab("ledger");
+            setPiLedgerHidden(false);
+            setPiNavReturn(null);
+          }
+        } else setPiOpenParty(null);
         return true;
       },
     };
@@ -4360,7 +4380,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
   };
   useEscapeKey(() => {
     if (piView==="form") { if (piLeaveUnsavedOk()) setPiView("list"); }
-    else if (piView==="detail") { setPiView("list"); setSelInvoice(null); }
+    else if (piView==="detail") { piLeaveDetail(); }
     else { setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); }
   }, {
     enabled: !piWin.min && (piView!=="list" || (piSubTab==="payments" && pmtView!=="list")),
@@ -4378,7 +4398,12 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const vid=e.target.value;
     if (!vid){ piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile",""); return; }
     const v=vendors.find(x=>x.id===vid);
-    if (v){ piUpd("vendorId",vid); piUpd("vendorName",v.vendorName); piUpd("vendorMobile",v.mobileNumber||v.whatsappNumber||""); }
+    if (v) {
+      piUpd("vendorId", vid);
+      piUpd("vendorName", v.vendorName);
+      piUpd("vendorMobile", v.mobileNumber || v.whatsappNumber || "");
+      piApplyVendorPayment(v);
+    }
   };
 
   // ── Searchable vendor picker handler ──
@@ -4386,11 +4411,13 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     piUpd("vendorId",v.id);
     piUpd("vendorName",v.vendorName);
     piUpd("vendorMobile",v.mobileNumber||v.whatsappNumber||"");
+    piApplyVendorPayment(v);
     setVendorSearchQ(v.vendorName);
     setVendorDropOpen(false);
   };
   const piClearVendor=()=>{
     piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile","");
+    setPiForm((p) => ({ ...p, paymentMethod: "cash", amountPaid: "" }));
     setVendorSearchQ(""); setVendorDropOpen(false);
   };
   // Inactive and blocked vendors stay in the ledger and payments but cannot get new bills.
@@ -4455,6 +4482,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     const nowIso = new Date().toISOString();
     const priorInvoice = editInvoiceId ? invoices.find(inv => inv.id === editInvoiceId) : null;
     let savedId;
+    let savedDoc = null;
     const deferPersist = { deferPersist: true };
 
     if (editInvoiceId) {
@@ -4466,6 +4494,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
       const updated = { ...result.data, id: editInvoiceId };
       savedId = editInvoiceId;
+      savedDoc = updated;
       setInvoices(prev => prev.map(inv => inv.id === editInvoiceId ? updated : inv));
       setSelInvoice(prev => prev && prev.id === editInvoiceId ? updated : prev);
       toast(successMessage || t.pi_updated);
@@ -4482,6 +4511,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
       const created = { ...result.data, id: result.documentId };
       savedId = result.documentId;
+      savedDoc = created;
       setInvoices(prev => [created, ...prev]);
       toast(successMessage);
     }
@@ -4507,7 +4537,12 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
     }
 
-    setPiView("list");
+    if (!editInvoiceId) {
+      piOpenNew();
+    } else if (savedDoc) {
+      setSelInvoice(savedDoc);
+      setPiView("detail");
+    }
   };
 
   // A confirmed purchase becomes the product's latest cost, and a sale price typed on the line updates the product's price.
@@ -4852,11 +4887,12 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
           {piSubTab==="ledger"&&canViewSupplierLedger&&!piLedgerHidden&&(
             <PartyLedgerWindow lang={lang} mode="supplier" cur={t.cur||"AED"} shopName={shop?.companyName||""}
               partyCodes={Object.fromEntries((vendors||[]).filter(v=>v.vendorCode).map(v=>[v.id, v.vendorCode]))}
+              partyTrns={Object.fromEntries((vendors||[]).filter(v=>v.trnNumber).map(v=>[v.id, v.trnNumber]))}
               invoices={piMoneyInvoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.vendorId||null, partyName:inv.vendorName||"", partyMobile:inv.vendorMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.supplierInvoiceNo||"", method:inv.paymentMethod, raw:inv }))}
               vouchers={(canVendorPayments ? payments.map(p=>({ id:p.id, no:p.paymentNo, date:String(p.paymentDate||"").slice(0,10), partyId:p.vendorId||null, partyName:p.vendorName||"", partyMobile:p.vendorMobile||"", method:p.method, amount:p.totalAmount, status:p.status, allocations:withSupRefs(p).allocations, raw:p })) : [])
                 .concat(returnsAsLedgerVouchers(billReturns, "purchase"))}
-              onOpenInvoice={(inv)=>{ setSelInvoice(inv); setPiSubTab(canManagePurchase?"invoices":"ledger"); setPiView("detail"); }}
-              onOpenVoucher={canVendorPayments ? (v)=>{ if (v?.raw?.__return) return; setSelVoucher(v); setPmtView("detail"); setPiSubTab("payments"); } : undefined}
+              onOpenInvoice={(inv)=>{ setPiNavReturn("ledger"); setSelInvoice(inv); setPiView("detail"); }}
+              onOpenVoucher={canVendorPayments ? (v)=>{ if (v?.raw?.__return) return; setPiNavReturn("ledger"); setSelVoucher(v); setPmtView("detail"); setPiSubTab("payments"); } : undefined}
               onNewVoucher={canVendorPayments ? (p)=>{ setPmtPrefillVendorId(p.id||p.name); setPmtPrefillInvoiceId(null); setSelVoucher(null); setPmtView("new"); setPiSubTab("payments"); } : undefined}
               onClose={()=>{ if (canManagePurchase||canVendorPayments) setPiSubTab(canManagePurchase?"invoices":"payments"); else setPiLedgerHidden(true); }} />
           )}
@@ -5111,7 +5147,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
       ...(calc.disc>0?[[t.pi_totalDiscount, `- ${piFmt2(calc.disc)}`, "#b91c1c"]]:[]),
       ...(calc.tax>0?[[t.pi_totalTax, `+ ${piFmt2(calc.tax)}`, "#0e7490"]]:[]),
     ];
-    const back = ()=>{ setPiView("list"); setSelInvoice(null); };
+    const back = () => piLeaveDetail();
     return (
       <div ref={piRootRef} className="si-root" style={piRootStyle}>
         <style>{PM_CSS}</style>
@@ -6154,6 +6190,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const [rcptSaving,setRcptSaving]     = useState(false);
   const [receiptWin,setReceiptWin]     = useState(null); // null | {} | { partyId, partyName, invoiceId } | { viewId }
   const [ledgerWin,setLedgerWin]       = useState(false);
+  const [siNavReturn,setSiNavReturn]   = useState(null); // null | "ledger"
 
   useEffect(()=>{
     if (!shopId || kind!=="sales") return;
@@ -6335,7 +6372,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     const salesmanDefault = myDefaults.salesmanId
       ? { salesmanId:myDefaults.salesmanId, salesmanName:myDefaults.salesmanName||"" }
       : { salesmanId:user?.uid||"", salesmanName:profile?.personName||"" };
-    const payDefault = kind==="sales" && SI_PAY[myDefaults.paymentMethod] ? { paymentMethod:myDefaults.paymentMethod } : {};
+    const payDefault = kind==="sales" ? {} : (SI_PAY[myDefaults.paymentMethod] ? { paymentMethod:myDefaults.paymentMethod } : {});
     const billTypeDefault = ["tax","regular"].includes(myDefaults.billType) ? { invoiceType:myDefaults.billType } : {};
     setSiForm({ ...siEmptyForm(), ...billTypeDefault, ...(isDN?{ invoiceType:"delivery" }:{}), ...salesmanDefault, ...payDefault, validUntil:isQuote&&!isSO?siAddDays(siToday(), QT_VALID_DAYS):"", ...customerFields });
     setSiLines([]);
@@ -6529,7 +6566,10 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     siUpd("customerType",c.customerType||"");
     const termDays = parseInt(String(c.paymentTerms||"").replace(/[^\d]/g,""),10);
     siUpd("creditDays", Number.isFinite(termDays)&&termDays>0 ? String(termDays) : "");
-    if (kind==="sales" && c.paymentType==="credit") setSiForm(p=>p.paymentMethod==="cash" ? { ...p, paymentMethod:"credit", amountPaid:"" } : p);
+    if (kind==="sales") {
+      const pm = c.paymentType === "credit" ? "credit" : "cash";
+      setSiForm((p) => ({ ...p, paymentMethod: pm, amountPaid: pm === "credit" ? "" : p.amountPaid }));
+    }
     setShowCustPicker(false);
     // Lines still on the old automatic discount move to the new customer's; hand-typed discounts stay.
     const oldCustomer = (customers||[]).find(x=>x.id===siForm.customerId) || null;
@@ -6609,6 +6649,14 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   };
   const siLeaveUnsavedOk = () =>
     !siIsDirty() || window.confirm(lang==="bn"?"এই বিলের পরিবর্তন সেভ হয়নি। তবুও চলে যাবেন?":"This bill has unsaved changes. Leave anyway?");
+  const siLeaveDetail = () => {
+    setSelInv(null);
+    setSiView("list");
+    if (siNavReturn === "ledger") {
+      setSiNavReturn(null);
+      setLedgerWin(true);
+    }
+  };
   // Phone back / header back steps out one level at a time instead of leaving Sales.
   useEffect(()=>{
     const inFolder = siMobile && siView==="list" && !!siOpenParty;
@@ -6617,7 +6665,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       leave: () => siView!=="form" || siLeaveUnsavedOk(),
       back: () => {
         if (siView==="form") { if (siLeaveUnsavedOk()) setSiView("list"); }
-        else if (siView==="detail") { setSiView("list"); setSelInv(null); }
+        else if (siView==="detail") { siLeaveDetail(); }
         else setSiOpenParty(null);
         return true;
       },
@@ -6882,7 +6930,12 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice save sync failed", err));
     }
 
-    setSiView("list");
+    if (!editInvId) {
+      siOpenNew();
+    } else {
+      setSelInv(savedInvoice);
+      setSiView("detail");
+    }
 
     if (options.print) {
       setSiPrintModal(savedInvoice);
@@ -7084,7 +7137,13 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
           const u = await siSetReceiptCheque(v.raw, st); return u ? toVoucherView(u,"receipt") : null;
         }}
         onPrint={(v)=>printPaymentVoucher(v.raw, shop, lang)}
-        onClose={()=>setReceiptWin(null)}
+        onClose={()=>{
+          setReceiptWin(null);
+          if (siNavReturn === "ledger") {
+            setLedgerWin(true);
+            setSiNavReturn(null);
+          }
+        }}
       />
     );
   })() : null;
@@ -7092,6 +7151,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
   const ledgerWindow = ledgerWin && kind==="sales" ? (
     <PartyLedgerWindow lang={lang} mode="customer" cur={t.cur||"AED"} shopName={shop?.companyName||""}
       partyCodes={Object.fromEntries((customers||[]).filter(c=>c.customerCode).map(c=>[c.id, c.customerCode]))}
+      partyTrns={Object.fromEntries((customers||[]).filter(c=>c.trnNumber).map(c=>[c.id, c.trnNumber]))}
       invoices={invoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.customerId||null, partyName:inv.customerName||"", partyMobile:inv.customerMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.deliveryNoteNo||"", method:inv.paymentMethod, raw:inv }))}
       vouchers={(isOwner ? receipts : (()=>{
         const visible = new Set(invoices.map(inv=>inv.id));
@@ -7101,9 +7161,9 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
         }).filter(Boolean);
       })()).map(r=>({ id:r.id, no:r.receiptNo, date:String(r.receiptDate||"").slice(0,10), partyId:r.customerId||null, partyName:r.customerName||"", partyMobile:r.customerMobile||"", method:r.method, amount:r.totalAmount, status:r.status, allocations:r.allocations||[], raw:r }))
         .concat(returnsAsLedgerVouchers(isOwner ? billReturns : billReturns.filter(r=>invoices.some(inv=>inv.id===r.invoiceId)), "sales"))}
-      onOpenInvoice={(inv)=>{ setLedgerWin(false); setSelInv(inv); setSiView("detail"); }}
-      onOpenVoucher={(r)=>{ if (r?.raw?.__return) return; setLedgerWin(false); setReceiptWin({ viewId:r.id }); }}
-      onNewVoucher={(p)=>{ setLedgerWin(false); setReceiptWin({ partyId:p.id||null, partyName:p.name }); }}
+      onOpenInvoice={(inv)=>{ setSiNavReturn("ledger"); setLedgerWin(false); setSelInv(inv); setSiView("detail"); }}
+      onOpenVoucher={(r)=>{ if (r?.raw?.__return) return; setSiNavReturn("ledger"); setLedgerWin(false); setReceiptWin({ viewId:r.id }); }}
+      onNewVoucher={(p)=>{ setSiNavReturn("ledger"); setLedgerWin(false); setReceiptWin({ partyId:p.id||null, partyName:p.name }); }}
       onClose={()=>setLedgerWin(false)} />
   ) : null;
 
@@ -7524,7 +7584,7 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
       ...(adjustment?[[bnL?"সমন্বয়":"Adjustment", `${adjustment>0?"+":"-"} ${siFmt2(Math.abs(adjustment))}`]]:[]),
       ...(roundOff?[["Round Off", `${roundOff>0?"+":"-"} ${siFmt2(Math.abs(roundOff))}`]]:[]),
     ];
-    const back = ()=>{ setSiView("list"); setSelInv(null); };
+    const back = () => siLeaveDetail();
     return (
       <div ref={siRootRef} className="si-root" style={siRootStyle}>
         <style>{PM_CSS}</style>

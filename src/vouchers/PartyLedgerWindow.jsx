@@ -18,9 +18,21 @@ const ledgerOptsKey = (mode) => `s4-party-ledger-opts-${mode}`;
 const loadLedgerOpts = (mode) => {
   try { return JSON.parse(localStorage.getItem(ledgerOptsKey(mode)) || "{}"); } catch { return {}; }
 };
-const billNarration = (inv, isCustomer, merge) => {
+const invMeta = (inv, isCustomer) => {
   const raw = inv?.raw || inv;
-  if (!raw) return "";
+  if (!raw) return { dn: "", vehicle: "", trn: "", note: "", refNo: "" };
+  return {
+    dn: isCustomer ? String(raw.deliveryNoteNo || inv.ref || "").trim() : String(raw.supplierInvoiceNo || inv.ref || "").trim(),
+    vehicle: String(raw.vehicleNo || "").trim(),
+    trn: String(raw.customerTrn || raw.vendorTrn || "").trim(),
+    note: String(raw.note || "").trim(),
+    refNo: String(raw.refNo || "").trim(),
+  };
+};
+const billNarration = (inv, isCustomer, merge, { includeDn, includeNote } = {}) => {
+  const raw = inv?.raw || inv;
+  if (!raw) return { text: "", ref: "" };
+  const meta = invMeta(inv, isCustomer);
   const vat = n2(raw.totalVat ?? raw.totalTax);
   const gt = n2(raw.grandTotal ?? inv.total);
   const ex = Math.max(0, gt - vat);
@@ -29,9 +41,35 @@ const billNarration = (inv, isCustomer, merge) => {
   const head = isCustomer ? "SALES" : "PURCHASE";
   lines.push(`${head} : ${f2(ex)} Cr`);
   if (vat > 0.01) lines.push(`${isCustomer ? "OUTPUT VAT 5%" : "INPUT VAT"} : ${f2(vat)} Cr`);
-  const ref = raw.deliveryNoteNo || raw.supplierInvoiceNo || inv.ref || raw.refNo || "";
-  if (ref) lines.push(ref);
-  return { text: lines.join("\n"), ref };
+  const refLine = includeDn ? meta.dn : "";
+  if (refLine) lines.push(refLine);
+  if (includeNote && meta.note) lines.push(meta.note);
+  return { text: lines.join("\n"), ref: refLine };
+};
+const voucherMeta = (raw) => ({
+  note: String(raw?.note || "").trim(),
+  chequeNo: String(raw?.chequeNo || "").trim(),
+  chequeBank: String(raw?.chequeBank || "").trim(),
+});
+const applyDisplayParticulars = (e, opts, isCustomer) => {
+  if (e.opening || e.monthly) return e;
+  const narrOpts = { includeDn: opts.showNarration && !opts.showDn, includeNote: opts.showNarration && opts.showNote };
+  if (opts.showNarration && (e.kind === "bill" || e.kind === "opening") && e.inv) {
+    const { text, ref } = billNarration(e.inv, isCustomer, opts.mergeEntries, narrOpts);
+    return { ...e, particulars: text || e.particularsBase, narrRef: ref || "" };
+  }
+  const lines = [];
+  if (e.kind === "bill" || e.kind === "opening") lines.push(isCustomer ? "SALES" : "PURCHASE");
+  else lines.push(e.particularsBase || e.particulars || "");
+  if (opts.showNote) {
+    if (e.meta?.note) lines.push(e.meta.note);
+    if (e.voucherMeta?.note) lines.push(e.voucherMeta.note);
+    if (e.voucherMeta?.chequeNo) {
+      lines.push([e.voucherMeta.chequeNo, e.voucherMeta.chequeBank].filter(Boolean).join(" · "));
+    }
+  }
+  const text = lines.filter(Boolean).join("\n");
+  return { ...e, particulars: text, narrRef: "" };
 };
 const entryPassesFilters = (e, { voucherFilter, includePdc }) => {
   if (!includePdc && e.isPdc) return false;
@@ -57,7 +95,7 @@ const sumFiltered = (list, from, to, filters) => {
 // vouchers: [{ id, no, date, partyId, partyName, method, amount, status, allocations, raw }]
 export default function PartyLedgerWindow({
   lang = "en", mode = "customer", cur = "AED", shopName = "",
-  invoices = [], vouchers = [], partyCodes = null, onOpenInvoice, onOpenVoucher, onNewVoucher, onClose,
+  invoices = [], vouchers = [], partyCodes = null, partyTrns = null, onOpenInvoice, onOpenVoucher, onNewVoucher, onClose,
 }) {
   const bn = lang === "bn";
   const isCustomer = mode === "customer";
@@ -72,13 +110,24 @@ export default function PartyLedgerWindow({
   const [voucherFilter, setVoucherFilter] = useState(savedOpts.voucherFilter || "all");
   const [includePdc, setIncludePdc] = useState(!!savedOpts.includePdc);
   const [monthly, setMonthly] = useState(!!savedOpts.monthly);
-  const [showNarration, setShowNarration] = useState(savedOpts.showNarration !== false);
+  const [showNarration, setShowNarration] = useState(!!savedOpts.showNarration);
   const [showBalanceInPrint, setShowBalanceInPrint] = useState(savedOpts.showBalanceInPrint !== false);
+  const [showBalance, setShowBalance] = useState(savedOpts.showBalance !== false);
+  const [showDrCr, setShowDrCr] = useState(savedOpts.showDrCr !== false);
+  const [showDn, setShowDn] = useState(!!savedOpts.showDn);
+  const [showVehicle, setShowVehicle] = useState(!!savedOpts.showVehicle);
+  const [showTrn, setShowTrn] = useState(!!savedOpts.showTrn);
+  const [showNote, setShowNote] = useState(!!savedOpts.showNote);
+  const [showVendorRef, setShowVendorRef] = useState(!!savedOpts.showVendorRef);
   const [mergeEntries, setMergeEntries] = useState(!!savedOpts.mergeEntries);
+  const displayOpts = useMemo(() => ({
+    showNarration, showDn, showVehicle, showTrn, showNote, showDrCr, showBalance, mergeEntries,
+  }), [showNarration, showDn, showVehicle, showTrn, showNote, showDrCr, showBalance, mergeEntries]);
   const persistLedgerOpts = () => {
     try {
       localStorage.setItem(ledgerOptsKey(mode), JSON.stringify({
-        voucherFilter, includePdc, monthly, showNarration, showBalanceInPrint, mergeEntries,
+        voucherFilter, includePdc, monthly, showNarration, showBalanceInPrint, showBalance, showDrCr,
+        showDn, showVehicle, showTrn, showNote, showVendorRef, mergeEntries,
       }));
     } catch { /* ignore */ }
   };
@@ -108,14 +157,19 @@ export default function PartyLedgerWindow({
       if (!map.has(k)) {
         const id = r.partyId || (k.startsWith("i:") ? k.slice(2) : null);
         const code = (id && partyCodes?.[id]) || "";
-        map.set(k, { key: k, id: r.partyId || null, name: r.partyName || "—", code, mobile: r.partyMobile || "", sub: subOf(code, r.partyMobile) });
+        const trn = (id && partyTrns?.[id]) || r.raw?.customerTrn || r.raw?.vendorTrn || "";
+        map.set(k, { key: k, id: r.partyId || null, name: r.partyName || "—", code, mobile: r.partyMobile || "", trn: String(trn || "").trim(), sub: subOf(code, r.partyMobile) });
       } else if (!map.get(k).mobile && r.partyMobile) {
         const p = map.get(k);
         Object.assign(p, { mobile: r.partyMobile, sub: subOf(p.code, r.partyMobile) });
+      } else if (!map.get(k).trn) {
+        const id = map.get(k).id || (k.startsWith("i:") ? k.slice(2) : null);
+        const trn = (id && partyTrns?.[id]) || r.raw?.customerTrn || r.raw?.vendorTrn || "";
+        if (trn) map.get(k).trn = String(trn).trim();
       }
     });
     return { parties: map, keyOf };
-  }, [invoices, vouchers, partyCodes]);
+  }, [invoices, vouchers, partyCodes, partyTrns]);
 
   // Every ledger entry (all dates), grouped by party key.
   const entriesByParty = useMemo(() => {
@@ -135,9 +189,11 @@ export default function PartyLedgerWindow({
       const type = isOpening ? "Opening Balance" : (isCustomer ? "Sales Bill" : "Purchase Bill");
       const vType = isOpening ? "Opening" : (isCustomer ? "Sales" : "Purchase");
       const kind = isOpening ? "opening" : "bill";
+      const meta = { ...invMeta(inv, isCustomer), trn: invMeta(inv, isCustomer).trn || (inv.partyId && partyTrns?.[inv.partyId]) || "" };
+      const particularsBase = [METHOD[inv.method] || inv.method, state, dueText].filter(Boolean).join(" · ");
       push(k, {
-        key: `i-${inv.id}`, invId: inv.id, inv, date: inv.date || "", seq: 0, kind, vType, type, no: inv.no, ref: inv.ref || "",
-        particulars: [METHOD[inv.method] || inv.method, state, dueText].filter(Boolean).join(" · "),
+        key: `i-${inv.id}`, invId: inv.id, inv, meta, date: inv.date || "", seq: 0, kind, vType, type, no: inv.no, ref: inv.ref || "",
+        particularsBase, particulars: particularsBase,
         bill: n2(inv.total), settle: 0, open: () => onOpenInvoice?.(inv.raw),
       });
       const direct = n2(inv.paid) - (allocByInv.get(inv.id) || 0);
@@ -145,7 +201,8 @@ export default function PartyLedgerWindow({
         push(k, {
           key: `d-${inv.id}`, invId: inv.id, date: inv.date || "", seq: 1, kind: "direct",
           vType: isCustomer ? "Receipt" : "Payment", type: isCustomer ? "Received on Bill" : "Paid on Bill",
-          no: inv.no, ref: inv.ref || "", particulars: METHOD[inv.method] || inv.method || "",
+          no: inv.no, ref: inv.ref || "", particularsBase: METHOD[inv.method] || inv.method || "",
+          particulars: METHOD[inv.method] || inv.method || "",
           bill: 0, settle: direct, open: () => onOpenInvoice?.(inv.raw),
         });
       }
@@ -157,10 +214,12 @@ export default function PartyLedgerWindow({
       const raw = v.raw || {};
       const chequeDate = raw.method === "cheque" ? String(raw.chequeDate || "").slice(0, 10) : "";
       const isPdc = raw.method === "cheque" && chequeDate && chequeDate > todayIso();
+      const voucherMetaRow = voucherMeta(raw);
+      const particularsBase = [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
       push(keyOf(v), {
-        key: `v-${v.id}`, date: v.date || "", seq: 2, kind: "voucher", isPdc,
+        key: `v-${v.id}`, date: v.date || "", seq: 2, kind: "voucher", isPdc, voucherMeta: voucherMetaRow,
         vType: isCustomer ? "Receipt" : "Payment", type: v.typeLabel || settleLabel, no: v.no, ref: supRefs || v.ref || "",
-        particulars: [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · "),
+        particularsBase, particulars: particularsBase,
         bill: 0, settle: n2(v.amount), open: onOpenVoucher ? () => onOpenVoucher(v.raw) : null,
       });
     });
@@ -176,7 +235,7 @@ export default function PartyLedgerWindow({
     });
     out.forEach((list) => list.sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.seq - b.seq || String(a.no).localeCompare(String(b.no))));
     return out;
-  }, [invoices, vouchers, keyOf, isCustomer, settleLabel, onOpenInvoice, onOpenVoucher]);
+  }, [invoices, vouchers, keyOf, isCustomer, settleLabel, onOpenInvoice, onOpenVoucher, partyTrns]);
 
   const inRange = (d) => (!from || d >= from) && (!to || d <= to);
   const sumUp = (list) => {
@@ -219,14 +278,8 @@ export default function PartyLedgerWindow({
         return e;
       });
     }
-    if (showNarration && !monthly) {
-      rows = rows.map((e) => {
-        if ((e.kind === "bill" || e.kind === "opening") && e.inv) {
-          const { text, ref } = billNarration(e.inv, isCustomer, mergeEntries);
-          return { ...e, particulars: text, narrRef: ref || "" };
-        }
-        return e;
-      });
+    if (!monthly) {
+      rows = rows.map((e) => applyDisplayParticulars(e, { ...displayOpts, mergeEntries }, isCustomer));
     }
     if (monthly) {
       const byMonth = new Map();
@@ -247,7 +300,7 @@ export default function PartyLedgerWindow({
     }
     return { ...s, rows };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [party, entriesByParty, from, to, ledgerFilters, mergeEntries, showNarration, monthly, isCustomer]);
+  }, [party, entriesByParty, from, to, ledgerFilters, displayOpts, mergeEntries, monthly, isCustomer]);
 
   const balText = (v) => {
     if (Math.abs(v) < 0.005) return "0.00";
@@ -281,21 +334,48 @@ export default function PartyLedgerWindow({
       <div key={i} style={{ color: e.narrRef && line === e.narrRef ? C.red : (e.dup && i === 0 ? C.red : undefined) }}>{line}</div>
     ));
   };
-  const stmtCols = monthly ? [
-    { key: "month", label: "Month", width: 140, render: (e) => (e.opening ? e.type : (e.monthly ? e.type : monthTitle(String(e.date).slice(0, 7)))) },
-    { key: "part", label: "Particulars", width: 280, wrap: true, render: (e) => (e.opening ? e.particulars : "") },
-    { key: "dr", label: "Debit", width: 100, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") },
-    { key: "cr", label: "Credit", width: 100, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") },
-    { key: "bal", label: "Balance", width: 120, align: "right", bold: true, render: (e) => balText(e.run) },
-  ] : [
-    { key: "date", label: "Date", width: 82, render: (e) => (e.opening ? "" : fmtDate(e.date)) },
-    { key: "vtype", label: "V.Type", width: 72, render: (e) => e.vType || e.type || "" },
-    { key: "no", label: "V.No.", width: 72, bold: true, render: (e) => e.no || "" },
-    { key: "part", label: "Particulars", width: 220, wrap: true, render: renderParticulars, color: (e) => (e.dup ? C.red : undefined) },
-    { key: "dr", label: "Debit", width: 88, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") },
-    { key: "cr", label: "Credit", width: 88, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") },
-    { key: "bal", label: "Balance", width: 110, align: "right", bold: true, render: (e) => balText(e.run) },
-  ];
+  const stmtCols = useMemo(() => {
+    if (monthly) {
+      const cols = [
+        { key: "month", label: "Month", width: 140, render: (e) => (e.opening ? e.type : (e.monthly ? e.type : monthTitle(String(e.date).slice(0, 7)))) },
+        { key: "part", label: "Particulars", width: 280, wrap: true, render: (e) => (e.opening ? e.particulars : "") },
+      ];
+      if (showDrCr) {
+        cols.push({ key: "dr", label: "Debit", width: 100, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") });
+        cols.push({ key: "cr", label: "Credit", width: 100, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") });
+      }
+      if (showBalance) cols.push({ key: "bal", label: "Balance", width: 120, align: "right", bold: true, render: (e) => balText(e.run) });
+      return cols;
+    }
+    const cols = [
+      { key: "date", label: "Date", width: 82, render: (e) => (e.opening ? "" : fmtDate(e.date)) },
+      { key: "vtype", label: "V.Type", width: 72, render: (e) => e.vType || e.type || "" },
+      { key: "no", label: "V.No.", width: 72, bold: true, render: (e) => e.no || "" },
+    ];
+    if (showDn) {
+      cols.push({
+        key: "dn", label: isCustomer ? (bn ? "DN No" : "DN No") : (bn ? "সাপ্লায়ার Inv" : "Vendor Inv"),
+        width: 95, render: (e) => (e.opening ? "" : (e.meta?.dn || e.ref || "")),
+      });
+    }
+    if (!isCustomer && showVendorRef) {
+      cols.push({ key: "vref", label: bn ? "আমাদের Ref" : "Our Ref", width: 88, render: (e) => (e.opening ? "" : (e.meta?.refNo || "")) });
+    }
+    if (isCustomer && showVehicle) {
+      cols.push({ key: "vehicle", label: bn ? "গাড়ি" : "Vehicle", width: 88, render: (e) => (e.opening ? "" : (e.meta?.vehicle || "")) });
+    }
+    if (showTrn) {
+      cols.push({ key: "trn", label: "TRN", width: 110, render: (e) => (e.opening ? "" : (e.meta?.trn || "")) });
+    }
+    cols.push({ key: "part", label: "Particulars", width: 200, wrap: true, render: renderParticulars, color: (e) => (e.dup ? C.red : undefined) });
+    if (showDrCr) {
+      cols.push({ key: "dr", label: "Debit", width: 88, align: "right", render: (e) => (dr(e) ? f2(dr(e)) : "") });
+      cols.push({ key: "cr", label: "Credit", width: 88, align: "right", render: (e) => (cr(e) ? f2(cr(e)) : "") });
+    }
+    if (showBalance) cols.push({ key: "bal", label: "Balance", width: 110, align: "right", bold: true, render: (e) => balText(e.run) });
+    return cols;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthly, showDn, showVehicle, showTrn, showVendorRef, showDrCr, showBalance, isCustomer, bn]);
   const stmtRows = statement ? [
     ...(from ? [{
       key: "opening", opening: true, vType: "", type: "Opening Balance", no: "", particulars: `before ${fmtDate(from)}`,
@@ -303,7 +383,12 @@ export default function PartyLedgerWindow({
     }] : []),
     ...statement.rows,
   ] : [];
-  const stmtColsForPrint = showBalanceInPrint ? stmtCols : stmtCols.filter((c) => c.key !== "bal");
+  const stmtColsForPrint = useMemo(() => {
+    let cols = stmtCols;
+    if (!showBalanceInPrint) cols = cols.filter((c) => c.key !== "bal");
+    if (!showDrCr) cols = cols.filter((c) => c.key !== "dr" && c.key !== "cr");
+    return cols;
+  }, [stmtCols, showBalanceInPrint, showDrCr]);
 
   const totals = party
     ? { bill: statement.bill, settle: statement.settle, closing: statement.closing }
@@ -311,6 +396,10 @@ export default function PartyLedgerWindow({
 
   const cellForPrint = (c, r) => {
     if (c.key === "part") return String(r.particulars ?? "");
+    if (c.key === "dn") return String(r.meta?.dn || r.ref || "");
+    if (c.key === "vehicle") return String(r.meta?.vehicle || "");
+    if (c.key === "trn") return String(r.meta?.trn || "");
+    if (c.key === "vref") return String(r.meta?.refNo || "");
     const v = c.render(r);
     return typeof v === "object" && v !== null ? String(r.particulars ?? "") : String(v ?? "");
   };
@@ -327,7 +416,8 @@ export default function PartyLedgerWindow({
         date: e.opening ? "" : (e.monthly ? e.type : fmtDate(e.date)),
         type: e.vType || e.type || "", no: e.no || "", ref: e.ref || "", particulars: String(e.particulars || ""),
         debit: dr(e) ? f2(dr(e)) : "", credit: cr(e) ? f2(cr(e)) : "",
-        balance: showBalanceInPrint ? balText(e.run) : "",
+        balance: showBalanceInPrint && showBalance ? balText(e.run) : "",
+        ref: showDn ? (e.meta?.dn || e.ref || "") : (e.ref || ""),
       }));
       const fields = {
         shopName, title: `${partyLabel.toUpperCase()} STATEMENT`, partyName: party.code ? `${party.name} (${party.code})` : party.name, partyMobile: party.mobile || "", period,
@@ -357,7 +447,7 @@ export default function PartyLedgerWindow({
     <>
     {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
     <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
-      <div style={{ width: "100%", maxWidth: win.max ? "none" : 960, height: win.max ? "100%" : undefined, maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
+      <div style={{ width: "100%", maxWidth: win.max ? "none" : 1040, height: win.max ? "100%" : undefined, maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
         <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none" }}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{winTitle}</span>
           <WindowButtons win={win} onClose={onClose} lang={lang} />
@@ -412,6 +502,40 @@ export default function PartyLedgerWindow({
               <button type="button" onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "দেখুন" : "View"}</button>
             </div>
           )}
+          {party && !monthly && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "6px 10px", background: "#f8fafc", border: `1px solid ${C.border}`, borderRadius: 3 }}>
+              <span style={{ ...lbl, fontWeight: 800, width: "100%", marginBottom: 2 }}>{bn ? "স্টেটমেন্টে দেখাবেন" : "Show on statement"}</span>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showDrCr} onChange={(e) => setShowDrCr(e.target.checked)} /> {bn ? "ডেবিট / ক্রেডিট" : "Debit / Credit"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showBalance} onChange={(e) => setShowBalance(e.target.checked)} /> {bn ? "ব্যালান্স" : "Balance"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showNarration} onChange={(e) => setShowNarration(e.target.checked)} /> {bn ? "ন্যারেশন (VAT)" : "Narration (VAT)"}
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showDn} onChange={(e) => setShowDn(e.target.checked)} />
+                {isCustomer ? (bn ? "ডেলিভারি নোট" : "Delivery Note") : (bn ? "সাপ্লায়ার Inv" : "Supplier Inv")}
+              </label>
+              {isCustomer && (
+                <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                  <input type="checkbox" checked={showVehicle} onChange={(e) => setShowVehicle(e.target.checked)} /> {bn ? "গাড়ি নং" : "Vehicle No"}
+                </label>
+              )}
+              {!isCustomer && (
+                <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                  <input type="checkbox" checked={showVendorRef} onChange={(e) => setShowVendorRef(e.target.checked)} /> {bn ? "আমাদের Ref" : "Our Ref No"}
+                </label>
+              )}
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showTrn} onChange={(e) => setShowTrn(e.target.checked)} /> TRN
+              </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showNote} onChange={(e) => setShowNote(e.target.checked)} /> {bn ? "নোট / চেক" : "Note / Cheque"}
+              </label>
+            </div>
+          )}
 
           {party && (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -419,6 +543,7 @@ export default function PartyLedgerWindow({
                 {isCustomer ? "Customer owes" : "We owe"}: {cur} {balText(statement.closing)}
               </div>
               {party.mobile && <div style={{ background: "#fff", border: `1px solid ${C.border}`, padding: "4px 10px", fontSize: 12.5, fontWeight: 700 }}>📱 {party.mobile}</div>}
+              {showTrn && party.trn && <div style={{ background: "#fff", border: `1px solid ${C.border}`, padding: "4px 10px", fontSize: 12.5, fontWeight: 700 }}>TRN: {party.trn}</div>}
             </div>
           )}
 
