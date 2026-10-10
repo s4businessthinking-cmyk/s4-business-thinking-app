@@ -8,6 +8,7 @@ import { PM_CSS } from "../product-master/pmStyles";
 import PartyPickerWindow, { VENDOR_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
 import { PURCHASE_OPTION_DEFAULTS, PURCHASE_OPTION_LABELS, isForeign, rateOf } from "./purchaseOptions.js";
 import { CURRENCIES } from "../reports/taxDomain.js";
+import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 
 const ACCENT = "#c2410c";
 
@@ -77,7 +78,10 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
               {lang === "bn" ? "এই নামে কোনো supplier নেই — নামটাই বিলে থাকবে" : "No matching supplier — the typed name will be used"}
             </div>
           ) : matches.map((v, i) => (
-            <div key={v.id} onMouseDown={(e) => { e.preventDefault(); pick(v); }} onMouseEnter={() => setActive(i)}
+            <div key={v.id}
+              onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
+              onClick={() => { if (!shouldPreserveTextSelection(inputRef)) pick(v); }}
+              onMouseEnter={() => { if (!shouldPreserveTextSelection(inputRef)) setActive(i); }}
               style={{ padding: "5px 10px", cursor: "pointer", background: i === active ? "#dbe6f5" : "#fff", borderBottom: "1px solid #eef3fb" }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: C.label }}>{v.vendorName}</div>
               <div style={{ fontSize: 11, color: "#4b5f86" }}>{[v.vendorCode && `#${v.vendorCode}`, v.mobileNumber || v.whatsappNumber, v.city].filter(Boolean).join(" · ")}</div>

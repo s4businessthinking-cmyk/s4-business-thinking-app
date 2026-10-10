@@ -10,6 +10,7 @@ import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
 import { printWithSettings } from "../print/printSettings.js";
 import { splitRack } from "./rackLocation.js";
+import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 
 const CURRENCIES = ["AED", "USD", "SAR", "OMR", "QAR", "KWD", "BHD", "INR", "BDT", "EUR"];
 
@@ -131,7 +132,10 @@ function CustomerTypeahead({ customers, value, onChange, onSelect, placeholder, 
               {lang === "bn" ? "এই নামে কোনো customer নেই — Walk-in হিসেবে থাকবে" : "No matching customer — will be saved as walk-in"}
             </div>
           ) : matches.map((c, i) => (
-            <div key={c.id} onMouseDown={(e) => { e.preventDefault(); pick(c); }} onMouseEnter={() => setActive(i)}
+            <div key={c.id}
+              onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
+              onClick={() => { if (!shouldPreserveTextSelection(inputRef)) pick(c); }}
+              onMouseEnter={() => { if (!shouldPreserveTextSelection(inputRef)) setActive(i); }}
               style={{ padding: "5px 10px", cursor: "pointer", background: i === active ? "#dbe6f5" : "#fff", borderBottom: "1px solid #eef3fb" }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: C.label }}>{c.customerName}</div>
               <div style={{ fontSize: 11, color: "#4b5f86" }}>{[c.mobileNumber, c.area || c.city, c.customerType].filter(Boolean).join(" · ")}</div>

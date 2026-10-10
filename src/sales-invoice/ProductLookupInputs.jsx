@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { nsq } from "../utils/productSearch";
 import { specValues } from "../product-master/productSpecs";
+import { dropdownMouseDown } from "../utils/dropdownSelectionGuard.js";
 
 const MAX_ROWS = 300;
 const ROW_H = 18;
@@ -110,7 +111,7 @@ export function ProductNameLookup({ products, value, onChange, onPickName, input
             ? <div style={{ ...rowStyle(false), color: "#64748b", textTransform: "none" }}>No matching product</div>
             : items.map((g, i) => (
               <div key={g.name} style={rowStyle(i === active)} title={g.items.length > 1 ? `${g.items.length} codes` : undefined}
-                onMouseDown={(e) => { e.preventDefault(); setActive(i); }}
+                onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
                 onDoubleClick={() => pick(g)}>
                 {g.name}{g.items.length > 1 ? <span style={{ opacity: 0.6, fontWeight: 400 }}> ({g.items.length})</span> : null}
               </div>
@@ -188,7 +189,7 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
           footer={<span style={{ color: "#b91c1c", textTransform: "uppercase" }}>{highlighted?.name || ""}</span>}>
           {items.map((p, i) => (
             <div key={p.id} style={rowStyle(i === active)} title={codeLine(p)}
-              onMouseDown={(e) => { e.preventDefault(); setActive(i); }}
+              onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
               onDoubleClick={() => pick(p)}>
               {codeLine(p)}
             </div>

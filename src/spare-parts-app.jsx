@@ -90,6 +90,7 @@ const compareProductNames = (a, b) => productNameCollator.compare(a?.name || "",
 import ReorderAlertCard from "./inventory/ReorderAlertCard";
 import { salesSpecs, specValues } from "./product-master/productSpecs";
 import { pricingPatchFromLanding } from "./product-master/pricingFromLanding.js";
+import { scheduleStaleClear, cancelStaleClear, STALE_DRAFT_MS } from "./utils/staleDraftClear.js";
 import { unitFactorFor, itemBaseQty, rescaleForUnit } from "./inventory/unitConversion";
 import StockBadge from "./inventory/StockBadge.jsx";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
@@ -4381,6 +4382,27 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
     billLeaveGuard.current = guard;
     return () => { if (billLeaveGuard.current===guard) billLeaveGuard.current = null; };
   });
+
+  useEffect(() => {
+    if (piView === "form") {
+      cancelStaleClear("pi-draft");
+      cancelStaleClear("pi-search");
+      return undefined;
+    }
+    scheduleStaleClear("pi-draft", () => {
+      setPiForm(piEmptyForm());
+      setPiLines([]);
+      setPiCurrent(piEmptyCurrent());
+      setEditInvoiceId(null);
+      setPiInvoiceNo("");
+    }, STALE_DRAFT_MS);
+    scheduleStaleClear("pi-search", () => setPiSearch(""), STALE_DRAFT_MS);
+    return () => {
+      cancelStaleClear("pi-draft");
+      cancelStaleClear("pi-search");
+    };
+  }, [piView]);
+
   // A minimized bill must be confirmed away before the list opens another one.
   const piLeaveMinOk = () => {
     if (!(piWin.min && piView==="form")) return true;
@@ -6698,6 +6720,29 @@ function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, pro
     billLeaveGuard.current = guard;
     return () => { if (billLeaveGuard.current===guard) billLeaveGuard.current = null; };
   });
+
+  useEffect(() => {
+    if (siView === "form") {
+      cancelStaleClear(`si-draft-${kind}`);
+      cancelStaleClear(`si-search-${kind}`);
+      return undefined;
+    }
+    scheduleStaleClear(`si-draft-${kind}`, () => {
+      setSiForm(siEmptyForm());
+      setSiLines([]);
+      setSiCurrent(siEmptyCurrent());
+      setEditInvId(null);
+      setSourceQuote(null);
+      setSiInvoiceNo("");
+      siSnapRef.current = null;
+    }, STALE_DRAFT_MS);
+    scheduleStaleClear(`si-search-${kind}`, () => setSiSearch(""), STALE_DRAFT_MS);
+    return () => {
+      cancelStaleClear(`si-draft-${kind}`);
+      cancelStaleClear(`si-search-${kind}`);
+    };
+  }, [siView, kind]);
+
   // A minimized bill must be confirmed away before the list opens another one.
   const siLeaveMinOk = () => {
     if (!(siWin.min && siView==="form")) return true;
@@ -11567,6 +11612,31 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
     setPmEditId(null);
     loadPmForm(createEmptyPmForm());
   }, [tab]);
+
+  useEffect(() => {
+    if (tab === "products") {
+      cancelStaleClear("pm-search");
+      return undefined;
+    }
+    scheduleStaleClear("pm-search", () => {
+      setPmSearch("");
+      setPmCatFilter("ALL");
+    }, STALE_DRAFT_MS);
+    return () => cancelStaleClear("pm-search");
+  }, [tab]);
+
+  useEffect(() => {
+    if (pmShowAdd) {
+      cancelStaleClear("pm-form-draft");
+      return undefined;
+    }
+    scheduleStaleClear("pm-form-draft", () => {
+      if (JSON.stringify(pmForm) === pmBaselineRef.current) return;
+      setPmEditId(null);
+      loadPmForm(createEmptyPmForm());
+    }, STALE_DRAFT_MS);
+    return () => cancelStaleClear("pm-form-draft");
+  }, [pmShowAdd]);
 
   const pmFormFromProduct = (p) => ({
     ...createEmptyPmForm(),

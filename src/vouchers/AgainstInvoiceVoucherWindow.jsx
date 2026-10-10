@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, inp, lbl, btn, th, td, Modal, GridTable, todayIso, fmtDate, fmtDateLong, textMatch } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
+import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 
 const METHODS = [["cash", "Cash"], ["cheque", "Cheque"], ["bank_transfer", "Bank Transfer"], ["card", "Card"]];
 const METHOD_LABEL = Object.fromEntries(METHODS);
@@ -45,7 +46,10 @@ export function PartySelect({ parties, value, onPick, disabled, inputRef, placeh
           {list.length === 0
             ? <div style={{ padding: "6px 10px", fontSize: 12, color: "#4b5f86" }}>—</div>
             : list.map((p, i) => (
-              <div key={p.key} onMouseDown={(e) => { e.preventDefault(); pick(p); }} onMouseEnter={() => setActive(i)}
+              <div key={p.key}
+                onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
+                onClick={() => { if (!shouldPreserveTextSelection(inputRef)) pick(p); }}
+                onMouseEnter={() => { if (!shouldPreserveTextSelection(inputRef)) setActive(i); }}
                 style={{ padding: "4px 10px", cursor: "pointer", background: i === active ? "#1f5fbf" : "#fff", color: i === active ? "#fff" : "#111", fontSize: 12.5, fontWeight: 700, display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                 {p.pending > 0 && <span style={{ opacity: 0.75, fontWeight: 600, flexShrink: 0 }}>{f2(p.pending)}</span>}

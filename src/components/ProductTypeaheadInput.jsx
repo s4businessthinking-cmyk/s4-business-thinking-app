@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { filterProducts, findExactProductMatch } from "../utils/productSearch";
+import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 export function ProductTypeaheadInput({
   products = [],
   value = "",
@@ -17,6 +18,8 @@ export function ProductTypeaheadInput({
 }) {
   const listId = useId();
   const wrapRef = useRef(null);
+  const localInputRef = useRef(null);
+  const fieldRef = inputRef || localInputRef;
   const suppressFocusOpenRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -89,7 +92,11 @@ export function ProductTypeaheadInput({
   return (
     <div ref={wrapRef} style={{ position: "relative", width: "100%" }}>
       <input
-        ref={inputRef}
+        ref={(el) => {
+          localInputRef.current = el;
+          if (typeof inputRef === "function") inputRef(el);
+          else if (inputRef) inputRef.current = el;
+        }}
         autoFocus={autoFocus}
         disabled={disabled}
         role="combobox"
@@ -139,8 +146,8 @@ export function ProductTypeaheadInput({
               type="button"
               role="option"
               aria-selected={index === activeIndex}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => pickProduct(product)}
+              onMouseDown={(event) => dropdownMouseDown(event, fieldRef)}
+              onClick={() => { if (!shouldPreserveTextSelection(fieldRef)) pickProduct(product); }}
               style={{
                 width: "100%",
                 textAlign: "left",
