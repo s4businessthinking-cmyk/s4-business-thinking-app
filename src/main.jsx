@@ -7,13 +7,19 @@ import { startOfflineEngine } from "./offline/offlineBoot";
 import S4BootErrorBoundary from "./components/S4BootErrorBoundary.jsx";
 import S4UiReadyGate from "./components/S4UiReadyGate.jsx";
 
+function isElectronRuntime() {
+  return Boolean(
+    window.S4Desktop ||
+      typeof window.process?.versions?.electron === "string" ||
+      /\bElectron\//.test(window.navigator?.userAgent || "")
+  );
+}
+
 async function clearStaleShellWebCache() {
   const isNative =
     typeof window !== "undefined" &&
     window.Capacitor?.isNativePlatform?.() === true;
-  const isElectron =
-    typeof window !== "undefined" &&
-    typeof window.process?.versions?.electron === "string";
+  const isElectron = typeof window !== "undefined" && isElectronRuntime();
 
   if (!isNative && !isElectron) return;
 
@@ -77,8 +83,7 @@ function wirePwaUpdateChecks(registration) {
 
 async function setupWebPwaAutoReload() {
   const isNative = window.Capacitor?.isNativePlatform?.() === true;
-  const isElectron = typeof window.process?.versions?.electron === "string";
-  if (isNative || isElectron) return;
+  if (isNative || isElectronRuntime()) return;
 
   try {
     const { registerSW } = await import("virtual:pwa-register");

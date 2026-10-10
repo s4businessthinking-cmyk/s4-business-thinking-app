@@ -132,7 +132,12 @@ export function getReleasePlatform() {
     return platform === "android" ? "android" : platform || "mobile";
   }
 
-  if (typeof window.process?.versions?.electron === "string") {
+  // contextIsolation hides window.process; the preload bridge is the reliable signal.
+  if (
+    window.S4Desktop ||
+    typeof window.process?.versions?.electron === "string" ||
+    /\bElectron\//.test(window.navigator?.userAgent || "")
+  ) {
     return "desktop";
   }
 
