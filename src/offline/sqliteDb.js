@@ -764,6 +764,33 @@ export async function getOfflineStatus() {
  * reason (permission-denied / invalid-argument / resource-exhausted /
  * deadline-exceeded / etc.) is visible instead of a single opaque count.
  */
+/** Keep the newest queue row per document; drop older duplicates (reconcile used to stack thousands). */
+export async function dedupePendingSyncQueue() {
+  await bootOfflineSqlite();
+
+  const rows = query(
+    `SELECT id, collection_name, document_id, created_at
+     FROM sync_queue
+     WHERE status IN ('PENDING', 'FAILED')
+     ORDER BY datetime(created_at) DESC`
+  );
+
+  const keep = new Set();
+  let removed = 0;
+  for (const row of rows) {
+    const key = `${row.collection_name}/${row.document_id}`;
+    if (keep.has(key)) {
+      db.run(`DELETE FROM sync_queue WHERE id = ?`, [row.id]);
+      removed += 1;
+    } else {
+      keep.add(key);
+    }
+  }
+
+  if (removed) await persist();
+  return { removed };
+}
+
 export async function getFailingSyncGroups(limit = 20) {
   await bootOfflineSqlite();
 
@@ -823,6 +850,12 @@ export async function bulkEnqueueUpsert(collectionName, records = [], options = 
         version = local_records.version + 1,
         updated_at = excluded.updated_at`,
       [localId, collectionName, documentId, dataJson, now, now]
+    );
+
+    db.run(
+      `DELETE FROM sync_queue
+       WHERE collection_name = ? AND document_id = ? AND status IN ('PENDING', 'FAILED')`,
+      [collectionName, documentId]
     );
 
     const queueId = uuidv4();

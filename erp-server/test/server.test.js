@@ -160,6 +160,19 @@ test("products: shop members write and read; other shop cannot", async () => {
   assert.equal(unscoped.status, 400);
 });
 
+test("products: bulk sync without productCatalogEpoch when maintenance epoch is 0", async () => {
+  assert.equal(
+    (await commit(owner.idToken, [
+      set("productMaintenance", "shop1", { shopId: "shop1", active: false, catalogEpoch: 0 }),
+    ])).status,
+    200
+  );
+  assert.equal(
+    (await commit(owner.idToken, [set("products", "bulk1", { shopId: "shop1", name: "Bulk Item", code: "B1" })])).status,
+    200
+  );
+});
+
 test("rules: a username entry cannot be taken over by another account", async () => {
   const entry = { username: "rahim", shopId: "shop1", authEmail: "owner@shop.com", firebaseUid: owner.uid };
   assert.equal((await commit(owner.idToken, [set("staffLoginIndex", "rahim", entry)])).status, 200);

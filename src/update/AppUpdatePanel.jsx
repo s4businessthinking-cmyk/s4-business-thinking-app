@@ -10,6 +10,7 @@ import {
   isMobileOtaSupported,
   runMobileAutoUpdate,
 } from "./mobileOtaService";
+import { reloadWebsiteFresh } from "./reloadWebsiteFresh.js";
 
 export function AppUpdatePanel({ lang, th, s, toast }) {
   const [busy, setBusy] = useState(false);
@@ -44,6 +45,12 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           otaFailed: "Auto update apply করা যায়নি। Internet চালু রেখে আবার চেষ্টা করুন।",
           needInternet: "Internet সংযোগ লাগবে",
           checkFailed: "আপডেট check করা যায়নি। Internet চালু আছে কিনা দেখুন।",
+          webStaleHint:
+            "এটা ওয়েবসাইট (Chrome)। PC আর ফোন আলাদা কপি সেভ করে — তাই PC-তে 1.0.78, ফোনে 1.0.67 দেখতে পারেন। APK লাগবে না।",
+          webReload: "সার্ভার থেকে নতুন ভার্সন লোড করুন",
+          webReloading: "লোড হচ্ছে...",
+          webFootnote:
+            "মোবাইল Chrome-এ ওয়েব আপডেট = নিচের বাটন বা 🔒 → Site settings → Clear data। Home screen shortcut পুরনো রাখতে পারে।",
         }
       : {
           title: "🔄 App Update",
@@ -69,6 +76,12 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           otaFailed: "Could not apply the auto update. Stay online and try again.",
           needInternet: "Internet connection required",
           checkFailed: "Could not check for updates. Please verify your internet connection.",
+          webStaleHint:
+            "This is the website in Chrome. PC and phone each keep their own saved copy — so PC can show 1.0.78 while the phone still runs 1.0.67. No APK needed.",
+          webReload: "Load latest from server",
+          webReloading: "Loading...",
+          webFootnote:
+            "On mobile Chrome, refresh the web app with the button above or 🔒 → Site settings → Clear data. A home-screen shortcut may still open the old copy.",
         };
 
   useEffect(() => {
@@ -138,6 +151,17 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
 
   const isUpToDate = result && !result.hasUpdate;
   const canAutoOta = platform === "android" && otaSupported && result?.bundleUrl;
+  const isWeb = platform === "web";
+
+  const runWebReload = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await reloadWebsiteFresh();
+    } catch {
+      setBusy(false);
+    }
+  };
 
   return (
     <div style={{ ...s.card, border: `1px solid ${th.border}` }}>
@@ -189,6 +213,24 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           }}
         >
           {txt.noBundleHint}
+        </div>
+      )}
+
+      {result?.hasUpdate && isWeb && (
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid #f59e0b",
+            background: "rgba(245,158,11,0.08)",
+            color: "#f59e0b",
+            fontSize: 12,
+            fontWeight: 700,
+            marginBottom: 12,
+            lineHeight: 1.5,
+          }}
+        >
+          {txt.webStaleHint}
         </div>
       )}
 
@@ -244,6 +286,12 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           </button>
         )}
 
+        {result?.hasUpdate && isWeb && (
+          <button style={s.addCoBtn} disabled={busy} onClick={runWebReload}>
+            {busy ? txt.webReloading : txt.webReload}
+          </button>
+        )}
+
         {result?.hasUpdate && result.apkUrl && platform === "android" && !otaSupported && (
           <button style={s.addCoBtn} onClick={() => openUpdateDownload(result.apkUrl)}>
             {txt.downloadApk}
@@ -254,9 +302,11 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
       <div style={{ fontSize: 11, color: th.txtMuted, lineHeight: 1.6 }}>
         {platform === "desktop"
           ? txt.desktopRestart
-          : otaSupported
-            ? txt.mobileAuto
-            : txt.mobileManualApk}
+          : isWeb
+            ? txt.webFootnote
+            : otaSupported
+              ? txt.mobileAuto
+              : txt.mobileManualApk}
       </div>
     </div>
   );

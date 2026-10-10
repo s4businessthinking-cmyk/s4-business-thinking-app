@@ -20,6 +20,10 @@ import {
   getFailingSyncGroups,
   bulkEnqueueUpsert,
 } from "./sqliteDb";
+import {
+  getProductCatalogMaintenance,
+  stampProductCatalogEpoch,
+} from "./productCatalogSync.js";
 
 const CLOUD_PULL_META_PREFIX = "s4-cloud-pull-v1";
 
@@ -375,7 +379,9 @@ export async function uploadPendingShopChanges(shopId) {
   let totalFailed = 0;
 
   for (const collectionName of collections) {
-    const rows = filterRecordsForShop(collectionName, shopId, await getLocalRecords(collectionName));
+    const rows = filterRecordsForShop(collectionName, shopId, await getLocalRecords(collectionName)).filter(
+      (row) => Number(row.dirty || 0) === 1
+    );
     if (!rows.length) {
       collectionResults.push({
         collection: collectionName,
@@ -441,6 +447,7 @@ export async function reconcileShopWithCloud(shopId) {
   const results = [];
   let totalMissing = 0;
   let totalRequeued = 0;
+  const productMaintenance = await getProductCatalogMaintenance(shopId);
 
   for (const collectionName of SHOP_PULL_COLLECTIONS) {
     try {
@@ -457,10 +464,14 @@ export async function reconcileShopWithCloud(shopId) {
 
       const { queued: requeued } = await bulkEnqueueUpsert(
         collectionName,
-        missingRows.map((row) => ({
-          documentId: row.document_id,
-          data: { ...(row.data || {}), shopId },
-        }))
+        missingRows.map((row) => {
+          const base = { ...(row.data || {}), shopId };
+          const data =
+            collectionName === "products"
+              ? stampProductCatalogEpoch(base, productMaintenance)
+              : base;
+          return { documentId: row.document_id, data };
+        })
       );
 
       totalMissing += missingRows.length;

@@ -59,7 +59,12 @@ const canReceiveBranchTransfer = async (c, shopId) => (await isOwnerOfShop(c, sh
 
 async function productCatalogWriteAllowed(c, shopId, req) {
   const m = await c.get("productMaintenance", shopId);
-  return !m || (m.active !== true && req?.productCatalogEpoch === m.catalogEpoch);
+  if (!m) return true;
+  if (m.active === true) return false;
+  const epoch = Number(m.catalogEpoch) || 0;
+  const reqEpoch = Number(req?.productCatalogEpoch);
+  const effectiveReqEpoch = Number.isFinite(reqEpoch) ? reqEpoch : 0;
+  return effectiveReqEpoch === epoch;
 }
 
 async function legacyOrMaintenanceDeleteAllowed(c, shopId) {

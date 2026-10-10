@@ -31,6 +31,50 @@ async function clearStaleShellWebCache() {
   }
 }
 
+function currentModuleScriptName() {
+  const el = document.querySelector('script[type="module"][src*="assets/index-"]');
+  const src = el?.getAttribute("src") || "";
+  const match = src.match(/assets\/(index-[^"?]+\.js)/);
+  return match?.[1] || "";
+}
+
+/** Mobile PWA often keeps an old precached bundle; compare live index.html to this tab. */
+async function reloadIfDeployedShellChanged() {
+  try {
+    const running = currentModuleScriptName();
+    if (!running) return;
+    const base = new URL(".", window.location.href).href;
+    const res = await fetch(`${base}index.html?_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return;
+    const html = await res.text();
+    const live = html.match(/assets\/(index-[^"]+\.js)/)?.[1];
+    if (live && live !== running) {
+      window.location.reload();
+    }
+  } catch {
+    // offline or blocked — keep running cached shell
+  }
+}
+
+function wirePwaUpdateChecks(registration) {
+  const checkSw = () => registration.update().catch(() => {});
+  checkSw();
+  setInterval(checkSw, 15 * 60 * 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      checkSw();
+      reloadIfDeployedShellChanged();
+    }
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) {
+      checkSw();
+      reloadIfDeployedShellChanged();
+    }
+  });
+  reloadIfDeployedShellChanged();
+}
+
 async function setupWebPwaAutoReload() {
   const isNative = window.Capacitor?.isNativePlatform?.() === true;
   const isElectron = typeof window.process?.versions?.electron === "string";
@@ -41,11 +85,7 @@ async function setupWebPwaAutoReload() {
     registerSW({
       immediate: true,
       onRegisteredSW(_swUrl, registration) {
-        if (registration) {
-          setInterval(() => {
-            registration.update().catch(() => {});
-          }, 60 * 60 * 1000);
-        }
+        if (registration) wirePwaUpdateChecks(registration);
       },
       onNeedRefresh() {
         window.location.reload();

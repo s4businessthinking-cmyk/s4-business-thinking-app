@@ -1,19 +1,25 @@
-import { doc, setDoc, deleteDoc, writeBatch, serverTimestamp } from "../backend/firestore";
-import { db } from "../firebase-config";
+import { doc, setDoc, deleteDoc, getDoc, writeBatch, serverTimestamp } from "../backend/firestore";
+import { auth, db } from "../firebase-config";
 import {
   getPendingSyncQueue,
   markSyncDone,
   markSyncFailed,
   getOfflineStatus,
   persistOfflineDb,
+  dedupePendingSyncQueue,
   SYNC_QUEUED_EVENT,
 } from "./sqliteDb";
+import {
+  getProductCatalogMaintenance,
+  stampProductCatalogEpoch,
+} from "./productCatalogSync.js";
 
 const QUEUED_SYNC_DEBOUNCE_MS = 150;
 
 let syncRunning = false;
 let syncRequestedWhileRunning = false;
 const pausedCollections = new Set();
+const catalogMaintenanceCache = new Map();
 
 // Firestore hard-caps a batch at 500 writes; stay well under it.
 const BATCH_SIZE = 400;
@@ -114,6 +120,46 @@ function groupQueueByCollection(queue) {
   return groups;
 }
 
+/** Drops stale queue rows for another shop/user that can never succeed (blocks the whole sync pass). */
+async function pruneOrphanGlobalSyncQueue() {
+  const uid = auth?.currentUser?.uid;
+  if (!uid || !db) return { pruned: 0 };
+
+  let activeShopId = "";
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    if (snap.exists()) activeShopId = String(snap.data()?.shopId || "");
+  } catch {
+    return { pruned: 0 };
+  }
+  if (!activeShopId) return { pruned: 0 };
+
+  const queue = await getPendingSyncQueue();
+  let pruned = 0;
+  for (const item of queue) {
+    const collectionName = item.payload?.collectionName || item.collection_name;
+    const documentId = String(item.payload?.documentId || item.document_id || "");
+    const operation = String(item.operation || "").toUpperCase();
+    const rowShopId = String(item.payload?.data?.shopId || "");
+
+    let drop = false;
+    if (collectionName === "shops" && documentId && documentId !== activeShopId) {
+      drop = true;
+    }
+    if (collectionName === "users" && operation === "CREATE" && documentId && documentId !== uid) {
+      if (!rowShopId || rowShopId !== activeShopId) drop = true;
+    }
+
+    if (drop) {
+      await markSyncDone(item.id, { skipPersist: true });
+      pruned += 1;
+    }
+  }
+
+  if (pruned) await persistOfflineDb();
+  return { pruned };
+}
+
 function buildFirestorePayload(collectionName, documentId, data) {
   const cleaned = cleanForFirestore(data || {});
   return {
@@ -124,6 +170,26 @@ function buildFirestorePayload(collectionName, documentId, data) {
     _cloud_synced_at: serverTimestamp(),
     _cloud_sync_status: "SYNCED",
   };
+}
+
+async function maintenanceForProductRow(data) {
+  const shopId = String(data?.shopId || "");
+  if (!shopId) return { active: false, catalogEpoch: 0, blocked: false };
+  if (!catalogMaintenanceCache.has(shopId)) {
+    catalogMaintenanceCache.set(shopId, await getProductCatalogMaintenance(shopId));
+  }
+  return catalogMaintenanceCache.get(shopId);
+}
+
+async function prepareSyncPayload(collectionName, data) {
+  if (collectionName !== "products") return data || {};
+  const maintenance = await maintenanceForProductRow(data);
+  if (maintenance.blocked) {
+    const error = new Error("PRODUCT_CATALOG_MAINTENANCE_ACTIVE");
+    error.code = "PRODUCT_CATALOG_MAINTENANCE_ACTIVE";
+    throw error;
+  }
+  return stampProductCatalogEpoch(data, maintenance);
 }
 
 // Per-item fallback path — used directly for small ad-hoc syncs, and as the
@@ -146,7 +212,8 @@ async function syncOneQueueItem(item) {
     return { ok: true, operation, collectionName, documentId };
   }
 
-  await setDoc(ref, buildFirestorePayload(collectionName, documentId, payload.data), { merge: true });
+  const prepared = await prepareSyncPayload(collectionName, payload.data);
+  await setDoc(ref, buildFirestorePayload(collectionName, documentId, prepared), { merge: true });
 
   return { ok: true, operation, collectionName, documentId };
 }
@@ -189,16 +256,18 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
         return Boolean(documentId);
       });
 
-    const buildRowPayload = ({ row, documentId }) => {
+    const buildRowPayload = async ({ row, documentId }) => {
       const raw = { ...(row.data || {}), id: documentId };
       delete raw._cloud_cached_at;
-      return buildFirestorePayload(collectionName, documentId, raw);
+      const prepared = await prepareSyncPayload(collectionName, raw);
+      return buildFirestorePayload(collectionName, documentId, prepared);
     };
 
     try {
       const batch = writeBatch(db);
       for (const entry of rows) {
-        batch.set(getFirebaseDocRef(collectionName, entry.documentId), buildRowPayload(entry), { merge: true });
+        const payload = await buildRowPayload(entry);
+        batch.set(getFirebaseDocRef(collectionName, entry.documentId), payload, { merge: true });
       }
       await batch.commit();
       uploaded += rows.length;
@@ -208,7 +277,8 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
 
       for (const entry of rows) {
         try {
-          await setDoc(getFirebaseDocRef(collectionName, entry.documentId), buildRowPayload(entry), { merge: true });
+          const payload = await buildRowPayload(entry);
+          await setDoc(getFirebaseDocRef(collectionName, entry.documentId), payload, { merge: true });
           uploaded += 1;
         } catch (itemError) {
           failed += 1;
@@ -262,9 +332,18 @@ export async function syncPendingQueueToFirebase() {
     done: 0,
     failed: 0,
     errors: [],
+    prunedOrphans: 0,
   };
 
   try {
+    catalogMaintenanceCache.clear();
+
+    const pruneResult = await pruneOrphanGlobalSyncQueue();
+    result.prunedOrphans = pruneResult.pruned || 0;
+
+    const dedupeResult = await dedupePendingSyncQueue();
+    result.dedupedQueue = dedupeResult.removed || 0;
+
     const queue = await getPendingSyncQueue();
     result.total = queue.length;
 
