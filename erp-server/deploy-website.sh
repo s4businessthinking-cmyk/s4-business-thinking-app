@@ -41,5 +41,26 @@ fi
 say "Unpack to ${WEB_ROOT}"
 unzip -oq "${TMP}/${ZIP}" -d "${WEB_ROOT}"
 
+# The OTA bundle is built without the PWA service worker. Phones that cached an
+# older PWA keep serving its precached index.html until /sw.js changes, so ship
+# a worker that clears those caches, unregisters itself and reloads the page.
+if ! unzip -l "${TMP}/${ZIP}" | grep -qE '[[:space:]]sw\.js$'; then
+  say "Write self-removing sw.js (retires stale PWA caches on phones)"
+  cat > "${WEB_ROOT}/sw.js" <<EOF
+// S4 web v${VERSION}: retire the old PWA cache and load the live site.
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => {
+  event.waitUntil((async () => {
+    await self.clients.claim();
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+    await self.registration.unregister();
+    const windows = await self.clients.matchAll({ type: "window" });
+    await Promise.all(windows.map((client) => client.navigate(client.url).catch(() => {})));
+  })());
+});
+EOF
+fi
+
 say "Website files updated to v${VERSION}"
 ls -la "${WEB_ROOT}/index.html" "${WEB_ROOT}/assets/" 2>/dev/null | head -5 || true
