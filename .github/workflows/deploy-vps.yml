@@ -1,0 +1,53 @@
+# After a successful release build, pull main on the VPS and rebuild API + website.
+# Requires repository secrets (see erp-server/DEPLOY-VPS.md):
+#   VPS_HOST, VPS_SSH_USER, VPS_SSH_PRIVATE_KEY â€” optional VPS_SSH_PORT (default 22)
+name: Deploy VPS
+
+on:
+  workflow_run:
+    workflows: ["Publish Release"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Skip when SSH secrets are not configured
+        id: gate
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_USER" ] || [ -z "$VPS_SSH_PRIVATE_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "VPS deploy skipped: set VPS_HOST, VPS_SSH_USER, VPS_SSH_PRIVATE_KEY in repo secrets."
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy API + website on VPS
+        if: steps.gate.outputs.configured == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_SSH_USER }}
+          key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            curl -fsSL "https://raw.githubusercontent.com/s4businessthinking-cmyk/s4-business-thinking-app/main/erp-server/vps-update.sh" | bash
+            curl -fsS "https://erp.s4businessthinking.com/health"
+            echo ""
+            echo "VPS deploy finished."
