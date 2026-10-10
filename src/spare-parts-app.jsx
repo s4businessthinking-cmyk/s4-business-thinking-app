@@ -9796,8 +9796,28 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
     </div>
   );
 
+  const globalSearchOn = onGlobalSearchNavigate && globalSearchCan && Object.values(globalSearchCan).some(Boolean);
+
   return (
     <div style={panelStyle}>
+      {!isDesktop && globalSearchOn && (
+        <div style={{ marginBottom: 10 }}>
+          <AppGlobalSearch
+            lang={lang}
+            th={th}
+            glassCard={{ ...glassCard, borderRadius: 14, padding: "10px 12px" }}
+            products={products}
+            customers={customers}
+            vendors={vendors}
+            can={globalSearchCan}
+            onNavigate={onGlobalSearchNavigate}
+            isMobile
+            cur={globalSearchCur || t.cur || "AED"}
+            canSeeCost={globalSearchCanSeeCost}
+          />
+        </div>
+      )}
+
       {orderModuleEnabled && (
         <>
           <div style={sectionTitle}>
@@ -9812,7 +9832,7 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
         </>
       )}
 
-      {isDesktop && onGlobalSearchNavigate && globalSearchCan && Object.values(globalSearchCan).some(Boolean) && (
+      {isDesktop && globalSearchOn && (
         <AppGlobalSearch
           lang={lang}
           th={th}
@@ -11682,9 +11702,9 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
   const [globalFocusProductId, setGlobalFocusProductId] = useState(null);
 
   const globalSearchCan = useMemo(() => ({
-    products: isOwner || can("viewProducts"),
+    products: isOwner || can("viewProducts") || can("manageSales") || can("managePurchase"),
     customers: isOwner,
-    vendors: isOwner || can("viewVendors") || can("manageVendors"),
+    vendors: isOwner || can("viewVendors") || can("manageVendors") || can("managePurchase"),
     sales: isOwner || can("manageSales"),
     purchase: isOwner || can("managePurchase"),
   }), [isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageSales, perms.managePurchase]);
@@ -11700,12 +11720,19 @@ const [vendorForm, setVendorForm] = useState(emptyVendor);
       return true;
     };
     if (hit.kind === "product") {
-      if (!(isOwner || can("viewProducts"))) return;
+      const canFindProduct = isOwner || can("viewProducts") || can("manageSales") || can("managePurchase");
+      if (!canFindProduct) return;
       if (!products.some((x) => x.id === hit.id)) return;
-      if (!goTab("products")) return;
-      // Tab-change effect clears pm form; open product after switch (like customer/vendor focus).
-      if (tabRef.current === "products") startProductEdit(products.find((x) => x.id === hit.id));
-      else setGlobalFocusProductId(hit.id);
+      if (isOwner || can("viewProducts")) {
+        if (!goTab("products")) return;
+        // Tab-change effect clears pm form; open product after switch (like customer/vendor focus).
+        if (tabRef.current === "products") startProductEdit(products.find((x) => x.id === hit.id));
+        else setGlobalFocusProductId(hit.id);
+      } else if (can("manageSales")) {
+        if (!goTab("sales")) return;
+      } else if (can("managePurchase")) {
+        if (!goTab("purchase")) return;
+      }
       return;
     }
     if (hit.kind === "customer") {
@@ -15616,7 +15643,7 @@ const startEditOrder = (order) => {
         shopName={localShop?.companyName||""} personName={profile.personName||""}
         rightSlot={(
           <>
-            {!isDesktop && erpSkin && globalSearchCanAny && (
+            {!isDesktop && globalSearchCanAny && (
               <button
                 type="button"
                 aria-label={lang === "bn" ? "সার্চ" : "Search"}
