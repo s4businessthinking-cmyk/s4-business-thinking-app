@@ -66,6 +66,11 @@ function isRetryableError(error) {
   return RETRYABLE_ERROR_HINTS.some((hint) => text.includes(hint));
 }
 
+function isPermissionDeniedMessage(message) {
+  const text = String(message || "").toLowerCase();
+  return text.includes("insufficient permissions") || text.includes("permission-denied");
+}
+
 function cleanForFirestore(value) {
   if (value === undefined) return null;
   if (value === null) return null;
@@ -148,6 +153,13 @@ async function pruneOrphanGlobalSyncQueue() {
     }
     if (collectionName === "users" && operation === "CREATE" && documentId && documentId !== uid) {
       if (!rowShopId || rowShopId !== activeShopId) drop = true;
+    }
+    // Rows tagged for another (often legacy, pre-migration) shop id that the
+    // server already refused: the server only accepts writes for the
+    // signed-in user's own shop, so these can never succeed and only starve
+    // the real backlog. The local record itself is left untouched.
+    if (rowShopId && rowShopId !== activeShopId && isPermissionDeniedMessage(item.last_error)) {
+      drop = true;
     }
 
     if (drop) {
