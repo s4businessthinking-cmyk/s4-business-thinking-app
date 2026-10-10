@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { offlineList } from "../offline/offlineRepository.js";
 import { specValues } from "../product-master/productSpecs";
+import { productSearchSub } from "./productSearchMeta.js";
 
 const nsq = (str) => String(str || "").replace(/[\.\-\/\\\s_,]+/g, "").toLowerCase();
 const match = (hay, needle) => {
@@ -17,7 +18,7 @@ function productHay(p) {
     ...(Array.isArray(p.moreBarcodes) ? p.moreBarcodes : []),
     ...(Array.isArray(p.unitPrices) ? p.unitPrices.map((r) => r?.barcode) : []),
   ].filter(Boolean);
-  return [p.name, p.code, p.brand, p.company, p.category, p.barcode, codes.join(" "), specValues(p)].filter(Boolean).join(" ");
+  return [p.name, p.code, p.brand, p.company, p.category, p.barcode, p.rackLocation, codes.join(" "), specValues(p)].filter(Boolean).join(" ");
 }
 
 const KIND_META = {
@@ -53,7 +54,7 @@ function ResultsList({ results, bn, th, onPick }) {
           {m.icon} {hit.title}
           <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: th.txtMuted }}>{bn ? m.bn : m.en}</span>
         </div>
-        {hit.sub && <div style={{ fontSize: 12, color: th.txtMuted, marginTop: 4 }}>{hit.sub}</div>}
+        {hit.sub && <div style={{ fontSize: 12, color: th.txtMuted, marginTop: 4, whiteSpace: "pre-wrap", lineHeight: 1.35 }}>{hit.sub}</div>}
       </button>
     );
   });
@@ -66,6 +67,8 @@ export default function AppGlobalSearch({
   onNavigate,
   isMobile = false,
   showBar = true,
+  cur = "AED",
+  canSeeCost = false,
 }) {
   const bn = lang === "bn";
   const [q, setQ] = useState("");
@@ -91,7 +94,10 @@ export default function AppGlobalSearch({
     if (canProduct) {
       for (const p of products) {
         if (!match(productHay(p), needle)) continue;
-        out.push({ kind: "product", id: p.id, title: p.name || "—", sub: [p.code, p.brand].filter(Boolean).join(" · ") });
+        out.push({
+          kind: "product", id: p.id, title: p.name || "—",
+          sub: productSearchSub(p, { bn: lang === "bn", cur, canSeeCost }),
+        });
         if (out.filter((h) => h.kind === "product").length >= cap) break;
       }
     }
@@ -112,7 +118,7 @@ export default function AppGlobalSearch({
       }
     }
     return out;
-  }, [needle, products, customers, vendors, canProduct, canCustomer, canVendor]);
+  }, [needle, products, customers, vendors, canProduct, canCustomer, canVendor, lang, cur, canSeeCost]);
 
   useEffect(() => {
     if (needle.length < 2 || (!canSales && !canPurchase)) {

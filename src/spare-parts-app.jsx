@@ -89,6 +89,7 @@ const productNameCollator = new Intl.Collator(undefined, { sensitivity: "base", 
 const compareProductNames = (a, b) => productNameCollator.compare(a?.name || "", b?.name || "");
 import ReorderAlertCard from "./inventory/ReorderAlertCard";
 import { salesSpecs, specValues } from "./product-master/productSpecs";
+import { pricingPatchFromLanding } from "./product-master/pricingFromLanding.js";
 import { unitFactorFor, itemBaseQty, rescaleForUnit } from "./inventory/unitConversion";
 import StockBadge from "./inventory/StockBadge.jsx";
 import { AppUpdatePanel, runStartupUpdatePrompt } from "./update/AppUpdatePanel.jsx";
@@ -3604,7 +3605,7 @@ function pushOrdersNow() {
     .finally(() => off.syncNow?.().catch(err => console.warn("[S4 Sync] order sync failed", err)));
 }
 
-function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, onShopUpdated, purchaseSource=null, onPurchaseSourceHandled, openInvoiceId=null, onOpenInvoiceHandled }) {
+function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, products, shop, toast, isDesktop, syncRefreshKey=0, wideDesktop=false, onOpenProductMaster, productFromMaster=null, onOpenChequePrinter, chequeHandoverRequest=null, onChequeHandoverHandled, openNewRequest=0, openNewVendor=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, onShopUpdated, purchaseSource=null, onPurchaseSourceHandled, openInvoiceId=null, onOpenInvoiceHandled, onProductPatched }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const perms = { ...DEFAULT_PERMISSIONS, ...(profile?.permissions || {}) };
@@ -4556,8 +4557,9 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
 
   // A confirmed purchase becomes the product's latest cost, and a sale price typed on the line updates the product's price.
   const piUpdateProductCosts = async (payload, persistOpts = {}) => {
-    if (!can("manageProducts")) return;
+    if (!(canManagePurchase || can("manageProducts"))) return;
     const nowIso = new Date().toISOString();
+    const billDay = String(payload.invoiceDate || nowIso).slice(0, 10);
     for (const it of payload.items || []) {
       if (!it.productId) continue;
       try {
@@ -4565,24 +4567,38 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         const prod = rec?.data || products.find(p => p.id === it.productId);
         if (!prod) continue;
         // A back-dated bill must not replace the cost/price of a newer purchase.
-        const billDay = String(payload.invoiceDate || nowIso).slice(0, 10);
         if (prod.lastPurchaseDate && billDay < String(prod.lastPurchaseDate).slice(0, 10)) continue;
         const factor = Number(it.unitFactor) > 0 ? Number(it.unitFactor) : 1;
         const qty = Number(it.qty) || 0;
         const netCost = qty > 0 ? (Number(it.lineTotal) - Number(it.taxAmt || 0)) / qty / factor : Number(it.unitCost) / factor;
-        const patch = {};
-        if (netCost > 0 && Math.abs(netCost - (Number(prod.landingCost) || 0)) > 0.0001) {
-          patch.landingCost = String(parseFloat(netCost.toFixed(4)));
-          patch.lastPurchaseCost = patch.landingCost;
+        const patch = {
+          lastPurchaseVendorId: payload.vendorId || "",
+          lastPurchaseVendorName: payload.vendorName || "",
+          lastPurchaseInvoiceNo: payload.invoiceNo || "",
+        };
+        const lastDay = String(prod.lastPurchaseDate || "").slice(0, 10);
+        if (!lastDay || billDay >= lastDay) patch.lastPurchaseDate = billDay;
+        if (netCost > 0) {
+          const lcStr = String(parseFloat(netCost.toFixed(4)));
+          const costChanged = Math.abs(netCost - (Number(prod.landingCost) || 0)) > 0.0001;
+          if (costChanged) {
+            patch.landingCost = lcStr;
+            patch.lastPurchaseCost = lcStr;
+            Object.assign(patch, pricingPatchFromLanding(prod, netCost));
+          } else if (!lastDay || billDay >= lastDay) {
+            patch.lastPurchaseCost = lcStr;
+          }
         }
-        if (billDay > String(prod.lastPurchaseDate || "").slice(0, 10)) patch.lastPurchaseDate = billDay;
         const sale = Number(it.salePrice) || 0;
         if (sale > 0 && factor === 1) {
           const priceKey = prod.vatInclusive ? "vatInclusive" : prod.mrp ? "mrp" : prod.vatExclusive ? "vatExclusive" : "vatInclusive";
           if (Math.abs(sale - (Number(prod[priceKey]) || 0)) > 0.0001) patch[priceKey] = String(sale);
         }
-        if (!Object.keys(patch).length) continue;
-        await offlinePatch("products", it.productId, { ...patch, updatedAt: nowIso }, prod, persistOpts);
+        const keys = Object.keys(patch).filter((k) => patch[k] !== undefined && patch[k] !== prod[k]);
+        if (!keys.length) continue;
+        const merged = { ...patch, updatedAt: nowIso };
+        await offlinePatch("products", it.productId, merged, prod, persistOpts);
+        onProductPatched?.(it.productId, merged);
       } catch (err) {
         console.warn("[S4 PI] product cost update failed", it.productId, err);
       }
@@ -4745,7 +4761,7 @@ function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vendors, pr
         actor: { uid: user?.uid, personName: profile?.personName },
       });
 
-      if (can("manageProducts")) {
+      if (canManagePurchase || can("manageProducts")) {
         const ids = [...new Set((inv.items || []).map((it) => it.productId).filter(Boolean))];
         const live = piMoneyInvoices.filter((i) => i.id !== inv.id && i.status !== "cancelled" && i.status !== "draft");
         for (const pid of ids) {
@@ -9504,7 +9520,7 @@ function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierId, canE
 }
 
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu, globalSearchCan, onGlobalSearchNavigate }) {
+function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu, globalSearchCan, onGlobalSearchNavigate, globalSearchCur, globalSearchCanSeeCost }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
@@ -9761,6 +9777,8 @@ function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos
           vendors={vendors}
           can={globalSearchCan}
           onNavigate={onGlobalSearchNavigate}
+          cur={globalSearchCur || t.cur || "AED"}
+          canSeeCost={globalSearchCanSeeCost}
         />
       )}
 
@@ -10133,6 +10151,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const can     = (key) => isOwner||perms[key]===true;
   const canManageProducts = can("manageProducts");
   const canSeeProductCost = canManageProducts || can("managePurchase");
+  const patchProductInList = useCallback((productId, patch) => {
+    setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, ...patch } : p)));
+  }, []);
   const isOrderManager = !isOwner&&(can("setStatus")||can("setPrices")||can("markDelivery")||can("deleteOrder"));
 
   const [orders,setOrders]=useState([]);
@@ -13910,6 +13931,8 @@ const startEditOrder = (order) => {
           onOpenMenu={()=>setMenuOpen(true)}
           globalSearchCan={globalSearchCan}
           onGlobalSearchNavigate={handleGlobalSearchNavigate}
+          globalSearchCur={t.cur || localShop?.currency || "AED"}
+          globalSearchCanSeeCost={canSeeProductCost}
         />
       )}
       {tab==="dashboard"&&(isOwner||can("viewProducts"))&&(
@@ -14806,6 +14829,7 @@ const startEditOrder = (order) => {
           onPurchaseSourceHandled={()=>setPurchaseSource(null)}
           openInvoiceId={globalOpenPurchaseInvoiceId}
           onOpenInvoiceHandled={()=>setGlobalOpenPurchaseInvoiceId(null)}
+          onProductPatched={patchProductInList}
         />
       )}
 
@@ -15589,6 +15613,8 @@ const startEditOrder = (order) => {
               onNavigate={handleGlobalSearchNavigate}
               isMobile
               showBar={false}
+              cur={t.cur || localShop?.currency || "AED"}
+              canSeeCost={canSeeProductCost}
             />
           )}
           {globalSearchCanAny && tab !== "products" && !pmOverSales && (
@@ -15602,6 +15628,8 @@ const startEditOrder = (order) => {
               can={globalSearchCan}
               onNavigate={handleGlobalSearchNavigate}
               isMobile
+              cur={t.cur || localShop?.currency || "AED"}
+              canSeeCost={canSeeProductCost}
             />
           )}
           {tabContent}
