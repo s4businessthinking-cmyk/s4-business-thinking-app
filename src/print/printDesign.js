@@ -329,7 +329,7 @@ export function applyDesign(html, kind, styleOverride) {
 
 // Built-in statement document (same structure/classes as invoices, so templates apply).
 // cols: [{ label, align }], rows: [[cell…]], foot: [cell…] | null
-export function generateStatementHTML({ shopName = "", title = "", subtitle = "", partyLine = "", cols = [], rows = [], foot = null, paper = "A4" }, styleOverride) {
+export function generateStatementHTML({ shopName = "", title = "", subtitle = "", partyLine = "", cols = [], rows = [], foot = null, summaryLines = [], paper = "A4" }, styleOverride) {
   const th = cols.map((c) => `<th style="text-align:${c.align || "left"}">${esc(c.label)}</th>`).join("");
   const body = rows.map((r) => `<tr>${r.map((v, i) => `<td style="text-align:${cols[i]?.align || "left"}">${esc(v)}</td>`).join("")}</tr>`).join("");
   const tfoot = foot ? `<tfoot><tr>${foot.map((v, i) => `<td style="text-align:${cols[i]?.align || "left"};font-weight:800;background:#f1f5f9">${esc(v)}</td>`).join("")}</tr></tfoot>` : "";
@@ -353,7 +353,7 @@ td{padding:5px 6px;border-bottom:1px solid #e5e7eb;vertical-align:top}tbody tr:n
 <div class="invoice"><div class="hdr"><div class="shop-block"><div class="shop-name">${esc(shopName)}</div></div>
 <div><div class="inv-title">${esc(title)}</div><div class="inv-no">${esc(subtitle)}</div></div></div>
 <div class="body">${partyLine ? `<div class="info-box">${esc(partyLine)}</div>` : ""}
-<table><thead><tr>${th}</tr></thead><tbody>${body}</tbody>${tfoot}</table></div>
+<table><thead><tr>${th}</tr></thead><tbody>${body}</tbody>${tfoot}</table>${summaryLines.length ? `<div style="margin-top:14px;font-size:12px;line-height:1.7">${summaryLines.map((line) => `<div>${esc(line)}</div>`).join("")}</div>` : ""}</div>
 <div class="footer">${esc(new Date().toLocaleString("en-GB"))}</div></div></body></html>`;
   return applyDesign(html, "statement", styleOverride);
 }

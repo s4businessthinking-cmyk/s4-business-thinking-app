@@ -61,6 +61,7 @@ const applyDisplayParticulars = (e, opts, isCustomer) => {
   const lines = [];
   if (e.kind === "bill" || e.kind === "opening") lines.push(isCustomer ? "SALES" : "PURCHASE");
   else lines.push(e.particularsBase || e.particulars || "");
+  if (opts.showSettledInvoices && e.allocText) lines.push(e.allocText);
   if (opts.showNote) {
     if (e.meta?.note) lines.push(e.meta.note);
     if (e.voucherMeta?.note) lines.push(e.voucherMeta.note);
@@ -69,7 +70,8 @@ const applyDisplayParticulars = (e, opts, isCustomer) => {
     }
   }
   const text = lines.filter(Boolean).join("\n");
-  return { ...e, particulars: text, narrRef: "" };
+  const ref = opts.showSettledInvoices && e.supRefs ? e.supRefs : e.ref;
+  return { ...e, particulars: text, narrRef: "", ref };
 };
 const entryPassesFilters = (e, { voucherFilter, includePdc }) => {
   if (!includePdc && e.isPdc) return false;
@@ -77,6 +79,20 @@ const entryPassesFilters = (e, { voucherFilter, includePdc }) => {
   if (voucherFilter === "bill") return e.kind === "bill";
   if (voucherFilter === "settle") return e.kind === "direct" || e.kind === "voucher";
   return true;
+};
+const OS_DEFAULT_OPTS = { ref: true, cn: true, pdc: true, afterPdc: true, running: true, days: true, ageing: true };
+const AGE_BUCKETS = [[0, 30, "0-30"], [31, 60, "31-60"], [61, 90, "61-90"], [91, Infinity, "90+"]];
+const daysBetween = (fromIso, toIso) => {
+  const a = Date.parse(`${String(fromIso).slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${String(toIso).slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(a) && Number.isFinite(b) ? Math.max(0, Math.round((b - a) / 86400000)) : 0;
+};
+// A cheque still waiting to clear: the amount already counts as paid on the bill, but no money has arrived yet.
+const isUnclearedCheque = (raw, asOf) => {
+  if (raw?.method !== "cheque") return false;
+  if (raw.chequeStatus) return raw.chequeStatus === "pending";
+  const chequeDate = String(raw.chequeDate || "").slice(0, 10);
+  return Boolean(chequeDate) && chequeDate > asOf;
 };
 const sumFiltered = (list, from, to, filters) => {
   let opening = 0, bill = 0, settle = 0, count = 0;
@@ -120,14 +136,19 @@ export default function PartyLedgerWindow({
   const [showNote, setShowNote] = useState(!!savedOpts.showNote);
   const [showVendorRef, setShowVendorRef] = useState(!!savedOpts.showVendorRef);
   const [mergeEntries, setMergeEntries] = useState(!!savedOpts.mergeEntries);
+  const [showSettledInvoices, setShowSettledInvoices] = useState(!!savedOpts.showSettledInvoices);
+  const [stmtType, setStmtType] = useState(savedOpts.stmtType === "outstanding" ? "outstanding" : "ledger");
+  const [osOpts, setOsOpts] = useState(() => ({ ...OS_DEFAULT_OPTS, ...(savedOpts.osOpts || {}) }));
+  const setOsOpt = (k, v) => setOsOpts((o) => ({ ...o, [k]: v }));
+  const isOutstanding = stmtType === "outstanding";
   const displayOpts = useMemo(() => ({
-    showNarration, showDn, showVehicle, showTrn, showNote, showDrCr, showBalance, mergeEntries,
-  }), [showNarration, showDn, showVehicle, showTrn, showNote, showDrCr, showBalance, mergeEntries]);
+    showNarration, showDn, showVehicle, showTrn, showNote, showDrCr, showBalance, mergeEntries, showSettledInvoices,
+  }), [showNarration, showDn, showVehicle, showTrn, showNote, showDrCr, showBalance, mergeEntries, showSettledInvoices]);
   const persistLedgerOpts = () => {
     try {
       localStorage.setItem(ledgerOptsKey(mode), JSON.stringify({
         voucherFilter, includePdc, monthly, showNarration, showBalanceInPrint, showBalance, showDrCr,
-        showDn, showVehicle, showTrn, showNote, showVendorRef, mergeEntries,
+        showDn, showVehicle, showTrn, showNote, showVendorRef, mergeEntries, showSettledInvoices, stmtType, osOpts,
       }));
     } catch { /* ignore */ }
   };
@@ -208,6 +229,7 @@ export default function PartyLedgerWindow({
       }
     });
     const refById = new Map(invoices.map((i) => [i.id, i.ref]));
+    const invById = new Map(invoices.map((i) => [i.id, i]));
     live.forEach((v) => {
       const allocs = v.allocations || [];
       const supRefs = isCustomer ? "" : allocs.map((a) => a.supplierInvoiceNo || refById.get(a.invoiceId) || "").filter(Boolean).join(", ");
@@ -215,12 +237,17 @@ export default function PartyLedgerWindow({
       const chequeDate = raw.method === "cheque" ? String(raw.chequeDate || "").slice(0, 10) : "";
       const isPdc = raw.method === "cheque" && chequeDate && chequeDate > todayIso();
       const voucherMetaRow = voucherMeta(raw);
-      const particularsBase = [METHOD[v.method] || v.method, allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ")].filter(Boolean).join(" · ");
+      const allocText = allocs.map((a) => a.invoiceNo).filter(Boolean).join(", ");
+      // A credit/debit note applies to a single bill, so its number stays on the row.
+      const particularsBase = [METHOD[v.method] || v.method, raw.__return ? allocText : ""].filter(Boolean).join(" · ");
+      const returnInv = raw.__return ? invById.get(allocs[0]?.invoiceId) : null;
       push(keyOf(v), {
         key: `v-${v.id}`, date: v.date || "", seq: 2, kind: "voucher", isPdc, voucherMeta: voucherMetaRow,
-        vType: isCustomer ? "Receipt" : "Payment", type: v.typeLabel || settleLabel, no: v.no, ref: supRefs || v.ref || "",
+        vType: isCustomer ? "Receipt" : "Payment", type: v.typeLabel || settleLabel, no: v.no, ref: v.ref || "",
+        allocText: raw.__return ? "" : allocText, supRefs,
         particularsBase, particulars: particularsBase,
-        bill: 0, settle: n2(v.amount), open: onOpenVoucher ? () => onOpenVoucher(v.raw) : null,
+        bill: 0, settle: n2(v.amount),
+        open: returnInv && onOpenInvoice ? () => onOpenInvoice(returnInv.raw) : (onOpenVoucher ? () => onOpenVoucher(v.raw) : null),
       });
     });
     out.forEach((list) => {
@@ -301,6 +328,68 @@ export default function PartyLedgerWindow({
     return { ...s, rows };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [party, entriesByParty, from, to, ledgerFilters, displayOpts, mergeEntries, monthly, isCustomer]);
+
+  // Open-bill statement: one row per bill that still has money due, like a supplier's "Statement of Account".
+  const outstanding = useMemo(() => {
+    if (!party || !isOutstanding) return null;
+    const asOf = todayIso();
+    const cnByInv = new Map();
+    const pdcByInv = new Map();
+    const add = (m, id, amt) => m.set(id, (m.get(id) || 0) + n2(amt));
+    vouchers.forEach((v) => {
+      if (v.status === "cancelled" || keyOf(v) !== party.key) return;
+      const raw = v.raw || {};
+      const target = raw.__return ? cnByInv : isUnclearedCheque(raw, asOf) ? pdcByInv : null;
+      if (target) (v.allocations || []).forEach((a) => add(target, a.invoiceId, a.amount));
+    });
+    let run = 0;
+    const ageing = AGE_BUCKETS.map(([, , label]) => ({ label, amount: 0 }));
+    const rows = invoices
+      .filter((inv) => inv.status !== "cancelled" && inv.status !== "draft" && keyOf(inv) === party.key)
+      .filter((inv) => inRange(String(inv.date).slice(0, 10)))
+      .map((inv) => {
+        const total = n2(inv.total);
+        const cn = cnByInv.get(inv.id) || 0;
+        const pdc = pdcByInv.get(inv.id) || 0;
+        const afterPdc = Math.max(0, total - n2(inv.paid));
+        const act = Math.min(total - cn, afterPdc + pdc);
+        return { inv, total, cn, pdc, afterPdc, act };
+      })
+      .filter((r) => r.act > 0.009)
+      .sort((a, b) => String(a.inv.date).localeCompare(String(b.inv.date)) || String(a.inv.no).localeCompare(String(b.inv.no)))
+      .map((r, i) => {
+        run += r.act;
+        const days = daysBetween(r.inv.date, asOf);
+        const bucket = AGE_BUCKETS.findIndex(([lo, hi]) => days >= lo && days <= hi);
+        if (bucket >= 0) ageing[bucket].amount += r.act;
+        return {
+          ...r, key: `os-${r.inv.id}`, sno: i + 1, run, days,
+          ref: invMeta(r.inv, isCustomer).dn || r.inv.ref || "",
+          isOpening: r.inv.raw?.source === "openingBalance",
+          open: () => onOpenInvoice?.(r.inv.raw),
+        };
+      });
+    const sum = (k) => rows.reduce((a, r) => a + r[k], 0);
+    return { asOf, rows, ageing, total: sum("total"), cn: sum("cn"), pdc: sum("pdc"), afterPdc: sum("afterPdc"), act: sum("act") };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [party, isOutstanding, invoices, vouchers, keyOf, from, to, isCustomer, onOpenInvoice]);
+
+  const osCols = useMemo(() => {
+    const cols = [
+      { key: "sno", label: "S.No", width: 44, align: "right", render: (r) => r.sno },
+      { key: "date", label: "Inv Date", width: 82, render: (r) => fmtDate(r.inv.date) },
+      { key: "no", label: "Invoice No", width: 90, bold: true, render: (r) => (r.isOpening ? `${r.inv.no || ""} (Opening)` : r.inv.no || "") },
+    ];
+    if (osOpts.ref) cols.push({ key: "ref", label: isCustomer ? "Ref / DN No" : "Supplier Inv", width: 95, render: (r) => r.ref });
+    cols.push({ key: "amt", label: "Invoice Amount", width: 95, align: "right", render: (r) => f2(r.total) });
+    if (osOpts.cn) cols.push({ key: "cn", label: isCustomer ? "Credit Note" : "Debit Note", width: 85, align: "right", render: (r) => (r.cn ? f2(r.cn) : "0.00") });
+    if (osOpts.pdc) cols.push({ key: "pdc", label: "PDC Covered", width: 85, align: "right", render: (r) => (r.pdc ? f2(r.pdc) : "0.00") });
+    if (osOpts.afterPdc) cols.push({ key: "after", label: "Balance After PDC", width: 95, align: "right", render: (r) => f2(r.afterPdc) });
+    cols.push({ key: "act", label: "Act Balance", width: 95, align: "right", bold: true, render: (r) => f2(r.act), color: () => C.red });
+    if (osOpts.running) cols.push({ key: "run", label: "Total O/S", width: 100, align: "right", render: (r) => f2(r.run) });
+    if (osOpts.days) cols.push({ key: "days", label: "O/S Days", width: 62, align: "right", render: (r) => r.days, color: (r) => (r.days > 90 ? C.red : undefined) });
+    return cols;
+  }, [osOpts, isCustomer]);
 
   const balText = (v) => {
     if (Math.abs(v) < 0.005) return "0.00";
@@ -403,8 +492,28 @@ export default function PartyLedgerWindow({
     const v = c.render(r);
     return typeof v === "object" && v !== null ? String(r.particulars ?? "") : String(v ?? "");
   };
+  const printOutstanding = () => {
+    const os = outstanding;
+    const cols = osCols;
+    const footVal = { amt: os.total, cn: os.cn, pdc: os.pdc, after: os.afterPdc, act: os.act };
+    const foot = cols.map((c, i) => (footVal[c.key] !== undefined ? f2(footVal[c.key]) : i === 0 ? "TOTAL" : ""));
+    const summaryLines = [
+      `Total Outstanding (Without PDC's): ${cur} ${f2(os.act)}`,
+      ...(os.pdc > 0.009 ? [`PDC in hand: ${cur} ${f2(os.pdc)}`, `Balance After PDC: ${cur} ${f2(os.afterPdc)}`] : []),
+      ...(osOpts.ageing ? [`Ageing (days): ${os.ageing.map((b) => `${b.label}: ${f2(b.amount)}`).join("   ")}`] : []),
+    ];
+    const partyBits = [party.code, party.name, party.mobile, party.trn ? `TRN ${party.trn}` : ""].filter(Boolean);
+    printWithSettings(generateStatementHTML({
+      shopName, title: "STATEMENT OF ACCOUNT", subtitle: `As on ${fmtDate(os.asOf)}${from || to ? ` · Bills ${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "Today"}` : ""}`,
+      partyLine: partyBits.join(" · "),
+      cols: cols.map((c) => ({ label: c.label, align: c.align })),
+      rows: os.rows.map((r) => cols.map((c) => String(c.render(r) ?? ""))),
+      foot, summaryLines,
+    }, loadPrintDesign().style.statement));
+  };
   const printLedger = () => {
     persistLedgerOpts();
+    if (party && isOutstanding && outstanding) { printOutstanding(); return; }
     const cols = party ? stmtColsForPrint : summaryCols;
     const rows = party ? stmtRows : summary;
     const period = from || to ? `${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "Today"}` : "All dates";
@@ -475,6 +584,38 @@ export default function PartyLedgerWindow({
           </div>
 
           {party && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "6px 10px", background: "#fff7e6", border: `1px solid ${C.border}`, borderRadius: 3 }}>
+              <span style={{ ...lbl, width: 88 }}>{bn ? "স্টেটমেন্ট" : "Statement"}</span>
+              {[
+                ["ledger", bn ? "লেজার (সব লেনদেন)" : "Ledger (all transactions)"],
+                ["outstanding", bn ? "বাকি বিল (Statement of Account)" : "Outstanding bills (Statement of Account)"],
+              ].map(([id, label]) => (
+                <label key={id} style={{ ...lbl, fontWeight: stmtType === id ? 800 : 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                  <input type="radio" name={`stmt-type-${mode}`} checked={stmtType === id} onChange={() => setStmtType(id)} /> {label}
+                </label>
+              ))}
+            </div>
+          )}
+          {party && isOutstanding && outstanding && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "6px 10px", background: "#f8fafc", border: `1px solid ${C.border}`, borderRadius: 3 }}>
+              <span style={{ ...lbl, fontWeight: 800, width: "100%", marginBottom: 2 }}>{bn ? "কলাম দেখাবেন" : "Show columns"}</span>
+              {[
+                ["ref", isCustomer ? (bn ? "Ref / DN নং" : "Ref / DN No") : (bn ? "সাপ্লায়ার Inv" : "Supplier Inv")],
+                ["cn", isCustomer ? "Credit Note" : "Debit Note"],
+                ["pdc", bn ? "PDC (চেক)" : "PDC Covered"],
+                ["afterPdc", "Balance After PDC"],
+                ["running", "Total O/S"],
+                ["days", bn ? "কত দিন বাকি (O/S Days)" : "O/S Days"],
+                ["ageing", bn ? "দিন অনুযায়ী সারাংশ" : "Ageing summary"],
+              ].map(([k, label]) => (
+                <label key={k} style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                  <input type="checkbox" checked={!!osOpts[k]} onChange={(e) => setOsOpt(k, e.target.checked)} /> {label}
+                </label>
+              ))}
+              <button type="button" onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "সেভ" : "Save choice"}</button>
+            </div>
+          )}
+          {party && !isOutstanding && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", padding: "8px 10px", background: "#e8f0fb", border: `1px solid ${C.border}`, borderRadius: 3 }}>
               <span style={{ ...lbl, width: 88 }}>{bn ? "ভাউচার" : "Voucher Type"}</span>
               <select style={inp({ width: 120 })} value={voucherFilter} onChange={(e) => setVoucherFilter(e.target.value)}>
@@ -503,7 +644,7 @@ export default function PartyLedgerWindow({
               <button type="button" onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "দেখুন" : "View"}</button>
             </div>
           )}
-          {party && !monthly && (
+          {party && !isOutstanding && !monthly && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "6px 10px", background: "#f8fafc", border: `1px solid ${C.border}`, borderRadius: 3 }}>
               <span style={{ ...lbl, fontWeight: 800, width: "100%", marginBottom: 2 }}>{bn ? "স্টেটমেন্টে দেখাবেন" : "Show on statement"}</span>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
@@ -535,6 +676,10 @@ export default function PartyLedgerWindow({
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                 <input type="checkbox" checked={showNote} onChange={(e) => setShowNote(e.target.checked)} /> {bn ? "নোট / চেক" : "Note / Cheque"}
               </label>
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showSettledInvoices} onChange={(e) => setShowSettledInvoices(e.target.checked)} />
+                {isCustomer ? (bn ? "রসিদের বিল নং" : "Bill nos on receipts") : (bn ? "পেমেন্টের বিল নং" : "Bill nos on payments")}
+              </label>
             </div>
           )}
 
@@ -549,7 +694,11 @@ export default function PartyLedgerWindow({
           )}
 
           <div style={{ border: `1px solid ${C.border}`, maxHeight: "52vh", overflow: "auto" }}>
-            {party
+            {party && isOutstanding && outstanding
+              ? <GridTable columns={osCols} rows={outstanding.rows} rowKey={(r) => r.key} minRows={14}
+                  onRowDoubleClick={(r) => r.open?.()}
+                  emptyText={bn ? "কোনো বাকি বিল নেই" : "No outstanding bills"} />
+              : party
               ? <GridTable columns={stmtCols} rows={stmtRows} rowKey={(e) => e.key} minRows={14}
                   onRowDoubleClick={(e) => e.open?.()}
                   emptyText={bn ? "এই সময়ে কোনো লেনদেন নেই" : "No transactions in this period"} />
@@ -564,10 +713,30 @@ export default function PartyLedgerWindow({
                 ? (bn ? "বিল বা ভাউচার খুলতে row-তে double click করুন" : "Double click a row to open the bill / voucher")
                 : (bn ? `স্টেটমেন্ট দেখতে ${isCustomer ? "কাস্টমারের" : "সাপ্লায়ারের"} row-তে double click করুন` : `Double click a ${partyLabel.toLowerCase()} to see the statement`)}
             </span>
-            {totalBox("Bill Amount", f2(totals.bill))}
-            {totalBox(isCustomer ? "Received" : "Paid", f2(totals.settle), C.green)}
-            {totalBox("Balance", balText(totals.closing), totals.closing > 0.01 ? C.red : C.green)}
+            {party && isOutstanding && outstanding ? (
+              <>
+                {outstanding.pdc > 0.009 && totalBox("PDC", f2(outstanding.pdc), "#b45309")}
+                {outstanding.pdc > 0.009 && totalBox("After PDC", f2(outstanding.afterPdc))}
+                {totalBox(bn ? "মোট বাকি (PDC ছাড়া)" : "Total Outstanding", f2(outstanding.act), C.red)}
+              </>
+            ) : (
+              <>
+                {totalBox("Bill Amount", f2(totals.bill))}
+                {totalBox(isCustomer ? "Received" : "Paid", f2(totals.settle), C.green)}
+                {totalBox("Balance", balText(totals.closing), totals.closing > 0.01 ? C.red : C.green)}
+              </>
+            )}
           </div>
+          {party && isOutstanding && outstanding && osOpts.ageing && outstanding.rows.length > 0 && (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", fontSize: 12, fontWeight: 700 }}>
+              <span style={{ color: "#4b5f86" }}>{bn ? "কত দিন বাকি:" : "Ageing (days):"}</span>
+              {outstanding.ageing.map((b) => (
+                <span key={b.label} style={{ background: "#fff", border: `1px solid ${C.border}`, padding: "2px 8px", color: b.label === "90+" && b.amount > 0.009 ? C.red : undefined }}>
+                  {b.label}: {f2(b.amount)}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
             {party && onNewVoucher && (
@@ -575,7 +744,7 @@ export default function PartyLedgerWindow({
                 💰 {isCustomer ? (bn ? "টাকা গ্রহণ" : "Receive Payment") : (bn ? "পেমেন্ট দিন" : "Make Payment")}
               </button>
             )}
-            <button type="button" onClick={printLedger} disabled={party ? !stmtRows.length : !summary.length} style={btn()}>🖨 Print</button>
+            <button type="button" onClick={printLedger} disabled={party ? (isOutstanding ? !outstanding?.rows.length : !stmtRows.length) : !summary.length} style={btn()}>🖨 Print</button>
             <button type="button" onClick={onClose} style={btn()}>Close</button>
           </div>
         </div>
