@@ -235,3 +235,6 @@ export async function nextPartyCode(shopId, kind, records = []) {
 // The open sales/purchase bill form registers here so tab switches and the phone back
 // button ask before discarding it. leave(): ok to navigate away; back(): handled the back.
 export const billLeaveGuard = { current: null };
+
+// ─── PURCHASE INVOICE — CONSTANTS ────────────────────────────
+export const PI_PREFIX       = "PI-";
