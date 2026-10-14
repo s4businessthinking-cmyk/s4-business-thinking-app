@@ -6,6 +6,7 @@ import { isErpDashboardRoute } from "./erp-build/buildStages.js";
 import { startOfflineEngine } from "./offline/offlineBoot";
 import S4BootErrorBoundary from "./components/S4BootErrorBoundary.jsx";
 import S4UiReadyGate from "./components/S4UiReadyGate.jsx";
+import S4SplashScreen from "./components/S4SplashScreen.jsx";
 
 function isElectronRuntime() {
   return Boolean(
@@ -131,13 +132,14 @@ if (typeof window !== "undefined") {
   });
 }
 
-const RootApp = isErpDashboardRoute() ? ErpBuildDashboard : App;
+const isErpDashboard = isErpDashboardRoute();
+const RootApp = isErpDashboard ? ErpBuildDashboard : App;
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <S4BootErrorBoundary>
       <S4UiReadyGate>
-        <RootApp />
+        {isErpDashboard ? <RootApp /> : <S4SplashScreen><RootApp /></S4SplashScreen>}
       </S4UiReadyGate>
     </S4BootErrorBoundary>
   </React.StrictMode>
