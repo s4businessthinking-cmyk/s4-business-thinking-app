@@ -209,9 +209,10 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
         </div>
 
         <div style={{ border: `1px solid ${C.border}`, maxHeight: inline ? "62vh" : "55vh", overflow: "auto", background: "#fff" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+          {/* with Month + Vendor Rcpt No the table grows wider than the window and scrolls left / right, so the party column keeps its width */}
+          <table style={{ width: "100%", minWidth: extraCols ? 1300 : undefined, borderCollapse: "collapse", tableLayout: "fixed" }}>
             <colgroup>
-              {[42, 85, 90, null, ...(extraCols ? [80, 100] : []), 120, 90, 90, 95, 44, 120, 110].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
+              {[42, 85, 90, extraCols ? 220 : null, ...(extraCols ? [80, 110] : []), 120, 90, 90, 95, 44, 120, 110].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
             </colgroup>
             <thead>
               <tr>
