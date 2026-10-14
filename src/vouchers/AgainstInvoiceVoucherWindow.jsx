@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C, inp, lbl, btn, th, td, Modal, GridTable, todayIso, fmtDate, fmtDateLong, textMatch } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
@@ -53,6 +53,62 @@ export function PartySelect({ parties, value, onPick, disabled, inputRef, placeh
                 style={{ padding: "4px 10px", cursor: "pointer", background: i === active ? "#1f5fbf" : "#fff", color: i === active ? "#fff" : "#111", fontSize: 12.5, fontWeight: 700, display: "flex", justifyContent: "space-between", gap: 10 }}>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                 {p.pending > 0 && <span style={{ opacity: 0.75, fontWeight: 600, flexShrink: 0 }}>{f2(p.pending)}</span>}
+              </div>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Type-to-search invoice picker: matches any part of the bill / vendor invoice number, the date or an amount,
+// shows date and balance per bill; arrows + Enter pick, like PartySelect.
+export function InvoiceSelect({ invoices, value, onPick, disabled, inputRef, onEnter, labelOf }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const wrapRef = useRef(null);
+  const list = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return invoices.filter((i) => !s || [labelOf(i), i.invoiceNo, i.supplierInvoiceNo, fmtDate(i.invoiceDate), i.invoiceDate, f2(i.grandTotal), f2(i.balanceDue)]
+      .some((v) => String(v || "").toLowerCase().includes(s))).slice(0, 200);
+  }, [invoices, q, labelOf]);
+  useEffect(() => { setActive(0); }, [q]);
+  useEffect(() => {
+    const onDown = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
+  const pick = (i) => { setOpen(false); setQ(""); onPick(i.id); };
+  return (
+    <div ref={wrapRef} style={{ position: "relative", minWidth: 0 }}>
+      <div style={{ display: "flex" }}>
+        <input ref={inputRef} disabled={disabled} style={inp({ fontWeight: 700 })} placeholder={disabled ? "" : "🔍"}
+          value={open ? q : (value ? labelOf(value) : "")} autoComplete="off"
+          onFocus={() => { setQ(""); setOpen(true); }}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown") { e.preventDefault(); setOpen(true); setActive((i) => Math.min(i + 1, list.length - 1)); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); setActive((i) => Math.max(i - 1, 0)); }
+            else if (e.key === "Enter") { e.preventDefault(); if (open && list[active]) pick(list[active]); else onEnter?.(); }
+            else if (e.key === "Escape") setOpen(false);
+          }} />
+        <button type="button" disabled={disabled} tabIndex={-1} onClick={() => { setOpen((o) => !o); inputRef?.current?.focus(); }}
+          style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11 })}>▼</button>
+      </div>
+      {open && !disabled && (
+        <div style={{ position: "absolute", top: "calc(100% + 1px)", left: 0, minWidth: 300, zIndex: 30, background: "#fff", border: `1px solid ${C.border}`, boxShadow: "0 10px 24px rgba(0,0,0,0.25)", maxHeight: 260, overflowY: "auto" }}>
+          {list.length === 0
+            ? <div style={{ padding: "6px 10px", fontSize: 12, color: "#4b5f86" }}>—</div>
+            : list.map((inv, i) => (
+              <div key={inv.id}
+                onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
+                onClick={() => { if (!shouldPreserveTextSelection(inputRef)) pick(inv); }}
+                onMouseEnter={() => { if (!shouldPreserveTextSelection(inputRef)) setActive(i); }}
+                style={{ padding: "4px 10px", cursor: "pointer", background: i === active ? "#1f5fbf" : "#fff", color: i === active ? "#fff" : "#111", fontSize: 12.5, display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, alignItems: "center" }}>
+                <span style={{ fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{labelOf(inv)}</span>
+                <span style={{ opacity: 0.75 }}>{fmtDate(inv.invoiceDate)}</span>
+                <span style={{ fontWeight: 700, minWidth: 70, textAlign: "right" }}>{f2(inv.balanceDue)}</span>
               </div>
             ))}
         </div>
@@ -117,6 +173,7 @@ export default function AgainstInvoiceVoucherWindow({
   const pendingTotal = openInvoices.reduce((a, i) => a + n2(i.balanceDue), 0);
   const choosable = openInvoices.filter((i) => !rows.some((r) => r.invoiceId === i.id));
   const selInv = openInvoices.find((i) => i.id === selInvId) || null;
+  const invoiceLabel = useCallback((i) => (!isReceipt && i.supplierInvoiceNo ? `${i.supplierInvoiceNo}  (${i.invoiceNo})` : i.invoiceNo), [isReceipt]);
   const total = rows.reduce((a, r) => a + n2(r.amount), 0);
 
   const resetNew = () => {
@@ -254,12 +311,9 @@ export default function AgainstInvoiceVoucherWindow({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 6, alignItems: "end" }}>
               <div>
                 <div style={lbl}>{isReceipt ? `${docLabel} No` : "Vendor Inv No"}</div>
-                <select ref={invRef} style={inp()} value={selInvId} disabled={!party}
-                  onChange={(e) => pickInvoice(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && selInvId) { e.preventDefault(); amtRef.current?.focus(); amtRef.current?.select(); } }}>
-                  <option value="">{party ? (choosable.length ? "" : "—") : ""}</option>
-                  {choosable.map((i) => <option key={i.id} value={i.id}>{!isReceipt && i.supplierInvoiceNo ? `${i.supplierInvoiceNo}  (${i.invoiceNo})` : i.invoiceNo}</option>)}
-                </select>
+                <InvoiceSelect invoices={choosable} value={selInv} disabled={!party} inputRef={invRef} onPick={pickInvoice}
+                  labelOf={invoiceLabel}
+                  onEnter={() => { if (selInvId) { amtRef.current?.focus(); amtRef.current?.select(); } }} />
               </div>
               {box(`${docLabel} Date`, selInv ? fmtDate(selInv.invoiceDate) : "")}
               {box(`${docLabel} Amount`, selInv ? f2(selInv.grandTotal) : "", { right: true })}
