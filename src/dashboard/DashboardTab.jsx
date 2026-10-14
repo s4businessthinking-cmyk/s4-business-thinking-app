@@ -87,6 +87,7 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
     { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
     { key:"pdc",      icon:"📃", label:lang==="bn"?"PDC চেক":"PDC",           badge:null },
     { key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses",          badge:null },
+    { key:"globalLedger", icon:"📒", label:lang==="bn"?"গ্লোবাল লেজার":"Global Ledger", badge:null },
     { key:"vouchers", icon:"🧾", label:lang==="bn"?"ভাউচার":"Vouchers",       badge:null },
     { key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null },
     { key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null },

@@ -320,7 +320,7 @@ export async function backfillPartyCodes(shopId, kind, records = []) {
 }
 
 // Global keyboard shortcuts per menu tab, shown beside the name in the desktop sidebar.
-export const TAB_SHORTCUT_KEYS = { products:"F2", purchase:"F3", sales:"F4", vendors:"Ctrl+O", customers:"Ctrl+U" };
+export const TAB_SHORTCUT_KEYS = { products:"F2", purchase:"F3", sales:"F4", vendors:"Ctrl+O", customers:"Ctrl+U", globalLedger:"Ctrl+L" };
 
 export function pushOrdersNow() {
   const off = window.S4Offline;

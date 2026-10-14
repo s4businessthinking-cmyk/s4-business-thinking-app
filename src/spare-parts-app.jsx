@@ -129,7 +129,6 @@ import BatchPickModal from "./sales-invoice/BatchPickModal";
 import { CURRENCIES } from "./reports/taxDomain.js";
 import AgainstInvoiceVoucherWindow from "./vouchers/AgainstInvoiceVoucherWindow.jsx";
 import PartyLedgerWindow from "./vouchers/PartyLedgerWindow.jsx";
-import GlobalLedgerWindow from "./ledger/GlobalLedgerWindow.jsx";
 import PartyPickerWindow, { CUSTOMER_PICKER_COLS } from "./components/PartyPickerWindow.jsx";
 import PdcWindow from "./vouchers/PdcWindow.jsx";
 import { logAudit } from "./utils/auditLog.js";
@@ -532,32 +531,23 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
-  // Global desktop shortcut: Ctrl+L opens the Global Ledger (every account, owner only; asks the owner PIN when accounts are locked).
-  const [globalLedgerOpen, setGlobalLedgerOpen] = useState(false);
-  const [globalLedgerAfterPin, setGlobalLedgerAfterPin] = useState(false);
+  // Global desktop shortcut: Ctrl+L opens the Global Ledger page (owner only; the owner PIN is asked when accounts are locked).
   useEffect(() => {
     const onLedgerShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "l") return;
       event.preventDefault();
-      if (!isOwner || globalLedgerOpen) return;
-      if (document.querySelector("[data-si-modal-open]")) return;
-      if (ownerUnlocked) setGlobalLedgerOpen(true);
-      else { setGlobalLedgerAfterPin(true); setPinModal("unlock"); }
+      if (!isOwner || document.querySelector("[data-si-modal-open]")) return;
+      setTab("globalLedger");
+      if (!ownerUnlocked) setPinModal("unlock");
     };
     window.addEventListener("keydown", onLedgerShortcut);
     return () => window.removeEventListener("keydown", onLedgerShortcut);
-  }, [isOwner, globalLedgerOpen, ownerUnlocked, setPinModal]);
-  useEffect(() => {
-    if (!globalLedgerAfterPin) return;
-    if (ownerUnlocked) { setGlobalLedgerAfterPin(false); setGlobalLedgerOpen(true); }
-    else if (!pinModal) setGlobalLedgerAfterPin(false); // PIN window closed without unlocking
-  }, [globalLedgerAfterPin, ownerUnlocked, pinModal]);
-  useEffect(() => { if (!ownerUnlocked) setGlobalLedgerOpen(false); }, [ownerUnlocked]);
+  }, [isOwner, ownerUnlocked, setPinModal]); // eslint-disable-line react-hooks/exhaustive-deps
   const { OrderCard, ownerLockedPanel } = createOrderRenderers({ can, canExpand, cancelOrder, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, isDesktop, isOrderManager, isOwner, isSalesman, lang, markRead, openOrderSupplierPicker, openPriceEditor, s, saveSupplierPhone, selOrder, setCo, setItemStatus, setOrderStatus, setPinModal, setSelOrder, startEditOrder, supplierPhone, t, th, user, waLinkGroup });
 
   const { tabContent } = renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, selectProductToOrder, sendOrder, setBranchTransferSettings, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth });
 
-  return renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout, isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, localShop, menuOpen, minTab, notificationItems, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent: globalLedgerOpen ? <>{tabContent}<GlobalLedgerWindow lang={lang} shopId={shopId} shopName={(localShop||shopProp)?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} onClose={()=>setGlobalLedgerOpen(false)} /></> : tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs });
+  return renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout, isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, localShop, menuOpen, minTab, notificationItems, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs });
 }
 
 // ─── ROOT ────────────────────────────────────────────────────

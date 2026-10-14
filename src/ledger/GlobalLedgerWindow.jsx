@@ -1,9 +1,11 @@
 // Global Ledger (Ctrl+L): every account of the shop in one window - customers, suppliers, cash & bank, sales,
 // purchases, VAT, expenses, partners, journal accounts. Left: accounts with balances; right: the chosen account's
 // statement, or the trial balance when none is chosen. Read-only, worked out from the saved documents.
+// embedded: shown as a page (menu / dashboard) instead of a window over the screen.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, inp, lbl, btn, fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
+import { usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineList } from "../offline/offlineRepository";
 import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
@@ -24,11 +26,13 @@ const TYPE_LABEL = {
   distribution: ["লাভ বণ্টন", "Profit share"], bank: ["ব্যাংক এন্ট্রি", "Bank entry"],
 };
 
-export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose }) {
+export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose, embedded = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const win = useWindowState({ maximized: true });
-  useEscapeKey(() => onClose?.(), { enabled: !win.min, level: 2 });
+  useEscapeKey(() => onClose?.(), { enabled: !embedded && !win.min, level: 2 });
+  const pageRef = useRef(null);
+  const fitH = usePmFitHeight(pageRef, usePmMobile());
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [from, setFrom] = useState("");
@@ -81,7 +85,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
     return { rows, dr, cr };
   }, [ledger, bal]);
 
-  useEffect(() => { if (!win.min) setTimeout(() => searchRef.current?.focus(), 0); }, [win.min]);
+  useEffect(() => { if (!win.min) setTimeout(() => searchRef.current?.focus(), 0); }, [win.min, data]);
   useEffect(() => { listRef.current?.querySelector("[data-sel='1']")?.scrollIntoView({ block: "nearest" }); }, [selKey]);
 
   const onSearchKey = (e) => {
@@ -123,15 +127,8 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
   const num = { ...td, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" };
   const winTitle = `📒 ${L("গ্লোবাল লেজার", "Global Ledger")} (Ctrl+L)${selected ? ` — ${selected.name}` : ""}`;
 
-  return (
+  const body = (
     <>
-      {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
-      <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1650, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
-        <div style={{ width: "100%", maxWidth: win.max ? "none" : 1180, height: win.max ? "100%" : "92%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
-          <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none" }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{winTitle}</span>
-            <WindowButtons win={win} onClose={onClose} lang={lang} />
-          </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderBottom: `1px solid ${C.border}` }}>
             <span style={lbl}>From</span>
@@ -244,6 +241,31 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
               </div>
             </div>
           )}
+    </>
+  );
+  const box = { display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label };
+  const titleBar = (buttons) => (
+    <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none", minHeight: 22 }}>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{winTitle}</span>
+      {buttons}
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      // the page frame already has the title bar
+      <div ref={pageRef} style={{ ...box, height: fitH || "calc(100vh - 120px)", minHeight: 420 }}>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <>
+      {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
+      <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1650, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
+        <div style={{ ...box, width: "100%", maxWidth: win.max ? "none" : 1180, height: win.max ? "100%" : "92%", borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }}>
+          {titleBar(<WindowButtons win={win} onClose={onClose} lang={lang} />)}
+          {body}
         </div>
       </div>
     </>

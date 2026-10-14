@@ -21,6 +21,7 @@ import { PurchaseInvoiceTab } from "../purchase/PurchaseInvoiceTab.jsx";
 import { PiSalesmanView } from "../purchase/PiSalesmanView.jsx";
 import ProductMasterScreen from "../product-master/ProductMasterScreen.jsx";
 import ProfitLossReport from "../reports/ProfitLossReport.jsx";
+import GlobalLedgerWindow from "../ledger/GlobalLedgerWindow.jsx";
 import PurchaseDocsTab from "../purchase/PurchaseDocsTab.jsx";
 import RemindersTab from "../reminders/RemindersTab.jsx";
 import ReorderAlertCard from "../inventory/ReorderAlertCard";
@@ -376,6 +377,10 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
         <AuditLogTab lang={lang} th={th} shopId={shopId} cur={t.cur||"AED"} isDesktop={isDesktop} />
       )}
 
+      {tab==="globalLedger"&&isOwner&&ownerUnlocked&&(
+        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} />
+      )}
+      {tab==="globalLedger"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"গ্লোবাল লেজার লক করা":"Global Ledger is locked")}
       {tab==="accounts"&&isOwner&&ownerUnlocked&&(
         <ProfitLossReport lang={lang} th={th} s={s} shopId={shopId} products={products}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} />
