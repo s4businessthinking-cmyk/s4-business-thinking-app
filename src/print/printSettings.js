@@ -11,11 +11,11 @@ const S4Print = registerPlugin("S4Print");
 const isNativeApp = () => typeof window !== "undefined" && !!window.Capacitor?.isNativePlatform?.();
 
 export const PAPER_SIZES = [
-  { key: "A4", label: "A4 (210 × 297 mm)", css: "A4" },
-  { key: "A5", label: "A5 (148 × 210 mm)", css: "A5" },
-  { key: "letter", label: "Letter 8.5 × 11", css: "8.5in 11in" },
-  { key: "8.5x12", label: "8.5 × 12", css: "8.5in 12in" },
-  { key: "8x6", label: "8 × 6", css: "8in 6in" },
+  { key: "A4", label: "A4 (210 × 297 mm)", css: "A4", heightMm: 297 },
+  { key: "A5", label: "A5 (148 × 210 mm)", css: "A5", heightMm: 210 },
+  { key: "letter", label: "Letter 8.5 × 11", css: "8.5in 11in", heightMm: 279.4 },
+  { key: "8.5x12", label: "8.5 × 12", css: "8.5in 12in", heightMm: 304.8 },
+  { key: "8x6", label: "8 × 6", css: "8in 6in", heightMm: 152.4 },
   { key: "80mm", label: "Thermal 80 mm", css: "80mm auto" },
   { key: "58mm", label: "Thermal 58 mm", css: "58mm auto" },
 ];
@@ -26,6 +26,8 @@ const DOC_DEFAULTS = {
   paper: "A4",
   language: "app",
   hideVatDiscCols: false,
+  // Stretch the bill to the full page (totals and signatures at the bottom) even with one or two items.
+  fullPage: true,
 };
 
 export const DEFAULT_PRINT_SETTINGS = {
@@ -65,6 +67,11 @@ export function savePrintSettings(settings) {
 
 export function docSettingsFor(settings, invoice) {
   return invoice?.invoiceType === "tax" ? settings.tax : settings.retail;
+}
+
+// Height of a page-size paper in mm; null for roll (thermal) paper.
+export function paperHeightMm(key) {
+  return (PAPER_SIZES.find((p) => p.key === key) || PAPER_SIZES[0]).heightMm || null;
 }
 
 export function paperCss(key) {

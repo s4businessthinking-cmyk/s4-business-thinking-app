@@ -144,6 +144,9 @@ function DocTab({ title, doc, setDoc, isTax, bn }) {
         <Check checked={doc.preprinted} onChange={(v) => set("preprinted", v)}>
           {bn ? "আগে থেকে ছাপানো প্যাড (Pre-printed form) ব্যবহার করি — দোকানের নাম/ঠিকানা প্রিন্ট হবে না" : "Tick if Pre-Printed form is used (company information is not printed)"}
         </Check>
+        <Check checked={doc.fullPage !== false} onChange={(v) => set("fullPage", v)}>
+          {bn ? "আইটেম কম হলেও বিল পুরো পাতা জুড়ে প্রিন্ট হবে (টোটাল ও স্বাক্ষর পাতার নিচে) — থার্মাল রোলে প্রযোজ্য নয়" : "Print the bill on the full page even with few items (totals and signatures at the bottom); not for thermal rolls"}
+        </Check>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 700 }}>{bn ? "কয়টা কপি প্রিন্ট হবে:" : "No. of Copies to Print :"}</span>
           <input type="number" min={1} max={10} value={doc.copies}

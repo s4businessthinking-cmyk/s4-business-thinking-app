@@ -1,5 +1,5 @@
 import { loadPrintDesign, layoutAppliesTo, amountInWords, renderLayoutDocument, shopHeaderExtras, applyDesign } from "../print/printDesign.js";
-import { loadPrintSettings, docSettingsFor, paperCss, printWithSettings } from "../print/printSettings.js";
+import { loadPrintSettings, docSettingsFor, paperCss, paperHeightMm, printWithSettings } from "../print/printSettings.js";
 import { PI_VOUCHER_METHODS, piFmt2, piN2 } from "../shared/appShared.jsx";
 
 // ─── PI: VOUCHER — PRINTABLE HTML ───────────────────────────────
@@ -366,6 +366,11 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     ? `<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>` : "";
 
   const thermal = ds.paper==="80mm" || ds.paper==="58mm";
+  // Full-page bill: in print the invoice box becomes a table at least one page tall (8 mm margins, 1 mm slack)
+  // whose items row takes the free space, so totals, signatures and footer sit at the bottom even with one item.
+  // A table (not flex) because Chrome splits table rows across pages correctly when the items run longer.
+  const pageH = !thermal && ds.fullPage !== false ? paperHeightMm(ds.paper) : null;
+  const fpRow = pageH ? `<div class="fp-r">` : "", fpGrow = pageH ? `<div class="fp-r fp-grow">` : "", fpEnd = pageH ? "</div>" : "";
   const rawDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} - ${invoice.invoiceNo}</title>
@@ -408,15 +413,15 @@ ${isDelivery?`.recv-box{background:${colorPrint?"#f3e8ff":"#f8f9fa"};border:2px 
 .footer{text-align:center;padding:11px 22px;background:${colorPrint?"#f9fafb":"#f0f0f0"};border-top:2px solid ${accentBorder};font-size:12px;color:${accentBorder};font-weight:700}
 @media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0;box-shadow:none}}
 ${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr;gap:6px}.totals-box{width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
-${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
+${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}${pageH?`.fp-grow .body{padding-bottom:0}.fp-tail{padding-top:0}@media print{.invoice{display:table;width:100%;height:${pageH-17}mm;margin-top:0!important}.fp-r{display:table-row}.fp-grow{height:100%}}`:""}
 </style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="padding:10px 28px;background:${grandBg};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
-<div class="invoice"><div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>
-<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>${metaHTML?`<div style="margin:-4px 0 12px;font-size:12px;color:#374151">${metaHTML}</div>`:""}
-${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>
+<div class="invoice">${fpRow}<div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>${fpEnd}
+${fpGrow}<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>${metaHTML?`<div style="margin:-4px 0 12px;font-size:12px;color:#374151">${metaHTML}</div>`:""}
+${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>${pageH?`</div>${fpEnd}${fpRow}<div class="body fp-tail">`:""}
 ${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
 ${vatSummaryHTML}
 ${!isDelivery&&!isQuote&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">${cur} ${siFmt2(invoice.amountPaid)}</span></div>`:""}
@@ -425,7 +430,7 @@ ${isDelivery?`<div class="recv-box"><div style="font-size:11px;color:#7c3aed;fon
 ${custBalanceHTML}
 ${ps.printNarration&&invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
 ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
-</div><div class="footer">${isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ! 🙏":"Thank you for your order! 🙏"):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ! 🙏`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you! 🙏`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div></div></body></html>`;
+</div>${fpEnd}${fpRow}<div class="footer">${isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ! 🙏":"Thank you for your order! 🙏"):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ! 🙏`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you! 🙏`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div>${fpEnd}</div></body></html>`;
   const doc = applyDesign(rawDoc, "invoice", opts.style || design.style.invoice);
   const copies = Math.max(1, Math.min(10, parseInt(ds.copies, 10) || 1));
   if (copies === 1) return doc;
