@@ -31,7 +31,7 @@ const toRow = (type, v) => {
     raw: v,
   };
 };
-const fmtMonth = (ym) => (/^d{4}-d{2}$/.test(ym || "") ? new Date(`${ym}-01T00:00:00`).toLocaleString("en-GB", { month: "short", year: "numeric" }) : "");
+const fmtMonth = (ym) => (/^\d{4}-\d{2}$/.test(ym || "") ? new Date(`${ym}-01T00:00:00`).toLocaleString("en-GB", { month: "short", year: "numeric" }) : "");
 
 // A bounced cheque cancels its voucher and gives the allocated amounts back to the bills' balances.
 export async function bounceVoucher(type, voucher, uid) {
