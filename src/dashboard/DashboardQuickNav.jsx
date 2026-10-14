@@ -55,22 +55,25 @@ export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDa
     </button>
   );
 
+  // Desktop: the untitled first group (Orders) shows "Quick Navigate" in its title row, level with "Masters".
+  const titleInRow = isDesktop && groups.length > 0 && !groups[0].label;
+
   return (
-    <div style={{ marginBottom: isDesktop ? 0 : 18 }}>
-      <div style={{ margin: "12px 2px 8px", color: th.txtPrimary, fontSize: isDesktop ? 12 : 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.7 }}>
+    <div style={{ marginBottom: isDesktop ? 0 : 18, marginTop: titleInRow ? 12 : 0 }}>
+      {!titleInRow && <div style={{ margin: "12px 2px 8px", color: th.txtPrimary, fontSize: isDesktop ? 12 : 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.7 }}>
         {title}
-      </div>
+      </div>}
       <div style={isDesktop
         ? { display: "flex", flexWrap: "wrap", columnGap: 18, rowGap: 14 }
         : { display: "flex", flexDirection: "column", gap: 12 }}>
-        {groups.map((g) => (
+        {groups.map((g, gi) => (
           <div key={g.key} style={isDesktop ? { flex: `${g.items.length} 1 ${g.items.length * MIN_CARD + (g.items.length - 1) * 10}px`, minWidth: 0 } : undefined}>
-            {/* Desktop: a group without a title (Orders) keeps an empty title row, so its cards line up with the
-                cards of the titled group next to it (Masters) */}
+            {/* Desktop: a group without a title (Orders) keeps a title row ("Quick Navigate" for the first one), so its
+                cards line up with the cards of the titled group next to it (Masters) */}
             {(g.label || isDesktop) && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 2px 8px" }}>
-                <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 0.4, textTransform: "uppercase", color: isLightDash ? "#1e3a8a" : "#cbd5e1", whiteSpace: "nowrap" }}>
-                  {g.label ? `${g.icon} ${g.label}` : " "}
+                <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", color: g.label ? (isLightDash ? "#1e3a8a" : "#cbd5e1") : th.txtPrimary, letterSpacing: g.label ? 0.4 : 0.7, whiteSpace: "nowrap" }}>
+                  {g.label ? `${g.icon} ${g.label}` : (gi === 0 && titleInRow ? title : " ")}
                 </span>
                 {g.label && <span style={{ flex: 1, height: 1, background: isLightDash ? "rgba(59,130,246,0.18)" : "rgba(148,163,184,0.22)" }} />}
               </div>
