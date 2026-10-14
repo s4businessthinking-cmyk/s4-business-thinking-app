@@ -21,17 +21,52 @@ const barcodesOf = (p) => [p.barcode, p.ean, ...(Array.isArray(p.moreBarcodes) ?
 
 export const aliasKey = (vendorId, line) => `${vendorId || "-"}|${norm(line.code) || norm(line.name)}`;
 
+// Part numbers inside a text: tokens with a digit and 4+ characters ("MC889604", "0001416002", "5023/M8"), the
+// pieces around "/" or "-", and short neighbours joined ("8PK 1275" -> "8pk1275"). Shop codes often hold the part
+// number plus more ("MC889604 CE1306 J&P RR LH"), so codes are matched by these tokens, not as a whole.
+export function partTokens(text) {
+  const raw = String(text || "").split(/\s+/).filter(Boolean);
+  const out = new Set();
+  const add = (t) => { if (/^[\d.,]+$/.test(t) && /[.,]/.test(t)) return; const n = norm(t); if (n.length >= 4 && /\d/.test(n)) out.add(n); };
+  raw.forEach((t, i) => {
+    add(t);
+    for (const piece of t.split(/[/\-,;]/)) add(piece);
+    const next = raw[i + 1];
+    if (next && t.length <= 6 && next.length <= 6 && /\d/.test(t + next)) add(t + next);
+  });
+  return [...out];
+}
+
+// One edit apart (OCR reads 9 as 3, drops or adds a character).
+function oneEdit(a, b) {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0, j = 0, edits = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; }
+  }
+  return edits + (a.length - i) + (b.length - j) <= 1;
+}
+
 export function buildProductIndex(products) {
-  const byBarcode = new Map(), byCode = new Map(), byAlias = new Map();
-  for (const p of products || []) {
-    if (!p?.id || p.isDeleted) continue;
+  const byBarcode = new Map(), byCode = new Map(), byAlias = new Map(), byPart = new Map();
+  const list = (products || []).filter((p) => p?.id && !p.isDeleted);
+  for (const p of list) {
     for (const b of barcodesOf(p)) if (!byBarcode.has(b)) byBarcode.set(b, p);
     const c = norm(p.code);
     if (c && !byCode.has(c)) byCode.set(c, p);
     for (const a of Array.isArray(p.supplierAliases) ? p.supplierAliases : []) if (!byAlias.has(a)) byAlias.set(a, p);
+    for (const t of new Set([...partTokens(p.code), ...partTokens(p.barcode), ...partTokens(p.ean), ...(Array.isArray(p.moreBarcodes) ? p.moreBarcodes.flatMap(partTokens) : [])])) {
+      if (!byPart.has(t)) byPart.set(t, new Set());
+      byPart.get(t).add(p);
+    }
   }
-  return { products: (products || []).filter((p) => p?.id && !p.isDeleted), byBarcode, byCode, byAlias };
+  return { products: list, byBarcode, byCode, byAlias, byPart };
 }
+
+const sideOf = (s) => (/\b(LH|L\/H|LEFT)\b/i.test(s) ? "L" : /\b(RH|R\/H|RIGHT)\b/i.test(s) ? "R" : "");
 
 // -> { status: "exact" | "suggest" | "none", product, how, candidates: [{ product, score }] }
 export function matchLine(line, index, vendorId) {
@@ -41,6 +76,33 @@ export function matchLine(line, index, vendorId) {
   for (const k of tryKeys) if (k && index.byCode.has(k)) return { status: "exact", product: index.byCode.get(k), how: "code", candidates: [] };
   const alias = index.byAlias.get(aliasKey(vendorId, line));
   if (alias) return { status: "exact", product: alias, how: "linked before", candidates: [] };
+
+  // part number inside the shop's codes; OCR slips of one character only as suggestions.
+  // Not the whole row: its qty / rate / amount would read as part numbers.
+  const parts = partTokens(`${line.code || ""} ${line.name || ""}`);
+  const hits = new Map(); // product -> { exact, fuzzy }
+  const hit = (p, kind) => { const h = hits.get(p) || { exact: 0, fuzzy: 0 }; h[kind]++; hits.set(p, h); };
+  for (const t of parts) {
+    const exact = index.byPart?.get(t);
+    if (exact) { exact.forEach((p) => hit(p, "exact")); continue; }
+    if (t.length >= 6) for (const [k, set] of index.byPart || []) if (k.length >= 6 && oneEdit(t, k)) set.forEach((p) => hit(p, "fuzzy"));
+  }
+  if (hits.size) {
+    const brand = norm(line.brand);
+    const side = sideOf(line.raw || `${line.code} ${line.name}`);
+    const scored = [...hits].map(([p, h]) => {
+      const hay = `${p.code || ""} ${p.name || ""} ${p.company || ""} ${p.brand || ""}`;
+      let score = h.exact * 3 + h.fuzzy * 1.5 + nameScore(line.name, p.name);
+      if (brand && words(hay).some((w) => norm(w) === brand)) score += 2;
+      const ps = sideOf(hay);
+      if (side && ps) score += side === ps ? 1 : -2;
+      return { product: p, score, exact: h.exact > 0 };
+    }).sort((a, b) => b.score - a.score);
+    const [top, second] = scored;
+    const sure = top.exact && (!second || top.score - second.score >= 2);
+    return { status: sure ? "exact" : "suggest", product: top.product, how: top.exact ? "part no" : "part no (close)", candidates: scored.slice(0, 8) };
+  }
+
   const candidates = index.products
     .map((p) => ({ product: p, score: Math.max(nameScore(line.name, p.name), line.code && p.code ? nameScore(line.code, p.code) : 0) }))
     .filter((c) => c.score >= 0.34)

@@ -37,7 +37,7 @@ function parseHeader(rows) {
   const out = { invoiceNo: "", date: "", trn: "", supplierName: "", grandTotal: null, vatTotal: null };
   for (const line of all) {
     if (!out.invoiceNo) {
-      const m = line.match(/\b(?:tax\s+)?(?:invoice|inv|bill)\s*(?:no\.?|number|#|num)\s*[:\-.]?\s*([A-Z0-9][A-Z0-9/\-_.]{1,24})/i);
+      const m = line.match(/\b(?:tax\s+)?(?:invoice|inv|bill|quot(?:ation)?|qtn|doc(?:ument)?|voucher|delivery\s*note|dn)\s*(?:no\.?|number|#|num)\s*[:\-.]?\s*([A-Z0-9][A-Z0-9/\-_.]{1,24})/i);
       if (m && /\d/.test(m[1])) out.invoiceNo = m[1].replace(/[.,]$/, "");
     }
     if (!out.date && /\bdate\b/i.test(line)) out.date = parseDate(line);
@@ -45,8 +45,11 @@ function parseHeader(rows) {
   if (!out.date) out.date = parseDate(joined);
   const trn = joined.match(/\bTRN\s*(?:no\.?|number)?\s*[:\-.]?\s*(\d[\d\s-]{13,20}\d)/i);
   if (trn) out.trn = trn[1].replace(/\D/g, "");
-  // the supplier is usually the first line that is not the title / a label
-  out.supplierName = (all.find((l) => l.trim().length > 2 && !/\b(tax\s+)?invoice\b|^\s*(date|trn|tel|phone|mob|email|p\.?o\.?\s*box)/i.test(l) && !/^[\d\s/.:-]+$/.test(l)) || "").trim().slice(0, 80);
+  // the supplier: a company-looking line near the top (LLC / Trading / Est. …), else the first real text line;
+  // logos read by OCR give short junk lines, so skip lines with fewer than 8 letters
+  const top = all.slice(0, 12).map((l) => l.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9.)]+$/g, "").trim())
+    .filter((l) => (l.match(/[A-Za-z]/g) || []).length >= 8 && !/\b(tax\s+)?invoice\b|quotation|^\s*(date|trn|tel|phone|mob|email|e-mail|p\.?o\.?\s*box|shop\s*no|address)/i.test(l));
+  out.supplierName = (top.find((l) => /\b(l\.?\s*l\.?\s*c|llc|trading|est\.?|establishment|co\.?|company|ltd|fze|fzco|enterprises?)\b/i.test(l)) || top[0] || "").slice(0, 80);
   // totals: the last "grand total / total / net amount" with a number, and the VAT amount
   for (const line of all) {
     const nums = (line.match(/-?[\d,]*\.\d{2}\b|\b\d{1,3}(?:,\d{3})+\b/g) || []).map(toNum).filter((v) => v !== null);
@@ -64,7 +67,9 @@ export function parseItemRow(row) {
   const text = row.text || row.cells.map((c) => c.text).join(" ");
   if (HEADER_WORDS.test(text) && !/\d+\.\d{2}/.test(text)) return null;
   // drop tokens without a letter or digit (table borders read as "|")
-  const tokens = (row.cells && row.cells.length ? row.cells.map((c) => c.text).join(" ") : text).split(/\s+/).filter((t) => /[A-Za-z0-9]/.test(t));
+  // and the border marks OCR glues onto a word ("|LG", "[LG", "(PCS")
+  const tokens = (row.cells && row.cells.length ? row.cells.map((c) => c.text).join(" ") : text).split(/\s+/)
+    .map((t) => t.replace(/^[|[\](){}:;'"~`]+|[|[\](){}:;'"~`,]+$/g, "")).filter((t) => /[A-Za-z0-9]/.test(t));
   const numIdx = [];
   tokens.forEach((t, i) => { const clean = t.replace(/%$/, ""); if (NUM_RE.test(clean) && toNum(clean) !== null) numIdx.push(i); });
   if (numIdx.length < 2) return null;
@@ -105,16 +110,26 @@ export function parseItemRow(row) {
   if (after && UNITS.includes(after.toUpperCase().replace(/[.]/g, ""))) unit = after;
   const lastWord = words[words.length - 1];
   if (!unit && lastWord && UNITS.includes(lastWord.toUpperCase().replace(/[.]/g, ""))) { unit = lastWord; words = words.slice(0, -1); }
-  // a code / part number: a token with digits and letters or dashes, at the start or the end of the description
-  let code = "";
-  const isCode = (t) => /\d/.test(t) && /^[A-Z0-9][A-Z0-9\-/.]{2,}$/i.test(t) && !/^\d{1,3}$/.test(t);
-  if (words.length > 1 && isCode(words[0])) { code = words[0]; words = words.slice(1); }
-  else if (words.length > 1 && isCode(words[words.length - 1])) { code = words[words.length - 1]; words = words.slice(0, -1); }
+  // the code / part number: the first token with a digit (4+ characters) among the first words, joined with a short
+  // digit token before or after it ("8PK 1275"); words before it are a brand prefix ("LG 4630131120"),
+  // words after it the description. Else a code-looking last word.
+  let code = "", brand = "";
+  const hasDigit = (t) => /\d/.test(t);
+  const isCode = (t) => hasDigit(t) && /^[A-Z0-9][A-Z0-9\-/.()%]{2,}$/i.test(t) && !/^\d{1,3}$/.test(t);
+  const start = words.slice(0, 4).findIndex((t) => isCode(t) && t.replace(/[^A-Za-z0-9]/g, "").length >= 4);
+  if (start >= 0 && words.length > 1) {
+    let s = start, e = start + 1;
+    if (s > 0 && hasDigit(words[s - 1]) && words[s - 1].length <= 4) s--;
+    if (e < words.length - 1 && hasDigit(words[e]) && words[e].length <= 5) e++;
+    code = words.slice(s, e).join(" ");
+    brand = s > 0 && words.slice(0, s).join("").length <= 6 ? words.slice(0, s).join(" ") : "";
+    words = brand ? words.slice(e) : [...words.slice(0, s), ...words.slice(e)];
+  } else if (words.length > 1 && isCode(words[words.length - 1])) { code = words[words.length - 1]; words = words.slice(0, -1); }
   const vatTok = nums.find((n) => n.pct);
   const name = words.join(" ").replace(/\s{2,}/g, " ").trim();
   if (!name && !code) return null;
   return {
-    raw: text, code, name: name || code, qty: best.q.v, unit, rate: best.r.v,
+    raw: text, code, brand, name: name || code, qty: best.q.v, unit, rate: best.r.v,
     discount: best.disc ? r2(best.disc) : 0, vatPerc: vatTok ? vatTok.v : best.vat, amount: best.A.v,
   };
 }

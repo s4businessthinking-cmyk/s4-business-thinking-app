@@ -93,3 +93,25 @@ Grand Total AED 824.25`;
   ]);
   assert.equal(inv.linesTotal, 785);
 });
+
+test("part number inside the shop's longer product codes; brand and side pick between several", () => {
+  const products = [
+    { id: "a", name: "STARTER", code: "0001416002 LG MERC/LP" },
+    { id: "b1", name: "NIPPLE", code: "MC889604 CE1306 J&P RR LH W/G NIPPLE" },
+    { id: "b2", name: "NIPPLE", code: "MC889604 CE1306 LG RR LH W/G NIPPLE" },
+    { id: "b3", name: "NIPPLE", code: "MC889604 CE1306 LG RR RH W/G NIPPLE" },
+    { id: "c", name: "FAN BELT", code: "8PK1275 LG" },
+    { id: "d", name: "BOLT", code: "BOLT 10.00 MM 2000" },
+  ];
+  const idx = buildProductIndex(products);
+  const line = (t) => parseItemRow(rows(t)[0]);
+  const starter = matchLine(line("1 LG 0001416002 STARTER 1 PCS 100.00 100.00"), idx, "v");
+  assert.deepEqual([starter.status, starter.product.id, starter.how], ["exact", "a", "part no"]);
+  assert.equal(matchLine(line("2 LG MC889604 LH NIPPLE 1 PCS 20.00 20.00"), idx, "v").product.id, "b2");
+  assert.equal(matchLine(line("3 LG 8PK 1275 BELT 1 PCS 60.00 60.00"), idx, "v").product.id, "c");
+  // an OCR slip of one character is only a suggestion
+  const slip = matchLine(line("4 LG MC883604 LH NIPPLE 1 PCS 20.00 20.00"), idx, "v");
+  assert.deepEqual([slip.status, slip.product.id, slip.how], ["suggest", "b2", "part no (close)"]);
+  // qty / rate / amount of the row are not part numbers
+  assert.notEqual(matchLine(line("5 LG X9 WASHER 1 PCS 20.00 20.00"), idx, "v").product?.id, "d");
+});
