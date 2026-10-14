@@ -1,4 +1,7 @@
 import { registerPlugin } from "@capacitor/core";
+import { inlinePrintFonts, preloadPrintFonts } from "./printFonts.js";
+
+if (typeof window !== "undefined") setTimeout(preloadPrintFonts, 3000);
 
 // Device-level print settings (like the old desktop ERP: each PC/printer keeps its own).
 const KEY = "s4-print-settings-v1";
@@ -82,6 +85,7 @@ export async function listPrinters() {
 // straight to that printer; with preview it opens a window (bill + print dialog); otherwise
 // it prints from a hidden frame.
 export async function printHtmlDocument(html, { preview = true, lang = "en", printer = "", pageSizeMm = null } = {}) {
+  html = inlinePrintFonts(html);
   if (isNativeApp()) {
     try {
       const name = (html.match(/<title>([^<]*)<\/title>/i)?.[1] || "S4 Document").trim();
