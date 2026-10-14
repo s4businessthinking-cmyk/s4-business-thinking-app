@@ -192,6 +192,7 @@ import { code128SvgMarkup } from "./product-master/code128.js";
 
 import s4LogoUrl from "./assets/s4-logo.png";
 import { TR } from "./i18n/translations.js";
+import { takeFreshRunSignOut } from "./auth/sessionPerRun.js";
 import { useFirebaseAuthReady } from "./auth/useFirebaseAuthReady.js";
 import { localIsoDate } from "./utils/localIsoDate.js";
 import { UAE_BANKS, amountToWordsAED } from "./cheque/chequeConfig.js";
@@ -688,6 +689,8 @@ export default function App() {
         const boot = await ensureLocalAuthBootstrap();
         if (boot.shop) saveCachedShop(boot.shop.id, boot.shop);
 
+        // closing the software logs out: a fresh start drops the saved offline session (see auth/sessionPerRun.js)
+        if (takeFreshRunSignOut()) await logoutLocalAuth();
         const restored = await restoreLocalAuthSession();
         if (cancelled) return;
         if (restored) applyAuthResult(restored);
