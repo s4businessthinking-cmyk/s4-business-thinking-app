@@ -17,6 +17,29 @@ import { printMoneyReceipt, qtIsExpired } from "./siHelpers.js";
 import { salesSpecs } from "../product-master/productSpecs";
 
 export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canSeeCost, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintModal, siQtyRef, siQuickAddCustomer, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
+  // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
+  // is rendered on every screen, not only on the list.
+  const siPrintPrompt = siPrintModal&&(
+      <div className="pm-backdrop" style={{ zIndex:10000, alignItems:"center" }}>
+        <style>{PM_CSS}</style>
+        <div className="pm-window" style={{ maxWidth:380 }} role="dialog" aria-modal="true">
+          <div className="pm-window-title">
+            <span>✅ {isSO ? (bnL?"সেলস অর্ডার সেভ হয়েছে":"Sales order saved") : isQuote ? (bnL?"কোটেশন সেভ হয়েছে":"Quotation saved") : isDN ? (bnL?"ডেলিভারি নোট সেভ হয়েছে":"Delivery note saved") : (bnL?"ইনভয়েস সেভ হয়েছে":"Invoice saved")}</span>
+            <button type="button" className="pm-window-close" onClick={()=>setSiPrintModal(null)}>✕</button>
+          </div>
+          <div className="pm-window-body">
+            <div style={{ fontWeight:700, marginBottom:8 }}>🖨️ {bnL?"প্রিন্ট করবেন?":"Print now?"}</div>
+            <div className="si-total-row"><span>{t.si_invoiceNo}</span><b>{siPrintModal.invoiceNo}</b></div>
+            <div className="si-total-row"><span>{t.si_customer}</span><b>{siPrintModal.customerName||"—"}</b></div>
+            <div className="si-total-row is-grand"><span>{t.si_grandTotal}</span><b>{t.cur} {siFmt2(siPrintModal.grandTotal)}</b></div>
+            <div className="pm-window-foot">
+              <button type="button" className="pm-btn-secondary" onClick={()=>setSiPrintModal(null)}>{bnL?"না":"No"}</button>
+              <button type="button" className="pm-btn pm-btn--primary" autoFocus onClick={()=>{ siPrint(siPrintModal); setSiPrintModal(null); }}>🖨️ {bnL?"হ্যাঁ, প্রিন্ট":"Yes, print"}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
   if (siView==="list" || (siView==="form" && siWin.min && wideDesktop)) {
     const groups = groupInvoicesByParty(siFiltered, { idField:"customerId", nameField:"customerName" });
     const openGroup = siGroupMode==="folders" && siOpenParty ? (groups.find(g=>g.key===siOpenParty) || null) : null;
@@ -45,25 +68,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
         )}
         {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
-        {siPrintModal&&(
-          <div className="pm-backdrop" style={{ zIndex:10000, alignItems:"center" }}>
-            <div className="pm-window" style={{ maxWidth:380 }} role="dialog" aria-modal="true">
-              <div className="pm-window-title">
-                <span>✅ {isSO ? (bnL?"সেলস অর্ডার সেভ হয়েছে":"Sales order saved") : isQuote ? (bnL?"কোটেশন সেভ হয়েছে":"Quotation saved") : isDN ? (bnL?"ডেলিভারি নোট সেভ হয়েছে":"Delivery note saved") : (bnL?"ইনভয়েস সেভ হয়েছে":"Invoice saved")}</span>
-                <button type="button" className="pm-window-close" onClick={()=>setSiPrintModal(null)}>✕</button>
-              </div>
-              <div className="pm-window-body">
-                <div className="si-total-row"><span>{t.si_invoiceNo}</span><b>{siPrintModal.invoiceNo}</b></div>
-                <div className="si-total-row"><span>{t.si_customer}</span><b>{siPrintModal.customerName||"—"}</b></div>
-                <div className="si-total-row is-grand"><span>{t.si_grandTotal}</span><b>{t.cur} {siFmt2(siPrintModal.grandTotal)}</b></div>
-                <div className="pm-window-foot">
-                  <button type="button" className="pm-btn-secondary" onClick={()=>setSiPrintModal(null)}>{bnL?"পরে প্রিন্ট করব":"Print later"}</button>
-                  <button type="button" className="pm-btn pm-btn--primary" autoFocus onClick={()=>{ siPrint(siPrintModal); setSiPrintModal(null); }}>🖨️ {bnL?"এখনই প্রিন্ট":"Print now"}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {siPrintPrompt}
         {receiptWindow}
         {ledgerWindow}
 
@@ -260,6 +265,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
     const back = () => siLeaveDetail();
     return (
       <div ref={siRootRef} className="si-root" style={siRootStyle}>
+        {siPrintPrompt}
         <style>{PM_CSS}</style>
         <style>{SI_CSS}</style>
         {receiptWindow}
@@ -382,6 +388,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
   // ══ FORM ══
   if (wideDesktop) return (
     <div style={{ position:"fixed", inset:siWin.max?0:"28px 40px", zIndex:1500, background:"#c7d8ee", padding:siWin.max?6:"0 6px 6px", boxSizing:"border-box", overflowX:"auto", overflowY:"hidden", display:"flex", flexDirection:"column", border:siWin.max?"none":"1px solid #2854ad", boxShadow:siWin.max?"none":"0 18px 50px rgba(2,6,23,0.45)" }}>
+      {siPrintPrompt}
       <div onDoubleClick={siWin.toggleMax} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, margin:siWin.max?"-6px -6px 6px":"0 -6px 6px", padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", flexShrink:0, fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
         <span>{isSO?"SALES ORDER":isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"}{siInvoiceNo?` — ${siInvoiceNo}`:""}</span>
         <WindowButtons win={siWin} lang={lang} onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
@@ -460,6 +467,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
 
   return (
     <div ref={siRootRef} className="si-root" style={siRootStyle}>
+      {siPrintPrompt}
       <style>{PM_CSS}</style>
       {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
       <style>{SI_CSS}</style>
