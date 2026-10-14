@@ -159,7 +159,18 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
 
   const { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource } = usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors });
 
-  const { piCancelInv, piConfirm, piDelete, piGoToMakePayment, piSaveDraft } = createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user });
+  const { piCancelInv, piConfirm, piDelete, piGoToMakePayment, piSaveDraft, refreshAverageCosts } = createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user });
+  // One-time catch-up per shop and device: Avg. Cost of products saved before it followed the purchases.
+  useEffect(() => {
+    if (!shopId || piLoading || !invoices.length || !products.length) return;
+    const key = `s4-avg-cost-v1:${shopId}`;
+    try { if (localStorage.getItem(key)) return; } catch { return; }
+    const ids = [...new Set(invoices.flatMap((inv) => (inv.items || []).map((it) => it.productId)))];
+    refreshAverageCosts(ids, invoices, { deferPersist: true })
+      .then(async (done) => { if (!done) return; await persistOfflineDb(); try { localStorage.setItem(key, new Date().toISOString()); } catch {} })
+      .catch((err) => console.warn("[S4 PI] average cost catch-up failed", err));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId, piLoading, invoices.length, products.length]);
 
   // ── Filter ──
   const piFiltered = invoices.filter(inv=>{

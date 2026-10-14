@@ -9,6 +9,8 @@ import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { piCalcLine, piCalcTotals } from "./purchaseShared.js";
 import { pricingPatchFromLanding } from "../product-master/pricingFromLanding.js";
 import { unitFactorFor } from "../inventory/unitConversion";
+import { averageCosts } from "../reports/averageCost.js";
+import { livePurchasesOf } from "../reports/reportFilters.js";
 
 export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user }) {
   // ── Build payload ──
@@ -105,6 +107,8 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
 
     if (!editInvoiceId) bumpShopPiSerial(payload.invoiceNo);
     if (STOCK_AFFECTING_INVOICE_STATUSES.includes(payload.status)) await piUpdateProductCosts(payload, deferPersist);
+    await refreshAverageCosts([...(payload.items || []), ...(priorInvoice?.items || [])].map((it) => it.productId),
+      [...invoices.filter((inv) => inv.id !== savedId), savedDoc], deferPersist);
 
     await persistOfflineDb();
 
@@ -121,6 +125,32 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
   };
 
   // A confirmed purchase becomes the product's latest cost, and a sale price typed on the line updates the product's price.
+  // Avg. Cost on the product = the weighted average the reports use (opening stock + live purchases, after discount,
+  // VAT excluded). It used to be set once when the product was created and never follow the purchases.
+  const refreshAverageCosts = async (productIds, purchaseList, persistOpts = {}) => {
+    if (!(canManagePurchase || can("manageProducts"))) return false;
+    const ids = [...new Set(productIds.filter(Boolean))];
+    if (!ids.length) return true;
+    const live = livePurchasesOf(purchaseList, shopId).filter((inv) => inv.source !== "openingBalance");
+    for (const pid of ids) {
+      try {
+        const rec = await offlineGetById("products", pid).catch(() => null);
+        const prod = rec?.data || products.find((p) => p.id === pid);
+        if (!prod) continue;
+        const avg = averageCosts([{ ...prod, id: pid }], live).get(pid);
+        if (!(avg > 0)) continue;
+        const next = String(parseFloat(avg.toFixed(4)));
+        if (Math.abs(avg - (Number(prod.averageCost) || 0)) < 0.0001) continue;
+        const patch = { averageCost: next, updatedAt: new Date().toISOString() };
+        await offlinePatch("products", pid, patch, prod, persistOpts);
+        onProductPatched?.(pid, patch);
+      } catch (err) {
+        console.warn("[S4 PI] average cost update failed", pid, err);
+      }
+    }
+    return true;
+  };
+
   const piUpdateProductCosts = async (payload, persistOpts = {}) => {
     if (!(canManagePurchase || can("manageProducts"))) return;
     const nowIso = new Date().toISOString();
@@ -337,6 +367,7 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
           }
           if (latest) await piUpdateProductCosts(latest);
         }
+        await refreshAverageCosts(ids, invoices.map((x) => (x.id === inv.id ? updated : x)));
       }
 
       toast(t.pi_cancelledMsg,"err");
@@ -366,5 +397,5 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       }
     } catch(e){ toast(e.message,"err"); }
   };
-  return { piCancelInv, piConfirm, piDelete, piGoToMakePayment, piSaveDraft };
+  return { piCancelInv, piConfirm, piDelete, piGoToMakePayment, piSaveDraft, refreshAverageCosts };
 }
