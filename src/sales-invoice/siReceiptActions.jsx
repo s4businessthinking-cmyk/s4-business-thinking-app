@@ -5,6 +5,7 @@ import { applyInvoiceStockEffect, deviceSerialTag, reserveShopSerial, toVoucherV
 import { isOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlineGetById, offlineList, offlinePatch, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
+import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { printPaymentVoucher, siFmt2, siN2 } from "./salesInvoiceShared.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import { siToday } from "./siHelpers.js";
@@ -28,15 +29,24 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, custome
     return isOwner ? rcptFormatNo(local + 1) : `${rcptFormatNo(local + 1)}-${deviceSerialTag()}`;
   };
 
+  // All bills of one receipt are patched in memory, written to disk once and shown at once (a disk write and a
+  // re-render per bill made a 20-bill receipt tick down bill by bill).
   const applyInvoicePayments = async (changes, nowIso) => {
-    for (const { invoice, newAmountPaid } of changes) {
-      const grand = siN2(invoice.grandTotal);
-      const newBalance = Math.max(0, parseFloat(siFmt2(grand - newAmountPaid)));
-      const newStatus = newBalance < 0.01 ? "paid" : (newAmountPaid > 0 ? "partial" : "confirmed");
-      const result = await offlinePatch("salesInvoices", invoice.id, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:nowIso, updatedBy:user?.uid || "" }, invoice);
-      const updated = { ...invoice, ...result.data, id: invoice.id };
-      setInvoices(prev => prev.map(x => x.id === invoice.id ? updated : x));
-      setSelInv(prev => prev && prev.id === invoice.id ? updated : prev);
+    const updatedById = new Map();
+    try {
+      for (const { invoice, newAmountPaid } of changes) {
+        const grand = siN2(invoice.grandTotal);
+        const newBalance = Math.max(0, parseFloat(siFmt2(grand - newAmountPaid)));
+        const newStatus = newBalance < 0.01 ? "paid" : (newAmountPaid > 0 ? "partial" : "confirmed");
+        const result = await offlinePatch("salesInvoices", invoice.id, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:nowIso, updatedBy:user?.uid || "" }, invoice, { deferPersist:true });
+        updatedById.set(invoice.id, { ...invoice, ...result.data, id: invoice.id });
+      }
+    } finally {
+      if (updatedById.size) {
+        await persistOfflineDb();
+        setInvoices(prev => prev.map(x => updatedById.get(x.id) || x));
+        setSelInv(prev => (prev && updatedById.get(prev.id)) || prev);
+      }
     }
   };
 

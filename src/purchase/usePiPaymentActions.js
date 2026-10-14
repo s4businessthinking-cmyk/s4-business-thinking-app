@@ -1,5 +1,6 @@
 import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlinePatch, offlineRemove } from "../offline/offlineRepository";
+import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { piFmt2, piN2 } from "../shared/appShared.jsx";
 import { piToday } from "./purchaseShared.js";
 import { useEffect } from "react";
@@ -101,18 +102,7 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
       const created = { ...result.data, id: result.documentId, createdAt: nowIso };
       setPayments((prev) => [created, ...prev]);
 
-      for (const update of invoiceUpdates) {
-        const patched = await offlinePatch("purchaseInvoices", update.invoice.id, {
-          amountPaid: update.newAmountPaid,
-          balanceDue: update.newBalance,
-          status: update.newStatus,
-          updatedAt: nowIso,
-          updatedBy: user?.uid || "",
-        }, update.invoice);
-        const updated = { ...update.invoice, ...patched.data, id: update.invoice.id };
-        setInvoices((prev) => prev.map((inv) => (inv.id === update.invoice.id ? updated : inv)));
-        setSelInvoice((prev) => prev && prev.id === update.invoice.id ? updated : prev);
-      }
+      await applyBillPayments(invoiceUpdates, nowIso);
 
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] purchase payment save sync failed", err));
@@ -123,6 +113,30 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
       return created;
     } catch(e) { toast(e.message,"err"); return null; }
     finally { setPmtSaving(false); }
+  };
+
+  // All bills of one voucher are patched in memory, written to disk once and shown at once (a disk write and a
+  // re-render per bill made a 20-bill voucher tick down bill by bill).
+  const applyBillPayments = async (invoiceUpdates, nowIso) => {
+    const updatedById = new Map();
+    try {
+      for (const update of invoiceUpdates) {
+        const patched = await offlinePatch("purchaseInvoices", update.invoice.id, {
+          amountPaid: update.newAmountPaid,
+          balanceDue: update.newBalance,
+          status: update.newStatus,
+          updatedAt: nowIso,
+          updatedBy: user?.uid || "",
+        }, update.invoice, { deferPersist: true });
+        updatedById.set(update.invoice.id, { ...update.invoice, ...patched.data, id: update.invoice.id });
+      }
+    } finally {
+      if (updatedById.size) {
+        await persistOfflineDb();
+        setInvoices((prev) => prev.map((inv) => updatedById.get(inv.id) || inv));
+        setSelInvoice((prev) => (prev && updatedById.get(prev.id)) || prev);
+      }
+    }
   };
 
   const piReversePaymentAllocations = async (payment, { cancelReason = "", chequeStatus = null } = {}) => {
@@ -139,18 +153,7 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
       invoiceUpdates.push({ invoice: cur, newAmountPaid, newBalance, newStatus });
     }
 
-    for (const update of invoiceUpdates) {
-      const patched = await offlinePatch("purchaseInvoices", update.invoice.id, {
-        amountPaid: update.newAmountPaid,
-        balanceDue: update.newBalance,
-        status: update.newStatus,
-        updatedAt: nowIso,
-        updatedBy: user?.uid || "",
-      }, update.invoice);
-      const updated = { ...update.invoice, ...patched.data, id: update.invoice.id };
-      setInvoices((prev) => prev.map((inv) => (inv.id === update.invoice.id ? updated : inv)));
-      setSelInvoice((prev) => prev && prev.id === update.invoice.id ? updated : prev);
-    }
+    await applyBillPayments(invoiceUpdates, nowIso);
 
     const paymentPatch = {
       status: "cancelled",
