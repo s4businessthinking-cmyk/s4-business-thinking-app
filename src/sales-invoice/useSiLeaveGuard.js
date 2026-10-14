@@ -3,6 +3,7 @@ import { STALE_DRAFT_MS, cancelStaleClear, scheduleStaleClear } from "../utils/s
 import { billLeaveGuard } from "../shared/appShared.jsx";
 import { printSalesInvoice, siEmptyForm } from "./siHelpers.js";
 import { siN2 } from "./salesInvoiceShared.js";
+import { isOpeningBill } from "../utils/openingBill.js";
 import { useEffect } from "react";
 
 export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, editInvId, invoices, isDN, isOwner, isQuote, kind, lang, productFromMaster, receipts, setEditInvId, setLedgerWin, setSelInv, setShowCustPicker, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiOpenParty, setSiSearch, setSiView, setSourceQuote, shop, siColorPrint, siCurrent, siEmptyCurrent, siForm, siLines, siMobile, siNavReturn, siOpenEdit, siOpenParty, siPerm, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siShowCode, siSnapRef, siView, siWin, t, user }) {
@@ -88,15 +89,16 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
   };
 
   // A bill with money received against it changes only through the owner; staff cancel the receipt first.
-  const siCanEditDoc = (inv) => (isQuote?["draft","open"]:isDN?["draft","confirmed"]:["draft","confirmed","paid","partial"]).includes(inv?.status)
+  const siCanEditDoc = (inv) => !isOpeningBill(inv) && (isQuote?["draft","open"]:isDN?["draft","confirmed"]:["draft","confirmed","paid","partial"]).includes(inv?.status)
     && (isOwner || !receipts.some(r => r.status!=="cancelled" && (r.allocations||[]).some(a => a.invoiceId===inv.id)));
   const siCanDeleteDoc = (inv) => !!inv && (isOwner
     ? ["draft","cancelled"].includes(inv.status)
     : canCancelInv && inv.status==="draft" && inv.createdBy===user?.uid);
   const siOpenFromDesktop = (inv) => {
     if (!siLeaveUnsavedOk()) return;
-    if (!siCanEditDoc(inv)) { setSelInv(inv); setSiView("detail"); return; }
-    siOpenEdit(inv);
+    // Every saved document (cancelled, converted, opening balance too) opens on the desktop form read-only, so < >
+    // keep stepping through them; the form shows Edit only where siCanEditDoc allows.
+    siOpenEdit(inv, { viewOnly:true });
   };
 
   const siPickCustomers = (customers||[]).filter(c=>!["inactive","blocked"].includes(c.status));

@@ -88,8 +88,9 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
     setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), discountFlat:siN2(it.discountFlat)>0?String(it.discountFlat):"", vatPerc:it.vatPerc!=null&&it.vatPerc!==""?String(it.vatPerc):"5", batchNo:it.batchNo||"", ...(it.isService?{ isService:true }:{}) })));
     setSiCurrent(siEmptyCurrent());
   };
-  const siOpenEdit=(inv)=>{
-    if (isOpeningBill(inv)) { toast(lang==="bn" ? "এটা Opening Balance বিল — কাস্টমার মাস্টার থেকে শুরুর ব্যালেন্স বদলান।" : "This is an Opening Balance bill — change the opening balance in Customer Master.", "err"); return; }
+  // viewOnly: load any saved document into the desktop form read-only (it shows Edit only where siCanEditDoc allows).
+  const siOpenEdit=(inv, { viewOnly=false }={})=>{
+    if (!viewOnly && isOpeningBill(inv)) { toast(lang==="bn" ? "এটা Opening Balance বিল — কাস্টমার মাস্টার থেকে শুরুর ব্যালেন্স বদলান।" : "This is an Opening Balance bill — change the opening balance in Customer Master.", "err"); return; }
     siSnapRef.current = "pending";
     siLoadDoc(inv);
     setSiInvoiceNo(inv.invoiceNo);

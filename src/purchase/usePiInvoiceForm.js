@@ -42,9 +42,10 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
   },[purchaseSource]);
 
   // ── Open edit form ──
-  const piOpenEdit = (inv) => {
-    if (isOpeningBill(inv)) { toast(lang==="bn" ? "এটা Opening Balance বিল — ভেন্ডর মাস্টার থেকে শুরুর ব্যালেন্স বদলান।" : "This is an Opening Balance bill — change the opening balance in Vendor Master.", "err"); return; }
-    if (isBranchTransferBill(inv)) { toast(lang==="bn" ? "এটা Branch Transfer রিসিভের বিল — Branch Transfer থেকে নিয়ন্ত্রণ হয়, এখানে বদলানো যাবে না।" : "This bill comes from a Branch Transfer receipt — manage it from Branch Transfer.", "err"); return; }
+  // viewOnly: load any saved bill into the desktop form read-only (it shows Edit only where piCanEditInv allows).
+  const piOpenEdit = (inv, { viewOnly = false } = {}) => {
+    if (!viewOnly && isOpeningBill(inv)) { toast(lang==="bn" ? "এটা Opening Balance বিল — ভেন্ডর মাস্টার থেকে শুরুর ব্যালেন্স বদলান।" : "This is an Opening Balance bill — change the opening balance in Vendor Master.", "err"); return; }
+    if (!viewOnly && isBranchTransferBill(inv)) { toast(lang==="bn" ? "এটা Branch Transfer রিসিভের বিল — Branch Transfer থেকে নিয়ন্ত্রণ হয়, এখানে বদলানো যাবে না।" : "This bill comes from a Branch Transfer receipt — manage it from Branch Transfer.", "err"); return; }
     piSnapRef.current = "pending";
     setPiInvoiceNo(inv.invoiceNo);
     setPiSource(null);
@@ -214,11 +215,12 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     level: piView==="form" ? 2 : 1,
   });
 
-  const piCanEditInv = (inv) => ["draft","confirmed"].includes(inv?.status) && (isOwner || (canManagePurchase && inv.createdBy===user?.uid));
+  const piCanEditInv = (inv) => ["draft","confirmed"].includes(inv?.status) && !isOpeningBill(inv) && !isBranchTransferBill(inv) && (isOwner || (canManagePurchase && inv.createdBy===user?.uid));
   const piOpenFromDesktop = (inv) => {
     if (!piLeaveUnsavedOk()) return;
-    if (piCanEditInv(inv)) { piOpenEdit(inv); return; }
-    setSelInvoice(inv); setPiView("detail");
+    // Every saved bill (paid, cancelled, opening balance, branch transfer too) opens on the desktop form read-only,
+    // so < > keep stepping through them; the form shows Edit only where piCanEditInv allows.
+    piOpenEdit(inv, { viewOnly:true });
   };
 
   const piHandleVendor=(e)=>{

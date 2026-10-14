@@ -473,6 +473,7 @@ export function renderPiScreens({ balance, billReturns, bnL, can, canManagePurch
         onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }}
         onNew={()=>{ if (piLeaveUnsavedOk()) piOpenNew(); }}
         onOpenInvoice={piOpenFromDesktop}
+        canEditInvoice={piCanEditInv}
         onCancelInvoice={isOwner ? async (inv)=>{ if (await piCancelInv(inv)) setPiView("detail"); } : undefined}
         onDeleteInvoice={isOwner ? (inv)=>piDelete(inv) : undefined}
         onOpenProductMaster={onOpenProductMaster}

@@ -419,6 +419,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }}
         onNew={()=>{ if (siLeaveUnsavedOk()) siOpenNew(); }}
         onOpenInvoice={siOpenFromDesktop}
+        canEditInvoice={siCanEditDoc}
         onCancelInvoice={canCancelInv ? async (inv)=>{ if (await siCancel(inv)) setSiView("detail"); } : undefined}
         onDeleteInvoice={(inv)=>{ if (siCanDeleteDoc(inv)) siDelete(inv); }}
         canDeleteInvoice={siCanDeleteDoc}

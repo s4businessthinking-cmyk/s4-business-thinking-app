@@ -153,7 +153,7 @@ export default function SalesInvoiceDesktopForm({
   invoiceNo, editInvId, saving, nameRef, qtyRef,
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine,
-  onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast,
+  onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast, canEditInvoice = () => true,
   kind = "sales", sourceQuoteNo = "", sourceIsDN = false, sourceKind = "", onConvertQuote, onConvertToDN, canDiscount = true, canSeeCost = false,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
@@ -770,8 +770,13 @@ export default function SalesInvoiceDesktopForm({
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
           {locked ? (
-            <button type="button" onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
-              style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}>✏️ {bn ? "এডিট" : "Edit"}</button>
+            canEditInvoice(savedInvoice) ? (
+              <button type="button" onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
+                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}>✏️ {bn ? "এডিট" : "Edit"}</button>
+            ) : (
+              <button type="button" disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / রূপান্তরিত / রিসিট আছে / অনুমতি নেই)" : "This bill cannot be edited (cancelled / converted / has receipts / no permission)"}
+                style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}>🔒 {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
+            )
           ) : (
             <>
               <button type="button" onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
