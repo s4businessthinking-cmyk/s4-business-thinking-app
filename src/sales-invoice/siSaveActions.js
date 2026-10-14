@@ -222,7 +222,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     }
 
     if (!editInvId) {
-      siOpenNew();
+      siOpenNew(null, payload.invoiceNo);
     } else {
       setSelInv(savedInvoice);
       setSiView("detail");

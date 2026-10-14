@@ -11,8 +11,13 @@ import { useEscapeKey } from "../components/WindowChrome.jsx";
 
 export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors }) {
   // ── Open new form ──
-  const piOpenNew = () => {
-    setPiInvoiceNo(piPreviewNextInvoiceNo());
+  // justSavedNo: right after a save `invoices` does not hold the new bill yet, so the preview counts it too
+  // (otherwise the fresh form showed the number just used). Called from onClick too, so ignore non-strings.
+  const piOpenNew = (justSavedNo) => {
+    const next = piPreviewNextInvoiceNo();
+    const saved = typeof justSavedNo === "string" ? Number(justSavedNo.match(/(\d+)(?:-[A-Z]{2})?$/i)?.[1] || 0) : 0;
+    const nextNum = Number(next.match(/(\d+)$/)?.[1] || 0);
+    setPiInvoiceNo(saved >= nextNum ? next.replace(/\d+$/, String(saved + 1).padStart(4, "0")) : next);
     setPiForm(piEmptyForm());
     setPiLines([]);
     setPiCurrent(piEmptyCurrent());

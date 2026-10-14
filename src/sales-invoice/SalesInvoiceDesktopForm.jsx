@@ -29,7 +29,8 @@ export const C = {
 };
 
 export const inp = (extra = {}) => ({
-  height: 26, padding: "2px 6px", border: `1px solid ${C.border}`, borderRadius: 2, background: C.input,
+  // longhands, so a caller can tint borderColor (required field) without React shorthand warnings
+  height: 26, padding: "2px 6px", borderWidth: 1, borderStyle: "solid", borderColor: C.border, borderRadius: 2, background: C.input,
   color: "#111", fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box", ...extra,
 });
 export const lbl = { fontSize: 12, fontWeight: 700, color: C.label, whiteSpace: "nowrap" };
@@ -424,7 +425,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <input type="date" style={inp({ border: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
+          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
         </div>
       </div>
 

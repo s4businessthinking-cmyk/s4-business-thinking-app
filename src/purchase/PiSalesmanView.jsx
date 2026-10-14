@@ -130,7 +130,7 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
       {/* Date filter pills */}
       <div style={{ display:"flex", gap:6, marginBottom:16, flexWrap:"wrap" }}>
         {dateOpts.map(o=>(
-          <button key={o.val} onClick={()=>setDateRange(o.val)} style={{ padding:"6px 14px", borderRadius:20, border:"1px solid", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"inherit", background:dateRange===o.val?"#f97316":"transparent", borderColor:dateRange===o.val?"#f97316":th.borderMid, color:dateRange===o.val?"#fff":th.txtMuted }}>
+          <button key={o.val} onClick={()=>setDateRange(o.val)} style={{ padding:"6px 14px", borderRadius:20, borderWidth:1, borderStyle:"solid", cursor:"pointer", fontSize:12, fontWeight:700, fontFamily:"inherit", background:dateRange===o.val?"#f97316":"transparent", borderColor:dateRange===o.val?"#f97316":th.borderMid, color:dateRange===o.val?"#fff":th.txtMuted }}>
             {o.label}
           </button>
         ))}

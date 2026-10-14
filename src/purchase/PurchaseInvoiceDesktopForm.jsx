@@ -302,7 +302,7 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <input type="date" style={inp({ border: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
+          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
         </div>
       </div>
 

@@ -271,7 +271,7 @@ export default function AgainstInvoiceVoucherWindow({
             </div>
             <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
               <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12, fontWeight: 800, padding: "1px 0" }}>Date</div>
-              <input type="date" disabled={ro} style={inp({ border: "none", height: 26, fontWeight: 700 })} value={ro ? viewing.date : date} onChange={(e) => setDate(e.target.value)} />
+              <input type="date" disabled={ro} style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={ro ? viewing.date : date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
 

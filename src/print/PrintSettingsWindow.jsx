@@ -29,7 +29,8 @@ function Group({ title, children }) {
 
 const tabBtn = (active) => ({
   padding: "6px 14px", fontSize: 13, fontFamily: font, cursor: "pointer",
-  border: `1px solid ${C.border}`, borderBottom: active ? `1px solid ${C.panel}` : `1px solid ${C.border}`,
+  borderTop: `1px solid ${C.border}`, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+  borderBottom: active ? `1px solid ${C.panel}` : `1px solid ${C.border}`,
   background: active ? C.panel : "#eef3fb", color: C.text, fontWeight: active ? 700 : 400,
   borderRadius: "3px 3px 0 0", marginRight: 2, position: "relative", top: 1,
 });

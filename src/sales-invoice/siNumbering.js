@@ -41,8 +41,13 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
     }).catch(err => console.warn(`[S4 SI] ${serialField} background bump failed`, err));
   };
 
-  const siOpenNew = (customer=null) => {
-    setSiInvoiceNo(siPreviewNextInvoiceNo());
+  // justSavedNo: right after a save `invoices` does not hold the new document yet, so the preview counts it too
+  // (otherwise the fresh form showed the number just used).
+  const siOpenNew = (customer=null, justSavedNo="") => {
+    const next = siPreviewNextInvoiceNo();
+    const saved = Number(String(justSavedNo||"").match(/(\d+)(?:-[A-Z]{2})?$/i)?.[1] || 0);
+    const nextNum = Number(next.match(/(\d+)$/)?.[1] || 0);
+    setSiInvoiceNo(saved >= nextNum ? next.replace(/\d+$/, String(saved + 1).padStart(4, "0")) : next);
     const termDays = customer ? parseInt(String(customer.paymentTerms||"").replace(/[^\d]/g,""),10) : 0;
     const customerFields = customer ? {
       customerId:customer.id, customerName:customer.customerName||"", customerMobile:customer.mobileNumber||"",

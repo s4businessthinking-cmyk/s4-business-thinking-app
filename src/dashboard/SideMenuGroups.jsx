@@ -17,7 +17,7 @@ export default function SideMenuGroups({ items, activeKey, lang, renderItem, col
               <button type="button" onClick={() => toggle(g.key)} aria-expanded={open}
                 style={{
                   display: "flex", alignItems: "center", gap: 6, marginTop: 6, padding: compact ? "7px 10px" : "6px 10px",
-                  border: 0, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                  borderTop: 0, borderRight: 0, borderBottom: 0, borderRadius: 7, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
                   background: colors.headBg, color: colors.head, fontSize: 11, fontWeight: 900, letterSpacing: 0.4, textTransform: "uppercase",
                   borderLeft: `3px solid ${hasActive ? "#f97316" : colors.line}`,
                 }}>

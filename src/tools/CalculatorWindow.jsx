@@ -58,7 +58,7 @@ export default function CalculatorWindow({ lang = "bn", baseCurrency = "AED", in
 
   const box = { ...(inline ? { position: "relative", margin: "16px auto", maxWidth: 360 } : { position: "fixed", right: 16, bottom: 16, width: 300, zIndex: 9000 }), background: "#fff", color: "#0f172a", borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,.35)", border: "1px solid #cbd5e1", fontFamily: "inherit" };
   const tabBtn = (k, label) => (
-    <button type="button" onClick={() => setMode(k)} style={{ flex: 1, padding: "6px 0", border: 0, borderBottom: mode === k ? "2px solid #2563eb" : "2px solid transparent", background: "none", fontWeight: 700, color: mode === k ? "#2563eb" : "#475569", cursor: "pointer" }}>{label}</button>
+    <button type="button" onClick={() => setMode(k)} style={{ flex: 1, padding: "6px 0", borderTop: 0, borderLeft: 0, borderRight: 0, borderBottom: mode === k ? "2px solid #2563eb" : "2px solid transparent", background: "none", fontWeight: 700, color: mode === k ? "#2563eb" : "#475569", cursor: "pointer" }}>{label}</button>
   );
   const keyBtn = (k) => (
     <button key={k} type="button" onClick={() => press(k)} style={{

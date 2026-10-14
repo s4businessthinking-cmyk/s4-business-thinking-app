@@ -113,7 +113,7 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     }
 
     if (!editInvoiceId) {
-      piOpenNew();
+      piOpenNew(payload.invoiceNo);
     } else if (savedDoc) {
       setSelInvoice(savedDoc);
       setPiView("detail");

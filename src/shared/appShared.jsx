@@ -290,7 +290,7 @@ export const THEMES = {
 // ─── STYLES FUNCTION ─────────────────────────────────────────
 export function getStyles(th) { return {
   root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
-  notif:       { position:"fixed", top:16, right:16, zIndex:20000, padding:"12px 20px", borderRadius:10, border:"1px solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
+  notif:       { position:"fixed", top:16, right:16, zIndex:20000, padding:"12px 20px", borderRadius:10, borderWidth:1, borderStyle:"solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
   hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
   hLeft:       { display:"flex", alignItems:"center", gap:10 },
   title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
@@ -389,7 +389,7 @@ export function getStyles(th) { return {
   sideNav:        { display:"flex", flexDirection:"column", gap:6 },
   sideTab:        { display:"flex", alignItems:"center", gap:10, padding:"11px 14px", borderRadius:10, border:"none", background:"transparent", color:th.txtMuted, cursor:"pointer", fontSize:13, fontWeight:600, fontFamily:"inherit" },
   sideTabA:       { background:th.accent, color:"#fff" },
-  sideKey:        { flexShrink:0, padding:"1px 6px", borderRadius:5, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtMuted, fontSize:10, fontWeight:700, fontFamily:"Consolas, monospace", whiteSpace:"nowrap" },
+  sideKey:        { flexShrink:0, padding:"1px 6px", borderRadius:5, borderWidth:1, borderStyle:"solid", borderColor:th.borderMid, background:th.bgInp, color:th.txtMuted, fontSize:10, fontWeight:700, fontFamily:"Consolas, monospace", whiteSpace:"nowrap" },
   sideKeyA:       { background:"rgba(255,255,255,0.18)", borderColor:"rgba(255,255,255,0.45)", color:"#fff" },
   sideBadge:      { background:"#ef4444", color:"#fff", borderRadius:10, padding:"2px 7px", fontSize:10, fontWeight:800, marginLeft:"auto" },
   sideLogout:     { width:"100%", padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"inherit" },

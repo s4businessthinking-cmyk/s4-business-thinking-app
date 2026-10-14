@@ -287,7 +287,15 @@ function readLegacyCachedShop(shopId) {
   }
 }
 
-export async function ensureLocalAuthBootstrap() {
+// Callers at start-up can overlap (session restore, login, a second effect run in development); they share one
+// run, otherwise both see zero users and the second "admin" insert fails with UNIQUE constraint failed.
+let bootstrapInFlight = null;
+export function ensureLocalAuthBootstrap() {
+  if (!bootstrapInFlight) bootstrapInFlight = runLocalAuthBootstrap().finally(() => { bootstrapInFlight = null; });
+  return bootstrapInFlight;
+}
+
+async function runLocalAuthBootstrap() {
   await bootOfflineSqlite();
 
   const count = await countLocalUsers();
