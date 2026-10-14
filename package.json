@@ -39,11 +39,13 @@
     "@capacitor/share": "^8.0.3",
     "@capgo/capacitor-updater": "^8.51.16",
     "electron-updater": "^6.8.9",
+    "pdfjs-dist": "^4.10.38",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "read-excel-file": "^9.3.10",
     "snappyjs": "^0.7.0",
     "sql.js": "^1.14.2",
+    "tesseract.js": "^5.1.1",
     "uuid": "^14.0.2",
     "xlsx": "^0.18.5"
   },

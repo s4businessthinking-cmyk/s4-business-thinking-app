@@ -9,6 +9,7 @@ import PartyPickerWindow, { VENDOR_PICKER_COLS } from "../components/PartyPicker
 import { PURCHASE_OPTION_DEFAULTS, PURCHASE_OPTION_LABELS, isForeign, rateOf } from "./purchaseOptions.js";
 import { CURRENCIES } from "../reports/taxDomain.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
+import InvoiceScanWindow from "./scan/InvoiceScanWindow.jsx";
 
 const ACCENT = "#c2410c";
 
@@ -99,7 +100,7 @@ export default function PurchaseInvoiceDesktopForm({
   invoiceNo, editInvoiceId, saving, nameRef, qtyRef,
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine, onPickVendor,
-  onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast, canEditInvoice = () => true,
+  onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast, canEditInvoice = () => true, onProductPatched,
   purchaseOptions = PURCHASE_OPTION_DEFAULTS, baseCurrency = "AED", onSaveOptions, sourceNote = "",
 }) {
   const { piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS } = helpers;
@@ -108,6 +109,24 @@ export default function PurchaseInvoiceDesktopForm({
   const [locked, setLocked] = useState(!!editInvoiceId);
   useEffect(() => { setLocked(!!editInvoiceId); }, [editInvoiceId]);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+  // a scanned bill fills the form; the user checks it and saves as usual
+  const billUnit = (u) => PI_UNITS.find((x) => x.toLowerCase() === String(u || "").toLowerCase().replace(/^pc$/, "pcs").replace(/^sets$/, "set")) || "Pcs";
+  const applyScan = (res) => {
+    setScanOpen(false);
+    if (res.vendor) onPickVendor(res.vendor);
+    else if (res.supplierName) setField("vendorName", res.supplierName); // not in the list: saved by name, as when typed
+    if (res.supplierInvoiceNo) setField("supplierInvoiceNo", res.supplierInvoiceNo);
+    if (res.invoiceDate) setField("invoiceDate", res.invoiceDate);
+    const toLine = (l) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, productId: l.product?.id || null,
+      name: l.product?.name || l.name, code: l.product?.code || l.code || "", brand: l.product?.brand || l.product?.company || "",
+      qty: String(l.qty), unit: l.product?.unit || billUnit(l.unit), unitCost: String(l.rate), discountPerc: "0",
+      discountFlat: l.discount ? String(l.discount) : "", taxPerc: String(l.vatPerc), salePrice: "",
+    });
+    setLines((prev) => [...prev.filter((x) => String(x.name || "").trim()), ...res.lines.map(toLine)]);
+    toast?.(bn ? `✅ ${res.lines.length}টি লাইন বসানো হয়েছে — মিলিয়ে নিয়ে Save করুন` : `✅ ${res.lines.length} line(s) filled — check them, then Save`);
+  };
   const foreign = isForeign(form, baseCurrency);
   const billCur = foreign ? String(form.currency).toUpperCase() : baseCurrency;
   const fxRate = rateOf(form, baseCurrency);
@@ -365,6 +384,8 @@ export default function PurchaseInvoiceDesktopForm({
             </>
           )}
           <span style={{ flex: 1 }} />
+          <button type="button" onClick={() => setScanOpen(true)} title={bn ? "সাপ্লায়ারের বিলের PDF / ছবি থেকে বসান" : "Fill from the supplier bill PDF / picture"}
+            style={btn("#ecfdf5", "#15803d", { height: 26, whiteSpace: "nowrap", marginRight: 6 })}>📄 {bn ? "বিল স্ক্যান" : "Scan Bill"}</button>
           {onSaveOptions && (
             <button type="button" onClick={() => setOptionsOpen(true)} style={btn("#e7eef9", C.label, { height: 26, whiteSpace: "nowrap" })}>⚙️ Options</button>
           )}
@@ -673,6 +694,11 @@ export default function PurchaseInvoiceDesktopForm({
               setTimeout(() => { if (document.activeElement === document.body) nameRef.current?.focus(); }, 120);
             }} />
         </div>
+      )}
+
+      {scanOpen && (
+        <InvoiceScanWindow lang={lang} products={products} vendors={vendors} onApply={applyScan} onClose={() => setScanOpen(false)}
+          onOpenProductMaster={onOpenProductMaster} onProductPatched={onProductPatched} />
       )}
 
       {optionsOpen && onSaveOptions && (
