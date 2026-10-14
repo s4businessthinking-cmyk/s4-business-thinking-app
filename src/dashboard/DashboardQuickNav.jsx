@@ -65,12 +65,14 @@ export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDa
         : { display: "flex", flexDirection: "column", gap: 12 }}>
         {groups.map((g) => (
           <div key={g.key} style={isDesktop ? { flex: `${g.items.length} 1 ${g.items.length * MIN_CARD + (g.items.length - 1) * 10}px`, minWidth: 0 } : undefined}>
-            {g.label && (
+            {/* Desktop: a group without a title (Orders) keeps an empty title row, so its cards line up with the
+                cards of the titled group next to it (Masters) */}
+            {(g.label || isDesktop) && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 2px 8px" }}>
                 <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: 0.4, textTransform: "uppercase", color: isLightDash ? "#1e3a8a" : "#cbd5e1", whiteSpace: "nowrap" }}>
-                  {g.icon} {g.label}
+                  {g.label ? `${g.icon} ${g.label}` : " "}
                 </span>
-                <span style={{ flex: 1, height: 1, background: isLightDash ? "rgba(59,130,246,0.18)" : "rgba(148,163,184,0.22)" }} />
+                {g.label && <span style={{ flex: 1, height: 1, background: isLightDash ? "rgba(59,130,246,0.18)" : "rgba(148,163,184,0.22)" }} />}
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: isDesktop ? `repeat(auto-fit, minmax(${MIN_CARD}px, 1fr))` : "repeat(3, minmax(0, 1fr))", gap: isDesktop ? 10 : 8 }}>
