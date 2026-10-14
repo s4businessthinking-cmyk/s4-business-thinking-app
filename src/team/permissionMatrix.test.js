@@ -5,8 +5,9 @@ import { fileURLToPath } from "node:url";
 import { GROUP_PRESETS, groupPermissions, matrixKeys, memberGroupState, rowSpans, userGroupsOf } from "./permissionMatrix.js";
 
 test("matrix covers every permission in PERMISSIONS_LIST", () => {
-  const src = readFileSync(fileURLToPath(new URL("../spare-parts-app.jsx", import.meta.url)), "utf8");
-  const block = src.slice(src.indexOf("const PERMISSIONS_LIST = ["), src.indexOf("const DEFAULT_PERMISSIONS"));
+  const src = readFileSync(fileURLToPath(new URL("../app/mainAppHelpers.js", import.meta.url)), "utf8");
+  const start = src.indexOf("const PERMISSIONS_LIST = [");
+  const block = src.slice(start, src.indexOf("\n];", start));
   const keys = [...block.matchAll(/key:\s*"([a-zA-Z]+)"/g)].map((m) => m[1]);
   assert.ok(keys.length > 20);
   const inMatrix = new Set(matrixKeys());
