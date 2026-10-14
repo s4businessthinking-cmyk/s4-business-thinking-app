@@ -134,12 +134,35 @@ export function parseItemRow(row) {
   };
 }
 
+// A row whose prices could not be read (blurred phone photo) but that starts with a part number:
+// -> { code, brand, name, qty (from "2 PCS", else 1), loose: true } with no rate. The caller keeps it only when
+// the part number finds a product, so the user fills in the rate.
+const NOT_ITEM = /\b(trn|tel|phone|mob|mobile|fax|e-?mail|p\.?\s*o\.?\s*box|invoice|date|total|vat|amount|price|dirhams?|only)\b/i;
+export function parseLooseRow(row) {
+  const text = row.text || row.cells.map((c) => c.text).join(" ");
+  if (NOT_ITEM.test(text) || HEADER_WORDS.test(text)) return null;
+  let tokens = text.split(/\s+/).map((t) => t.replace(/^[|[\](){}:;'"~`,.]+|[|[\](){}:;'"~`,]+$/g, "")).filter((t) => /[A-Za-z0-9]/.test(t));
+  if (tokens.length && /^\d{1,2}$/.test(tokens[0])) tokens = tokens.slice(1); // serial no.
+  const at = tokens.slice(0, 4).findIndex((t) => /\d/.test(t) && t.replace(/[^A-Za-z0-9]/g, "").length >= 5 && !/^[\d,]*\.\d+$/.test(t));
+  if (at < 0) return null;
+  const prefix = tokens.slice(0, at);
+  const brand = prefix.length && prefix.length <= 2 && prefix.every((t) => /^[A-Za-z]{2,8}$/.test(t)) ? prefix.join(" ") : "";
+  let e = at + 1;
+  if (e < tokens.length && /\d/.test(tokens[e]) && tokens[e].length <= 5 && !/^[\d,]*\.\d+$/.test(tokens[e])) e++;
+  const code = tokens.slice(at, e).join(" ");
+  const nameWords = [];
+  for (const t of tokens.slice(e)) { if (/^[\d.,]+$/.test(t) || nameWords.length >= 8) break; nameWords.push(t); }
+  const q = text.match(/\b(\d{1,4})\s*(PCS|PC|NOS|NO|SETS?|PRS|PAIRS?|EA|BOX|CTN)\b/i);
+  return { raw: text, code, brand, name: nameWords.join(" ") || code, qty: q ? Number(q[1]) : 1, unit: q ? q[2] : "", rate: 0, discount: 0, vatPerc: 0, amount: 0, loose: true };
+}
+
 export function parseInvoice(rows) {
   const header = parseHeader(rows);
-  const lines = [];
+  const lines = [], loose = [];
   for (const row of rows) {
     const item = parseItemRow(row);
     if (item) lines.push(item);
+    else { const l = parseLooseRow(row); if (l) loose.push(l); }
   }
   const linesTotal = r2(lines.reduce((s, l) => s + l.amount, 0));
   // no VAT column on the lines, VAT only in the totals: take the rate that turns the lines total into the grand total
@@ -147,5 +170,7 @@ export function parseInvoice(rows) {
     const v = [5, 15].find((p) => near(linesTotal * (1 + p / 100), header.grandTotal, 0.002));
     if (v) lines.forEach((l) => { l.vatPerc = v; });
   }
-  return { ...header, lines, linesTotal };
+  const vat = lines.find((l) => l.vatPerc)?.vatPerc || Number((rows.map((r) => r.text).join("\n").match(/\bvat\s*[@:]?\s*(5|15)\s*%/i) || [])[1] || 0);
+  loose.forEach((l) => { l.vatPerc = vat; });
+  return { ...header, lines, loose, linesTotal };
 }

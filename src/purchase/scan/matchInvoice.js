@@ -27,12 +27,13 @@ export const aliasKey = (vendorId, line) => `${vendorId || "-"}|${norm(line.code
 export function partTokens(text) {
   const raw = String(text || "").split(/\s+/).filter(Boolean);
   const out = new Set();
-  const add = (t) => { if (/^[\d.,]+$/.test(t) && /[.,]/.test(t)) return; const n = norm(t); if (n.length >= 4 && /\d/.test(n)) out.add(n); };
+  // a bare number needs 5+ digits: "1992" or "2000" is a year or a size, not a part number
+  const add = (t) => { if (/^[\d.,]+$/.test(t) && /[.,]/.test(t)) return; const n = norm(t); if (n.length >= (/^\d+$/.test(n) ? 5 : 4) && /\d/.test(n)) out.add(n); };
   raw.forEach((t, i) => {
     add(t);
     for (const piece of t.split(/[/\-,;]/)) add(piece);
     const next = raw[i + 1];
-    if (next && t.length <= 6 && next.length <= 6 && /\d/.test(t + next)) add(t + next);
+    if (next && t.length >= 2 && next.length >= 2 && t.length <= 6 && next.length <= 6 && /\d/.test(t + next)) add(t + next);
   });
   return [...out];
 }
@@ -88,12 +89,14 @@ export function matchLine(line, index, vendorId) {
     if (t.length >= 6) for (const [k, set] of index.byPart || []) if (k.length >= 6 && oneEdit(t, k)) set.forEach((p) => hit(p, "fuzzy"));
   }
   if (hits.size) {
-    const brand = norm(line.brand);
+    // the bill's brand ("LG", "DFT", "ELR" for ELRING) in the product's code / company / brand
+    const brands = words(line.brand).filter((b) => /[a-z]/.test(b));
     const side = sideOf(line.raw || `${line.code} ${line.name}`);
     const scored = [...hits].map(([p, h]) => {
       const hay = `${p.code || ""} ${p.name || ""} ${p.company || ""} ${p.brand || ""}`;
       let score = h.exact * 3 + h.fuzzy * 1.5 + nameScore(line.name, p.name);
-      if (brand && words(hay).some((w) => norm(w) === brand)) score += 2;
+      const hw = words(hay);
+      if (brands.some((b) => hw.some((w) => w === b || (b.length >= 3 && w.startsWith(b))))) score += 2;
       const ps = sideOf(hay);
       if (side && ps) score += side === ps ? 1 : -2;
       return { product: p, score, exact: h.exact > 0 };

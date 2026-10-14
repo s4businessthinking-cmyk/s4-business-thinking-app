@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseInvoice, parseItemRow, parseDate } from "./parseInvoice.js";
+import { parseInvoice, parseItemRow, parseLooseRow, parseDate } from "./parseInvoice.js";
 import { buildProductIndex, matchLine, matchVendor, aliasKey } from "./matchInvoice.js";
 
 const rows = (text) => text.split("\n").map((t) => t.trim()).filter(Boolean).map((t) => ({ text: t, cells: t.split(/\s+/).map((w, i) => ({ x: i, text: w })) }));
@@ -114,4 +114,22 @@ test("part number inside the shop's longer product codes; brand and side pick be
   assert.deepEqual([slip.status, slip.product.id, slip.how], ["suggest", "b2", "part no (close)"]);
   // qty / rate / amount of the row are not part numbers
   assert.notEqual(matchLine(line("5 LG X9 WASHER 1 PCS 20.00 20.00"), idx, "v").product?.id, "d");
+});
+
+test("blurred photo rows: part number kept without prices; brand prefix like ELR finds ELRING", () => {
+  const products = [
+    { id: "e", name: "WHEEL SEAL KIT", code: "208.230 KIT RR HUB ELRING MERC/ACTROS/LP", barcode: "6243560080", company: "ELRING" },
+    { id: "e2", name: "WHEEL SEAL KIT", code: "6243560080 FEBI", company: "FEBI" },
+    { id: "y", name: "AXLE", code: "17801-15070 SM MAZDA 1992-05/2002-01" },
+  ];
+  const idx = buildProductIndex(products);
+  const l = parseLooseRow(rows("2 ELR 6243560080/M HUB SEAL KIT MERC 5 PCS 3s.0O 17s 0O")[0]);
+  assert.deepEqual([l.brand, l.code, l.qty, l.unit, l.loose], ["ELR", "6243560080/M", 5, "PCS", true]);
+  assert.equal(matchLine(l, idx, "v").product.id, "e");
+  // a year is not a part number; header rows are not items
+  assert.equal(parseLooseRow(rows("SHOP SINCE 1992 MUSAFFAH 64")[0]), null);
+  assert.notEqual(matchLine({ code: "1992", name: "", raw: "1992" }, idx, "v").how, "part no");
+  assert.equal(parseLooseRow(rows("TRN 100364990000003")[0]), null);
+  const inv = parseInvoice(rows("1 DFT 0980623220 HUB BOLT 50 PCS 6 7S 33?\nVAT 5% 85.08"));
+  assert.deepEqual([inv.lines.length, inv.loose.length, inv.loose[0].code, inv.loose[0].qty, inv.loose[0].vatPerc], [0, 1, "0980623220", 50, 5]);
 });

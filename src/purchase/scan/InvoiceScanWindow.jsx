@@ -37,13 +37,13 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
       const vm = matchVendor(inv, vendors);
       const vid = vm.vendor?.id || "";
       setVendorId(vid);
-      setLines(inv.lines.map((l, i) => {
-        const m = matchLine(l, index, vid);
-        return { key: i, use: true, line: l, productId: m.product?.id || "", status: m.status, how: m.how, candidates: m.candidates,
-          qty: String(l.qty), rate: String(l.rate), discount: l.discount ? String(l.discount) : "", vatPerc: String(l.vatPerc || 0), learn: false };
-      }));
+      // rows whose prices could not be read are kept only when their part number finds a product; rate left empty
+      const loose = (inv.loose || []).map((l) => ({ l, m: matchLine(l, index, vid) })).filter(({ m }) => m.product && m.how !== "name");
+      setLines([...inv.lines.map((l) => ({ l, m: matchLine(l, index, vid) })), ...loose].map(({ l, m }, i) => (
+        { key: i, use: !l.loose || m.status === "exact", line: l, productId: m.product?.id || "", status: m.status, how: m.how, candidates: m.candidates,
+          qty: String(l.qty), rate: l.loose ? "" : String(l.rate), discount: l.discount ? String(l.discount) : "", vatPerc: String(l.vatPerc || 0), learn: false })));
       setPhase("review");
-      if (!inv.lines.length) setError(bn ? "কোনো আইটেমের লাইন পড়া যায়নি — নিচে নিজে যোগ করুন বা পরিষ্কার PDF / ছবি দিন।" : "No item lines could be read — add them below, or try a clearer PDF / photo.");
+      if (!inv.lines.length && !loose.length) setError(bn ? "কোনো আইটেমের লাইন পড়া যায়নি — নিচে নিজে যোগ করুন বা পরিষ্কার PDF / ছবি দিন।" : "No item lines could be read — add them below, or try a clearer PDF / photo.");
     } catch (err) {
       console.warn("[S4 Scan] read failed", err);
       setError((bn ? "ফাইল পড়া যায়নি: " : "Could not read the file: ") + (err?.message || err));
@@ -163,7 +163,8 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
                           <td style={{ ...td, textAlign: "center", width: 26, color }} title={l.how}>{icon}</td>
                           <td style={{ ...td, textAlign: "left", whiteSpace: "normal", minWidth: 180 }}>
                             <div style={{ fontWeight: 700 }}>{l.line.name}</div>
-                            <div style={{ fontSize: 11, color: "#64748b" }}>{[l.line.code, l.line.unit].filter(Boolean).join(" · ")}</div>
+                            <div style={{ fontSize: 11, color: "#64748b" }}>{[l.line.brand, l.line.code, l.line.unit].filter(Boolean).join(" · ")}</div>
+                            {l.line.loose && <div style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>⚠️ {bn ? "দাম পড়া যায়নি — qty / rate দেখে দিন" : "Price not readable — check qty / rate"}</div>}
                           </td>
                           <td style={{ ...td, textAlign: "left", minWidth: 260, whiteSpace: "normal" }}>
                             <select style={inp({ height: 24, fontSize: 12 })} value={l.productId} onChange={(e) => pickProduct(l, e.target.value)}>

@@ -31,30 +31,57 @@ const loadOcr = () => (ocrWorkerPromise ||= Promise.all([
   workerPath: worker.default, corePath: core.default, langPath: `${import.meta.env.BASE_URL || "./"}ocr`, gzip: true,
 })).catch((error) => { ocrWorkerPromise = null; throw error; }));
 
-// Small screenshots and phone photos read far better enlarged to ~2400 px wide, in grey with more contrast.
-async function prepareImage(image) {
+// Small screenshots and phone photos read far better enlarged (~3200 px wide, at most ~16 MP to spare memory),
+// in grey with more contrast. binarize: black / white against the local background, for phone photos darker at one
+// end than the other (one global threshold loses the faint side); it hurts clean screenshots, so only as a retry.
+const MAX_PIXELS = 16e6;
+async function prepareImage(image, binarize) {
   const src = image instanceof HTMLCanvasElement ? image : await createImageBitmap(image);
-  const scale = Math.min(3, Math.max(1, 2400 / (src.width || 1)));
+  const w0 = src.width || 1, h0 = src.height || 1;
+  const scale = binarize ? Math.max(1, Math.min(6, 3200 / w0, Math.sqrt(MAX_PIXELS / (w0 * h0)))) : Math.min(3, Math.max(1, 2400 / w0));
+  const W = Math.round(w0 * scale), H = Math.round(h0 * scale);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(src.width * scale); canvas.height = Math.round(src.height * scale);
-  const ctx = canvas.getContext("2d");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.imageSmoothingQuality = "high";
-  ctx.filter = "grayscale(1) contrast(1.4)";
-  ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+  ctx.filter = binarize ? "grayscale(1)" : "grayscale(1) contrast(1.4)";
+  ctx.drawImage(src, 0, 0, W, H);
+  if (!binarize) return canvas;
+  // local mean: the same picture blurred
+  const bg = document.createElement("canvas");
+  bg.width = W; bg.height = H;
+  const bctx = bg.getContext("2d", { willReadFrequently: true });
+  bctx.filter = `blur(${Math.round(Math.max(W, H) / 120)}px)`;
+  bctx.drawImage(canvas, 0, 0);
+  const img = ctx.getImageData(0, 0, W, H), mean = bctx.getImageData(0, 0, W, H).data, d = img.data;
+  for (let k = 0; k < d.length; k += 4) d[k] = d[k + 1] = d[k + 2] = d[k] < mean[k] * 0.85 ? 0 : 255;
+  ctx.putImageData(img, 0, 0);
+  bg.width = bg.height = 0;
   return canvas;
 }
+
+// how much of an invoice was read: rows with a price, and part-number-like words
+const readScore = (rows) => rows.reduce((s, r) => s + (/\d\.\d{2}\b/.test(r.text) ? 2 : 0) + (r.text.match(/\b[A-Z]{0,4}\d{5,}/g) || []).length, 0);
 
 async function ocrImage(image, onProgress) {
   onProgress?.("ocr");
   const worker = await loadOcr();
   // one uniform block of text keeps a table row on one line; keep the spaces between columns
   await worker.setParameters({ tessedit_pageseg_mode: "6", preserve_interword_spaces: "1" });
-  const { data } = await worker.recognize(await prepareImage(image));
-  // Tesseract already gives text lines with their words in reading order
-  return (data.lines || []).map((line) => {
-    const cells = (line.words || []).map((w) => ({ x: w.bbox.x0, text: w.text })).filter((c) => c.text.trim());
-    return { text: cells.map((c) => c.text).join(" "), cells };
-  }).filter((r) => r.text.trim());
+  const read = async (binarize) => {
+    const { data } = await worker.recognize(await prepareImage(image, binarize));
+    // Tesseract already gives text lines with their words in reading order
+    return (data.lines || []).map((line) => {
+      const cells = (line.words || []).map((w) => ({ x: w.bbox.x0, text: w.text })).filter((c) => c.text.trim());
+      return { text: cells.map((c) => c.text).join(" "), cells };
+    }).filter((r) => r.text.trim());
+  };
+  const plain = await read(false);
+  if (plain.filter((r) => (r.text.match(/\d\.\d{2}\b/g) || []).length >= 2).length >= 4) return plain;
+  // few prices read: a phone photo, read again in black / white (garbled plain readings score high on stray digits,
+  // so only a clearly better plain reading wins)
+  const bw = await read(true);
+  return readScore(plain) > readScore(bw) * 1.5 ? plain : bw;
 }
 
 async function readPdf(file, onProgress) {
