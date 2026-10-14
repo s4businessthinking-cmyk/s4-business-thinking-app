@@ -240,14 +240,19 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     adjustment ? `<div class="totals-row"><span class="tl">${isBn?"সমন্বয়":"Adjustment"}</span><span class="tv">${adjustment>0?"+":"-"} ${cur} ${siFmt2(Math.abs(adjustment))}</span></div>` : "",
     roundOff ? `<div class="totals-row"><span class="tl">Round Off</span><span class="tv">${roundOff>0?"+":"-"} ${cur} ${siFmt2(Math.abs(roundOff))}</span></div>` : "",
   ].join("");
-  const metaHTML = [
-    invoice.refNo ? `Ref: ${invoice.refNo}` : "",
-    invoice.quotationNo ? `${isBn?"কোটেশন":"Quotation"}: ${invoice.quotationNo}` : "",
-    invoice.salesOrderNo ? `${isBn?"সেলস অর্ডার":"Sales Order"}: ${invoice.salesOrderNo}` : "",
-    invoice.jobOrderNo ? `${isBn?"জব কার্ড":"Job Card"}: ${invoice.jobOrderNo}` : "",
-    ps.printSalesman&&invoice.salesmanName ? `${isBn?"বিক্রেতা":"Salesman"}: ${invoice.salesmanName}` : "",
-    ps.printCreditPeriod&&siN2(invoice.creditDays)>0 ? `${isBn?"বাকির মেয়াদ":"Credit"}: ${invoice.creditDays} ${isBn?"দিন":"days"}` : "",
-  ].filter(Boolean).join(" &nbsp;·&nbsp; ");
+  // Reference, salesman, delivery and credit details print inside the payment / validity / delivery box
+  // (no separate line or boxes above the items).
+  const metaRows = [
+    invoice.refNo ? ["Ref", invoice.refNo] : null,
+    invoice.quotationNo ? [isBn?"কোটেশন":"Quotation", invoice.quotationNo] : null,
+    invoice.salesOrderNo ? [isBn?"সেলস অর্ডার":"Sales Order", invoice.salesOrderNo] : null,
+    invoice.jobOrderNo ? [isBn?"জব কার্ড":"Job Card", invoice.jobOrderNo] : null,
+    ps.printSalesman&&invoice.salesmanName ? [isBn?"বিক্রেতা":"Salesman", invoice.salesmanName] : null,
+    !isDelivery&&invoice.deliveryNoteNo ? [isBn?"ডেলিভারি নোট নং":"Delivery Note No.", invoice.deliveryNoteNo] : null,
+    !isDelivery&&invoice.vehicleNo ? [isBn?"গাড়ির নম্বর":"Vehicle No.", invoice.vehicleNo] : null,
+    ps.printCreditPeriod&&siN2(invoice.creditDays)>0 ? [isBn?"বাকির মেয়াদ":"Credit", `${invoice.creditDays} ${isBn?"দিন":"days"}`] : null,
+  ].filter(Boolean);
+  const metaHTML = metaRows.map(([label, value]) => `<div class="info-sub" style="color:#374151">${label}: <b>${value}</b></div>`).join("");
   const hideVatCols = isTax && !isDelivery && ds.hideVatDiscCols;
   const userNameHTML = ps.printUserName && invoice.createdByName ? invoice.createdByName : "";
   const timeText = ps.printTime && invoice.createdAt
@@ -357,13 +362,10 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerCode?`<div class="info-sub">${isBn?"কোড":"Code"}: ${invoice.customerCode}</div>`:""}${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
 
   const payInfoHTML = isQuote
-    ? `<div class="info-box"><div class="info-label">📅 ${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">👤 ${invoice.createdByName||""}</div></div>`
+    ? `<div class="info-box"><div class="info-label">📅 ${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">👤 ${invoice.createdByName||""}</div>${metaHTML}</div>`
     : isDelivery
-    ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}<div class="info-sub">👤 ${invoice.createdByName}</div></div>`
-    : `<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div></div>`;
-
-  const deliveryHTML = !isDelivery&&(invoice.deliveryNoteNo||invoice.vehicleNo)
-    ? `<div style="display:flex;gap:16px;margin-bottom:14px">${invoice.deliveryNoteNo?`<div class="info-box" style="flex:1"><div class="info-label">🚚 ${isBn?"ডেলিভারি নোট নং":"Delivery Note No."}</div><div class="info-value">${invoice.deliveryNoteNo}</div></div>`:""} ${invoice.vehicleNo?`<div class="info-box" style="flex:1"><div class="info-label">🚗 ${isBn?"গাড়ির নম্বর":"Vehicle No."}</div><div class="info-value">${invoice.vehicleNo}</div></div>`:""}</div>` : "";
+    ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}${invoice.createdByName?`<div class="info-sub">👤 ${invoice.createdByName}</div>`:""}${metaHTML}</div>`
+    : `<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div>${metaHTML}</div>`;
 
   const thermal = ds.paper==="80mm" || ds.paper==="58mm";
   // Full-page bill: in print the invoice box becomes a table at least one page tall (8 mm margins, 1 mm slack)
@@ -420,8 +422,8 @@ ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}$
   <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
 <div class="invoice">${fpRow}<div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>${fpEnd}
-${fpGrow}<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>${metaHTML?`<div style="margin:-4px 0 12px;font-size:12px;color:#374151">${metaHTML}</div>`:""}
-${deliveryHTML}<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>${pageH?`</div>${fpEnd}${fpRow}<div class="body fp-tail">`:""}
+${fpGrow}<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>
+<table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>${pageH?`</div>${fpEnd}${fpRow}<div class="body fp-tail">`:""}
 ${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
 ${vatSummaryHTML}
 ${!isDelivery&&!isQuote&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">${cur} ${siFmt2(invoice.amountPaid)}</span></div>`:""}
