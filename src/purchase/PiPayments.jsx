@@ -92,6 +92,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoic
   const [chequeBank,setChequeBank] = useState("");
   const [chequeReceivedBy,setChequeReceivedBy] = useState("");
   const [vendorReceiptNo,setVendorReceiptNo] = useState("");
+  const [chequeMonth,setChequeMonth] = useState("");
   const [refNo,setRefNo] = useState("");
   const [refBank,setRefBank] = useState("");
   const [chequeDate,setChequeDate] = useState(piToday());
@@ -149,6 +150,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoic
       chequeDate: method==="cheque"?chequeDate:"",
       chequeReceivedBy: method==="cheque"?chequeReceivedBy:"",
       vendorReceiptNo,
+      chequeMonth,
       refNo: (method==="bank_transfer"||method==="card")?refNo:"",
       refBank: (method==="bank_transfer"||method==="card")?refBank:"",
       refDate: (method==="bank_transfer"||method==="card")?paymentDate:"",
@@ -241,6 +243,10 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoic
           <div style={{ marginBottom:14 }}>
             <div style={lbl}>{lang==="bn"?"ভেন্ডরের রিসিট নম্বর (ঐচ্ছিক)":"Vendor Receipt No. (optional)"}</div>
             <input style={{ ...inp(), fontFamily:"monospace" }} placeholder={lang==="bn"?"ভেন্ডর যে রিসিট দিয়েছে":"Receipt number given by the vendor"} value={vendorReceiptNo} onChange={e=>setVendorReceiptNo(e.target.value)} />
+          </div>
+          <div style={{ marginBottom:14 }}>
+            <div style={lbl}>{lang==="bn"?"চেক / পেমেন্ট কোন মাসের (ঐচ্ছিক)":"Cheque / payment for month (optional)"}</div>
+            <input type="month" style={inp()} value={chequeMonth} onChange={e=>setChequeMonth(e.target.value)} />
           </div>
 
           {(method==="bank_transfer"||method==="card")&&(
@@ -342,6 +348,7 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
             {voucher.chequeReceivedBy&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🙋 {lang==="bn"?"চেক গ্রহণকারী":"Cheque Received By"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeReceivedBy}</span></div>}
           </>
         )}
+        {voucher.chequeMonth&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🗓️ {lang==="bn"?"কোন মাসের":"For Month"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{new Date(`${voucher.chequeMonth}-01T00:00:00`).toLocaleString("en-GB",{ month:"short", year:"numeric" })}</span></div>}
         {voucher.vendorReceiptNo&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🧾 {lang==="bn"?"ভেন্ডরের রিসিট নম্বর":"Vendor Receipt No."}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorReceiptNo}</span></div>}
         {(voucher.method==="bank_transfer"||voucher.method==="card")&&(
           <>

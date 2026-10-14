@@ -52,6 +52,7 @@ export default function VendorChequeWizard({
   const [chequeBank, setChequeBank] = useState("");
   const [receivedBy, setReceivedBy] = useState("");
   const [vendorReceiptNo, setVendorReceiptNo] = useState("");
+  const [chequeMonth, setChequeMonth] = useState("");
   const [note, setNote] = useState("");
   const [noteTouched, setNoteTouched] = useState(false);
   const [chequeAmt, setChequeAmt] = useState("");
@@ -122,7 +123,7 @@ export default function VendorChequeWizard({
       vendorId: vendor.id || null, vendorName: vendor.name, vendorMobile: vendor.mobile || "",
       method: "cheque", paymentDate: todayIso(),
       chequeNo: chequeNo.trim(), chequeBank, chequeDate, chequeReceivedBy: receivedBy.trim(),
-      vendorReceiptNo: vendorReceiptNo.trim(), note: note.trim(), allocations,
+      vendorReceiptNo: vendorReceiptNo.trim(), chequeMonth, note: note.trim(), allocations,
       chequeAmount,
     });
     if (result) setCreated(result);
@@ -233,6 +234,7 @@ export default function VendorChequeWizard({
             </div>
             <div><span style={lbl}>{bn ? "চেক গ্রহণকারী (ঐচ্ছিক)" : "Received by (optional)"}</span><input style={field} value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} /></div>
             <div><span style={lbl}>{bn ? "ভেন্ডর রিসিট নং (ঐচ্ছিক)" : "Vendor receipt no (optional)"}</span><input style={field} value={vendorReceiptNo} onChange={(e) => setVendorReceiptNo(e.target.value)} /></div>
+            <div><span style={lbl}>{bn ? "চেক কোন মাসের (ঐচ্ছিক)" : "Cheque for month (optional)"}</span><input type="month" style={field} value={chequeMonth} onChange={(e) => setChequeMonth(e.target.value)} /></div>
             <div style={{ gridColumn: mobile ? "1 / -1" : "auto" }}><span style={lbl}>{bn ? "বিবরণ" : "Narration"}</span><input style={field} value={note} onChange={(e) => { setNote(e.target.value); setNoteTouched(true); }} /></div>
           </div>
         </div>

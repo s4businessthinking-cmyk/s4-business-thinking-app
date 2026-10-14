@@ -152,7 +152,7 @@ export const toVoucherView = (v, kind) => ({
   partyName:kind==="receipt" ? v.customerName : v.vendorName, method:v.method, totalAmount:v.totalAmount, status:v.status,
   chequeNo:v.chequeNo, chequeBank:v.chequeBank, chequeDate:v.chequeDate, chequeStatus:v.chequeStatus, note:v.note,
   refNo:v.refNo, refBank:v.refBank, refDate:v.refDate,
-  chequeReceivedBy:v.chequeReceivedBy, vendorReceiptNo:v.vendorReceiptNo,
+  chequeReceivedBy:v.chequeReceivedBy, vendorReceiptNo:v.vendorReceiptNo, chequeMonth:v.chequeMonth,
   collectedByName:v.collectedByName, allocations:v.allocations||[], raw:v,
 });
 

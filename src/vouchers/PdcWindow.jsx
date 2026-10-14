@@ -27,9 +27,11 @@ const toRow = (type, v) => {
     id: v.id, type, no: v[m.no] || "", date: day(v[m.date] || v.createdAt), party: v[m.party] || "",
     chequeNo: v.chequeNo || "", chequeDate: day(v.chequeDate), bank: v.chequeBank || "",
     amount: n2(v.chequeAmount ?? v.totalAmount), chequeStatus: v.chequeStatus || "pending", clearedAt: day(v.clearedAt || v.bouncedAt),
+    month: v.chequeMonth || "", vendorRcpt: v.vendorReceiptNo || "",
     raw: v,
   };
 };
+const fmtMonth = (ym) => (/^d{4}-d{2}$/.test(ym || "") ? new Date(`${ym}-01T00:00:00`).toLocaleString("en-GB", { month: "short", year: "numeric" }) : "");
 
 // A bounced cheque cancels its voucher and gives the allocated amounts back to the bills' balances.
 export async function bounceVoucher(type, voucher, uid) {
@@ -75,6 +77,10 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [includePosted, setIncludePosted] = useState(false);
+  // PDC Issued: optional Month + Vendor Receipt No columns, remembered per device
+  const [showMonth, setShowMonth] = useState(() => { try { return localStorage.getItem("s4-pdc-show-month") === "1"; } catch { return false; } });
+  const toggleMonth = (v) => { setShowMonth(v); try { localStorage.setItem("s4-pdc-show-month", v ? "1" : "0"); } catch { /* ignore */ } };
+  const extraCols = showMonth && type === "issued";
   const [data, setData] = useState({ issued: [], received: [] });
   const [edits, setEdits] = useState({});
   const [selId, setSelId] = useState(null);
@@ -145,11 +151,11 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
   const printList = () => {
     const m = TYPES[type];
     const period = from || to ? `${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "End"}` : "All dates";
-    const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.no)}</td><td>${esc(fmtDate(r.date))}</td><td>${esc(r.party)}</td><td>${esc(r.bank)}</td><td>${esc(r.chequeNo)}</td><td>${esc(fmtDate(r.chequeDate))}</td><td style="text-align:right">${f2(r.amount)}</td><td>${esc(r.clearedAt ? fmtDate(r.clearedAt) : "")}</td><td>${esc(r.chequeStatus.toUpperCase())}</td></tr>`).join("");
+    const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.no)}</td><td>${esc(fmtDate(r.date))}</td><td>${esc(r.party)}</td>${extraCols ? `<td>${esc(fmtMonth(r.month))}</td><td>${esc(r.vendorRcpt)}</td>` : ""}<td>${esc(r.bank)}</td><td>${esc(r.chequeNo)}</td><td>${esc(fmtDate(r.chequeDate))}</td><td style="text-align:right">${f2(r.amount)}</td><td>${esc(r.clearedAt ? fmtDate(r.clearedAt) : "")}</td><td>${esc(r.chequeStatus.toUpperCase())}</td></tr>`).join("");
     printWithSettings(`<html><head><meta charset="UTF-8"><title>${esc(m.label)}</title><style>body{font-family:Segoe UI,Arial;font-size:12px;padding:18px}h2{margin:0;font-size:16px}h3{margin:4px 0 2px;font-size:13px}p{margin:2px 0 10px;color:#555}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 6px}th{background:#e5eaf3;text-align:left}tfoot td{font-weight:800;background:#f1f5f9}</style></head><body>
 <h2>${esc(shopName)}</h2><h3>POST DATED CHEQUES — ${esc(m.label.toUpperCase())}${bank ? ` — ${esc(bank)}` : ""}</h3><p>${esc(period)}</p>
-<table><thead><tr><th>Sl</th><th>Vchr No</th><th>Voucher Date</th><th>${esc(m.partyHead)}</th><th>Bank</th><th>Cheque No</th><th>Cheque Date</th><th style="text-align:right">Amount</th><th>Post Date</th><th>Status</th></tr></thead>
-<tbody>${body}</tbody><tfoot><tr><td colspan="7" style="text-align:right">TOTAL</td><td style="text-align:right">${f2(total)}</td><td colspan="2"></td></tr></tfoot></table></body></html>`);
+<table><thead><tr><th>Sl</th><th>Vchr No</th><th>Voucher Date</th><th>${esc(m.partyHead)}</th>${extraCols ? "<th>Month</th><th>Vendor Rcpt No</th>" : ""}<th>Bank</th><th>Cheque No</th><th>Cheque Date</th><th style="text-align:right">Amount</th><th>Post Date</th><th>Status</th></tr></thead>
+<tbody>${body}</tbody><tfoot><tr><td colspan="${extraCols ? 9 : 7}" style="text-align:right">TOTAL</td><td style="text-align:right">${f2(total)}</td><td colspan="2"></td></tr></tfoot></table></body></html>`);
   };
 
   const sel = rows.find((r) => r.id === selId) || null;
@@ -189,6 +195,11 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
           <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
             <input type="checkbox" checked={includePosted} onChange={(e) => setIncludePosted(e.target.checked)} /> Include Posted Cheques
           </label>
+          {type === "issued" && (
+            <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
+              <input type="checkbox" checked={showMonth} onChange={(e) => toggleMonth(e.target.checked)} /> {bn ? "মাস ও ভেন্ডর রিসিট নং দেখাও" : "Show Month & Vendor Receipt No"}
+            </label>
+          )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             {onOpenVoucher && <button type="button" onClick={() => sel && onOpenVoucher(sel.raw)} disabled={!sel} style={btn()}><u>V</u>iew</button>}
             <button type="button" onClick={save} disabled={saving || !changed.length} style={btn("#15803d", "#fff")}>{saving ? "…" : <><u>S</u>ave</>}</button>
@@ -200,18 +211,18 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
         <div style={{ border: `1px solid ${C.border}`, maxHeight: inline ? "62vh" : "55vh", overflow: "auto", background: "#fff" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <colgroup>
-              {[42, 85, 90, null, 120, 90, 90, 95, 44, 120, 110].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
+              {[42, 85, 90, null, ...(extraCols ? [80, 100] : []), 120, 90, 90, 95, 44, 120, 110].map((w, i) => <col key={i} style={w ? { width: w } : undefined} />)}
             </colgroup>
             <thead>
               <tr>
-                {["Sl.No", "Vchr No", "Voucher Date", TYPES[type].partyHead, "Bank", "Cheque No", "Cheque Date", "Amount", "Post", "Post Date", "Status"].map((h, i) => (
-                  <th key={h} style={{ ...th, textAlign: i === 7 ? "right" : "left" }}>{h}</th>
+                {["Sl.No", "Vchr No", "Voucher Date", TYPES[type].partyHead, ...(extraCols ? ["Month", "Vendor Rcpt No"] : []), "Bank", "Cheque No", "Cheque Date", "Amount", "Post", "Post Date", "Status"].map((h) => (
+                  <th key={h} style={{ ...th, textAlign: h === "Amount" ? "right" : "left" }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
-                <tr><td colSpan={11} style={{ ...td, textAlign: "center", color: "#64748b", padding: 16 }}>
+                <tr><td colSpan={extraCols ? 13 : 11} style={{ ...td, textAlign: "center", color: "#64748b", padding: 16 }}>
                   {includePosted ? (bn ? "কোনো চেক নেই" : "No cheques") : (bn ? "কোনো pending চেক নেই — পোস্ট করা চেক দেখতে 'Include Posted Cheques' টিক দিন" : "No pending cheques — tick 'Include Posted Cheques' to see posted ones")}
                 </td></tr>
               )}
@@ -227,6 +238,8 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
                     <td style={{ ...td, fontWeight: 700 }}>{r.no}</td>
                     <td style={td}>{fmtDate(r.date)}</td>
                     <td style={{ ...td, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.party}</td>
+                    {extraCols && <td style={{ ...td, textAlign: "left" }}>{fmtMonth(r.month)}</td>}
+                    {extraCols && <td style={{ ...td, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis" }}>{r.vendorRcpt}</td>}
                     <td style={{ ...td, textAlign: "left", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bank}</td>
                     <td style={td}>{r.chequeNo}</td>
                     <td style={{ ...td, color: due ? "#b45309" : td.color, fontWeight: due ? 800 : 400 }}>{fmtDate(r.chequeDate)}</td>

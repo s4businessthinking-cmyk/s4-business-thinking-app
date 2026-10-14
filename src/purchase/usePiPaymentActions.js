@@ -73,6 +73,8 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
         chequeStatus: payload.method === "cheque" ? "pending" : null,
         chequeReceivedBy: payload.method === "cheque" ? (payload.chequeReceivedBy || "").trim() : "",
         vendorReceiptNo: (payload.vendorReceiptNo || "").trim(),
+        // which month the payment / cheque is for (YYYY-MM), shown in the PDC register
+        chequeMonth: /^\d{4}-\d{2}$/.test(payload.chequeMonth || "") ? payload.chequeMonth : "",
         ...(payload.method === "cheque" && payload.chequeAmount != null ? {
           chequeAmount: parseFloat(piFmt2(payload.chequeAmount)),
           discountAmount: parseFloat(piFmt2(Math.max(0, totalAmount - piN2(payload.chequeAmount)))),

@@ -140,6 +140,7 @@ export default function AgainstInvoiceVoucherWindow({
   const [chequeBank, setChequeBank] = useState("");
   const [chequeReceivedBy, setChequeReceivedBy] = useState("");
   const [vendorReceiptNo, setVendorReceiptNo] = useState("");
+  const [chequeMonth, setChequeMonth] = useState("");
   const [refNo, setRefNo] = useState("");
   const [refBank, setRefBank] = useState("");
   const [refDate, setRefDate] = useState(todayIso);
@@ -180,7 +181,7 @@ export default function AgainstInvoiceVoucherWindow({
     setViewingId(null); setViewSnapshot(null);
     setDate(todayIso()); setParty(null); setCollector(""); setRows([]); setSelInvId(""); setCurAmt("");
     setMethod("cash"); setChequeNo(""); setChequeDate(todayIso()); setChequeBank(""); setNote("");
-    setChequeReceivedBy(""); setVendorReceiptNo("");
+    setChequeReceivedBy(""); setVendorReceiptNo(""); setChequeMonth("");
     setRefNo(""); setRefBank(""); setRefDate(todayIso());
     setTimeout(() => partyRef.current?.focus(), 60);
   };
@@ -219,7 +220,7 @@ export default function AgainstInvoiceVoucherWindow({
       date, method, note: note.trim(),
       chequeNo: method === "cheque" ? chequeNo.trim() : "", chequeBank: method === "cheque" ? chequeBank : "", chequeDate: method === "cheque" ? chequeDate : "",
       refNo: hasRef ? refNo.trim() : "", refBank: hasRef ? refBank : "", refDate: hasRef ? refDate : "",
-      ...(isReceipt ? {} : { chequeReceivedBy: method === "cheque" ? chequeReceivedBy.trim() : "", vendorReceiptNo: vendorReceiptNo.trim() }),
+      ...(isReceipt ? {} : { chequeReceivedBy: method === "cheque" ? chequeReceivedBy.trim() : "", vendorReceiptNo: vendorReceiptNo.trim(), chequeMonth }),
       collectedById: isReceipt ? (collector || "") : "", collectedByName: isReceipt ? (sm?.name || "") : "",
       allocations: rows.map((r) => ({ invoiceId: r.invoiceId, invoiceNo: r.invoiceNo, ...(isReceipt ? {} : { supplierInvoiceNo: r.supplierInvoiceNo || "" }), invoiceDate: r.invoiceDate, amount: parseFloat(f2(r.amount)) })),
     });
@@ -444,6 +445,8 @@ export default function AgainstInvoiceVoucherWindow({
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ ...lbl, width: 88 }}>Vendor Rcpt No</span>
               <input style={inp(ro ? { background: "#f4f7fc" } : {})} readOnly={ro} placeholder={bn ? "ভেন্ডরের রিসিট নম্বর (ঐচ্ছিক)" : "Receipt number given by the vendor (optional)"} value={ro ? (viewing.vendorReceiptNo || "") : vendorReceiptNo} onChange={(e) => setVendorReceiptNo(e.target.value)} />
+              <span style={{ ...lbl, whiteSpace: "nowrap" }}>{bn ? "কোন মাসের" : "For Month"}</span>
+              <input type="month" style={inp({ width: 150, ...(ro ? { background: "#f4f7fc" } : {}) })} readOnly={ro} value={ro ? (viewing.chequeMonth || "") : chequeMonth} onChange={(e) => setChequeMonth(e.target.value)} />
             </div>
           )}
 
