@@ -117,6 +117,7 @@ export default function PurchaseInvoiceDesktopForm({
   const unitRef = useRef(null);
   const costRef = useRef(null);
   const discRef = useRef(null);
+  const discAmtRef = useRef(null);
   const vatRef = useRef(null);
   const saleRef = useRef(null);
   const [editingLineId, setEditingLineId] = useState(null);
@@ -366,7 +367,7 @@ export default function PurchaseInvoiceDesktopForm({
 
       {/* Entry row */}
       <div style={{ padding: "8px 12px", background: "#e9f0fa", borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 64px 100px auto", gap: 6, alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 80px 64px 100px auto", gap: 6, alignItems: "end" }}>
           <div>
             <div style={{ ...lbl, display: "flex", justifyContent: "space-between" }}>
               <span>Product Nam<u>e</u>{" "}
@@ -418,6 +419,14 @@ export default function PurchaseInvoiceDesktopForm({
             <div style={lbl}>Dis %</div>
             <input ref={discRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.discountPerc}
               onChange={(e) => setCurrent((p) => ({ ...p, discountPerc: e.target.value }))}
+              onFocus={(e) => e.target.select()}
+              onKeyDown={(e) => enterTo(e, discAmtRef)} />
+          </div>
+          <div>
+            <div style={lbl}>Dis Amt</div>
+            <input ref={discAmtRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.discountFlat || ""}
+              disabled={piN2(current.discountPerc) > 0} title={piN2(current.discountPerc) > 0 ? (bn ? "Dis % দেওয়া আছে — টাকায় ছাড় দিতে Dis % ০ করুন" : "Dis % is set; make it 0 to give a flat discount") : ""}
+              onChange={(e) => setCurrent((p) => ({ ...p, discountFlat: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, vatRef)} />
           </div>

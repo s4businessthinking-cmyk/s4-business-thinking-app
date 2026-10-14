@@ -20,6 +20,9 @@ test("foreign currency bills convert line costs to the shop currency", () => {
   assert.equal(lineToBase({ unitCost: "10" }, 3.6725).unitCost, "36.725");
   const same = { unitCost: "5" };
   assert.equal(lineToBase(same, 1), same);
+  // a flat line discount is in the bill currency too
+  assert.equal(lineToBase({ unitCost: "10", discountFlat: "2" }, 3.6725).discountFlat, "7.345");
+  assert.equal("discountFlat" in lineToBase({ unitCost: "10" }, 3.6725), false);
 });
 
 test("separate-batch question only when stock is on hand and something differs", () => {

@@ -622,8 +622,9 @@ export function renderPiScreens({ balance, billReturns, bnL, can, canManagePurch
               {fField(t.pi_unitCost, <input className="pm-input" style={{ fontWeight:700 }} inputMode="decimal" placeholder="0.00" value={piCurrent.unitCost}
                 onChange={e=>setPiCurrent(p=>({...p,unitCost:e.target.value}))} onKeyDown={enterAdd} />)}
             </div>
-            <div className="si-grid3" style={{ gridTemplateColumns:"70px 62px minmax(0,1fr)" }}>
+            <div className="si-grid3" style={{ gridTemplateColumns:"62px 74px 56px minmax(0,1fr)" }}>
               {fField(t.pi_discPerc, <input className="pm-input" inputMode="decimal" placeholder="0" value={piCurrent.discountPerc} onChange={e=>setPiCurrent(p=>({...p,discountPerc:e.target.value}))} />)}
+              {fField(bnL?"ছাড় (টাকা)":"Dis Amt", <input className="pm-input" inputMode="decimal" placeholder="0.00" value={piCurrent.discountFlat||""} disabled={piN2(piCurrent.discountPerc)>0} onChange={e=>setPiCurrent(p=>({...p,discountFlat:e.target.value}))} />)}
               {fField("VAT%", <input className="pm-input" inputMode="decimal" placeholder="5" value={piCurrent.taxPerc} onChange={e=>setPiCurrent(p=>({...p,taxPerc:e.target.value}))} />)}
               {fField(`💰 ${t.pi_salePrice}`, <input className="pm-input" style={{ color:"#15803d", fontWeight:700 }} inputMode="decimal" placeholder={t.pi_salePricePh} value={piCurrent.salePrice}
                 onChange={e=>setPiCurrent(p=>({...p,salePrice:e.target.value}))} onKeyDown={enterAdd} />)}

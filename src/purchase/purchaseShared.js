@@ -32,7 +32,9 @@ export const piToday    = () => localIsoDate();
 
 export function piCalcLine(it) {
   const qty=piN2(it.qty), cost=piN2(it.unitCost), dp=Math.min(Math.max(piN2(it.discountPerc),0),100), tp=Math.max(piN2(it.taxPerc),0);
-  const gross=piR2(qty*cost), disc=piR2(gross*dp/100), base=piR2(gross-disc), tax=piR2(base*tp/100);
+  // Dis % wins; with no % the flat Dis Amt applies (never more than the line amount), as on sales.
+  const gross=piR2(qty*cost), disc=dp>0 ? piR2(gross*dp/100) : piR2(Math.min(Math.max(piN2(it.discountFlat),0), gross));
+  const base=piR2(gross-disc), tax=piR2(base*tp/100);
   return { gross, disc, tax, total:piR2(base+tax) };
 }
 
@@ -43,11 +45,11 @@ export function piCalcTotals(items) {
 }
 
 export function piEmptyLine() {
-  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
+  return { id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", discountFlat:"", taxPerc:"5", salePrice:"" };
 }
 
 export function piEmptyCurrent() {
-  return { productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", taxPerc:"5", salePrice:"" };
+  return { productId:null, name:"", code:"", brand:"", qty:"", unit:"Pcs", unitCost:"", discountPerc:"0", discountFlat:"", taxPerc:"5", salePrice:"" };
 }
 
 export function piEmptyForm() {

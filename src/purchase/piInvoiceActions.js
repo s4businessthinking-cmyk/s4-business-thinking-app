@@ -28,13 +28,14 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       if (piN2(it.unitCost)<0){ toast(t.pi_errCost,"err"); return null; }
       if (piN2(it.taxPerc)<0){ toast(lang==="bn"?"❌ VAT % ঋণাত্মক হতে পারে না":"❌ VAT % cannot be negative","err"); return null; }
       if (piN2(it.discountPerc)<0||piN2(it.discountPerc)>100){ toast(lang==="bn"?`❌ "${it.name}": ছাড় ০–১০০% হতে হবে`:`❌ "${it.name}": discount must be 0–100%`,"err"); return null; }
+      if (piN2(it.discountFlat)<0){ toast(lang==="bn"?`❌ "${it.name}": ছাড়ের টাকা ঋণাত্মক হতে পারে না`:`❌ "${it.name}": discount amount cannot be negative`,"err"); return null; }
     }
     const foreign = isForeign(piForm, piBaseCur);
     const rate = rateOf(piForm, piBaseCur);
     if (foreign && !(rate > 0)) { toast(lang==="bn"?`❌ ${piForm.currency} থেকে ${piBaseCur}-এর রেট (Exchange Rate) দিন`:`❌ Enter the exchange rate from ${piForm.currency} to ${piBaseCur}`,"err"); return null; }
     const baseLines = valid.map(it=>lineToBase(it, rate));
-    const builtItems=baseLines.map((it,idx)=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null,
-      ...(foreign?{ fcUnitCost:piN2(valid[idx].unitCost) }:{}), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) }; });
+    const builtItems=baseLines.map((it,idx)=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), ...(piN2(it.discountFlat)>0?{ discountFlat:piN2(it.discountFlat) }:{}), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null,
+      ...(foreign?{ fcUnitCost:piN2(valid[idx].unitCost), ...(piN2(valid[idx].discountFlat)>0?{ fcDiscountFlat:piN2(valid[idx].discountFlat) }:{}) }:{}), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) }; });
     const { sub, disc, tax, grand } = piCalcTotals(baseLines);
     const fcGrand = piCalcTotals(valid).grand;
     // Paying the whole bill in a foreign currency settles it exactly, without a rounding paisa left over.

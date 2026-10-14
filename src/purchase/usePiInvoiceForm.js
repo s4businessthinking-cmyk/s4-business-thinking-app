@@ -51,7 +51,7 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     const fxRate = inv.currency && Number(inv.exchangeRate) > 0 ? Number(inv.exchangeRate) : 1;
     const fxBack = (v) => String(parseFloat((Number(v||0)/fxRate).toFixed(4)));
     setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", refNo:inv.refNo||"", currency:fxRate!==1?inv.currency:"", exchangeRate:fxRate!==1?String(inv.exchangeRate):"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:(inv.paymentMethod||"cash")!=="cash"&&inv.amountPaid>0?fxBack(inv.amountPaid):"", note:inv.note||"" });
-    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:fxRate!==1?String(it.fcUnitCost ?? fxBack(it.unitCost)):String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||""), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) })));
+    setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:fxRate!==1?String(it.fcUnitCost ?? fxBack(it.unitCost)):String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), discountFlat:it.discountFlat?(fxRate!==1?String(it.fcDiscountFlat ?? fxBack(it.discountFlat)):String(it.discountFlat)):"", taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||""), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) })));
     setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
   };
@@ -108,7 +108,7 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
 
   // ── Load a confirmed item into the entry row for editing; it stays in the bill until Add updates it ──
   const piEditLine = (item) => {
-    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc??"0"), taxPerc:String(item.taxPerc??"5"), salePrice:String(item.salePrice||""), ...(item.batchNo?{ batchNo:item.batchNo, batchReasons:item.batchReasons||[] }:{}) });
+    setPiCurrent({ productId:item.productId||null, name:item.name||"", code:item.code||"", brand:item.brand||"", qty:String(item.qty||""), unit:item.unit||"Pcs", unitCost:String(item.unitCost||""), discountPerc:String(item.discountPerc??"0"), discountFlat:String(item.discountFlat||""), taxPerc:String(item.taxPerc??"5"), salePrice:String(item.salePrice||""), ...(item.batchNo?{ batchNo:item.batchNo, batchReasons:item.batchReasons||[] }:{}) });
     setPiEditLineId(item.id);
     setTimeout(()=>piNameRef.current?.focus(), 80);
   };

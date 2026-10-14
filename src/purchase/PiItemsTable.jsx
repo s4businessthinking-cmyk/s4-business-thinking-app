@@ -64,9 +64,9 @@ export function PiItemsTable({ items, lang, onEdit, onDelete, editId }) {
                   <div className="si-strong">{it.name}</div>
                   {(it.code||it.brand)&&<div className="si-muted">{[it.code,it.brand].filter(Boolean).join(" · ")}</div>}
                   {it.batchNo&&<div style={{ color:"#7c3aed", fontWeight:700 }}>📦 {bn?"আলাদা ব্যাচ":"Batch"} {it.batchNo}</div>}
-                  {(piN2(it.discountPerc)>0||piN2(it.taxPerc)>0||piN2(it.salePrice)>0)&&(
+                  {(disc>0||piN2(it.taxPerc)>0||piN2(it.salePrice)>0)&&(
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-                      {piN2(it.discountPerc)>0&&<span style={{ color:"#b91c1c" }}>{bn?"ছাড়":"Disc"} {it.discountPerc}% (-{piFmt2(disc)})</span>}
+                      {disc>0&&<span style={{ color:"#b91c1c" }}>{bn?"ছাড়":"Disc"} {piN2(it.discountPerc)>0?`${it.discountPerc}% `:""}(-{piFmt2(disc)})</span>}
                       {piN2(it.taxPerc)>0&&<span style={{ color:"#0e7490" }}>VAT {it.taxPerc}% (+{piFmt2(tax)})</span>}
                       {piN2(it.salePrice)>0&&<span style={{ color:"#15803d", fontWeight:700 }}>{bn?"বিক্রয়":"Sale"} {piFmt2(it.salePrice)}</span>}
                     </div>

@@ -34,7 +34,7 @@ export const isForeign = (form, baseCurrency) => {
 // Line prices are typed in the bill currency; stock, cost, VAT and vendor balance are kept in the shop currency.
 export function lineToBase(line, rate) {
   if (rate === 1) return line;
-  return { ...line, unitCost: String(r4(num(line.unitCost) * rate)) };
+  return { ...line, unitCost: String(r4(num(line.unitCost) * rate)), ...(num(line.discountFlat) ? { discountFlat: String(r4(num(line.discountFlat) * rate)) } : {}) };
 }
 
 // Reasons this purchase line differs from the stock already on hand, for the options that are switched on.

@@ -50,7 +50,9 @@ function calculateInvoiceTotals(items = []) {
     const taxPerc = Number(item.taxPerc) || 0;
 
     const lineSubtotal = qty * unitCost;
-    const lineDiscount = (lineSubtotal * discountPerc) / 100;
+    const lineDiscount = discountPerc > 0
+      ? (lineSubtotal * discountPerc) / 100
+      : Math.min(Math.max(Number(item.discountFlat) || 0, 0), lineSubtotal);
     const lineBeforeTax = lineSubtotal - lineDiscount;
     const lineTax = (lineBeforeTax * taxPerc) / 100;
 
