@@ -38,7 +38,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(() => localDay());
   const [search, setSearch] = useState("");
-  const [hideZero, setHideZero] = useState(true);
+  const [hideZero, setHideZero] = useState(false);
   const [selKey, setSelKey] = useState("");
   const searchRef = useRef(null);
   const listRef = useRef(null);

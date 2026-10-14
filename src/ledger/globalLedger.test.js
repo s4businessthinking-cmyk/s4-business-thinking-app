@@ -68,3 +68,22 @@ test("statement: opening before From, running balance, totals, other side named"
   assert.equal(st.lines[0].against, "Sales, VAT Output");
   assert.deepEqual([st.dr, st.cr, st.closing], [105, 90, 65]);
 });
+
+test("like the party ledger: bills by name only join the customer, any live status counts, every customer listed", () => {
+  const d = {
+    salesInvoices: [
+      { id: "a", shopId: S, status: "open", invoiceNo: "SI-9", invoiceDate: "2026-10-01", customerName: "AL NOOR ", grandTotal: 40, amountPaid: 0, paymentMethod: "credit" },
+      { id: "b", shopId: S, status: "draft", invoiceNo: "SI-D", invoiceDate: "2026-10-01", customerId: "c1", grandTotal: 999 },
+      { id: "c", shopId: S, status: "confirmed", invoiceNo: "SI-C", invoiceDate: "2026-10-01", customerId: "c1", grandTotal: 10, amountPaid: 10, paymentMethod: "credit" },
+    ],
+    receipts: [{ id: "r", shopId: S, status: "confirmed", receiptNo: "RV-9", receiptDate: "2026-10-02", customerName: "Al Noor", method: "cash", totalAmount: 15 }],
+  };
+  const { accounts, postings } = buildGlobalLedger(d, { ...opts, customers: [...opts.customers, { id: "c2", customerName: "No Bills Yet" }] });
+  const b = balances(postings);
+  assert.equal(b.get("c:c1"), 40 + 10 - 10 - 15);
+  assert.ok(![...accounts.keys()].some((k) => k.startsWith("cn:")));
+  assert.equal(accounts.get("c:c2")?.name, "No Bills Yet");
+  assert.equal(accounts.get("v:v1")?.group, "vendor");
+  const cash = [...accounts.values()].find((a) => a.name === "Cash in Hand").key;
+  assert.equal(b.get(cash), 10 + 15); // paid on a "credit" bill still lands in cash, the entry stays balanced
+});

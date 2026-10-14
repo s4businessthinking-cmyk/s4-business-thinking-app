@@ -4,9 +4,11 @@
 // - a bill's own payment is amountPaid less what receipts / payments and returns settled on it;
 // - payment method cash -> "Cash in Hand", transfer / card / cheque -> "Bank", credit -> no money moves;
 // - VAT goes to "VAT Output" (sales) / "VAT Input" (purchases, expenses); an expense's cost is its amount less VAT.
+// Like the party ledger: every bill counts except cancelled / draft, and a bill or voucher without a party id goes to
+// the customer / supplier of that name.
 
 import { CASH_ACCOUNT } from "../vouchers/accountVoucherDomain.js";
-import { n, r2, dayOf, isLive, liveSalesOf, livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
+import { n, r2, dayOf, isLive, liveReturnsOf } from "../reports/reportFilters.js";
 
 export const GROUPS = [
   { id: "customer", bn: "কাস্টমার", en: "Customers" },
@@ -29,6 +31,8 @@ const FIXED = {
 const lc = (v) => String(v || "").trim().toLowerCase();
 const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);
 const live = (d, shopId) => isLive(d, shopId) && d.status !== "cancelled" && d.status !== "draft";
+const liveSales = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
+const livePurchases = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
 const sumAlloc = (vouchers, id) => vouchers.reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
 const sumApplied = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((t, r) => t + n(r.appliedToInvoice), 0);
 
@@ -50,12 +54,12 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
   const vendById = new Map(vendors.filter((v) => v?.id).map((v) => [v.id, v]));
   const custByName = new Map(customers.filter((c) => c?.id && !c.isDeleted && c.customerName).map((c) => [lc(c.customerName), c]));
   const vendByName = new Map(vendors.filter((v) => v?.id && !v.isDeleted && v.vendorName).map((v) => [lc(v.vendorName), v]));
-  const customer = (id, name) => (id
+  const customer = (pid, name) => { const id = pid || custByName.get(lc(name))?.id; return (id
     ? acc(`c:${id}`, custById.get(id)?.customerName || name || "Customer", "customer", { partyId: id })
-    : acc(`cn:${lc(name) || "walk-in"}`, name || "Walk-in", "customer"));
-  const vendor = (id, name) => (id
+    : acc(`cn:${lc(name) || "walk-in"}`, name || "Walk-in", "customer")); };
+  const vendor = (pid, name) => { const id = pid || vendByName.get(lc(name))?.id; return (id
     ? acc(`v:${id}`, vendById.get(id)?.vendorName || name || "Supplier", "vendor", { partyId: id })
-    : acc(`vn:${lc(name) || "-"}`, name || "Supplier", "vendor"));
+    : acc(`vn:${lc(name) || "-"}`, name || "Supplier", "vendor")); };
   const partner = (id, name) => acc(`p:${id || lc(name)}`, name || "Partner", "equity", { partnerId: id });
   const money = (method) => (method === "credit" ? null : named(BANK_METHODS.has(method) ? BANK : CASH_ACCOUNT));
   // a journal line's account: a customer / supplier by name goes to their own ledger
@@ -68,6 +72,11 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     if (v) return vendor(v.id, v.vendorName);
     return named(String(name).trim());
   };
+
+  // every customer and supplier has a ledger, even before the first bill
+  customers.filter((c) => c?.id && !c.isDeleted).forEach((c) => customer(c.id, c.customerName));
+  vendors.filter((v) => v?.id && !v.isDeleted).forEach((v) => vendor(v.id, v.vendorName));
+  [CASH_ACCOUNT, BANK, "Sales", "Purchase", "VAT Output", "VAT Input"].forEach(named);
 
   // lines: [[accountKey, dr, cr]]; zero lines are dropped
   const entry = (doc, lines) => {
@@ -83,23 +92,23 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
   const salesRet = liveReturnsOf(data.salesReturns, shopId);
   const purchRet = liveReturnsOf(data.purchaseReturns, shopId);
 
-  liveSalesOf(data.salesInvoices, shopId).forEach((inv) => {
+  liveSales(data.salesInvoices, shopId).forEach((inv) => {
     const c = customer(inv.customerId, inv.customerName);
     const gt = n(inv.grandTotal), vat = n(inv.totalVat);
     const doc = { date: inv.invoiceDate, no: inv.invoiceNo, col: "salesInvoices", id: inv.id, narration: inv.note || "" };
     if (inv.source === "openingBalance") entry({ ...doc, type: "opening" }, [[c, gt, 0], [named("Opening Balance"), 0, gt]]);
     else entry({ ...doc, type: "sale" }, [[c, gt, 0], [named("Sales"), 0, gt - vat], [named("VAT Output"), 0, vat]]);
     const direct = n(inv.amountPaid) - sumAlloc(receipts, inv.id) - sumApplied(salesRet, inv.id);
-    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "saleReceipt" }, [[money(inv.paymentMethod), direct, 0], [c, 0, direct]]);
+    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "saleReceipt" }, [[money(inv.paymentMethod) || named(CASH_ACCOUNT), direct, 0], [c, 0, direct]]);
   });
-  livePurchasesOf(data.purchaseInvoices, shopId).forEach((inv) => {
+  livePurchases(data.purchaseInvoices, shopId).forEach((inv) => {
     const v = vendor(inv.vendorId, inv.vendorName);
     const gt = n(inv.grandTotal), vat = n(inv.totalTax);
     const doc = { date: inv.invoiceDate, no: inv.invoiceNo, col: "purchaseInvoices", id: inv.id, narration: [inv.supplierInvoiceNo, inv.note].filter(Boolean).join(" · ") };
     if (inv.source === "openingBalance") entry({ ...doc, type: "opening" }, [[named("Opening Balance"), gt, 0], [v, 0, gt]]);
     else entry({ ...doc, type: "purchase" }, [[named("Purchase"), gt - vat, 0], [named("VAT Input"), vat, 0], [v, 0, gt]]);
     const direct = n(inv.amountPaid) - sumAlloc(payments, inv.id) - sumApplied(purchRet, inv.id);
-    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "purchasePayment" }, [[v, direct, 0], [money(inv.paymentMethod), 0, direct]]);
+    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "purchasePayment" }, [[v, direct, 0], [money(inv.paymentMethod) || named(CASH_ACCOUNT), 0, direct]]);
   });
   receipts.forEach((r) => {
     const amt = n(r.totalAmount);
