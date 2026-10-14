@@ -11,6 +11,7 @@ import { saveShopRecord } from "../offline/shopService";
 import { signOut } from "../backend/auth";
 import { unitFactorFor } from "../inventory/unitConversion";
 import { useEffect } from "react";
+import { backupBeforeExit } from "../backup/backupOnExit.js";
 
 export function useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle }) {
   const selectProductToOrder = (prod) => {
@@ -773,6 +774,7 @@ const startEditOrder = (order) => {
 
   const handleLogout = async () => {
     if (!window.confirm(t.confirmLogout)) return;
+    if (isOwner && shopId && !(await backupBeforeExit({ shopId, lang, toast, action:"logout" }))) return;
     try {
       if (onLogout) await onLogout();
       else await signOut(auth);

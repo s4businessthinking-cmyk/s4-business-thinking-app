@@ -8,6 +8,11 @@ const SILENT_INSTALL_DELAY_MS = 2500;
 const BACKUP_KEEP_PER_SHOP = 30;
 const BACKUP_FILE_RE = /^(S4-backup-[\w-]+)-\d{8}-\d{4}\.s4backup$/;
 
+// Closing the window asks the page first (the owner is offered a data backup); the page then sends
+// s4-app:close-now. Quitting the app (auto-update install, app.quit) never asks.
+let closeAllowed = false;
+app.on("before-quit", () => { closeAllowed = true; });
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -25,6 +30,31 @@ function createWindow() {
   win.removeMenu();
   // On Windows the page can lose keyboard focus while the window stays active, so text boxes stop taking input.
   win.on("focus", () => win.webContents.focus());
+  let closeAsked = 0;
+  let closeAcked = false;
+  win.on("close", (event) => {
+    if (closeAllowed || win.webContents.isDestroyed() || win.webContents.isCrashed()) return;
+    // Pressing close again 20 s after asking (e.g. a backup that hangs) closes anyway.
+    if (closeAsked && Date.now() - closeAsked > 20000) return;
+    event.preventDefault();
+    if (closeAsked) return;
+    closeAsked = Date.now();
+    closeAcked = false;
+    win.webContents.send("s4-app:close-requested");
+    // A page that does not handle the request (login screen, staff, old bundle) closes as before.
+    setTimeout(() => {
+      if (closeAcked || win.isDestroyed()) return;
+      closeAllowed = true;
+      win.close();
+    }, 1500);
+  });
+  ipcMain.on("s4-app:close-ack", (event) => { if (event.sender === win.webContents) closeAcked = true; });
+  ipcMain.on("s4-app:close-cancel", (event) => { if (event.sender === win.webContents) closeAsked = 0; });
+  ipcMain.on("s4-app:close-now", (event) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    closeAllowed = true;
+    win.close();
+  });
   // Websites (tax portal, WhatsApp) open in the user's own browser where their logins are saved; print previews stay in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url) && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url)) {
@@ -69,6 +99,25 @@ function setupDialogIpc() {
       choice = win ? dialog.showMessageBoxSync(win, options) : dialog.showMessageBoxSync(options);
     } finally {
       event.returnValue = isConfirm ? choice === 0 : true;
+      setTimeout(() => {
+        if (!win || win.isDestroyed()) return;
+        win.focus();
+        win.webContents.focus();
+      }, 0);
+    }
+  });
+
+  // Native message box with custom buttons; returns the index of the pressed button (cancelId on Esc).
+  ipcMain.on("s4-dialog:choose", (event, message, buttons, cancelId) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const labels = Array.isArray(buttons) && buttons.length ? buttons.slice(0, 4).map((b) => String(b)) : ["OK"];
+    const cancel = Number.isInteger(cancelId) && cancelId >= 0 && cancelId < labels.length ? cancelId : labels.length - 1;
+    const options = { type: "question", title: "S4 Business Thinking", message: String(message ?? ""), buttons: labels, defaultId: 0, cancelId: cancel, noLink: true };
+    let choice = cancel;
+    try {
+      choice = win ? dialog.showMessageBoxSync(win, options) : dialog.showMessageBoxSync(options);
+    } finally {
+      event.returnValue = choice;
       setTimeout(() => {
         if (!win || win.isDestroyed()) return;
         win.focus();
@@ -208,6 +257,7 @@ function setupAutoUpdater() {
     console.log("[S4 AutoUpdate] silent install starting...");
     setTimeout(() => {
       try {
+        closeAllowed = true;
         autoUpdater.quitAndInstall(false, true);
       } catch (error) {
         installing = false;

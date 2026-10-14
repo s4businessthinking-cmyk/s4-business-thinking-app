@@ -15,6 +15,7 @@ import { useEmployeeAlerts } from "../employees/useEmployeeAlerts.js";
 import { usePartnerAlerts } from "../partners/usePartnerAlerts.js";
 import { useReminderAlerts } from "../reminders/useReminderAlerts.js";
 import { useShopFinance } from "../dashboard/shopFinance.js";
+import { backupBeforeExit } from "../backup/backupOnExit.js";
 
 export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors }) {
   useEffect(() => {
@@ -144,6 +145,24 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
         : "💾 No recent backup — go to Settings › Backup & restore to save one to Google Drive"),
     });
   }, [shopId, isOwner, authSyncReady]);
+
+  // Desktop window close button: offer the owner a backup first (electron/main.cjs waits for closeNow / cancelClose).
+  useEffect(() => {
+    const desk = window.S4Desktop?.app;
+    if (!desk || !shopId || !isOwner) return;
+    let busy = false;
+    return desk.onCloseRequested(async () => {
+      desk.ackClose();
+      if (busy) return;
+      busy = true;
+      try {
+        if (await backupBeforeExit({ shopId, lang, toast, action:"close" })) desk.closeNow();
+        else desk.cancelClose();
+      } finally {
+        busy = false;
+      }
+    });
+  }, [shopId, isOwner, lang]);
 
   // ── Background real-time sync for collections that don't have their own
   // always-mounted listener above (purchaseInvoices/purchasePayments/
