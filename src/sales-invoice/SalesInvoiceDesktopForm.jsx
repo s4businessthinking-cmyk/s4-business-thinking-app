@@ -158,6 +158,9 @@ export default function SalesInvoiceDesktopForm({
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
+  // A saved bill opens read-only (also when stepping with < >); the Edit button unlocks it.
+  const [locked, setLocked] = useState(!!editInvId);
+  useEffect(() => { setLocked(!!editInvId); }, [editInvId]);
   const isSO = kind === "salesOrder";
   const isQuote = kind === "quotation" || isSO;
   const isDN = kind === "delivery";
@@ -317,6 +320,7 @@ export default function SalesInvoiceDesktopForm({
 
   const handlersRef = useRef({});
   handlersRef.current = {
+    locked,
     history: () => {
       if (!current.productId && !String(current.name || "").trim()) { toast(bn ? "আগে Product বাছাই করুন, তারপর F8 চাপুন" : "Select a product first, then press F8", "err"); return; }
       setShowHistory(true);
@@ -333,6 +337,7 @@ export default function SalesInvoiceDesktopForm({
     const onKey = (e) => {
       if (document.querySelector("[data-si-modal-open]")) return;
       const h = handlersRef.current;
+      if (h.locked && ["F9", "F10", "Home", "Insert"].includes(e.key)) return;
       const tag = String(e.target?.tagName || "").toLowerCase();
       const typing = tag === "select" || ((tag === "input" || tag === "textarea") && String(e.target.value || "").length > 0);
       if (e.key === "F8") { e.preventDefault(); h.history(); }
@@ -365,6 +370,7 @@ export default function SalesInvoiceDesktopForm({
 
   return (
     <div style={{ background: C.bg, border: `1px solid ${C.bar}`, borderRadius: 4, minWidth: 1060, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
+      <fieldset disabled={locked} style={{ display: "contents" }}>
       {/* Header */}
       <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 150px", gap: 8, padding: "8px 10px 4px", background: C.panel }}>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
@@ -384,6 +390,11 @@ export default function SalesInvoiceDesktopForm({
             {savedInvoice && (
               <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: SI_STATUSES[savedInvoice.status]?.color || "#64748b", color: "#fff" }}>
                 {SI_STATUSES[savedInvoice.status]?.[lang] || savedInvoice.status}
+              </span>
+            )}
+            {locked && (
+              <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: "#e2e8f0", color: "#334155" }}>
+                🔒 {bn ? "শুধু দেখা" : "View only"}
               </span>
             )}
           </div>
@@ -606,8 +617,8 @@ export default function SalesInvoiceDesktopForm({
               const prod = it.productId ? productById.get(it.productId) : null;
               const selected = it.id === editingLineId;
               return (
-                <tr key={it.id} onClick={() => editLine(it)} title={bn ? "এডিট করতে ক্লিক করুন" : "Click to edit"}
-                  style={{ cursor: "pointer", background: selected ? C.sel : i % 2 ? C.rowAlt : "#fff" }}>
+                <tr key={it.id} onClick={() => { if (!locked) editLine(it); }} title={locked ? undefined : (bn ? "এডিট করতে ক্লিক করুন" : "Click to edit")}
+                  style={{ cursor: locked ? "default" : "pointer", background: selected ? C.sel : i % 2 ? C.rowAlt : "#fff" }}>
                   <td style={{ ...td, textAlign: "center" }}>{i + 1}</td>
                   <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>{it.name}{it.batchNo && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#7c3aed" }}>[{it.batchNo}]</span>}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.code}</td>
@@ -730,6 +741,7 @@ export default function SalesInvoiceDesktopForm({
           )}
         </div>
       </div>
+      </fieldset>
 
       {/* Action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
@@ -757,10 +769,17 @@ export default function SalesInvoiceDesktopForm({
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
-          <button type="button" onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
-          <button type="button" onClick={onConfirm} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
-            {saving ? "…" : (bn ? "সেভ" : "Save")}
-          </button>
+          {locked ? (
+            <button type="button" onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
+              style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}>✏️ {bn ? "এডিট" : "Edit"}</button>
+          ) : (
+            <>
+              <button type="button" onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
+              <button type="button" onClick={onConfirm} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
+                {saving ? "…" : (bn ? "সেভ" : "Save")}
+              </button>
+            </>
+          )}
           <button type="button" title={bn ? "আগের বিল" : "Previous bill"} disabled={!olderInvoice} onClick={() => olderInvoice && onOpenInvoice(olderInvoice)}
             style={btn("#e7eef9", C.label, { padding: "0 12px", marginLeft: 10, opacity: olderInvoice ? 1 : 0.4 })}>&lt;</button>
           <button type="button" title={bn ? "পরের বিল" : "Next bill"} disabled={!newerInvoice} onClick={() => newerInvoice && onOpenInvoice(newerInvoice)}
