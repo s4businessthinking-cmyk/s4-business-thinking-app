@@ -377,10 +377,9 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
         <AuditLogTab lang={lang} th={th} shopId={shopId} cur={t.cur||"AED"} isDesktop={isDesktop} />
       )}
 
-      {tab==="globalLedger"&&isOwner&&ownerUnlocked&&(
+      {tab==="globalLedger"&&isOwner&&(
         <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} />
       )}
-      {tab==="globalLedger"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"গ্লোবাল লেজার লক করা":"Global Ledger is locked")}
       {tab==="accounts"&&isOwner&&ownerUnlocked&&(
         <ProfitLossReport lang={lang} th={th} s={s} shopId={shopId} products={products}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} />
