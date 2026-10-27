@@ -4,11 +4,15 @@ import {
   persistOfflineDb,
   queryRows,
 } from "../offline/sqliteDb";
-import { createOfflineSession } from "./authSession";
+import { createOfflineSession, SESSION_IDLE_MS } from "./authSession";
 import { hashPassword, verifyPassword } from "./passwordService";
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
+
+const isNativeMobile = () => {
+  try { return window.Capacitor?.isNativePlatform?.() === true; } catch { return false; }
+};
 
 function nowIso() {
   return new Date().toISOString();
@@ -353,6 +357,8 @@ export async function verifyLocalUserPassword(
         role: user.role,
         permissions: user.permissions,
         session,
+        // Mobile only: a 16-hour sliding idle timeout instead of a one-run session (see sessionPerRun.js).
+        expiresAt: isNativeMobile() ? Date.now() + SESSION_IDLE_MS : null,
       })
     : null;
 

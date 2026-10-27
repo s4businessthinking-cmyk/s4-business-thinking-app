@@ -73,7 +73,7 @@ function masterCustomerTypes(shopId) {
 
 export default function CustomerMasterScreen({
   t, lang, shopId, user, customers, team = [], toast, cur = "AED",
-  canEdit = false, canDelete = false, canSales = false, actorName = "", leaveGuard, onClose, onGoToSales, renderImport, nextCode,
+  canEdit = false, canDelete = false, canSales = false, actorName = "", leaveGuard, onClose, onGoToSales, onGoToSecurityCheques, renderImport, nextCode,
   focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved,
 }) {
   const bn = lang === "bn";
@@ -91,6 +91,19 @@ export default function CustomerMasterScreen({
   const rootRef = useRef(null);
   const seenSelected = useRef(false);
   const [fitHeight, setFitHeight] = useState(null);
+  const [scSummary, setScSummary] = useState({ count: 0, total: 0 });
+
+  // Read-only: how many security cheques are held for this customer (own collection, never written here).
+  useEffect(() => {
+    if (!selectedId) { setScSummary({ count: 0, total: 0 }); return; }
+    let cancelled = false;
+    offlineList("securityCheques").then(({ records: rows }) => {
+      if (cancelled) return;
+      const held = (rows || []).filter((r) => r.data?.shopId === shopId && r.data?.partyId === selectedId && r.data?.partyType === "customer" && !r.data?.isDeleted && r.data?.status === "held");
+      setScSummary({ count: held.length, total: held.reduce((t, r) => t + (parseFloat(r.data?.amount) || 0), 0) });
+    }).catch((err) => console.warn("[S4 Customer] security cheque summary failed", err));
+    return () => { cancelled = true; };
+  }, [selectedId, shopId]);
 
   // On PC the screen fills exactly the space below the window title, so the page never scrolls.
   useEffect(() => {
@@ -426,6 +439,14 @@ export default function CustomerMasterScreen({
               {row("IBAN", "ibanNumber", { mono: true })}
               {row("SWIFT", "swiftCode", { mono: true })}
             </>)}
+            {selectedId && onGoToSecurityCheques && panel(L("সিকিউরিটি চেক", "Security Cheques"), (
+              <div className="pm-form-row" style={{ alignItems: "center" }}>
+                <span style={{ fontSize: 13 }}>
+                  {L(`জমা আছে: ${scSummary.count}টি · মোট ${cur} ${scSummary.total.toFixed(2)}`, `Held: ${scSummary.count} · Total ${cur} ${scSummary.total.toFixed(2)}`)}
+                </span>
+                <button type="button" className="pm-btn-secondary" onClick={() => onGoToSecurityCheques(selectedCustomer)}>{L("দেখুন", "View")}</button>
+              </div>
+            ))}
           </div>
         </fieldset>
 

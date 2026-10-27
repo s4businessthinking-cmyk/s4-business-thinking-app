@@ -80,7 +80,7 @@ export function PiPaymentsListTab({ payments, loading, t, lang, onOpen, mobile=f
 
 // ─── PI: NEW VENDOR PAYMENT VOUCHER FORM ───────────────────────
 // Select a vendor → see all their open invoices → allocate Cash/Cheque payment, full or partial, per invoice.
-export function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoices, saving, onSave, onCancel, t, th, lang, isDesktop }) {
+export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, getVendorOpenInvoices, saving, onSave, onCancel, t, th, lang, isDesktop }) {
   const [vendorQ,setVendorQ]       = useState("");
   const [vendorDropOpen,setVendorDropOpen] = useState(false);
   const [vendor,setVendor]         = useState(null); // { id, name, mobile }
@@ -105,6 +105,22 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoic
     const v = vendors.find(x=>x.id===prefillVendorId || x.vendorName===prefillVendorId);
     if (v) setVendor({ id:v.id, name:v.vendorName, mobile:v.mobileNumber||v.whatsappNumber||"" });
   },[prefillVendorId, vendors]);
+
+  // "Cancel & Edit" on an old voucher: refill vendor, method, cheque/ref details, note and every
+  // allocation amount so the user corrects and re-saves instead of retyping everything.
+  useEffect(()=>{
+    if (!prefillVoucher) return;
+    const partyId = prefillVoucher.raw?.vendorId || null;
+    const v = vendors?.find(x=>x.id===partyId || x.vendorName===prefillVoucher.partyName);
+    setVendor(v ? { id:v.id, name:v.vendorName, mobile:v.mobileNumber||v.whatsappNumber||"" } : { id:partyId, name:prefillVoucher.partyName, mobile:prefillVoucher.raw?.vendorMobile||"" });
+    setAmounts(Object.fromEntries((prefillVoucher.allocations||[]).map(a=>[a.invoiceId, piFmt2(piN2(a.amount))])));
+    setMethod(prefillVoucher.method||"cash");
+    setChequeNo(prefillVoucher.chequeNo||""); setChequeBank(prefillVoucher.chequeBank||""); setChequeDate(prefillVoucher.chequeDate||piToday());
+    setChequeReceivedBy(prefillVoucher.chequeReceivedBy||""); setVendorReceiptNo(prefillVoucher.vendorReceiptNo||""); setChequeMonth(prefillVoucher.chequeMonth||"");
+    setRefNo(prefillVoucher.refNo||""); setRefBank(prefillVoucher.refBank||"");
+    setNote(prefillVoucher.note||"");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[prefillVoucher]);
 
   useEffect(()=>{
     const handler=(e)=>{ if (vendorBoxRef.current && !vendorBoxRef.current.contains(e.target)) setVendorDropOpen(false); };
@@ -319,7 +335,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, getVendorOpenInvoic
 }
 
 // ─── PI: VOUCHER DETAIL VIEW ────────────────────────────────────
-export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onDelete, onSetChequeStatus, onPrint, onViewInvoice, onPrintCheque, onPrintChequeVoucher, onHandover }) {
+export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onCancelAndEdit, onDelete, onSetChequeStatus, onPrint, onViewInvoice, onPrintCheque, onPrintChequeVoucher, onHandover }) {
   const isCheque = voucher.method==="cheque";
   const isCancelled = voucher.status==="cancelled";
   const chequeSt = PI_CHEQUE_STATUSES[voucher.chequeStatus]||PI_CHEQUE_STATUSES.pending;
@@ -405,6 +421,9 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
           )}
           {!isCancelled&&onCancel&&(
             <button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelVoucher}</button>
+          )}
+          {!isCancelled&&onCancelAndEdit&&(
+            <button onClick={onCancelAndEdit} style={{ padding:"11px", borderRadius:10, border:"1px solid #92400e", background:"rgba(146,64,14,0.08)", color:"#92400e", fontSize:13, fontWeight:700, cursor:"pointer" }}>✏️ {lang==="bn"?"বাতিল করে এডিট করুন":"Cancel & Edit"}</button>
           )}
           {isCancelled&&onDelete&&(
             <button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #7f1d1d", background:"#7f1d1d", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>🗑️ {lang==="bn"?"ভাউচার মুছুন":"Delete Voucher"}</button>

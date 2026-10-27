@@ -81,6 +81,7 @@ export const PERMISSIONS_LIST = [
   { key: "manageEmployees",  bn: "কর্মচারী ও হাজিরা",              en: "Employees & Attendance" },
   { key: "bankReconcile",    bn: "ব্যাংক হিসাব মেলানো",            en: "Bank Reconciliation" },
   { key: "manageJobs",       bn: "জব কার্ড / সার্ভিস কাজ",          en: "Job Cards / Service Jobs" },
+  { key: "manageSecurityCheques", bn: "সিকিউরিটি চেক ম্যানেজ করা",  en: "Manage Security Cheques" },
 ];
 
 export const SC = {

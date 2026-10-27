@@ -42,6 +42,7 @@ export const MATRIX_ROWS = [
   { key: "pdc", group: "accounts", bn: "PDC চেক", en: "PDC cheques", view: "managePdc", add: "managePdc", edit: "managePdc" },
   { key: "cheque", group: "accounts", bn: "চেক প্রিন্টার", en: "Cheque printer", print: "printCheques" },
   { key: "bankRec", group: "accounts", bn: "ব্যাংক মেলানো", en: "Bank reconciliation", view: "bankReconcile", add: "bankReconcile", edit: "bankReconcile" },
+  { key: "securityCheque", group: "accounts", bn: "সিকিউরিটি চেক", en: "Security cheques", view: "manageSecurityCheques", add: "manageSecurityCheques", edit: "manageSecurityCheques" },
 ];
 
 export const OWNER_ONLY_AREAS = {
@@ -86,7 +87,7 @@ export const GROUP_PRESETS = [
   { id: "preset_store", bn: "স্টোর কিপার", en: "Store keeper",
     permissions: on("viewProducts", "manageProducts", "managePurchase", "viewVendors", "stockAdjust", "sendBranchTransfer", "receiveBranchTransfer") },
   { id: "preset_accountant", bn: "হিসাবরক্ষক", en: "Accountant",
-    permissions: on("viewProducts", "viewVendors", "viewSupplierLedger", "vendorPayments", "managePdc", "manageExpenses", "printCheques", "viewCustomerBalance", "accountVouchers", "bankReconcile", "manageCustomers") },
+    permissions: on("viewProducts", "viewVendors", "viewSupplierLedger", "vendorPayments", "managePdc", "manageExpenses", "printCheques", "viewCustomerBalance", "accountVouchers", "bankReconcile", "manageCustomers", "manageSecurityCheques") },
   { id: "preset_manager", bn: "ম্যানেজার", en: "Manager",
     permissions: Object.fromEntries(matrixKeys().map((k) => [k, true])) },
 ];

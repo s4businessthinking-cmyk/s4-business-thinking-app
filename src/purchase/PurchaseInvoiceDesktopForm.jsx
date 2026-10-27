@@ -23,7 +23,8 @@ function VendorPickerWindow({ vendors, onPick, onClose, lang }) {
 
 function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang, inputRef, onEnterEmpty }) {
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(-1);
+  const navigatedRef = useRef(false);
   const wrapRef = useRef(null);
   const q = String(value || "").trim();
 
@@ -49,7 +50,7 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
       .map((r) => r.v);
   }, [vendors, q, open]);
 
-  useEffect(() => { setActive(0); }, [q]);
+  useEffect(() => { setActive(-1); navigatedRef.current = false; }, [q]);
   useEffect(() => {
     const onDown = (e) => { if (!wrapRef.current?.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", onDown);
@@ -63,11 +64,14 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
       <input ref={inputRef} style={inp({ fontWeight: 700 })} value={value} placeholder={placeholder} autoComplete="off"
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
         onKeyDown={(e) => {
-          if (e.key === "ArrowDown") { e.preventDefault(); if (!open) setOpen(true); else if (matches.length) setActive((i) => (i + 1) % matches.length); }
-          else if (e.key === "ArrowUp" && matches.length) { e.preventDefault(); setActive((i) => (i - 1 + matches.length) % matches.length); }
+          if (e.key === "ArrowDown") { e.preventDefault(); navigatedRef.current = true; if (!open) setOpen(true); else if (matches.length) setActive((i) => (i + 1) % matches.length); }
+          else if (e.key === "ArrowUp" && matches.length) { e.preventDefault(); navigatedRef.current = true; setActive((i) => (i < 0 ? matches.length - 1 : (i - 1 + matches.length) % matches.length)); }
           else if (e.key === "Enter") {
             e.preventDefault();
-            if (open && matches.length) pick(matches[active] || matches[0]);
+            // Only commit a vendor the user actually arrowed to, or an unambiguous single match —
+            // never silently grab the top fuzzy match just because Enter was pressed.
+            if (open && navigatedRef.current && active >= 0 && matches[active]) pick(matches[active]);
+            else if (open && matches.length === 1) pick(matches[0]);
             else { setOpen(false); onEnterEmpty?.(); }
           }
           else if (e.key === "Escape" && open) { e.preventDefault(); e.stopPropagation(); setOpen(false); }
@@ -99,7 +103,7 @@ export default function PurchaseInvoiceDesktopForm({
   form, setField, lines, setLines, current, setCurrent, totals, paid, balance,
   invoiceNo, editInvoiceId, saving, nameRef, qtyRef,
   helpers,
-  onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine, onPickVendor,
+  onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine, onPickVendor, onCheckDuplicate,
   onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast, canEditInvoice = () => true, onProductPatched,
   purchaseOptions = PURCHASE_OPTION_DEFAULTS, baseCurrency = "AED", onSaveOptions, sourceNote = "",
 }) {
@@ -321,7 +325,7 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
+          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
         </div>
       </div>
 
@@ -330,6 +334,7 @@ export default function PurchaseInvoiceDesktopForm({
           <div style={lbl}>Supplier Inv. No <span style={{ color: C.red }}>*</span></div>
           <input ref={supInvRef} style={inp(form.supplierInvoiceNo.trim() ? {} : { borderColor: C.red })} value={form.supplierInvoiceNo} placeholder={bn ? "সাপ্লায়ারের বিল নং" : "Supplier's bill no"}
             onChange={(e) => setField("supplierInvoiceNo", e.target.value)}
+            onBlur={() => onCheckDuplicate?.()}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); vendorRef.current?.focus(); } }} />
         </div>
         <div>

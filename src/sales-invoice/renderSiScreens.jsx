@@ -127,18 +127,29 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                       <td className="si-strong">{bnL?"সব কাস্টমার":"All customers"} ({siFiltered.length})</td><td /><td />
                     </tr>
                   )}
-                  {groups.map(g=>(
+                  {groups.map(g=>{
+                    const stCounts = {};
+                    g.invoices.forEach(inv=>{ stCounts[inv.status] = (stCounts[inv.status]||0)+1; });
+                    return (
                     <tr key={g.key} className={`pm-clickable si-party-row${openGroup?.key===g.key?" pm-selected":""}`} onClick={()=>setSiOpenParty(g.key)}>
                       <td className="si-wrap">
                         {g.isCash?"💵 ":""}{groupName(g)}
                         <div className="si-muted" style={{ fontWeight:400, fontSize:"0.9em" }}>
                           {g.invoices.length} {bnL?"টি":(g.invoices.length===1?"doc":"docs")}{g.lastDate?` · ${g.lastDate}`:""}
                         </div>
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:4, marginTop:3 }}>
+                          {Object.keys(STATUSES).filter(st=>stCounts[st]).map(st=>(
+                            <span key={st} style={{ fontSize:"0.78em", fontWeight:700, padding:"1px 6px", borderRadius:8, color:STATUSES[st]?.color, background:STATUSES[st]?.bg }}>
+                              {STATUSES[st]?.[lang]||st}: {stCounts[st]}
+                            </span>
+                          ))}
+                        </div>
                       </td>
                       <td className="si-num">{siFmt2(g.total)}</td>
                       <td className={`si-num${g.due>0.01?" si-due":""}`}>{g.due>0.01?siFmt2(g.due):"-"}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                   {groups.length===0&&<tr><td colSpan={3} className="si-empty">{siLoading?"⏳":invoices.length===0?emptyText:t.si_noResults}</td></tr>}
                 </tbody>
               </table>
@@ -176,17 +187,18 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                 : (
                   <table className="pm-table">
                     <colgroup>
-                      <col style={{ width:96 }} /><col style={{ width:78 }} /><col /><col style={{ width:84 }} />
+                      <col style={{ width:96 }} /><col style={{ width:78 }} /><col style={{ width:140 }} />
+                      {Object.keys(STATUSES).map(st=><col key={st} style={{ width:74 }} />)}
                       {(isQuote||isDN) ? <col style={{ width:110 }} /> : <><col style={{ width:42 }} /><col style={{ width:84 }} /><col style={{ width:84 }} /></>}
-                      <col style={{ width:88 }} /><col style={{ width:100 }} />
+                      <col style={{ width:88 }} />
                     </colgroup>
                     <thead>
                       <tr>
-                        <th>{t.si_invoiceNo}</th><th>{t.si_date}</th><th>{t.si_customer}</th><th>{bnL?"স্ট্যাটাস":"Status"}</th>
+                        <th>{t.si_invoiceNo}</th><th>{t.si_date}</th><th>{t.si_customer}</th>
+                        {Object.keys(STATUSES).map(st=><th key={st} className="si-center" style={{ textOverflow:"ellipsis" }} title={STATUSES[st]?.[lang]||st}>{STATUSES[st]?.[lang]||st}</th>)}
                         {(isQuote||isDN) ? <th>{isSO?(bnL?"ডেলিভারি / বিল":"Delivery / Bill"):isQuote?(bnL?"মেয়াদ / ইনভয়েস":"Valid / Invoice"):(bnL?"ইনভয়েস":"Invoice")}</th>
                           : <><th className="si-num">{bnL?"আইটেম":"Items"}</th><th className="si-num">{bnL?"মোট":"Total"}</th><th className="si-num">{bnL?"পরিশোধ":"Paid"}</th></>}
                         <th className="si-num">{(isQuote||isDN)?(bnL?"মোট":"Total"):(bnL?"বাকি":"Due")}</th>
-                        <th>{t.si_createdBy}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -197,8 +209,13 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                           <tr key={inv.id} className="pm-clickable" onClick={()=>siOpenInvoice(inv)} title={inv.note||""}>
                             <td className="si-strong" style={{ color:siAccent }}>{inv.invoiceNo}</td>
                             <td>{inv.invoiceDate}</td>
-                            <td className={matches.length?"si-wrap":""} title={inv.customerName||""}>{inv.customerName||"—"}{matches}</td>
-                            <td>{siExpiredBadge(inv)}{siBadge(inv.status)}</td>
+                            <td title={inv.customerName||""}>{inv.customerName||"—"}{matches}</td>
+                            {Object.keys(STATUSES).map(st=>(
+                              <td key={st} className="si-center">
+                                {inv.status===st && <span style={{ color:STATUSES[st]?.color, fontWeight:900, fontSize:14 }}>✓</span>}
+                                {st==="open" && siExpiredBadge(inv)}
+                              </td>
+                            ))}
                             {(isQuote||isDN) ? (
                               <td>{inv.convertedInvoiceNo ? <span style={{ color:"#15803d" }}>→ {inv.convertedInvoiceNo}</span> : (isQuote ? (inv.validUntil||"-") : "-")}</td>
                             ) : (
@@ -211,7 +228,6 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                             <td className={`si-num${(isQuote||isDN)?" si-strong":due>0.01?" si-due":""}`}>
                               {(isQuote||isDN) ? siFmt2(inv.grandTotal) : due>0.01 ? siFmt2(due) : "-"}
                             </td>
-                            <td title={inv.createdByName||""}>{inv.createdByName||"-"}</td>
                           </tr>
                         );
                       })}

@@ -235,6 +235,25 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       : `⚠️ A bill from this supplier on ${day} for ${piFmt2(payload.grandTotal)} already exists as ${lookalike.invoiceNo}.\nIt may be a duplicate — save anyway?`);
   };
 
+  // Early warning while just the header is filled in (date + vendor + supplier invoice no) — a toast,
+  // not a block, so it fires before any line items exist. The hard check/confirm at save time (above)
+  // still has the final say once the full invoice (and its total) is known.
+  const piEarlyDuplicateCheck = () => {
+    const key = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, " ");
+    const supNo = key(piForm.supplierInvoiceNo);
+    if (!supNo || !(piForm.vendorId || key(piForm.vendorName))) return;
+    const day = String(piForm.invoiceDate || "").slice(0, 10);
+    const sameVendor = (inv) => (piForm.vendorId && inv.vendorId === piForm.vendorId)
+      || (!!key(piForm.vendorName) && key(inv.vendorName) === key(piForm.vendorName));
+    const same = piMoneyInvoices.filter(inv => inv.id !== editInvoiceId && inv.status !== "cancelled" && sameVendor(inv) && key(inv.supplierInvoiceNo) === supNo);
+    if (!same.length) return;
+    const bn = lang === "bn";
+    const match = same.find(inv => String(inv.invoiceDate || "").slice(0, 10) === day) || same[0];
+    toast(bn
+      ? `⚠️ এই সাপ্লায়ারের Supplier Invoice No "${piForm.supplierInvoiceNo}" আগেই ${match.invoiceNo}${match.invoiceDate ? ` (${match.invoiceDate})` : ""}-এ এন্ট্রি করা আছে — ডুপ্লিকেট হতে পারে।`
+      : `⚠️ Supplier invoice "${piForm.supplierInvoiceNo}" from this supplier is already entered as ${match.invoiceNo}${match.invoiceDate ? ` (${match.invoiceDate})` : ""} — this may be a duplicate.`, "err");
+  };
+
   // Vendor Master rules: a blocked vendor gets no new bills, the credit limit warns, credit days set the due date.
   const piVendorTermsOk = (payload, status) => {
     const bn = lang==="bn";
@@ -397,5 +416,5 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       }
     } catch(e){ toast(e.message,"err"); }
   };
-  return { piCancelInv, piConfirm, piDelete, piGoToMakePayment, piSaveDraft, refreshAverageCosts };
+  return { piCancelInv, piConfirm, piDelete, piEarlyDuplicateCheck, piGoToMakePayment, piSaveDraft, refreshAverageCosts };
 }

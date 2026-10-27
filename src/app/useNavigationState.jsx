@@ -4,11 +4,12 @@ import { branchTransferMenuLabel } from "../branch-transfer/BranchTransferNative
 import { chequeTypeIcon, chequeTypeLabel } from "../dashboard/ChequeDueAlert.jsx";
 import { alertText as employeeAlertText } from "../employees/employeeAlerts.js";
 import { partnerAlertText } from "../partners/partners.js";
+import { securityChequeAlertText } from "../securityCheque/securityCheque.js";
 import { reminderAlertText } from "../reminders/reminders.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
-export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, team, th, toast, user }) {
+export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, team, th, toast, user }) {
   const unread = isOwner || isOrderManager
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
@@ -44,6 +45,10 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     ...reminderAlertList.map(a => {
       const txt = reminderAlertText(a, lang==="bn");
       return { key:a.key, icon:txt.icon, tone:a.tone, title:txt.title, sub:txt.sub, onClick:()=>{ setSettingsPage(null); setTab("reminders"); } };
+    }),
+    ...securityChequeAlertList.map(a => {
+      const txt = securityChequeAlertText(a, lang==="bn", t.cur||"AED");
+      return { key:a.key, icon:txt.icon, tone:a.tone==="bad"?"danger":undefined, title:txt.title, sub:txt.sub, onClick:()=>{ setSettingsPage(null); setTab("securityCheque"); } };
     }),
     ...(orderModuleEnabled && unread>0 ? [{
       key:"orders", icon:"📋", count:unread,
@@ -241,6 +246,7 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     globalLedger: lang==="bn"?"📒 গ্লোবাল লেজার":"📒 Global Ledger",
     jobCard: lang==="bn"?"🔧 জব কার্ড":"🔧 Job Card",
     partners: lang==="bn"?"🤝 পার্টনার ও লাভের ভাগ":"🤝 Partners",
+    securityCheque: lang==="bn"?"🔒 সিকিউরিটি চেক":"🔒 Security Cheques",
     labels: lang==="bn"?"🏷️ বারকোড লেবেল":"🏷️ Barcode Labels",
     reminders: lang==="bn"?"🔔 রিমাইন্ডার":"🔔 Reminders",
     calculator: lang==="bn"?"🧮 ক্যালকুলেটর / মুদ্রা":"🧮 Calculator / Currency",
@@ -255,7 +261,7 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
   };
 
   const visibleTabs = useMemo(() => (isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
@@ -266,6 +272,7 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
         ...(can("viewVendors")||can("manageVendors")?[["vendors",t.tabVendor]]:[]),
         ...(can("printCheques")?[["cheque",t.tabCheque]]:[]),
         ...(can("managePdc")?[["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"]]:[]),
+        ...(can("manageSecurityCheques")?[["securityCheque",newTabLabels.securityCheque]]:[]),
         ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employeeExpense",newTabLabels.employeeExpense]]:[]),
         ...(can("manageEmployees")?[["employees",newTabLabels.employees],["attendance",newTabLabels.attendance]]:[]),
         ...(can("bankReconcile")?[["bankRec",newTabLabels.bankRec]]:[]),

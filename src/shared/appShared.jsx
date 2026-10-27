@@ -291,7 +291,7 @@ export const THEMES = {
 export function getStyles(th) { return {
   root:        { minHeight:"100vh", background:th.bgRoot, color:th.txtSecondary, fontFamily:"'Segoe UI', system-ui, sans-serif" },
   notif:       { position:"fixed", top:16, right:16, zIndex:20000, padding:"12px 20px", borderRadius:10, borderWidth:1, borderStyle:"solid", fontSize:13, fontWeight:600, maxWidth:320, boxShadow:"0 4px 20px rgba(0,0,0,0.3)" },
-  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:10, flexWrap:"wrap", gap:8 },
+  hdr:         { display:"flex", alignItems:"center", justifyContent:"space-between", padding:"12px 14px", borderBottom:`1px solid ${th.border}`, background:th.bgHdr, position:"sticky", top:0, zIndex:40, flexWrap:"wrap", gap:8 },
   hLeft:       { display:"flex", alignItems:"center", gap:10 },
   title:       { fontSize:14, fontWeight:800, color:th.accent, lineHeight:1.1 },
   title3dBase: {

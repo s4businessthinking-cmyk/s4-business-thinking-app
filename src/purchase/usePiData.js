@@ -41,6 +41,10 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
   const [selVoucher,setSelVoucher]     = useState(null);
   const [pmtPrefillVendorId,setPmtPrefillVendorId] = useState(null);
   const [pmtPrefillInvoiceId,setPmtPrefillInvoiceId] = useState(null);
+  // Full voucher snapshot (vendor, method, cheque/ref details, note, every allocation) carried from
+  // "Cancel & Edit" on an old voucher into the new-entry form, so the user corrects and re-saves
+  // instead of retyping everything.
+  const [pmtEditSnapshot,setPmtEditSnapshot] = useState(null);
   const [pmtSaving,setPmtSaving]       = useState(false);
   const [chqWizard,setChqWizard]       = useState(null);     // null | { vendorId }
   const [chqHandover,setChqHandover]   = useState(null);     // voucher being documented
@@ -168,5 +172,5 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
     }
     return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
   },[shopId,syncRefreshKey,authSyncReady]);
-  return { billReturns, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, payments, piCurrent, piEditLineId, piForm, piInvoiceNo, piLedgerHidden, piLines, piNameRef, piNavReturn, piQtyRef, piSaveLockRef, piSaving, piSearch, piSnapRef, piStatusF, piSubTab, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, selInvoice, selVoucher, setChqHandover, setChqHandoverSaving, setChqWizard, setEditInvoiceId, setPayments, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiSaving, setPiSearch, setPiStatusF, setPiSubTab, setPmtLoading, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, vendorDropOpen, vendorSearchQ, vendorSearchRef };
+  return { billReturns, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, payments, piCurrent, piEditLineId, piForm, piInvoiceNo, piLedgerHidden, piLines, piNameRef, piNavReturn, piQtyRef, piSaveLockRef, piSaving, piSearch, piSnapRef, piStatusF, piSubTab, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, selInvoice, selVoucher, setChqHandover, setChqHandoverSaving, setChqWizard, setEditInvoiceId, setPayments, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiSaving, setPiSearch, setPiStatusF, setPiSubTab, setPmtEditSnapshot, setPmtLoading, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, vendorDropOpen, vendorSearchQ, vendorSearchRef };
 }

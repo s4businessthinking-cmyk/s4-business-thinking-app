@@ -22,12 +22,14 @@ export function ProductTypeaheadInput({
   const fieldRef = inputRef || localInputRef;
   const suppressFocusOpenRef = useRef(false);
   const [open, setOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const navigatedRef = useRef(false);
 
   const suggestions = open ? filterProducts(products, value, { field, limit: 8 }) : [];
 
   useEffect(() => {
-    setActiveIndex(0);
+    setActiveIndex(-1);
+    navigatedRef.current = false;
   }, [value, open]);
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export function ProductTypeaheadInput({
   const handleKeyDown = (event) => {
     if (event.key === "ArrowDown" && suggestions.length) {
       event.preventDefault();
+      navigatedRef.current = true;
       setOpen(true);
       setActiveIndex((idx) => (idx + 1) % suggestions.length);
       return;
@@ -70,15 +73,28 @@ export function ProductTypeaheadInput({
 
     if (event.key === "ArrowUp" && suggestions.length) {
       event.preventDefault();
+      navigatedRef.current = true;
       setOpen(true);
-      setActiveIndex((idx) => (idx - 1 + suggestions.length) % suggestions.length);
+      setActiveIndex((idx) => (idx < 0 ? suggestions.length - 1 : (idx - 1 + suggestions.length) % suggestions.length));
       return;
     }
 
+    // Enter only commits a product when the user actually arrowed to one, or when what's
+    // typed is an exact name/code match — never the top fuzzy suggestion by default, so
+    // pressing Enter with the mouse just resting here (nothing chosen) adds nothing.
     if (event.key === "Enter" && open && suggestions.length) {
-      event.preventDefault();
-      pickProduct(suggestions[activeIndex] || suggestions[0]);
-      return;
+      if (navigatedRef.current && activeIndex >= 0) {
+        event.preventDefault();
+        pickProduct(suggestions[activeIndex]);
+        return;
+      }
+      const exact = findExactProductMatch(products, field === "code" ? { code: value } : { name: value });
+      if (exact) {
+        event.preventDefault();
+        pickProduct(exact);
+        return;
+      }
+      // No deliberate choice and no exact match: let Enter fall through (e.g. move to next field).
     }
 
     if (event.key === "Escape") {

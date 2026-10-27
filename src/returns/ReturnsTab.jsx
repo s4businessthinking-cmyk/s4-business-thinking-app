@@ -131,17 +131,18 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
 
   const ownOnly = kind === "sales" && !isOwner;
   const myInvoiceIds = useMemo(() => new Set(invoices.filter((i) => i.createdBy === user?.uid).map((i) => i.id)), [invoices, user?.uid]);
-  const visibleReturns = ownOnly ? returns.filter((r) => r.createdBy === user?.uid || myInvoiceIds.has(r.invoiceId)) : returns;
+  const visibleReturns = useMemo(() => ownOnly ? returns.filter((r) => r.createdBy === user?.uid || myInvoiceIds.has(r.invoiceId)) : returns, [returns, ownOnly, user?.uid, myInvoiceIds]);
   const sortedReturns = useMemo(() => [...visibleReturns].sort((a, b) => String(b.returnDate || b.createdAt || "").localeCompare(String(a.returnDate || a.createdAt || ""))), [visibleReturns]);
-  const filtered = sortedReturns.filter((r) => {
+  // Memoized: re-renders on every keystroke anywhere in the form, not just search/filters.
+  const filtered = useMemo(() => sortedReturns.filter((r) => {
     if (!showCancelled && r.status === "cancelled") return false;
     const day = String(r.returnDate || r.createdAt || "").slice(0, 10);
     if ((from && day < from) || (to && day > to)) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return [r.returnNo, r.invoiceNo, r.supplierInvoiceNo, r.partyName, ...(r.items || []).map((it) => `${it.name} ${it.code || ""}`)].join(" ").toLowerCase().includes(q);
-  });
-  const activeTotal = visibleReturns.filter((r) => r.status !== "cancelled").reduce((t, r) => t + n2(r.total), 0);
+  }), [sortedReturns, showCancelled, from, to, search]);
+  const activeTotal = useMemo(() => visibleReturns.filter((r) => r.status !== "cancelled").reduce((t, r) => t + n2(r.total), 0), [visibleReturns]);
 
   const invMatches = useMemo(() => {
     const q = invQ.trim().toLowerCase();

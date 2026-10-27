@@ -27,6 +27,7 @@ import RemindersTab from "../reminders/RemindersTab.jsx";
 import ReorderAlertCard from "../inventory/ReorderAlertCard";
 import ReturnsTab from "../returns/ReturnsTab.jsx";
 import { SalesInvoiceTab } from "../sales-invoice/SalesInvoiceTab.jsx";
+import SecurityChequeTab from "../securityCheque/SecurityChequeTab.jsx";
 import { SettingsPage } from "../settings/SettingsPage.jsx";
 import { ShopOrderScreen } from "../orders/ShopOrderScreen.jsx";
 import StockAdjustmentTab from "../returns/StockAdjustmentTab.jsx";
@@ -38,7 +39,7 @@ import VouchersTab from "../vouchers/VouchersTab.jsx";
 import { billLeaveGuard, nextPartyCode } from "../shared/appShared.jsx";
 import { printPaymentVoucher } from "../sales-invoice/salesInvoiceShared.js";
 
-export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, selectProductToOrder, sendOrder, setBranchTransferSettings, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth }) {
+export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth }) {
   const tabContent = (
     <>
       {pinModal&&isOwner&&(
@@ -164,6 +165,11 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
             setSiNewCustomer(customer||null);
             setSiNewReq(Date.now());
           }}
+          onGoToSecurityCheques={(isOwner||can("manageSecurityCheques")) ? (customer)=>{
+            if (tabRef.current !== "securityCheque" && billLeaveGuard.current && !billLeaveGuard.current.leave()) return;
+            setSecurityChequeFocusParty({ id: customer?.id||"", type: "customer" });
+            setTabState("securityCheque");
+          } : undefined}
           renderImport={(close)=>(
             <ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
               type="customer" columnMap={CM_IMPORT_COLUMNS} defaultFields={{ ...EMPTY_CUSTOMER, customerType:"Customer", status:"active", country:"UAE", paymentType:"cash" }}
@@ -193,6 +199,11 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
             setTabState("purchase");
             setPiNewVendor(vendor||null);
             setPiNewReq(Date.now());
+          } : undefined}
+          onGoToSecurityCheques={(isOwner||can("manageSecurityCheques")) ? (vendor)=>{
+            if (tabRef.current !== "securityCheque" && billLeaveGuard.current && !billLeaveGuard.current.leave()) return;
+            setSecurityChequeFocusParty({ id: vendor?.id||"", type: "vendor" });
+            setTabState("securityCheque");
           } : undefined}
           renderImport={(close)=>(
             <ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
@@ -236,6 +247,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       {(tab==="purchaseOrder"||tab==="goodsReceipt")&&(isOwner||can("managePurchase"))&&(
         <PurchaseDocsTab key={tab} kind={tab==="purchaseOrder"?"po":"grn"} lang={lang} shopId={shopId} user={user} profile={profile}
           isOwner={isOwner} canManage={isOwner||can("managePurchase")} products={products} vendors={vendors} toast={toast}
+          wideDesktop={windowWidth >= 1100}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} makeNo={makeShopNo} leaveGuard={billLeaveGuard}
           incoming={tab==="goodsReceipt"?grnIncoming:null} onIncomingHandled={()=>setGrnIncoming(null)}
           onMakePurchase={(k,doc,lines)=>{ setPurchaseSource({ kind:k, doc, lines, at:Date.now() }); setTabState("purchase"); }}
@@ -305,6 +317,15 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           onOpenVoucher={(raw)=>printPaymentVoucher(raw, localShop, lang)} />
       )}
 
+      {tab==="securityCheque"&&(isOwner||can("manageSecurityCheques"))&&(
+        <SecurityChequeTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
+          canManage={isOwner||can("manageSecurityCheques")} cur={t.cur||"AED"} toast={toast}
+          shopName={localShop?.companyName||""} shop={localShop} alerts={securityChequeAlertList}
+          customers={customers} vendors={vendors}
+          focusParty={securityChequeFocusParty} onFocusPartyHandled={()=>setSecurityChequeFocusParty(null)}
+          leaveGuard={billLeaveGuard} />
+      )}
+
       {(tab==="expenses"||tab==="employeeExpense")&&(isOwner||can("manageExpenses"))&&(
         <ExpensesTab key={tab} employeeMode={tab==="employeeExpense"} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
           cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} shop={localShop} />
@@ -351,7 +372,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {tab==="stockAdjust"&&(isOwner||can("stockAdjust"))&&(
         <StockAdjustmentTab lang={lang} th={th} shopId={shopId} user={user} profile={profile} products={products}
-          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} isDesktop={isDesktop} toast={toast}
+          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} isDesktop={isDesktop} wideDesktop={windowWidth >= 1100} toast={toast}
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
       )}
       {tab==="reminders"&&(

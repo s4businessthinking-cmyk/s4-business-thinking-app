@@ -13,6 +13,7 @@ import { useChequeDueNotifications } from "../dashboard/chequeNotifications.js";
 import { useEffect, useRef, useState } from "react";
 import { useEmployeeAlerts } from "../employees/useEmployeeAlerts.js";
 import { usePartnerAlerts } from "../partners/usePartnerAlerts.js";
+import { useSecurityChequeAlerts } from "../securityCheque/useSecurityChequeAlerts.js";
 import { useReminderAlerts } from "../reminders/useReminderAlerts.js";
 import { useShopFinance } from "../dashboard/shopFinance.js";
 import { backupBeforeExit } from "../backup/backupOnExit.js";
@@ -114,6 +115,9 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
   });
   const partnerAlertList = usePartnerAlerts({
     shopId, enabled: isOwner, shop: localShop, lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("partners"); },
+  });
+  const securityChequeAlertList = useSecurityChequeAlerts({
+    shopId, enabled: isOwner || can("manageSecurityCheques"), lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("securityCheque"); },
   });
   const reminderAlertList = useReminderAlerts({
     shopId, uid: user?.uid, isOwner, lang, toast, onOpen: () => { setSettingsPage(null); setTab("reminders"); },
@@ -641,5 +645,5 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       (err) => console.warn("[Product Master] maintenance lock listener failed", err)
     );
   }, [shopId, productMaintenanceId, productReplacementActive, authSyncReady]);
-  return { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef };
+  return { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef };
 }

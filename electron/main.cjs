@@ -203,7 +203,9 @@ function setupPrintIpc() {
       await win.loadFile(file);
       await new Promise((resolve) => setTimeout(resolve, 300));
       return await new Promise((resolve) => {
-        win.webContents.print({ silent: true, printBackground: true, deviceName, ...pageOptions }, (ok, reason) => {
+        // color:false — a silent job sent as "color" makes many printers switch to a slower
+        // pipeline even for plain black text; these documents never need actual color ink.
+        win.webContents.print({ silent: true, printBackground: true, color: false, deviceName, ...pageOptions }, (ok, reason) => {
           resolve({ ok, error: ok ? "" : String(reason || "print failed") });
         });
       });

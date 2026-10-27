@@ -191,6 +191,15 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     const parts = multiItems(r).map((it) => `${it.name} ${fq(it.qty)}`).join(" + ");
     return kind === "loosen" ? `${s.name || ""} × ${fq(s.qty)} → ${parts}` : `${parts} → ${s.name || ""} × ${fq(s.qty)}`;
   };
+  // Memoized: re-renders on every keystroke anywhere in the form, not just search/filters. Must
+  // run before the "form"/"detail" early returns below, since hooks can't be conditionally skipped.
+  const sorted = useMemo(() => [...rows].sort((a, b) => String(b.adjustDate || b.createdAt || "").localeCompare(String(a.adjustDate || a.createdAt || ""))), [rows]);
+  const filtered = useMemo(() => sorted.filter((r) => {
+    if (!showCancelled && r.status === "cancelled") return false;
+    const q = search.trim().toLowerCase();
+    return !q || [r.adjustNo, r.note, summary(r)].join(" ").toLowerCase().includes(q);
+  }), [sorted, showCancelled, search]);
+  const liveCount = useMemo(() => rows.filter((r) => r.status !== "cancelled").length, [rows]);
   const print = (r) => {
     const cols = [{ label: "#" }, { label: "Item" }, { label: "Out", align: "right" }, { label: "In", align: "right" }, { label: "Unit" }];
     const body = (r.items || []).map((it, i) => [String(i + 1), [it.name, it.code].filter(Boolean).join(" · "), it.direction === "out" ? fq(it.qty) : "", it.direction === "in" ? fq(it.qty) : "", it.unit || ""]);
@@ -357,13 +366,6 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     ));
   }
 
-  const sorted = [...rows].sort((a, b) => String(b.adjustDate || b.createdAt || "").localeCompare(String(a.adjustDate || a.createdAt || "")));
-  const filtered = sorted.filter((r) => {
-    if (!showCancelled && r.status === "cancelled") return false;
-    const q = search.trim().toLowerCase();
-    return !q || [r.adjustNo, r.note, summary(r)].join(" ").toLowerCase().includes(q);
-  });
-  const liveCount = rows.filter((r) => r.status !== "cancelled").length;
   return shell(T("title"), `${liveCount} ${L("টি", "entries")}`, (
     <>
       <div className="si-toolbar">

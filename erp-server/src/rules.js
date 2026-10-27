@@ -357,7 +357,8 @@ export const RULES = {
   }),
 
   purchaseInvoices: shopScoped({
-    view: "managePurchase",
+    // Security Cheque's read-only invoice-link/AP picker also needs this, without granting it managePurchase.
+    view: ["managePurchase", "manageSecurityCheques"],
     create: async (c, req) => (await isOwnerOfShop(c, req.shopId))
       || (req.createdBy === c.uid && (
         (await memberMay(c, req.shopId, "managePurchase"))
@@ -390,8 +391,24 @@ export const RULES = {
   }),
   chequeHandovers: shopScoped({ view: "vendorPayments", del: ownerDelete }),
 
+  // Cheques held as collateral (vendor or customer, either direction) — separate register from
+  // PDC/accountVouchers, never references a payment/sales voucher. Returning/presenting the cheque
+  // or approving a closure request is owner-only; staff with the permission may create/edit/request.
+  securityCheques: shopScoped({
+    view: "manageSecurityCheques",
+    create: async (c, req) => memberMay(c, req.shopId, "manageSecurityCheques"),
+    update: async (c, res, req) => {
+      if (!(await memberMay(c, res.shopId, "manageSecurityCheques"))) return false;
+      const ownerFields = ["status", "closureApproved", "closureApprovedAt", "closureApprovedBy", "returnedAt", "returnedBy", "presentedAt", "presentedBy"];
+      const touchesOwnerFields = changedKeys(res, req).some((k) => ownerFields.includes(k));
+      return !touchesOwnerFields || (await isOwnerOfShop(c, res.shopId));
+    },
+  }),
+  securityChequeDocs: shopScoped({ view: "manageSecurityCheques", del: ownerDelete }),
+
   salesInvoices: shopScoped({
-    view: "manageSales",
+    // Security Cheque's read-only invoice-link/AR picker also needs this, without granting it manageSales.
+    view: ["manageSales", "manageSecurityCheques"],
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageSales")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (await salesCreatorUpdate(c, res, req))

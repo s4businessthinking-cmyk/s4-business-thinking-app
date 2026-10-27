@@ -520,3 +520,47 @@ test("rules: a salesman bills the delivered goods of their own order only", asyn
   assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpo1", { ...pi, sourceOrderId: "missing" })])).status, 403, "unknown order");
   assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpo1", { ...pi, sourceOrderId: "ro-own" })])).status, 200);
 });
+
+test("rules: security cheques need the permission to read/write, and only the owner closes them out", async () => {
+  const perms = (p) => commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSecurityCheques: false, ...p } }, true)]);
+  const upd = (collection, id, data) => ({ op: "update", collection, id, data });
+  const sc = { shopId: "shop1", partyType: "vendor", direction: "give", party: "Gulf Auto Parts", chequeNo: "771208", bank: "ADCB", amount: 10000, status: "held", handoverDate: "2026-01-01", lastTxn: "2026-01-01" };
+
+  assert.equal((await perms({})).status, 200);
+  assert.equal((await commit(sales.idToken, [set("securityCheques", "sc1", sc)])).status, 403, "create needs manageSecurityCheques");
+  assert.equal((await api("/v1/db/get", { collection: "securityCheques", id: "sc1" }, sales.idToken)).status, 403, "unknown doc, but also unauthorised to read");
+
+  assert.equal((await perms({ manageSecurityCheques: true })).status, 200);
+  assert.equal((await commit(sales.idToken, [set("securityCheques", "sc1", sc)])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "securityCheques", id: "sc1" }, sales.idToken)).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "securityCheques", id: "sc1" }, outsider.idToken)).status, 403, "another shop cannot read it");
+
+  assert.equal((await commit(sales.idToken, [upd("securityCheques", "sc1", { closureRequested: true })])).status, 200, "staff may request closure");
+  assert.equal((await commit(sales.idToken, [upd("securityCheques", "sc1", { closureApproved: true })])).status, 403, "staff cannot approve closure");
+  assert.equal((await commit(sales.idToken, [upd("securityCheques", "sc1", { status: "returned" })])).status, 403, "staff cannot mark it returned");
+  assert.equal((await commit(owner.idToken, [upd("securityCheques", "sc1", { closureApproved: true, closureApprovedBy: owner.uid })])).status, 200);
+  assert.equal((await commit(owner.idToken, [upd("securityCheques", "sc1", { status: "returned", returnedBy: owner.uid })])).status, 200);
+
+  assert.equal((await perms({})).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "securityCheques", id: "sc1" }])).status, 403, "only the owner deletes");
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "securityCheques", id: "sc1" }])).status, 200);
+});
+
+test("rules: manageSecurityCheques lets staff read purchase/sales invoices (for the invoice-link picker) but not write them", async () => {
+  assert.equal((await commit(owner.idToken, [
+    set("purchaseInvoices", "scpi1", { shopId: "shop1", invoiceNo: "PI-SC1", status: "confirmed", balanceDue: 50, createdBy: owner.uid }),
+    set("salesInvoices", "scsi1", { shopId: "shop1", invoiceNo: "SI-SC1", status: "confirmed", balanceDue: 40, createdBy: owner.uid }),
+  ])).status, 200);
+
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSecurityCheques: true, managePurchase: false, manageSales: false } }, true)])).status, 200);
+
+  assert.equal((await api("/v1/db/get", { collection: "purchaseInvoices", id: "scpi1" }, sales.idToken)).status, 200, "manageSecurityCheques alone can read purchase invoices");
+  assert.equal((await api("/v1/db/get", { collection: "salesInvoices", id: "scsi1" }, sales.idToken)).status, 200, "manageSecurityCheques alone can read sales invoices");
+  // invoiceNo isn't one of the payment-only fields every shop member may already patch (amountPaid/balanceDue/status),
+  // so this isolates the view-permission change from that separate, pre-existing write path.
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "scpi1", data: { invoiceNo: "changed" } }])).status, 403, "read access does not grant general write");
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesInvoices", id: "scsi1", data: { invoiceNo: "changed" } }])).status, 403, "read access does not grant general write");
+
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSecurityCheques: false } }, true)])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "purchaseInvoices", id: "scpi1" }, sales.idToken)).status, 403, "without any of the view permissions, read is denied again");
+});

@@ -66,6 +66,8 @@ export const SHOP_PULL_COLLECTIONS = [
   "branchTransferReceipts",
   "branchStockBalances",
   "branchStockMovements",
+  "securityCheques",
+  "securityChequeDocs",
 ];
 
 export const SHOP_PULL_ONLY_COLLECTIONS = ["stock_ledger"];

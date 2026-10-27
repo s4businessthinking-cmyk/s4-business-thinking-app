@@ -1,12 +1,13 @@
-import { applyInvoiceStockEffect, unlinkedStockOk } from "../shared/appShared.jsx";
+import { applyInvoiceStockEffect, STOCK_AFFECTING_INVOICE_STATUSES, unlinkedStockOk } from "../shared/appShared.jsx";
 import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlineGetById, offlineUpdate } from "../offline/offlineRepository";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { siAddDays, siDeliveryLines, siResolveRate, sourceDocOf } from "./siHelpers.js";
 import { siCalcLine, siCalcTotals, siFmt2, siInvoiceExtras, siN2 } from "./salesInvoiceShared.js";
-import { unitFactorFor } from "../inventory/unitConversion";
+import { itemBaseQty, unitFactorFor } from "../inventory/unitConversion";
+import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 
-export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siSaveLockRef, sourceQuote, t, toast, user }) {
+export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siSaveLockRef, sourceQuote, t, toast, user }) {
   const siBuild=(status, invoiceNoOverride)=>{
     if (String(siCurrent.name||"").trim()) {
       toast(lang==="bn"?"❌ উপরের ঘরে একটা আইটেম আছে যা বিলে যোগ হয়নি — Add চাপুন বা ঘরটা খালি করুন":"❌ An item in the entry row is not added to the bill yet — press Add or clear it","err");
@@ -147,6 +148,44 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     return true;
   };
 
+  // Oversell check: warns (does not block) when a line needs more than what's actually in
+  // stock, using the same invoice-based stock calculation StockBadge already shows on screen.
+  const siStockOk = async (p) => {
+    if (isQuote || p.status === "draft") return true;
+    const productById = new Map((products || []).map((pr) => [pr.id, pr]));
+    const needed = new Map();
+    (p.items || []).forEach((it) => {
+      if (!it?.productId) return;
+      const qty = itemBaseQty(it, productById.get(it.productId));
+      if (qty > 0) needed.set(it.productId, (needed.get(it.productId) || 0) + qty);
+    });
+    if (!needed.size) return true;
+    let rows;
+    try { rows = await loadInvoiceRows(); } catch { return true; }
+    const stockMap = computeStockMap(products, rows.purchaseInvoices, rows.salesInvoices, shopId, rows.deliveryNotes, rows.extras);
+    // Editing an already-confirmed invoice: its own old items were already subtracted from
+    // the stock map above, so add them back before comparing against the new quantities.
+    const priorDoc = editInvId ? invoices.find((inv) => inv.id === editInvId) : null;
+    const restored = new Map();
+    if (priorDoc && STOCK_AFFECTING_INVOICE_STATUSES.includes(priorDoc.status)) {
+      (priorDoc.items || []).forEach((it) => {
+        if (!it?.productId) return;
+        const qty = itemBaseQty(it, productById.get(it.productId));
+        if (qty > 0) restored.set(it.productId, (restored.get(it.productId) || 0) + qty);
+      });
+    }
+    const short = [];
+    needed.forEach((qty, id) => {
+      const available = (stockMap.get(id) || 0) + (restored.get(id) || 0);
+      if (qty > available + 0.0001) short.push({ name: productById.get(id)?.name || id, available, qty });
+    });
+    if (!short.length) return true;
+    const list = short.slice(0, 5).map((s) => `${s.name}: ${lang==="bn"?"আছে":"have"} ${siFmt2(s.available)}, ${lang==="bn"?"লাগবে":"need"} ${siFmt2(s.qty)}`).join("\n");
+    return window.confirm(lang==="bn"
+      ? `⚠️ স্টকের চেয়ে বেশি বিক্রি হচ্ছে:\n${list}\n\nতবুও সেভ করবেন?`
+      : `⚠️ Selling more than what's in stock:\n${list}\n\nSave anyway?`);
+  };
+
   const saveSalesInvoiceOffline = async (payload, successMessage, options = {}) => {
     const nowIso = new Date().toISOString();
     const priorInvoice = editInvId ? invoices.find(inv => inv.id === editInvId) : null;
@@ -262,6 +301,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       const p = siBuild(status, siInvoiceNo);
       if (!p) return;
       if (!siCustomerTermsOk(p)) return;
+      if (!(await siStockOk(p))) return;
       if (status!=="draft" && !isQuote && !unlinkedStockOk(p.items, lang)) return;
       if (!editInvId) p.invoiceNo = await reserveSiInvoiceNo();
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : successMsg, options);

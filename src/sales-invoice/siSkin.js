@@ -156,7 +156,7 @@ export const SI_CSS = `
   .si-root .pm-input { height: 34px; padding: 4px 7px; font-size: 14px; }
   .si-root select.pm-input { padding: 2px 4px; }
   .si-root textarea.pm-input { height: 64px; }
-  .si-pills { flex-wrap: nowrap; overflow-x: auto; width: 100%; }
+  .si-pills { flex-wrap: wrap; width: 100%; }
   .si-pills > button { min-height: 32px; font-size: 12px; flex: 0 0 auto; }
   .si-main, .si-main.is-all { display: block; padding: 0 4px 4px; }
   .si-box { overflow: visible; }

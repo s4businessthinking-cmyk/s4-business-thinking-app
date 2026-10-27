@@ -32,6 +32,10 @@ function safeParseJson(value, fallback) {
   }
 }
 
+// Mobile login survives the app being fully closed, sliding forward by this much on every
+// touch (see spare-parts-app.jsx) while in use, and expiring this long after the last touch.
+export const SESSION_IDLE_MS = 16 * 60 * 60 * 1000;
+
 function rowToSession(row) {
   if (!row) return null;
 
@@ -126,6 +130,36 @@ export async function getActiveOfflineSession() {
   }
 
   return session;
+}
+
+// Slides the active session's expiry forward without creating a new row (called periodically
+// while the mobile app is in the foreground, so idle time only starts counting after the user
+// actually leaves).
+export async function touchOfflineSession(expiresAt) {
+  await bootOfflineSqlite();
+
+  const rows = queryRows(
+    `SELECT *
+     FROM offline_sessions
+     WHERE is_active = 1
+     ORDER BY updated_at DESC
+     LIMIT 1`
+  );
+  const row = rows?.[0];
+  if (!row) return false;
+
+  const session = safeParseJson(row.session_json, {});
+  session.expiresAt = expiresAt;
+
+  executeSql(
+    `UPDATE offline_sessions
+     SET expires_at = ?, session_json = ?, updated_at = ?
+     WHERE id = ?`,
+    [expiresAt, JSON.stringify(session), nowIso(), row.id]
+  );
+
+  await persistOfflineDb();
+  return true;
 }
 
 export async function clearOfflineSessions(userId = null) {

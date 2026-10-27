@@ -117,7 +117,7 @@ function useMobileLayout() {
 
 export default function VendorMasterScreen({
   t, lang, shopId, user, vendors, toast, cur = "AED",
-  canEdit = false, canDelete = false, canPurchase = false, actorName = "", leaveGuard, onClose, onGoToPurchase, renderImport, nextCode,
+  canEdit = false, canDelete = false, canPurchase = false, actorName = "", leaveGuard, onClose, onGoToPurchase, onGoToSecurityCheques, renderImport, nextCode,
   focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved,
 }) {
   const bn = lang === "bn";
@@ -134,6 +134,19 @@ export default function VendorMasterScreen({
   const rootRef = useRef(null);
   const seenSelected = useRef(false);
   const [fitHeight, setFitHeight] = useState(null);
+  const [scSummary, setScSummary] = useState({ count: 0, total: 0 });
+
+  // Read-only: how many security cheques are held for this vendor (own collection, never written here).
+  useEffect(() => {
+    if (!selectedId) { setScSummary({ count: 0, total: 0 }); return; }
+    let cancelled = false;
+    offlineList("securityCheques").then(({ records: rows }) => {
+      if (cancelled) return;
+      const held = (rows || []).filter((r) => r.data?.shopId === shopId && r.data?.partyId === selectedId && r.data?.partyType === "vendor" && !r.data?.isDeleted && r.data?.status === "held");
+      setScSummary({ count: held.length, total: held.reduce((t, r) => t + (parseFloat(r.data?.amount) || 0), 0) });
+    }).catch((err) => console.warn("[S4 Vendor] security cheque summary failed", err));
+    return () => { cancelled = true; };
+  }, [selectedId, shopId]);
 
   // On PC the screen fills exactly the space below the window title, so the page never scrolls.
   useEffect(() => {
@@ -458,6 +471,14 @@ export default function VendorMasterScreen({
               {row("IBAN", "ibanNumber", { mono: true })}
               {row("SWIFT", "swiftCode", { mono: true })}
             </>)}
+            {selectedId && onGoToSecurityCheques && panel(L("সিকিউরিটি চেক", "Security Cheques"), (
+              <div className="pm-form-row" style={{ alignItems: "center" }}>
+                <span style={{ fontSize: 13 }}>
+                  {L(`জমা আছে: ${scSummary.count}টি · মোট ${cur} ${scSummary.total.toFixed(2)}`, `Held: ${scSummary.count} · Total ${cur} ${scSummary.total.toFixed(2)}`)}
+                </span>
+                <button type="button" className="pm-btn-secondary" onClick={() => onGoToSecurityCheques(selectedVendor)}>{L("দেখুন", "View")}</button>
+              </div>
+            ))}
           </div>
         </fieldset>
 

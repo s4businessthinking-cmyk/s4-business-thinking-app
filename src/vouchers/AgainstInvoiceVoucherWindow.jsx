@@ -157,9 +157,28 @@ export default function AgainstInvoiceVoucherWindow({
 
   const viewing = viewingId ? (vouchers.find((v) => v.id === viewingId) || viewSnapshot) : null;
 
+  // Refills the new-entry form from a cancelled voucher's full data (party, method, cheque/ref
+  // details, note and every allocation row) — used for both the initial `prefill` prop and the
+  // "Cancel & Edit" action on a voucher already being viewed.
+  const applyVoucherSnapshot = (snap) => {
+    const partyId = snap.raw?.vendorId || snap.raw?.customerId || snap.partyId || null;
+    const p = parties.find((x) => (partyId && x.id === partyId) || (!partyId && x.name === snap.partyName))
+      || { key: `n:${snap.partyName}`, id: partyId, name: snap.partyName, mobile: snap.raw?.vendorMobile || snap.raw?.customerMobile || "" };
+    setParty(p);
+    setRows((snap.allocations || []).map((a) => ({ invoiceId: a.invoiceId, invoiceNo: a.invoiceNo, supplierInvoiceNo: a.supplierInvoiceNo || "", invoiceDate: a.invoiceDate || "", invoiceAmount: n2(a.invoiceAmount), amount: n2(a.amount) })));
+    setDate(snap.date || todayIso());
+    setMethod(snap.method || "cash");
+    setChequeNo(snap.chequeNo || ""); setChequeDate(snap.chequeDate || todayIso()); setChequeBank(snap.chequeBank || "");
+    setChequeReceivedBy(snap.chequeReceivedBy || ""); setVendorReceiptNo(snap.vendorReceiptNo || ""); setChequeMonth(snap.chequeMonth || "");
+    setRefNo(snap.refNo || ""); setRefBank(snap.refBank || ""); setRefDate(snap.refDate || todayIso());
+    setNote(snap.note || "");
+    setSelInvId(""); setCurAmt("");
+  };
+
   useEffect(() => {
     if (initialViewId) return;
     if (!prefill) { setTimeout(() => partyRef.current?.focus(), 80); return; }
+    if (prefill.allocations) { applyVoucherSnapshot(prefill); return; }
     const p = parties.find((x) => (prefill.partyId && x.id === prefill.partyId) || (!prefill.partyId && x.name === prefill.partyName))
       || (prefill.partyName ? { key: `n:${prefill.partyName}`, id: prefill.partyId || null, name: prefill.partyName } : null);
     if (p) setParty(p);
@@ -460,7 +479,7 @@ export default function AgainstInvoiceVoucherWindow({
             {!ro ? (
               <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, cursor: "pointer", marginRight: "auto" }}>
                 <input type="checkbox" checked={printDetails} onChange={(e) => setPrintDetails(e.target.checked)} />
-                Print {docLabel} Details in {isReceipt ? "Receipt " : ""}Voucher
+                Print {isReceipt ? "Receipt " : ""}Voucher After Saving
               </label>
             ) : (
               <div style={{ display: "flex", gap: 6, marginRight: "auto", flexWrap: "wrap" }}>
@@ -473,6 +492,17 @@ export default function AgainstInvoiceVoucherWindow({
                 )}
                 {!cancelled && onCancelVoucher && (
                   <button type="button" onClick={async () => { const u = await onCancelVoucher(viewing); if (u) setViewSnapshot(u); }} style={btn("#fee2e2", C.red)}>⛔ {bn ? "ভাউচার বাতিল" : "Cancel Voucher"}</button>
+                )}
+                {!cancelled && onCancelVoucher && (
+                  <button type="button" onClick={async () => {
+                    const snap = viewing;
+                    const u = await onCancelVoucher(snap);
+                    if (!u) return;
+                    // The old voucher is now cancelled (allocations reversed, audit logged); refill the
+                    // new-entry form with its data so the user corrects and re-saves instead of retyping.
+                    applyVoucherSnapshot(snap);
+                    setViewingId(null); setViewSnapshot(null);
+                  }} style={btn("#fef3c7", "#92400e")}>✏️ {bn ? "বাতিল করে এডিট করুন" : "Cancel & Edit"}</button>
                 )}
                 {cancelled && onDeleteVoucher && (
                   <button type="button" onClick={async () => { if (await onDeleteVoucher(viewing)) resetNew(); }} style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "ভাউচার মুছুন" : "Delete Voucher"}</button>
