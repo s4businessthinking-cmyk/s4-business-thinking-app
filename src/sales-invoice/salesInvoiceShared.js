@@ -16,9 +16,14 @@ export function generatePaymentVoucherHTML(voucherIn, shopIn, lang, opts={}) {
   const methodLabel = PI_VOUCHER_METHODS[voucher.method]?.[lang] || voucher.method;
   const cur = "AED";
   const docNo = a => (!isReceipt && a.supplierInvoiceNo) || a.invoiceNo || "";
-  const rows = (voucher.allocations||[]).map(a=>`
-    <tr><td><strong>${docNo(a)}</strong>${!isReceipt&&a.supplierInvoiceNo?`<div style="font-size:10px;color:#6b7280">${a.invoiceNo}</div>`:""}</td><td>${a.invoiceDate||"—"}</td><td style="text-align:right">${cur} ${piFmt2(a.amount)}</td></tr>
-  `).join("");
+  // allocDetail (optional): each selected bill's own total and its balance left after this voucher —
+  // looked up by the caller from live invoice data, since the voucher record itself only keeps what was allocated.
+  const allocDetail = opts.allocDetail || null;
+  const rows = (voucher.allocations||[]).map(a=>{
+    const d = allocDetail?.find(x=>x.invoiceId===a.invoiceId);
+    const extra = allocDetail ? `<td style="text-align:right">${cur} ${piFmt2(d?.invoiceAmount)}</td><td style="text-align:right">${cur} ${piFmt2(d?.balanceAfter)}</td>` : "";
+    return `<tr><td><strong>${docNo(a)}</strong>${!isReceipt&&a.supplierInvoiceNo?`<div style="font-size:10px;color:#6b7280">${a.invoiceNo}</div>`:""}</td><td>${a.invoiceDate||"—"}</td><td style="text-align:right">${cur} ${piFmt2(a.amount)}</td>${extra}</tr>`;
+  }).join("");
   const design = opts.design || loadPrintDesign();
   const layout = design.layout.voucher;
   const vTitle = opts.title || (isReceipt?(isBn?"রিসিট ভাউচার":"RECEIPT VOUCHER"):(isBn?"পেমেন্ট ভাউচার":"PAYMENT VOUCHER"));
@@ -32,7 +37,10 @@ export function generatePaymentVoucherHTML(voucherIn, shopIn, lang, opts={}) {
       chequeNo:isCheque?(voucher.chequeNo||""):"", chequeBank:isCheque?(voucher.chequeBank||""):isRef?(voucher.refBank||""):"",
       chequeDate:isCheque?(voucher.chequeDate||""):"", refNo:isRef?(voucher.refNo||""):"", note:voucher.note||"", collectedBy:voucher.collectedByName||"",
     };
-    const items = (voucher.allocations||[]).map(a=>({ invoiceNo:docNo(a), ourNo:a.invoiceNo||"", invoiceDate:a.invoiceDate||"", amount:piFmt2(a.amount) }));
+    const items = opts.summaryOnly ? [] : (voucher.allocations||[]).map(a=>{
+      const d = allocDetail?.find(x=>x.invoiceId===a.invoiceId);
+      return { invoiceNo:docNo(a), ourNo:a.invoiceNo||"", invoiceDate:a.invoiceDate||"", amount:piFmt2(a.amount), ...(allocDetail ? { invoiceAmount:piFmt2(d?.invoiceAmount), balanceAfter:piFmt2(d?.balanceAfter) } : {}) };
+    });
     return renderLayoutDocument(layout, "voucher", { fields, items, logo:design.style.voucher?.logo }, { title:`${vTitle} - ${voucher.paymentNo}`, bn:isBn });
   }
   const docTitle = opts.title || (isReceipt ? (isBn ? "রিসিট ভাউচার" : "Receipt Voucher") : (isBn ? "পেমেন্ট ভাউচার" : "Payment Voucher"));
@@ -103,6 +111,10 @@ body{font-family:'Segoe UI',Tahoma,Arial,'Noto Sans Bengali',sans-serif;font-siz
       <div class="amount-label">${amountLabel}</div>
       <div class="amount-val">${cur} ${piFmt2(voucher.totalAmount)}</div>
     </div>
+    ${!isCheque&&piN2(voucher.discountAmount)>0?`<div class="cheque-box">
+      <div class="cheque-row"><span style="color:#b45309;font-weight:700">🏷️ ${isBn?"ছাড়":"Discount"}</span><span style="font-weight:700">${cur} ${piFmt2(voucher.discountAmount)}</span></div>
+      <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">${isReceipt?(isBn?"নেট গ্রহণ":"Net Received"):(isBn?"নেট পরিশোধ":"Net Paid")}</span><span style="font-weight:900">${cur} ${piFmt2(piN2(voucher.totalAmount)-piN2(voucher.discountAmount))}</span></div>
+    </div>`:""}
     ${isCheque?`<div class="cheque-box">
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">📃 ${isBn?"চেক নম্বর":"Cheque No."}</span><span style="font-weight:700">${voucher.chequeNo||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🏦 ${isBn?"ব্যাংক":"Bank"}</span><span style="font-weight:700">${voucher.chequeBank||"—"}</span></div>
@@ -116,10 +128,12 @@ body{font-family:'Segoe UI',Tahoma,Arial,'Noto Sans Bengali',sans-serif;font-siz
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">🔖 ${voucher.method==="card"?(isBn?"অনুমোদন / রেফ নং":"Approval / Ref No."):(isBn?"রেফারেন্স নং":"Reference No.")}</span><span style="font-weight:700">${voucher.refNo||"—"}</span></div>
       <div class="cheque-row"><span style="color:#4f46e5;font-weight:700">${voucher.method==="card"?(isBn?"💳 কার্ডের ধরন":"💳 Card Type"):(isBn?"🏦 ব্যাংক":"🏦 Bank")}</span><span style="font-weight:700">${voucher.refBank||"—"}</span></div>
     </div>`:""}
-    <table class="alloc-table">
-      <thead><tr><th>${isReceipt?(isBn?"ইনভয়েস নং":"Invoice No."):(isBn?"ভেন্ডরের ইনভয়েস নং":"Vendor Invoice No.")}</th><th>${isBn?"তারিখ":"Date"}</th><th style="text-align:right">${isBn?"পরিমাণ":"Amount"}</th></tr></thead>
+    ${opts.summaryOnly
+      ? `<div class="note-box">🧾 ${(voucher.allocations||[]).length} ${isReceipt?(isBn?"টি ইনভয়েস":"invoices"):(isBn?"টি ভেন্ডর ইনভয়েস":"vendor invoices")} ${isBn?"পরিশোধ হয়েছে":"settled"} — ${cur} ${piFmt2(voucher.totalAmount)}</div>`
+      : `<table class="alloc-table">
+      <thead><tr><th>${isReceipt?(isBn?"ইনভয়েস নং":"Invoice No."):(isBn?"ভেন্ডরের ইনভয়েস নং":"Vendor Invoice No.")}</th><th>${isBn?"তারিখ":"Date"}</th><th style="text-align:right">${isBn?"পরিমাণ":"Amount"}</th>${allocDetail?`<th style="text-align:right">${isBn?"ইনভয়েসের মোট":"Invoice Amount"}</th><th style="text-align:right">${isBn?"বাকি":"Balance"}</th>`:""}</tr></thead>
       <tbody>${rows}</tbody>
-    </table>
+    </table>`}
     ${voucher.note?`<div class="note-box">📝 ${voucher.note}</div>`:""}
     <div class="sigs">
       <div><div class="sig-line">${isBn?"প্রদানকারীর স্বাক্ষর":"Paid By Signature"}</div></div>${isReceipt&&voucher.collectedByName?`<div style="grid-column:1/3;font-size:11px;color:#6b7280">${isBn?"সংগ্রহকারী":"Collected by"}: ${voucher.collectedByName}</div>`:""}
@@ -131,8 +145,8 @@ body{font-family:'Segoe UI',Tahoma,Arial,'Noto Sans Bengali',sans-serif;font-siz
 </body></html>`, "voucher", opts.style || design.style.voucher);
 }
 
-export function printPaymentVoucher(voucher, shop, lang) {
-  printWithSettings(generatePaymentVoucherHTML(voucher, shop, lang), { lang });
+export function printPaymentVoucher(voucher, shop, lang, opts={}) {
+  printWithSettings(generatePaymentVoucherHTML(voucher, shop, lang, opts), { lang });
 }
 
 export const SI_UNITS   = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];

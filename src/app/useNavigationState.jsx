@@ -9,7 +9,7 @@ import { reminderAlertText } from "../reminders/reminders.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
-export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, team, th, toast, user }) {
+export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList = [], team, th, toast, user }) {
   const unread = isOwner || isOrderManager
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
@@ -44,12 +44,17 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     }),
     ...reminderAlertList.map(a => {
       const txt = reminderAlertText(a, lang==="bn");
-      return { key:a.key, icon:txt.icon, tone:a.tone, title:txt.title, sub:txt.sub, onClick:()=>{ setSettingsPage(null); setTab("reminders"); } };
+      return { key:a.key, icon:txt.icon, tone:a.tone, title:txt.title, sub:txt.sub, onClick:()=>{
+        setSettingsPage(null);
+        if (a.linkType && a.linkId && ["sales","quotation","delivery","salesOrder"].includes(a.linkType)) { setTab(a.linkType); setGlobalOpenSalesInvoiceId(a.linkId); }
+        else setTab("reminders");
+      } };
     }),
     ...securityChequeAlertList.map(a => {
       const txt = securityChequeAlertText(a, lang==="bn", t.cur||"AED");
       return { key:a.key, icon:txt.icon, tone:a.tone==="bad"?"danger":undefined, title:txt.title, sub:txt.sub, onClick:()=>{ setSettingsPage(null); setTab("securityCheque"); } };
     }),
+    ...taxAlertList.map(a => ({ key:a.key, icon:a.icon, tone:a.tone, title:a.title, sub:a.sub, onClick:()=>{ a.onSeen?.(); setSettingsPage(null); setTab("tax"); } })),
     ...(orderModuleEnabled && unread>0 ? [{
       key:"orders", icon:"📋", count:unread,
       title:lang==="bn"?`${unread}টি নতুন অর্ডার`:`${unread} new order(s)`,

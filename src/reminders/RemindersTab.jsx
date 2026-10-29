@@ -3,7 +3,7 @@ import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineCreate, offlinePatch, offlineRemove } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
-import { REPEATS, addDays, canSee, donePatch, dueState, ymd } from "./reminders.js";
+import { REPEATS, addDays, canSee, donePatch, dueState, nextDue, ymd } from "./reminders.js";
 
 const ACCENT = "#db2777";
 const emptyForm = () => ({ title: "", note: "", dueDate: ymd(new Date()), dueTime: "", repeat: "none", remindBefore: "0", assignedTo: "", private: false });
@@ -15,7 +15,9 @@ const STATE_STYLE = {
   done: { color: "#15803d", bn: "শেষ", en: "Done" },
 };
 
-export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwner, team = [], toast }) {
+const LINK_LABELS = { sales: { bn: "ইনভয়েস", en: "Invoice" }, quotation: { bn: "কোটেশন", en: "Quotation" }, delivery: { bn: "ডেলিভারি নোট", en: "Delivery Note" }, salesOrder: { bn: "সেলস অর্ডার", en: "Sales Order" } };
+
+export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwner, team = [], toast, onOpenLink }) {
   const L = (bn, en) => (lang === "bn" ? bn : en);
   const uid = user?.uid || "";
   const [rows, setRows] = useState([]);
@@ -102,9 +104,9 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
     }
   };
 
-  const markDone = async (r) => {
+  const markDone = async (r, { stop = false } = {}) => {
     try {
-      const patch = donePatch(r, { uid, name: profile?.personName || "" });
+      const patch = donePatch(r, { uid, name: profile?.personName || "", stop });
       await offlinePatch("reminders", r.id, patch, r);
       toast?.(patch.status === "done" ? L("✅ শেষ হিসেবে রাখা হলো", "✅ Marked done") : L(`✅ হয়েছে — পরের বার ${patch.dueDate}`, `✅ Done — next on ${patch.dueDate}`));
       sync();
@@ -132,14 +134,28 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
   const fmt = (d) => String(d || "").slice(0, 10).split("-").reverse().join("/");
   const repeatLabel = (k) => (REPEATS.find((x) => x.key === k) || REPEATS[0])[lang] || "";
   const badge = (state) => <span className="si-badge" style={{ color: STATE_STYLE[state].color }}>{STATE_STYLE[state][lang] || STATE_STYLE[state].en}</span>;
-  const actions = (r, state) => (
-    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
-      {state !== "done" && canMarkDone(r) && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); markDone(r); }}>✅ {L("হয়েছে", "Done")}</button>}
-      {state !== "done" && (state === "overdue" || state === "today") && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); snooze(r, 1); }}>😴 {L("কাল", "Tomorrow")}</button>}
-      {state === "done" && canEdit(r) && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); reopen(r); }}>↩️ {L("আবার খুলুন", "Reopen")}</button>}
-      {canEdit(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={(e) => { e.stopPropagation(); remove(r); }}>🗑️</button>}
-    </div>
-  );
+  const actions = (r, state) => {
+    const repeating = r.repeat && r.repeat !== "none";
+    const next = repeating ? fmt(nextDue(r.dueDate, r.repeat)) : "";
+    return (
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        {state !== "done" && canMarkDone(r) && (
+          <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); markDone(r); }}>
+            ✅ {repeating ? L(`হয়েছে · পরের বার ${next}`, `Done · next ${next}`) : L("হয়েছে", "Done")}
+          </button>
+        )}
+        {state !== "done" && repeating && canMarkDone(r) && (
+          <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); markDone(r, { stop: true }); }}>
+            🏁 {L("পুনরাবৃত্তি বন্ধ করে শেষ করুন", "Finish, stop repeating")}
+          </button>
+        )}
+        {state !== "done" && (state === "overdue" || state === "today") && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); snooze(r, 1); }}>😴 {L("কাল", "Tomorrow")}</button>}
+        {state === "done" && canEdit(r) && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); reopen(r); }}>↩️ {L("আবার খুলুন", "Reopen")}</button>}
+        {r.linkType && r.linkId && onOpenLink && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); onOpenLink(r.linkType, r.linkId); }}>🔗 {L(LINK_LABELS[r.linkType]?.bn || "খুলুন", LINK_LABELS[r.linkType]?.en || "Open")}</button>}
+        {canEdit(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={(e) => { e.stopPropagation(); remove(r); }}>🗑️</button>}
+      </div>
+    );
+  };
 
   if (form) {
     const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));

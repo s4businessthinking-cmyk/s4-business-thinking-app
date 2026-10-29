@@ -229,6 +229,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     const totalPer = lines.reduce((t, l) => t + n2(l.per), 0);
     const singleCost = single ? costOf(productOf(single.productId)) : 0;
     const dirColor = (out) => (out ? "#b91c1c" : "#15803d");
+    const dirLegendBg = (out) => (out ? "linear-gradient(180deg, #ef4444, #b91c1c)" : "linear-gradient(180deg, #22c55e, #15803d)");
     return shell(T("newBtn"), T("title"), (
       <>
         <div className="si-body">
@@ -242,7 +243,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
           </fieldset>
 
           <fieldset className="pm-panel" style={{ margin: 0 }}>
-            <legend className="pm-panel-legend" style={{ color: dirColor(singleOut) }}>{singleOut ? "−" : "+"} {T("single")}</legend>
+            <legend className="pm-panel-legend" style={{ background: dirLegendBg(singleOut) }}>{singleOut ? "−" : "+"} {T("single")}</legend>
             <div className="si-panel-body">
               {!single && <ProductPicker products={products} exclude={exclude} stockOf={stockOf} onPick={pickSingle} autoFocus={!mobile} mobile={mobile} lang={lang}
                 placeholder={L("নাম, কোড বা বারকোড লিখুন / স্ক্যান করুন…", "Type or scan name, code or barcode…")} />}
@@ -262,7 +263,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
           </fieldset>
 
           <fieldset className="pm-panel" style={{ margin: 0, flex: mobile ? undefined : 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <legend className="pm-panel-legend" style={{ color: dirColor(!singleOut) }}>{singleOut ? "+" : "−"} {T("multi")}</legend>
+            <legend className="pm-panel-legend" style={{ background: dirLegendBg(!singleOut) }}>{singleOut ? "+" : "−"} {T("multi")}</legend>
             <div className="si-panel-body" style={{ display: "flex", flexDirection: "column", gap: 4, minHeight: 0, flex: 1 }}>
               <ProductPicker products={products} exclude={exclude} stockOf={stockOf} onPick={addLine} mobile={mobile} lang={lang}
                 placeholder={L("পণ্য যোগ করুন — নাম, কোড বা বারকোড…", "Add product — name, code or barcode…")} />

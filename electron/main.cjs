@@ -2,6 +2,7 @@ const { autoUpdater } = require("electron-updater");
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
 
 const UPDATE_CHECK_INTERVAL_MS = 2 * 60 * 60 * 1000;
 const SILENT_INSTALL_DELAY_MS = 2500;
@@ -13,7 +14,36 @@ const BACKUP_FILE_RE = /^(S4-backup-[\w-]+)-\d{8}-\d{4}\.s4backup$/;
 let closeAllowed = false;
 app.on("before-quit", () => { closeAllowed = true; });
 
-function createWindow() {
+const STATIC_MIME = {
+  ".html": "text/html; charset=utf-8", ".js": "application/javascript; charset=utf-8", ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8", ".json": "application/json; charset=utf-8", ".wasm": "application/wasm",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon",
+  ".woff": "font/woff", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json", ".gz": "application/gzip", ".map": "application/json",
+};
+
+// The packaged app's UI reads files over file://, and Chromium refuses to create Workers (OCR,
+// PDF parsing) or fetch WASM from that scheme — it works on the web build only because that one
+// is served over http(s). Serving the same built files from a local HTTP server removes that gap.
+function startLocalServer(rootDir) {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      let reqPath;
+      try { reqPath = decodeURIComponent(new URL(req.url, "http://127.0.0.1").pathname); } catch { reqPath = "/"; }
+      if (reqPath === "/" || reqPath === "") reqPath = "/index.html";
+      const filePath = path.normalize(path.join(rootDir, reqPath));
+      if (!filePath.startsWith(rootDir)) { res.writeHead(403); res.end(); return; }
+      fs.readFile(filePath, (err, data) => {
+        if (err) { res.writeHead(404); res.end(); return; }
+        res.setHeader("Content-Type", STATIC_MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream");
+        res.end(data);
+      });
+    });
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => resolve(server));
+  });
+}
+
+async function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -67,7 +97,15 @@ function createWindow() {
   if (!app.isPackaged) {
     win.loadURL(process.env.S4_DEV_URL || "http://localhost:5173");
   } else {
-    win.loadFile(path.join(__dirname, "../dist/index.html"));
+    const distDir = path.join(__dirname, "../dist");
+    try {
+      const server = await startLocalServer(distDir);
+      win.on("closed", () => server.close());
+      win.loadURL(`http://127.0.0.1:${server.address().port}/index.html`);
+    } catch (error) {
+      console.error("[S4] local server failed, falling back to file://", error);
+      win.loadFile(path.join(distDir, "index.html"));
+    }
   }
 }
 

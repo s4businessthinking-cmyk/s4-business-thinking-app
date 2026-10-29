@@ -65,8 +65,11 @@ export function reminderAlerts(list = [], { uid, isOwner = false, today, nowTime
     .filter((r) => r.status !== "done" && isMine(r, uid, isOwner) && (!r.assignedTo || r.assignedTo === uid || r.createdBy === uid))
     .map((r) => ({ r, state: dueState(r, today, nowTime) }))
     .filter((x) => x.state === "overdue" || x.state === "today" || x.state === "soon")
+    // A reminder due today with a set time shouldn't alert at midnight just because the date flipped —
+    // wait until that time actually arrives (dueState itself still shows it as "today" all day, for the list view).
+    .filter((x) => !(x.state === "today" && x.r.dueTime && nowTime && nowTime < x.r.dueTime))
     .sort((a, b) => String(a.r.dueDate).localeCompare(String(b.r.dueDate)) || String(a.r.dueTime || "").localeCompare(String(b.r.dueTime || "")))
-    .map(({ r, state }) => ({ key: `rem-${r.id}-${r.dueDate}`, id: r.id, state, title: r.title, note: r.note || "", dueDate: r.dueDate, dueTime: r.dueTime || "", tone: state === "overdue" ? "danger" : undefined }));
+    .map(({ r, state }) => ({ key: `rem-${r.id}-${r.dueDate}`, id: r.id, state, title: r.title, note: r.note || "", dueDate: r.dueDate, dueTime: r.dueTime || "", tone: state === "overdue" ? "danger" : undefined, linkType: r.linkType || "", linkId: r.linkId || "" }));
 }
 
 export function reminderAlertText(a, bn) {
@@ -75,11 +78,12 @@ export function reminderAlertText(a, bn) {
   return { icon: a.state === "overdue" ? "⏰" : "🔔", title: a.title, sub: `${label} · ${when}${a.note ? ` · ${a.note}` : ""}` };
 }
 
-// Patch for marking a reminder done: repeating ones roll to the next date.
-export function donePatch(r, { uid = "", name = "", now = new Date() } = {}) {
+// Patch for marking a reminder done: repeating ones roll to the next date,
+// unless `stop` is set — that ends the series instead of rescheduling it.
+export function donePatch(r, { uid = "", name = "", now = new Date(), stop = false } = {}) {
   const at = now.toISOString();
   const history = [...(Array.isArray(r.history) ? r.history.slice(-29) : []), { dueDate: r.dueDate, doneAt: at, by: name }];
-  const next = nextDue(r.dueDate, r.repeat);
+  const next = stop ? "" : nextDue(r.dueDate, r.repeat);
   if (next) {
     let n = next;
     const today = ymd(now);

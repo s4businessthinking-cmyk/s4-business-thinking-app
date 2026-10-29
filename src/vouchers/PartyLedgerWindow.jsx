@@ -152,7 +152,8 @@ export default function PartyLedgerWindow({
       }));
     } catch { /* ignore */ }
   };
-  const win = useWindowState();
+  // Full screen by default only on a phone — desktop keeps its original compact centered window.
+  const win = useWindowState({ maximized: typeof window !== "undefined" && window.innerWidth < 768 });
   const ledgerFilters = useMemo(() => ({ voucherFilter, includePdc }), [voucherFilter, includePdc]);
   useEscapeKey(() => onClose?.(), { enabled: !win.min, level: 2 });
 

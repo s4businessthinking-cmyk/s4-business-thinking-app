@@ -35,6 +35,13 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
         return null;
       }
     }
+    if (payload.chequeAmount == null && payload.discountAmount != null && piN2(payload.discountAmount) > 0) {
+      const allocTotal = allocations.reduce((s,a)=>s+piN2(a.amount),0);
+      if (piN2(payload.discountAmount) > allocTotal + 0.001) {
+        toast(lang==="bn"?"ছাড় মোট টাকার চেয়ে বেশি হতে পারবে না":"Discount cannot exceed the total","err");
+        return null;
+      }
+    }
 
     setPmtSaving(true);
     try {
@@ -78,6 +85,8 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
         ...(payload.method === "cheque" && payload.chequeAmount != null ? {
           chequeAmount: parseFloat(piFmt2(payload.chequeAmount)),
           discountAmount: parseFloat(piFmt2(Math.max(0, totalAmount - piN2(payload.chequeAmount)))),
+        } : payload.discountAmount != null && piN2(payload.discountAmount) > 0 ? {
+          discountAmount: parseFloat(piFmt2(payload.discountAmount)),
         } : {}),
         refNo: (payload.refNo || "").trim(),
         refBank: (payload.refBank || "").trim(),

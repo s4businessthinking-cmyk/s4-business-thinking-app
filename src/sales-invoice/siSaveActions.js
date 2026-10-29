@@ -68,27 +68,32 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     if (status==="draft" && priorDoc && !isQuote && priorDoc.status && priorDoc.status!=="draft") {
       toast(lang==="bn"?"❌ সেভ করা বিলকে আবার Draft করা যাবে না":"❌ A saved invoice cannot be turned back into a draft","err"); return null;
     }
-    const isCash     = siForm.paymentMethod==="cash";
+    const isCash      = siForm.paymentMethod==="cash";
+    // A plain cash bill is always auto-paid in full (unchanged, original behaviour). "Partial cash" is an
+    // explicit opt-in for transport-style customers who pay cash but in a lump sum later across several
+    // bills — it tracks a real balance and receipts exactly like a credit bill, while keeping paymentMethod:"cash".
+    const cashPartial = isCash && !!siForm.cashPartial;
+    const plainCash   = isCash && !cashPartial;
     // Receipts may have been posted since the form was opened: apply only the user's change on top of the latest paid amount.
-    const typedPaid  = siN2(siForm.amountPaid);
-    const creditPaid = priorDoc && priorDoc.paymentMethod!=="cash"
+    const typedPaid   = siN2(siForm.amountPaid);
+    const trackedPaid = priorDoc && !plainCash
       ? siN2(priorDoc.amountPaid) + (typedPaid - siLoadedPaidRef.current)
       : typedPaid;
     const receiptsOnBill = priorDoc ? (receipts||[]).filter(r=>r.status!=="cancelled")
       .reduce((s,r)=>s+(r.allocations||[]).filter(a=>a.invoiceId===priorDoc.id).reduce((x,a)=>x+siN2(a.amount),0),0) : 0;
-    if (!isDelivery && !isQuote && !isCash && priorDoc && receiptsOnBill > grand + 0.01) {
+    if (!isDelivery && !isQuote && !plainCash && priorDoc && receiptsOnBill > grand + 0.01) {
       toast(lang==="bn"?`❌ এই বিলে আগেই ${siFmt2(receiptsOnBill)} টাকা নেওয়া হয়েছে — সর্বমোট এর চেয়ে কম করা যাবে না`:`❌ ${siFmt2(receiptsOnBill)} has already been received on this bill — the total cannot go below it`,"err"); return null;
     }
-    if (!isDelivery && !isQuote && isCash && receiptsOnBill > 0.01) {
+    if (!isDelivery && !isQuote && plainCash && receiptsOnBill > 0.01) {
       toast(lang==="bn"?"❌ এই বিলে Receipt Voucher আছে — Cash করা যাবে না, আগে Receipt বাতিল করুন":"❌ This bill has receipt vouchers — it cannot be made cash; cancel the receipts first","err"); return null;
     }
-    if (!isDelivery && !isQuote && !isCash && (typedPaid < 0 || creditPaid > grand + 0.01)) {
+    if (!isDelivery && !isQuote && !plainCash && (typedPaid < 0 || trackedPaid > grand + 0.01)) {
       toast(lang==="bn"?"❌ পরিশোধিত টাকা মোট বিলের চেয়ে বেশি বা ঋণাত্মক হতে পারে না!":"❌ Amount paid cannot exceed the grand total or be negative!","err"); return null;
     }
-    // cash invoice: auto fully paid | delivery: confirmed | credit: normal; receipts already posted on the bill always stay counted
+    // plain cash invoice: auto fully paid | delivery: confirmed | credit/partial-cash: normal; receipts already posted on the bill always stay counted
     const paid = isDelivery || isQuote ? 0
-               : isCash     ? parseFloat(siFmt2(grand))
-               : Math.min(Math.max(creditPaid,receiptsOnBill,0), Math.max(grand,0));
+               : plainCash  ? parseFloat(siFmt2(grand))
+               : Math.min(Math.max(trackedPaid,receiptsOnBill,0), Math.max(grand,0));
     const bal  = isDelivery || isQuote ? 0 : Math.max(0, grand - paid);
     const derivedStatus = isQuote ? (status==="confirmed" ? "open" : status)
                         : isDN ? status
@@ -106,7 +111,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       : priorDoc?.jobOrderId ? { jobOrderId:priorDoc.jobOrderId, jobOrderNo:priorDoc.jobOrderNo||"" }
       : priorDoc?.quotationId ? { quotationId:priorDoc.quotationId, quotationNo:priorDoc.quotationNo||"" } : {};
     const docType = isDN ? "delivery" : isQuote ? (isTax ? "tax" : "regular") : (siForm.invoiceType||"tax");
-    return { ...quoteFields, shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:docType, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerCode:siForm.customerId?((customers||[]).find(c=>c.id===siForm.customerId)?.customerCode||""):"", customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:priorDoc?.createdBy||user.uid, createdByName:priorDoc?.createdByName||profile.personName,
+    return { ...quoteFields, shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:docType, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerCode:siForm.customerId?((customers||[]).find(c=>c.id===siForm.customerId)?.customerCode||""):"", customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, cashPartial, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:priorDoc?.createdBy||user.uid, createdByName:priorDoc?.createdByName||profile.personName,
       refNo:String(siForm.refNo||"").trim(),
       salesmanId:siForm.salesmanId||"", salesmanName:String(siForm.salesmanName||"").trim(),
       currency:siForm.currency||"AED",

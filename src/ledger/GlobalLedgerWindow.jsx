@@ -32,7 +32,8 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
   const win = useWindowState({ maximized: true });
   useEscapeKey(() => onClose?.(), { enabled: !embedded && !win.min, level: 2 });
   const pageRef = useRef(null);
-  const fitH = usePmFitHeight(pageRef, usePmMobile());
+  const mobile = usePmMobile();
+  const fitH = usePmFitHeight(pageRef, mobile);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [from, setFrom] = useState("");
@@ -148,8 +149,10 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
           {error && <div style={{ padding: 12, color: C.red, fontWeight: 700 }}>{L("ডেটা পড়া যায়নি: ", "Could not load: ")}{error}</div>}
           {!ledger && !error && <div style={{ padding: 24, textAlign: "center", fontWeight: 700 }}>{L("লোড হচ্ছে…", "Loading…")}</div>}
           {ledger && (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 10, padding: 10, flex: 1, minHeight: 0 }}>
-              <div style={{ display: "flex", flexDirection: "column", minHeight: 0, background: "#fff", border: `1px solid ${C.border}` }}>
+            // Side-by-side needs real width for both panes; a phone doesn't have it, so stack
+            // them full-width instead of squeezing the statement into a sliver next to the list.
+            <div style={{ display: mobile ? "flex" : "grid", flexDirection: mobile ? "column" : undefined, gridTemplateColumns: mobile ? undefined : "minmax(240px, 320px) 1fr", gap: 10, padding: 10, flex: 1, minHeight: 0, overflow: mobile ? "auto" : undefined }}>
+              <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...(mobile ? { maxHeight: 220, flexShrink: 0 } : {}), background: "#fff", border: `1px solid ${C.border}` }}>
                 <div style={{ padding: 6, borderBottom: `1px solid ${C.border}` }}>
                   <input ref={searchRef} style={inp()} value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={onSearchKey}
                     placeholder={L("🔍 খাত / পার্টির নাম (↑ ↓ দিয়ে বাছুন)", "🔍 Account / party name (↑ ↓ to pick)")} />
@@ -175,7 +178,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", minHeight: 0, gap: 6 }}>
+              <div style={{ display: "flex", flexDirection: "column", minHeight: mobile ? 320 : 0, gap: 6 }}>
                 {selected && st ? (
                   <>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "baseline", padding: "6px 10px", background: "#fff7e6", border: `1px solid ${C.border}` }}>

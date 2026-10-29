@@ -35,7 +35,7 @@ export function orderProgress(order, purchaseInvoices, goodsReceipts) {
 }
 
 export function billOfReceipt(grn, purchaseInvoices = []) {
-  return purchaseInvoices.find((p) => p?.goodsReceiptId === grn.id && p.status !== "cancelled") || null;
+  return purchaseInvoices.find((p) => p.status !== "cancelled" && (p?.goodsReceiptId === grn.id || (p?.goodsReceiptIds || []).includes(grn.id))) || null;
 }
 
 export function docTotals(items = [], withTax = true) {

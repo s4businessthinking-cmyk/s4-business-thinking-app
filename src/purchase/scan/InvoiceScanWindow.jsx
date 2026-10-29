@@ -30,7 +30,8 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
     if (!file) return;
     setError(""); setPhase("reading");
     try {
-      const res = await readInvoiceFile(file, (s) => setStep(s));
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(bn ? "অনেকক্ষণ ধরে পড়া শেষ হচ্ছে না — ডিভাইসটি এই ফাইল পড়তে পারছে না।" : "Taking far too long — this device could not read the file.")), 45000));
+      const res = await Promise.race([readInvoiceFile(file, (s) => setStep(s)), timeout]);
       const inv = parseInvoice(res.rows);
       setPreview(res.previewUrl); setSource(res.source);
       setHead({ invoiceNo: inv.invoiceNo, date: inv.date, supplierName: inv.supplierName, trn: inv.trn, grandTotal: inv.grandTotal, vatTotal: inv.vatTotal });

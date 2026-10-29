@@ -273,7 +273,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           onOpenNewHandled={()=>{ setSiNewReq(0); setSiNewCustomer(null); }}
           voucherRequest={tab==="sales" ? siVoucherReq : 0}
           onVoucherHandled={()=>setSiVoucherReq(0)}
-          openInvoiceId={tab === "sales" ? globalOpenSalesInvoiceId : null}
+          openInvoiceId={globalOpenSalesInvoiceId}
           onOpenInvoiceHandled={()=>setGlobalOpenSalesInvoiceId(null)}
           t={t} lang={lang} th={th} s={s}
           shopId={shopId} user={user} profile={profile}
@@ -376,7 +376,8 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
       )}
       {tab==="reminders"&&(
-        <RemindersTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} team={team} toast={toast} />
+        <RemindersTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} team={team} toast={toast}
+          onOpenLink={(linkType,linkId)=>{ setTabState(linkType); setGlobalOpenSalesInvoiceId(linkId); }} />
       )}
       {tab==="calculator"&&(
         <CalculatorWindow inline lang={lang} baseCurrency={String(localShop?.currency||t.cur||"AED").toUpperCase()} />

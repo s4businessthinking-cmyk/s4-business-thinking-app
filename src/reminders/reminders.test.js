@@ -34,6 +34,13 @@ test("alerts only for my visible open reminders", () => {
   assert.deepEqual(reminderAlerts(list, { uid: "o", isOwner: true, today: "2026-10-07" }).map((a) => a.id), ["1", "2", "3"]);
 });
 
+test("a reminder due today doesn't alert before its set time", () => {
+  const list = [{ id: "1", title: "Call client", dueDate: "2026-10-07", dueTime: "14:00", createdBy: "o" }];
+  assert.deepEqual(reminderAlerts(list, { uid: "o", today: "2026-10-07", nowTime: "09:00" }).map((a) => a.id), []);
+  assert.deepEqual(reminderAlerts(list, { uid: "o", today: "2026-10-07", nowTime: "14:00" }).map((a) => a.id), ["1"]);
+  assert.deepEqual(reminderAlerts(list, { uid: "o", today: "2026-10-07", nowTime: "18:00" }).map((a) => a.id), ["1"]);
+});
+
 test("done rolls repeating reminders forward", () => {
   const now = new Date(2026, 9, 7, 12);
   assert.equal(donePatch({ dueDate: "2026-09-07", repeat: "monthly" }, { now }).dueDate, "2026-10-07");
@@ -41,4 +48,11 @@ test("done rolls repeating reminders forward", () => {
   const once = donePatch({ dueDate: "2026-10-07", repeat: "none" }, { now, name: "Rahim" });
   assert.equal(once.status, "done");
   assert.equal(once.history[0].by, "Rahim");
+});
+
+test("done with stop ends a repeating reminder instead of rescheduling it", () => {
+  const now = new Date(2026, 9, 7, 12);
+  const stopped = donePatch({ dueDate: "2026-10-07", repeat: "daily" }, { now, stop: true });
+  assert.equal(stopped.status, "done");
+  assert.equal(stopped.dueDate, undefined);
 });

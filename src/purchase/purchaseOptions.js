@@ -1,8 +1,9 @@
 import { unitFactorFor } from "../inventory/unitConversion.js";
 
-export const PURCHASE_OPTION_DEFAULTS = { refNo: false, multiCurrency: false, batchVendor: false, batchMrp: false, batchCost: false };
+export const PURCHASE_OPTION_DEFAULTS = { refNo: false, multiCurrency: false, batchVendor: false, batchMrp: false, batchCost: false, enablePrint: false };
 
 export const PURCHASE_OPTION_LABELS = [
+  ["enablePrint", "Enable printing the Purchase Invoice", "ক্রয় ইনভয়েস প্রিন্ট করার অপশন চালু করো"],
   ["refNo", "Enable Reference Number Entry", "রেফারেন্স নম্বর (Ref. No) ঘর দেখাও"],
   ["multiCurrency", "Enable Multiple Currency Purchase", "অন্য মুদ্রায় (USD ইত্যাদি) কেনা চালু করো"],
   ["batchVendor", "Ask to maintain separate stock when purchased from a different vendor", "অন্য সাপ্লায়ার থেকে কিনলে আলাদা stock রাখার কথা জিজ্ঞেস করো"],

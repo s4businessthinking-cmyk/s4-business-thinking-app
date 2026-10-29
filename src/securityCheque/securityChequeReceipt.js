@@ -31,8 +31,11 @@ export function buildSecurityChequeReceiptHTML(record, shop, lang = "en", cur = 
   const conditions = CONDITIONS[bn ? "bn" : "en"];
   const dash = "________________________";
   const row2 = (l1, v1, l2, v2) => `<tr><th>${esc(l1)}</th><td>${esc(v1 || dash)}</td><th>${esc(l2)}</th><td>${l2 ? esc(v2 || dash) : ""}</td></tr>`;
-  // A captured photo fills the box (scaled to fit, never stretching it); otherwise show the placeholder text.
-  const photoBox = (src, placeholder) => (src ? `<img src="${esc(src)}" alt="" />` : placeholder);
+  // A captured photo or PDF fills the box (scaled to fit, never stretching it); otherwise show the placeholder text.
+  const photoBox = (src, placeholder) => {
+    if (!src) return placeholder;
+    return String(src).startsWith("data:application/pdf") ? `<embed src="${esc(src)}" type="application/pdf" />` : `<img src="${esc(src)}" alt="" />`;
+  };
 
   return `<!doctype html><html lang="${bn ? "bn" : "en"}"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
@@ -52,10 +55,10 @@ table.detail th,table.detail td{border:1px solid #555;padding:5px 7px;text-align
 table.detail th{width:16%;background:#f1f5f9}
 table.detail td{width:34%}
 .chequearea{border:1.5px dashed #333;height:55mm;display:flex;align-items:center;justify-content:center;text-align:center;margin:6px 0;font-size:11px;color:#555;overflow:hidden}
-.chequearea img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.chequearea img,.chequearea embed{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 .idrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
 .idbox{height:30mm;border:1.5px dashed #333;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#555;overflow:hidden}
-.idbox img{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+.idbox img,.idbox embed{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 .conditions{font-size:9.5px;line-height:1.3;margin:8px 0}
 .conditions ol{margin:3px 0 3px 18px;padding:0}
 .siggrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}

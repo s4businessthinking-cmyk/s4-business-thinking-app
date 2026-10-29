@@ -111,7 +111,7 @@ export function siEmptyForm() {
     invoiceType:loadPrintSettings().defaultBillType==="regular" ? "regular" : "tax",
     invoiceDate:siToday(),
     customerId:"", customerName:"", customerMobile:"", customerAddress:"", customerTrn:"", customerType:"",
-    paymentMethod:"cash", amountPaid:"",
+    paymentMethod:"cash", amountPaid:"", cashPartial:false,
     deliveryNoteNo:"", vehicleNo:"",
     note:"",
     refNo:"", salesmanId:"", salesmanName:"", currency:"AED", stockLocation:"main", stockLocationName:"Main",

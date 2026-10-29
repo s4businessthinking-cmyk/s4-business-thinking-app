@@ -10,10 +10,16 @@ import { printPaymentVoucher, siFmt2, siN2 } from "./salesInvoiceShared.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import { siToday } from "./siHelpers.js";
 
-export function createSiReceiptActions({ COL, billReturns, canCancelInv, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user }) {
-  // ── Receipts against Bill ──
+export function createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user }) {
+  // ── Receipts against Bill ── (credit bills only — a "partial cash" bill is settled via the Cash Receipt Voucher instead)
   const getCustomerOpenInvoices = (partyId, partyName) => invoices
-    .filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01
+    .filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01 && inv.paymentMethod!=="cash"
+      && (partyId ? inv.customerId===partyId : !inv.customerId && String(inv.customerName||"").trim()===String(partyName||"").trim()))
+    .sort((a,b) => String(a.invoiceDate||"").localeCompare(String(b.invoiceDate||"")));
+
+  // ── Cash Receipt Voucher — only "partial cash" bills (paymentMethod:"cash" with a real balanceDue), never credit ──
+  const getCustomerCashOpenInvoices = (partyId, partyName) => invoices
+    .filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01 && inv.paymentMethod==="cash" && inv.cashPartial
       && (partyId ? inv.customerId===partyId : !inv.customerId && String(inv.customerName||"").trim()===String(partyName||"").trim()))
     .sort((a,b) => String(a.invoiceDate||"").localeCompare(String(b.invoiceDate||"")));
 
@@ -53,6 +59,13 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, custome
   const siSaveReceipt = async (d) => {
     const allocations = (d.allocations||[]).filter(a => siN2(a.amount) > 0);
     if (!d.partyName || !allocations.length) return null;
+    if (d.discountAmount != null && siN2(d.discountAmount) > 0) {
+      const allocTotal = allocations.reduce((s,a)=>s+siN2(a.amount),0);
+      if (siN2(d.discountAmount) > allocTotal + 0.001) {
+        toast(lang==="bn" ? "ছাড় মোট টাকার চেয়ে বেশি হতে পারবে না" : "Discount cannot exceed the total", "err");
+        return null;
+      }
+    }
     setRcptSaving(true);
     try {
       const nowIso = new Date().toISOString();
@@ -75,6 +88,7 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, custome
         refNo: d.refNo || "", refBank: d.refBank || "", refDate: d.refDate || "",
         collectedById: d.collectedById || "", collectedByName: d.collectedByName || "",
         note: d.note || "",
+        ...(d.discountAmount != null && siN2(d.discountAmount) > 0 ? { discountAmount: parseFloat(siFmt2(d.discountAmount)) } : {}),
         allocations: allocations.map(a => ({ invoiceId:a.invoiceId, invoiceNo:a.invoiceNo, invoiceDate:a.invoiceDate||"", amount:parseFloat(siFmt2(a.amount)) })),
         status: "active",
         createdBy: user.uid, createdByName: profile.personName,
@@ -172,7 +186,7 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, custome
           if (st==="bounced" && !canCancelInv) { toast(lang==="bn"?"❌ চেক বাউন্স করার অনুমতি নেই":"❌ You don't have permission to bounce cheques","err"); return null; }
           const u = await siSetReceiptCheque(v.raw, st); return u ? toVoucherView(u,"receipt") : null;
         }}
-        onPrint={(v)=>printPaymentVoucher(v.raw, shop, lang)}
+        onPrint={(v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts)}
         onClose={()=>{
           setReceiptWin(null);
           if (siNavReturn === "ledger") {
@@ -180,6 +194,34 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, custome
             setSiNavReturn(null);
           }
         }}
+      />
+    );
+  })() : null;
+
+  const cashReceiptWindow = cashReceiptWin && kind==="sales" ? (() => {
+    const openAllCash = invoices.filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01 && inv.paymentMethod==="cash" && inv.cashPartial);
+    return (
+      <AgainstInvoiceVoucherWindow
+        lang={lang} mode="receipt" cur={t.cur||"AED"} title={lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER"}
+        voucherNo={rcptFormatNo(rcptMaxLocalSerial() + 1)}
+        parties={voucherParties(customers, openAllCash, "customerId", "customerName", c=>c.customerName, c=>c.mobileNumber)}
+        banks={UAE_BANKS.map(b=>b.name)}
+        getOpenInvoices={(p)=>getCustomerCashOpenInvoices(p.id, p.name)}
+        vouchers={receipts.map(r=>toVoucherView(r,"receipt"))}
+        prefill={cashReceiptWin.partyId||cashReceiptWin.partyName ? cashReceiptWin : null}
+        initialViewId={cashReceiptWin.viewId||null}
+        saving={cashRcptSaving}
+        onSave={async (d)=>{ setCashRcptSaving(true); try { const c = await siSaveReceipt({ ...d, method:"cash" }); return c ? toVoucherView(c,"receipt") : null; } finally { setCashRcptSaving(false); } }}
+        onCancelVoucher={canCancelInv ? async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; } : undefined}
+        onDeleteVoucher={isOwner ? (v)=>siDeleteReceipt(v.raw) : undefined}
+        onPrint={(v,opts)=>{
+          const allocDetail = (v.raw.allocations||[]).map(a=>{
+            const inv = invoices.find(i=>i.id===a.invoiceId);
+            return { invoiceId:a.invoiceId, invoiceAmount:inv?.grandTotal||0, balanceAfter:inv?.balanceDue||0 };
+          });
+          printPaymentVoucher(v.raw, shop, lang, { ...opts, allocDetail, title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" });
+        }}
+        onClose={()=>setCashReceiptWin(null)}
       />
     );
   })() : null;
@@ -323,5 +365,5 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, custome
       }
     } catch(e){ toast(e.message,"err"); }
   };
-  return { ledgerWindow, receiptWindow, siCancel, siDelete };
+  return { cashReceiptWindow, ledgerWindow, receiptWindow, siCancel, siDelete };
 }

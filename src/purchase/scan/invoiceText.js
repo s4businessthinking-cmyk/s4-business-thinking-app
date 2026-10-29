@@ -24,12 +24,27 @@ let pdfjsPromise = null;
 const loadPdfjs = () => (pdfjsPromise ||= Promise.all([import("pdfjs-dist"), import("pdfjs-dist/build/pdf.worker.min.mjs?url")])
   .then(([pdfjs, worker]) => { pdfjs.GlobalWorkerOptions.workerSrc = worker.default; return pdfjs; }));
 
+// Minimal WASM module using a SIMD instruction (v128.const; drop) — if the engine can even compile
+// it, SIMD is supported. Older/low-end Android WebViews often cannot, so they get the slower but
+// compatible core instead of silently failing to start the OCR worker.
+async function wasmSimdSupported() {
+  try {
+    return WebAssembly.validate(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 26, 11]));
+  } catch { return false; }
+}
+
 let ocrWorkerPromise = null;
-const loadOcr = () => (ocrWorkerPromise ||= Promise.all([
-  import("tesseract.js"), import("tesseract.js/dist/worker.min.js?url"), import("tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url"),
-]).then(([tess, worker, core]) => tess.createWorker("eng", 1, {
-  workerPath: worker.default, corePath: core.default, langPath: `${import.meta.env.BASE_URL || "./"}ocr`, gzip: true,
-})).catch((error) => { ocrWorkerPromise = null; throw error; }));
+const loadOcr = () => (ocrWorkerPromise ||= (async () => {
+  const simd = await wasmSimdSupported();
+  const [tess, worker, core] = await Promise.all([
+    import("tesseract.js"),
+    import("tesseract.js/dist/worker.min.js?url"),
+    simd ? import("tesseract.js-core/tesseract-core-simd-lstm.wasm.js?url") : import("tesseract.js-core/tesseract-core-lstm.wasm.js?url"),
+  ]);
+  return tess.createWorker("eng", 1, {
+    workerPath: worker.default, corePath: core.default, langPath: `${import.meta.env.BASE_URL || "./"}ocr`, gzip: true,
+  });
+})().catch((error) => { ocrWorkerPromise = null; throw error; }));
 
 // Small screenshots and phone photos read far better enlarged (~3200 px wide, at most ~16 MP to spare memory),
 // in grey with more contrast. binarize: black / white against the local background, for phone photos darker at one

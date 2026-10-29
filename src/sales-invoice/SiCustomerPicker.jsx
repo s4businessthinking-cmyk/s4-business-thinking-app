@@ -74,7 +74,6 @@ export function SiCustomerPicker({ customers, onSelect, onClose, onQuickAdd, can
               style={{ width:"100%", textAlign:"left", padding:isPhone?"14px 16px":"10px 16px", minHeight:isPhone?56:0, background:i===active&&!isPhone?"rgba(37,99,235,0.12)":"transparent", border:"none", borderBottom:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit" }}>
               <div style={{ fontSize:isPhone?15:13, fontWeight:700, color:th.txtPrimary }}>{c.customerName}</div>
               <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8 }}>
-                {c.mobileNumber&&<span>📱 {c.mobileNumber}</span>}
                 {c.customerCode&&<span>#{c.customerCode}</span>}
                 {c.city&&<span>📍 {c.city}</span>}
               </div>

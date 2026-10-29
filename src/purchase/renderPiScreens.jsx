@@ -2,13 +2,13 @@ import AgainstInvoiceVoucherWindow from "../vouchers/AgainstInvoiceVoucherWindow
 import { CURRENCIES } from "../reports/taxDomain.js";
 import ChequeHandoverModal from "../vouchers/ChequeHandoverModal.jsx";
 import { MinimizedChip, WindowButtons } from "../components/WindowChrome.jsx";
-import { PI_CHEQUE_STATUSES, PI_PAY_METHODS, PI_STATUSES, PI_UNITS, piCalcLine, piCalcTotals, piEmptyCurrent } from "./purchaseShared.js";
+import { PI_CHEQUE_STATUSES, PI_PAY_METHODS, PI_STATUSES, PI_UNITS, piCalcLine, piCalcTotals, piEmptyCurrent, piToday } from "./purchaseShared.js";
 import { PI_VOUCHER_METHODS, piFmt2, piN2, toVoucherView, voucherParties } from "../shared/appShared.jsx";
 import { PM_CSS } from "../product-master/pmStyles";
 import { PM_TH, SI_CSS } from "../sales-invoice/siSkin.js";
 import PartyLedgerWindow from "../vouchers/PartyLedgerWindow.jsx";
 import { PiItemsTable } from "./PiItemsTable.jsx";
-import { PiNewPaymentForm, PiPaymentsListTab, PiVoucherDetailView } from "./PiPayments.jsx";
+import { PiPaymentsListTab } from "./PiPayments.jsx";
 import ProductInvoiceEntryInfo from "../sales-invoice/ProductInvoiceEntryInfo.jsx";
 import { ProductTypeaheadInput } from "../components/ProductTypeaheadInput.jsx";
 import PurchaseInvoiceDesktopForm from "./PurchaseInvoiceDesktopForm.jsx";
@@ -20,15 +20,21 @@ import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js
 import { isForeign } from "./purchaseOptions.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { printPaymentVoucher, siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
+import { printPurchaseInvoice } from "./purchasePrint.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 
 export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shop, shopId, t, th, toast, totals, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
   if (piView==="list" || (piView==="form" && piWin.min && wideDesktop)) {
     const groups = groupInvoicesByParty(piFiltered, { idField:"vendorId", nameField:"vendorName" });
     const openGroup = piGroupMode==="folders" && piOpenParty ? (groups.find(g=>g.key===piOpenParty) || null) : null;
-    const rows = openGroup ? openGroup.invoices : piFiltered;
+    const allRows = openGroup ? openGroup.invoices : piFiltered;
+    // Thousands of rows in one flat table makes the page heavy to open and scroll — cap it
+    // (newest first, invoices are already sorted that way) and point to search/filter instead.
+    const LIST_ROW_LIMIT = 300;
+    const rows = !openGroup && allRows.length > LIST_ROW_LIMIT ? allRows.slice(0, LIST_ROW_LIMIT) : allRows;
+    const rowsTruncated = rows.length < allRows.length;
     const groupName = (g) => g.isCash ? (bnL?"নাম ছাড়া":"No name") : g.name;
-    const rowsSum = rows.reduce((a,inv)=>{
+    const rowsSum = allRows.reduce((a,inv)=>{
       if (!["cancelled","draft"].includes(inv.status) && !isBranchTransferBill(inv)) { a.total += piN2(inv.grandTotal); a.due += piRowDue(inv); }
       if (inv.status==="draft") a.drafts += 1;
       return a;
@@ -40,6 +46,9 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
       ...(canViewSupplierLedger ? [{ key:"ledger", icon:"🏭", bn:"সাপ্লায়ার লেজার", en:"Supplier Ledger" }] : []),
       ...(canVendorPayments ? [{ key:"payments", icon:"💳", bn:"পেমেন্ট", en:"Payments" }] : []),
     ];
+    // On a phone, once you've drilled into a Payment Voucher (new/detail), the top title + tab
+    // pills are redundant screen space — the voucher's own "← Back" already gets you out.
+    const pmtSubView = !isDesktop && piSubTab==="payments" && (pmtView==="new"||pmtView==="detail");
     return (
       <div ref={piRootRef} className="si-root" style={piRootStyle}>
         <style>{PM_CSS}</style>
@@ -50,35 +59,39 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
             onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }} />
         )}
 
-        <div className="pm-reference-title">
-          <strong style={{ color:piAccent }}>{bnL?"ক্রয় ইনভয়েস":"PURCHASE INVOICE"}</strong>
-          <span>{invoices.length} {bnL?"টি":"total"}</span>
-        </div>
+        {!pmtSubView&&(
+          <div className="pm-reference-title">
+            <strong style={{ color:piAccent }}>{bnL?"ক্রয় ইনভয়েস":"PURCHASE INVOICE"}</strong>
+            <span>{invoices.length} {bnL?"টি":"total"}</span>
+          </div>
+        )}
 
-        <div className="si-toolbar">
-          {canManagePurchase&&piSubTab==="invoices"&&(
-            <button type="button" className="pm-btn pm-btn--primary" onClick={()=>{ if (piLeaveMinOk()) piOpenNew(); }} disabled={piSaving}>
-              {piSaving?"...":(bnL?"+ নতুন ইনভয়েস":"+ New Invoice")}{!piMobile&&!piSaving?" (F3)":""}
-            </button>
-          )}
-          {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&(
-            <button type="button" className="pm-btn pm-btn--primary" onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }}>{t.pi_newPayment}</button>
-          )}
-          {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&(
-            <button type="button" className="pm-btn-secondary" onClick={()=>setChqWizard({ vendorId:null })}>🖨️ {bnL?"ভেন্ডর চেক":"Vendor Cheque"}</button>
-          )}
-          <span className="si-toolbar-gap" />
-          {subTabs.length>1&&(
-            <div className="si-pills">
-              {subTabs.map(tab=>(
-                <button key={tab.key} type="button" className={`pm-btn-secondary${piSubTab===tab.key?" is-active":""}`}
-                  onClick={()=>{ setPiSubTab(tab.key); if(tab.key==="ledger") setPiLedgerHidden(false); if(tab.key==="payments"){ setPmtView("list"); setSelVoucher(null); } }}>
-                  {tab.icon} {bnL?tab.bn:tab.en}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {!pmtSubView&&(
+          <div className="si-toolbar">
+            {canManagePurchase&&piSubTab==="invoices"&&(
+              <button type="button" className="pm-btn pm-btn--primary" onClick={()=>{ if (piLeaveMinOk()) piOpenNew(); }} disabled={piSaving}>
+                {piSaving?"...":(bnL?"+ নতুন ইনভয়েস":"+ New Invoice")}{!piMobile&&!piSaving?" (F3)":""}
+              </button>
+            )}
+            {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&(
+              <button type="button" className="pm-btn pm-btn--primary" onClick={()=>{ setPmtPrefillVendorId(null); setSelVoucher(null); setPmtView("new"); }}>{t.pi_newPayment}</button>
+            )}
+            {canVendorPayments&&piSubTab==="payments"&&pmtView==="list"&&(
+              <button type="button" className="pm-btn-secondary" onClick={()=>setChqWizard({ vendorId:null })}>🖨️ {bnL?"ভেন্ডর চেক":"Vendor Cheque"}</button>
+            )}
+            <span className="si-toolbar-gap" />
+            {subTabs.length>1&&(
+              <div className="si-pills">
+                {subTabs.map(tab=>(
+                  <button key={tab.key} type="button" className={`pm-btn-secondary${piSubTab===tab.key?" is-active":""}`}
+                    onClick={()=>{ setPiSubTab(tab.key); if(tab.key==="ledger") setPiLedgerHidden(false); if(tab.key==="payments"){ setPmtView("list"); setSelVoucher(null); } }}>
+                    {tab.icon} {bnL?tab.bn:tab.en}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className={piSubTab==="invoices"?undefined:"si-body"} style={piSubTab==="invoices"?{ display:"contents" }:undefined}>
           {/* ── SUB-TAB: SUPPLIER LEDGER ── */}
@@ -106,7 +119,7 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
             <PiPaymentsListTab payments={payments} loading={pmtLoading} t={t} lang={lang} mobile={piMobile}
               onOpen={(v)=>{ setSelVoucher(v); setPmtView("detail"); }} />
           )}
-          {piSubTab==="payments"&&canVendorPayments&&pmtView==="new"&&isDesktop&&(()=>{
+          {piSubTab==="payments"&&canVendorPayments&&(pmtView==="new"||pmtView==="detail")&&(()=>{
             const openAll = piMoneyInvoices.filter(inv => ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01);
             const prefParty = pmtPrefillVendorId ? (vendors.find(v=>v.id===pmtPrefillVendorId) ? { partyId:pmtPrefillVendorId } : { partyName:pmtPrefillVendorId }) : null;
             return (
@@ -118,53 +131,23 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
                 getOpenInvoices={(p)=>getVendorOpenInvoices(p.id, p.name)}
                 vouchers={payments.map(p=>toVoucherView(withSupRefs(p),"payment"))}
                 prefill={pmtEditSnapshot || (prefParty ? { ...prefParty, invoiceId:pmtPrefillInvoiceId } : null)}
+                initialViewId={pmtView==="detail" ? (selVoucher?.id||null) : null}
                 saving={pmtSaving}
                 onSave={async (d)=>{
-                  const created = await piSavePaymentVoucher({ vendorId:d.partyId, vendorName:d.partyName, vendorMobile:d.partyMobile, method:d.method, paymentDate:d.date, note:d.note, chequeNo:d.chequeNo, chequeBank:d.chequeBank, chequeDate:d.chequeDate, chequeReceivedBy:d.chequeReceivedBy, vendorReceiptNo:d.vendorReceiptNo, chequeMonth:d.chequeMonth, refNo:d.refNo, refBank:d.refBank, refDate:d.refDate, allocations:d.allocations }, { stayOpen:true });
+                  const created = await piSavePaymentVoucher({ vendorId:d.partyId, vendorName:d.partyName, vendorMobile:d.partyMobile, method:d.method, paymentDate:d.date, note:d.note, chequeNo:d.chequeNo, chequeBank:d.chequeBank, chequeDate:d.chequeDate, chequeReceivedBy:d.chequeReceivedBy, vendorReceiptNo:d.vendorReceiptNo, chequeMonth:d.chequeMonth, refNo:d.refNo, refBank:d.refBank, refDate:d.refDate, discountAmount:d.discountAmount, allocations:d.allocations }, { stayOpen:true });
                   return created ? toVoucherView(withSupRefs(created),"payment") : null;
                 }}
                 onCancelVoucher={(isOwner||canVendorPayments) ? async (v)=>{ const u = await piCancelPaymentVoucher(v.raw); return u ? toVoucherView(u,"payment") : null; } : undefined}
                 onDeleteVoucher={isOwner ? (v)=>piDeletePaymentVoucher(v.raw) : undefined}
                 onSetChequeStatus={isOwner ? async (v,st)=>{ const u = await piSetVoucherChequeStatus(v.raw, st); return u ? toVoucherView(u,"payment") : null; } : undefined}
-                onPrint={(v)=>printPaymentVoucher(v.raw, shop, lang)}
-                onClose={()=>{ setPmtView("list"); setPmtPrefillVendorId(null); setPmtPrefillInvoiceId(null); setPmtEditSnapshot(null); }}
+                onPrint={(v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts)}
+                onPrintCheque={onOpenChequePrinter ? (v)=>openVoucherInChequePrinter(v.raw) : undefined}
+                onPrintChequeVoucher={(v)=>printChequePaymentVoucher(v.raw)}
+                onHandover={(v)=>openChequeHandover(v.raw)}
+                onClose={()=>{ setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); setPmtPrefillInvoiceId(null); setPmtEditSnapshot(null); }}
               />
             );
           })()}
-          {piSubTab==="payments"&&canVendorPayments&&pmtView==="new"&&!isDesktop&&(
-            <PiNewPaymentForm prefillVendorId={pmtPrefillVendorId} prefillVoucher={pmtEditSnapshot}
-              vendors={[
-                ...(vendors||[]),
-                ...[...new Set(piMoneyInvoices
-                  .filter(inv => !inv.vendorId && inv.vendorName && ["confirmed","partial"].includes(inv.status) && piN2(inv.balanceDue)>0.01)
-                  .map(inv => inv.vendorName))]
-                  .filter(name => !(vendors||[]).some(v => v.vendorName===name))
-                  .map(name => ({ id:null, vendorName:name, mobileNumber:invoices.find(inv=>inv.vendorName===name)?.vendorMobile||"" })),
-              ]}
-              getVendorOpenInvoices={getVendorOpenInvoices} saving={pmtSaving}
-              onSave={piSavePaymentVoucher} onCancel={()=>{ setPmtView("list"); setPmtPrefillVendorId(null); setPmtEditSnapshot(null); }}
-              t={t} th={th} lang={lang} isDesktop={isDesktop} />
-          )}
-          {piSubTab==="payments"&&canVendorPayments&&pmtView==="detail"&&selVoucher&&(
-            <PiVoucherDetailView voucher={withSupRefs(selVoucher)} t={t} th={th} lang={lang} isOwner={isOwner}
-              onBack={()=>{ setPmtView("list"); setSelVoucher(null); }}
-              onCancel={(isOwner||canVendorPayments) ? ()=>piCancelPaymentVoucher(selVoucher) : undefined}
-              onCancelAndEdit={(isOwner||canVendorPayments) ? async ()=>{
-                const u = await piCancelPaymentVoucher(selVoucher);
-                if (!u) return;
-                setPmtEditSnapshot(toVoucherView(withSupRefs(u),"payment"));
-                setSelVoucher(null);
-                setPmtView("new");
-              } : undefined}
-              onDelete={isOwner ? async ()=>{ if (await piDeletePaymentVoucher(selVoucher)) { setPmtView("list"); setSelVoucher(null); } } : undefined}
-              onSetChequeStatus={(st)=>piSetVoucherChequeStatus(selVoucher,st)}
-              onPrint={()=>printPaymentVoucher(withSupRefs(selVoucher), shop, lang)}
-              onPrintCheque={onOpenChequePrinter ? ()=>openVoucherInChequePrinter(selVoucher) : undefined}
-              onPrintChequeVoucher={()=>printChequePaymentVoucher(selVoucher)}
-              onHandover={()=>openChequeHandover(selVoucher)}
-              onViewInvoice={(invoiceId)=>{ const inv=invoices.find(i=>i.id===invoiceId); if(inv){ setSelInvoice(inv); setPiSubTab("invoices"); setPiView("detail"); } }}
-            />
-          )}
           {chqWizard&&canVendorPayments&&(
             <VendorChequeWizard
               lang={lang} cur={t.cur||"AED"}
@@ -274,6 +257,11 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
                     ← {bnL?"সব ভেন্ডর":"All vendors"} · {groupName(openGroup)}
                   </button>
                 )}
+                {rowsTruncated&&(
+                  <div className="si-hint" style={{ padding:"4px 8px" }}>
+                    {bnL?`প্রথম ${rows.length}টি দেখানো হচ্ছে (মোট ${allRows.length}) — খুঁজে বা ফিল্টার করে কমান`:`Showing the latest ${rows.length} of ${allRows.length} — search or filter to narrow it down`}
+                  </div>
+                )}
                 {piLoading ? <div className="si-empty">⏳ {t.pi_loading}</div>
                   : invoices.length===0 ? <div className="si-empty">{t.pi_noInvoices}</div>
                   : rows.length===0 ? <div className="si-empty">🔍 {t.pi_noResults}</div>
@@ -321,7 +309,7 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
                               <td title={inv.supplierInvoiceNo||""}>{inv.supplierInvoiceNo||"-"}</td>
                               {Object.keys(PI_STATUSES).map(st=>(
                                 <td key={st} className="si-center">
-                                  {inv.status===st && <span style={{ color:PI_STATUSES[st]?.color, fontWeight:900, fontSize:14 }}>✓</span>}
+                                  {inv.status===st && <span style={{ color:PI_STATUSES[st]?.color, fontWeight:900, fontSize:12 }}>{PI_STATUSES[st]?.[lang]||st}</span>}
                                 </td>
                               ))}
                               <td className="si-num">{inv.items?.length||0}</td>
@@ -395,9 +383,10 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
                 {inv.supplierInvoiceNo&&vRow(t.pi_supplierInvoiceNo, inv.supplierInvoiceNo, { color:"#7e22ce" })}
                 {inv.refNo&&vRow("Ref. No", inv.refNo)}
                 {inv.purchaseOrderNo&&vRow(bnL?"পারচেজ অর্ডার":"Purchase Order", inv.purchaseOrderNo, { color:"#1d4ed8" })}
-                {inv.goodsReceiptNo&&vRow(bnL?"মাল গ্রহণ (DN)":"Goods Received (DN)", inv.goodsReceiptNo, { color:"#0f766e" })}
+                {inv.goodsReceiptNo&&vRow(bnL?"মাল গ্রহণ (DN)":"Goods Received (DN)", (inv.goodsReceiptNos||[]).length>1?inv.goodsReceiptNos.join(", "):inv.goodsReceiptNo, { color:"#0f766e" })}
                 {inv.currency&&vRow(bnL?"মুদ্রা":"Currency", `${inv.currency} ${piFmt2(inv.fcGrandTotal)} @ ${inv.exchangeRate}`, { color:"#0e7490" })}
                 {vRow(t.pi_date, inv.invoiceDate||"-")}
+                {vRow(bnL?"এন্ট্রি তারিখ":"Entry Date", inv.entryDate||String(inv.createdAt||"").slice(0,10)||"-")}
                 {vRow(t.pi_createdBy, inv.createdByName||"-")}
                 {isOB&&<div className="si-note">{bnL?"এটা ভেন্ডরের শুরুর ব্যালেন্স (Opening Balance) — বদলাতে ভেন্ডর মাস্টারে যান।":"This is the vendor's opening balance — change it in Vendor Master."}</div>}
                 {isBT&&<div className="si-note">🚚 {bnL?`Branch Transfer ${inv.branchTransferNo||""} → ${inv.branchName||""} রিসিভের বিল। এটা দোকানের ভেতরে মাল সরানোর হিসাব — স্টক, ক্রয়ের মোট আর সাপ্লায়ারের বাকিতে ধরা হয় না। আসল সাপ্লায়ার বিল আলাদা Purchase Invoice-এ থাকবে।`:`Receipt bill of Branch Transfer ${inv.branchTransferNo||""} → ${inv.branchName||""}. It only records goods moving inside the shop — not counted in stock, purchase totals or supplier dues. The real supplier bill stays a separate Purchase Invoice.`}</div>}
@@ -466,6 +455,10 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
 
         <div className="si-actions">
           <button type="button" className="pm-btn-secondary" onClick={back}>← {bnL?"তালিকা":"List"}</button>
+          {purchaseOpts.enablePrint&&<button type="button" className="pm-btn pm-btn--primary" onClick={()=>{
+            const vm = vendors.find(v=>v.id===inv.vendorId);
+            printPurchaseInvoice({ ...inv, vendorAddress:inv.vendorAddress||vm?.address||"", vendorTrn:inv.vendorTrn||vm?.trnNumber||"" }, shop, lang);
+          }}>🖨️ {bnL?"প্রিন্ট":"Print"}</button>}
           {canEdit&&<button type="button" className="pm-btn pm-btn--primary" onClick={()=>piOpenEdit(inv)}>✏️ {t.pi_editBtn}</button>}
           {canPay&&<button type="button" className="pm-btn" onClick={()=>piGoToMakePayment(inv)}>{t.pi_makePayment}</button>}
           {canCancel&&<button type="button" className="pm-btn pm-btn--danger" onClick={()=>piCancelInv(inv)}>{bnL?"বাতিল":"Cancel"}</button>}
@@ -484,7 +477,7 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
         <WindowButtons win={piWin} lang={lang} onClose={()=>{ if (piLeaveUnsavedOk()) setPiView("list"); }} />
       </div>
       <PurchaseInvoiceDesktopForm
-        lang={lang} t={t} shopId={shopId} products={products} vendors={pickVendors} invoices={invoices}
+        lang={lang} t={t} shopId={shopId} shop={shop} products={products} vendors={pickVendors} invoices={invoices}
         form={piForm} setField={piUpd} lines={piLines} setLines={setPiLines} current={piCurrent} setCurrent={setPiCurrent}
         totals={totals} paid={paid} balance={balance}
         invoiceNo={piInvoiceNo} editInvoiceId={editInvoiceId} saving={piSaving} nameRef={piNameRef} qtyRef={piQtyRef}
@@ -538,11 +531,17 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
 
       <div className="si-body">
         {fPanel(`${t.pi_invoiceNo} & ${t.pi_date}`, <>
-          {fRow(t.pi_invoiceNo, <div className="si-val is-strong" style={{ color:piAccent, fontFamily:"Consolas, monospace" }}>{piInvoiceNo}</div>)}
-          {fRow(t.pi_date, <input type="date" className="pm-input" value={piForm.invoiceDate} onChange={e=>piUpd("invoiceDate",e.target.value)} />)}
-          {fRow(<>{t.pi_supplierInvoiceNo} <span style={{ color:"#b91c1c" }}>*</span></>,
-            <input className="pm-input" style={piForm.supplierInvoiceNo.trim()?undefined:{ borderColor:"#b91c1c" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />)}
-          {(purchaseOpts.refNo||piForm.refNo)&&fRow("Ref. No", <input className="pm-input" value={piForm.refNo||""} onChange={e=>piUpd("refNo",e.target.value)} placeholder={bnL?"PO / চালান নং":"PO / challan no"} />)}
+          <div className="si-grid2">
+            {fField(t.pi_invoiceNo, <div className="si-val is-strong" style={{ color:piAccent, fontFamily:"Consolas, monospace" }}>{piInvoiceNo}</div>)}
+            {fField(bnL?"এন্ট্রি তারিখ":"Entry Date", <input type="date" className="pm-input" value={piForm.entryDate||piToday()} onChange={e=>piUpd("entryDate",e.target.value)} />)}
+          </div>
+          <div className="si-grid2">
+            {fField(<>{t.pi_supplierInvoiceNo} <span style={{ color:"#b91c1c" }}>*</span></>,
+              <input className="pm-input" style={piForm.supplierInvoiceNo.trim()?undefined:{ borderColor:"#b91c1c" }} placeholder={t.pi_supplierInvoiceNoPh} value={piForm.supplierInvoiceNo} onChange={e=>piUpd("supplierInvoiceNo",e.target.value)} />)}
+            {(purchaseOpts.refNo||piForm.refNo)
+              ? fField("Ref. No", <input className="pm-input" value={piForm.refNo||""} onChange={e=>piUpd("refNo",e.target.value)} placeholder={bnL?"PO / চালান নং":"PO / challan no"} />)
+              : <div />}
+          </div>
           {(purchaseOpts.multiCurrency||piForm.currency)&&fRow(bnL?"মুদ্রা":"Currency", (
             <div style={{ display:"flex", gap:4 }}>
               <select className="pm-input" style={{ flex:1 }} value={piForm.currency||""} onChange={e=>{ piUpd("currency",e.target.value); if (!e.target.value) piUpd("exchangeRate",""); }}>
@@ -562,13 +561,13 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
                 <input className="pm-input" style={{ flex:1 }} autoComplete="off"
                   placeholder={bnL?"ভেন্ডর খুঁজুন (নাম / কোড / মোবাইল)...":"Search vendor (name / code / mobile)..."}
                   value={vendorSearchQ}
-                  onChange={e=>{ setVendorSearchQ(e.target.value); setVendorDropOpen(true); if(!e.target.value.trim()){ piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile",""); } }}
+                  onChange={e=>{ setVendorSearchQ(e.target.value); setVendorDropOpen(true); if(!e.target.value.trim()){ piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile",""); piUpd("vendorAddress",""); piUpd("vendorTrn",""); } }}
                   onFocus={()=>setVendorDropOpen(true)} />
                 {piForm.vendorId&&<button type="button" className="pm-btn-secondary" title="Clear vendor" onClick={piClearVendor}>✕</button>}
                 <button type="button" className="pm-btn-secondary" onClick={()=>setVendorDropOpen(o=>!o)}>▾</button>
               </div>
               {piForm.vendorId&&!vendorDropOpen&&(
-                <div className="si-paid-box" style={{ marginTop:3 }}><span>✅ {piForm.vendorName}</span><span style={{ fontWeight:400 }}>{piForm.vendorMobile}</span></div>
+                <div className="si-paid-box" style={{ marginTop:3 }}><span>✅ {piForm.vendorName}</span></div>
               )}
               {vendorDropOpen&&(
                 <div className="si-box" style={{ position:"absolute", top:"100%", left:0, right:0, zIndex:999, maxHeight:240, boxShadow:"0 6px 18px rgba(0,0,0,0.25)" }}>
@@ -580,7 +579,6 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
                         <div className="si-strong">{v.vendorName}{piForm.vendorId===v.id?" ✓":""}</div>
                         <div className="si-muted" style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                           {v.vendorCode&&<span style={{ fontFamily:"Consolas, monospace" }}>{v.vendorCode}</span>}
-                          {(v.mobileNumber||v.whatsappNumber)&&<span>📱 {v.mobileNumber||v.whatsappNumber}</span>}
                           {v.city&&<span>📍 {v.city}</span>}
                         </div>
                       </button>
@@ -589,9 +587,12 @@ export function renderPiScreens({ onProductPatched, balance, billReturns, bnL, c
               )}
             </div>
           )}
-          {fRow(<>{bnL?"নাম":"Name"} <span style={{ color:"#b91c1c" }}>*</span></>,
+          <div className="si-grid2">
+            {fField(t.pi_date, <input type="date" className="pm-input" value={piForm.invoiceDate} onChange={e=>piUpd("invoiceDate",e.target.value)} />)}
+            <div />
+          </div>
+          {!piForm.vendorId&&fRow(<>{bnL?"নাম":"Name"} <span style={{ color:"#b91c1c" }}>*</span></>,
             <input className="pm-input" style={piForm.vendorName.trim()?undefined:{ borderColor:"#b91c1c" }} placeholder={t.pi_vendorManual} value={piForm.vendorName} onChange={e=>{ piUpd("vendorName",e.target.value); if (piForm.vendorId) piUpd("vendorId",""); }} />)}
-          {fRow(bnL?"মোবাইল":"Mobile", <input className="pm-input" inputMode="tel" value={piForm.vendorMobile} onChange={e=>piUpd("vendorMobile",e.target.value)} />)}
         </>)}
 
         {fPanel(`📦 ${t.pi_items}`, <>

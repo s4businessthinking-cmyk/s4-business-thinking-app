@@ -41,7 +41,7 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
       unitCost:l.unitCost!=null&&l.unitCost!=="" ? String(l.unitCost) : "", taxPerc:String(l.taxPerc ?? "5"), salePrice:l.salePrice ? String(l.salePrice) : "" })));
     setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(null);
-    setPiSource({ kind:srcKind, id:doc.id, no:doc.docNo||"", purchaseOrderId:srcKind==="po" ? doc.id : (doc.purchaseOrderId||""), purchaseOrderNo:srcKind==="po" ? (doc.docNo||"") : (doc.purchaseOrderNo||"") });
+    setPiSource({ kind:srcKind, id:doc.id, no:doc.docNo||"", ids:doc.ids||[doc.id], nos:doc.nos||[doc.docNo||""], purchaseOrderId:srcKind==="po" ? doc.id : (doc.purchaseOrderId||""), purchaseOrderNo:srcKind==="po" ? (doc.docNo||"") : (doc.purchaseOrderNo||"") });
     setPiView("form"); setVendorSearchQ(doc.vendorName||""); setVendorDropOpen(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[purchaseSource]);
@@ -56,7 +56,7 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     setPiSource(null);
     const fxRate = inv.currency && Number(inv.exchangeRate) > 0 ? Number(inv.exchangeRate) : 1;
     const fxBack = (v) => String(parseFloat((Number(v||0)/fxRate).toFixed(4)));
-    setPiForm({ invoiceDate:inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", refNo:inv.refNo||"", currency:fxRate!==1?inv.currency:"", exchangeRate:fxRate!==1?String(inv.exchangeRate):"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:(inv.paymentMethod||"cash")!=="cash"&&inv.amountPaid>0?fxBack(inv.amountPaid):"", note:inv.note||"" });
+    setPiForm({ invoiceDate:inv.invoiceDate, entryDate:inv.entryDate||String(inv.createdAt||"").slice(0,10)||inv.invoiceDate, supplierInvoiceNo:inv.supplierInvoiceNo||"", refNo:inv.refNo||"", currency:fxRate!==1?inv.currency:"", exchangeRate:fxRate!==1?String(inv.exchangeRate):"", vendorId:inv.vendorId||"", vendorName:inv.vendorName||"", vendorMobile:inv.vendorMobile||"", vendorAddress:inv.vendorAddress||"", vendorTrn:inv.vendorTrn||"", paymentMethod:inv.paymentMethod||"cash", amountPaid:(inv.paymentMethod||"cash")!=="cash"&&inv.amountPaid>0?fxBack(inv.amountPaid):"", note:inv.note||"" });
     setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:fxRate!==1?String(it.fcUnitCost ?? fxBack(it.unitCost)):String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), discountFlat:it.discountFlat?(fxRate!==1?String(it.fcDiscountFlat ?? fxBack(it.discountFlat)):String(it.discountFlat)):"", taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||""), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) })));
     setPiCurrent(piEmptyCurrent());
     setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
@@ -245,12 +245,14 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     piUpd("vendorId",v.id);
     piUpd("vendorName",v.vendorName);
     piUpd("vendorMobile",v.mobileNumber||v.whatsappNumber||"");
+    piUpd("vendorAddress",v.address||"");
+    piUpd("vendorTrn",v.trnNumber||"");
     piApplyVendorPayment(v);
     setVendorSearchQ(v.vendorName);
     setVendorDropOpen(false);
   };
   const piClearVendor=()=>{
-    piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile","");
+    piUpd("vendorId",""); piUpd("vendorName",""); piUpd("vendorMobile",""); piUpd("vendorAddress",""); piUpd("vendorTrn","");
     setPiForm((p) => ({ ...p, paymentMethod: "cash", amountPaid: "" }));
     setVendorSearchQ(""); setVendorDropOpen(false);
   };

@@ -32,6 +32,7 @@ export const DEFAULT_TAX_SETTINGS = {
   fyStartMonth: 1,
   ...UAE_CT_DEFAULTS,
   sbrElected: false,
+  taxNotify: true,
 };
 
 export const CURRENCIES = [
@@ -130,21 +131,28 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.no.localeCompare(b.no));
 
+  // A vendor without a TRN on file means the bill cannot carry a valid tax invoice, so that VAT
+  // is not reclaimable — these rows stay visible (for the bill list) but are kept out of the
+  // input VAT totals below via vatClaimable.
   const purchaseRows = [
-    ...purchases.map((inv) => ({
-      id: inv.id, date: dayOf(inv.invoiceDate), no: inv.invoiceNo || "", ref: inv.supplierInvoiceNo || "", party: inv.vendorName || "",
-      trn: vendorById.get(inv.vendorId)?.trnNumber || "",
-      taxable: r2(n(inv.grandTotal) - n(inv.totalTax)), vat: r2(inv.totalTax), total: r2(inv.grandTotal), isReturn: false,
-    })),
-    ...purchRet.map((r) => ({
-      id: r.id, date: dayOf(r.returnDate), no: r.returnNo || "", ref: r.supplierInvoiceNo || r.invoiceNo || "", party: r.partyName || "",
-      trn: vendorById.get(r.partyId)?.trnNumber || "",
-      taxable: -r2(n(r.total) - n(r.totalVat)), vat: -r2(r.totalVat), total: -r2(r.total), isReturn: true,
-    })),
-    ...expenseBills.map((e) => ({
-      id: e.id, date: dayOf(e.expenseDate), no: e.expenseNo || "", ref: e.refNo || "", party: e.paidTo || e.categoryName || e.category || "",
-      trn: e.supplierTrn || "", taxable: r2(n(e.amount) - n(e.vatAmount)), vat: r2(e.vatAmount), total: r2(e.amount), isReturn: false, isExpense: true,
-    })),
+    ...purchases.map((inv) => {
+      const trn = vendorById.get(inv.vendorId)?.trnNumber || "";
+      return { id: inv.id, date: dayOf(inv.invoiceDate), no: inv.invoiceNo || "", ref: inv.supplierInvoiceNo || "", party: inv.vendorName || "",
+        trn, vatClaimable: !!trn,
+        taxable: r2(n(inv.grandTotal) - n(inv.totalTax)), vat: r2(inv.totalTax), total: r2(inv.grandTotal), isReturn: false };
+    }),
+    ...purchRet.map((r) => {
+      const trn = vendorById.get(r.partyId)?.trnNumber || "";
+      return { id: r.id, date: dayOf(r.returnDate), no: r.returnNo || "", ref: r.supplierInvoiceNo || r.invoiceNo || "", party: r.partyName || "",
+        trn, vatClaimable: !!trn,
+        taxable: -r2(n(r.total) - n(r.totalVat)), vat: -r2(r.totalVat), total: -r2(r.total), isReturn: true };
+    }),
+    ...expenseBills.map((e) => {
+      const trn = e.supplierTrn || "";
+      return { id: e.id, date: dayOf(e.expenseDate), no: e.expenseNo || "", ref: e.refNo || "", party: e.paidTo || e.categoryName || e.category || "",
+        trn, vatClaimable: !!trn,
+        taxable: r2(n(e.amount) - n(e.vatAmount)), vat: r2(e.vatAmount), total: r2(e.amount), isReturn: false, isExpense: true };
+    }),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.no.localeCompare(b.no));
 
   // A return of a VAT bill is VAT-able even if its own VAT rounds to 0, so split on the bill that was sold.
@@ -156,8 +164,9 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   const sum = (rows, key) => r2(rows.reduce((t, r) => t + n(r[key]), 0));
   const stdSalesRows = salesRows.filter((r) => (r.isReturn ? salesRetVatable(r) : n(r.vat) !== 0));
   const noVatSalesRows = salesRows.filter((r) => !stdSalesRows.includes(r));
-  const stdPurchRows = purchaseRows.filter((r) => (r.isReturn ? purchRetVatable(r) : n(r.vat) !== 0));
-  const noVatPurchRows = purchaseRows.filter((r) => !stdPurchRows.includes(r));
+  const stdPurchRows = purchaseRows.filter((r) => (r.isReturn ? purchRetVatable(r) : n(r.vat) !== 0) && r.vatClaimable);
+  const noTrnPurchRows = purchaseRows.filter((r) => (r.isReturn ? purchRetVatable(r) : n(r.vat) !== 0) && !r.vatClaimable);
+  const noVatPurchRows = purchaseRows.filter((r) => !stdPurchRows.includes(r) && !noTrnPurchRows.includes(r));
 
   const regionMap = new Map();
   stdSalesRows.forEach((r) => {
@@ -169,6 +178,31 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     regionMap.set(key, cur);
   });
   const regionRows = [...regionMap.values()].map((x) => ({ ...x, taxable: r2(x.taxable), vat: r2(x.vat) })).sort((a, b) => b.vat - a.vat);
+
+  // Purchases grouped per supplier — only the ones counted as recoverable (vendor has a TRN on file).
+  const vendorMap = new Map();
+  stdPurchRows.forEach((r) => {
+    const key = r.party || "—";
+    const cur = vendorMap.get(key) || { vendor: key, trn: r.trn, taxable: 0, vat: 0, bills: 0 };
+    cur.taxable += n(r.taxable);
+    cur.vat += n(r.vat);
+    if (!r.isReturn) cur.bills += 1;
+    vendorMap.set(key, cur);
+  });
+  const vendorRows = [...vendorMap.values()].map((x) => ({ ...x, taxable: r2(x.taxable), vat: r2(x.vat) })).sort((a, b) => b.vat - a.vat);
+
+  // Sales grouped per customer — cash sales / bills with no customer name fall into one "—" bucket.
+  const customerMap = new Map();
+  salesRows.forEach((r) => {
+    const key = r.party || "—";
+    const cur = customerMap.get(key) || { customer: key, trn: r.trn, taxable: 0, vat: 0, total: 0, bills: 0 };
+    cur.taxable += n(r.taxable);
+    cur.vat += n(r.vat);
+    cur.total += n(r.total);
+    if (!r.isReturn) cur.bills += 1;
+    customerMap.set(key, cur);
+  });
+  const customerRows = [...customerMap.values()].map((x) => ({ ...x, taxable: r2(x.taxable), vat: r2(x.vat), total: r2(x.total) })).sort((a, b) => b.total - a.total);
 
   const productMap = new Map();
   const productRow = (it) => {
@@ -205,16 +239,18 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   const journalExpensePl = journalPlTotal(journalPl);
 
   const outputVat = sum(salesRows, "vat");
-  const inputVat = sum(purchaseRows, "vat");
+  const inputVat = sum(stdPurchRows, "vat");
   return {
-    salesRows, purchaseRows, regionRows, productRows,
+    salesRows, purchaseRows, regionRows, productRows, vendorRows, customerRows,
     stdSales: sum(stdSalesRows, "taxable"), noVatSales: sum(noVatSalesRows, "taxable"),
     stdPurch: sum(stdPurchRows, "taxable"), noVatPurch: sum(noVatPurchRows, "taxable"),
+    noTrnPurch: sum(noTrnPurchRows, "taxable"), noTrnPurchVat: sum(noTrnPurchRows, "vat"),
     outputVat, inputVat, payable: r2(outputVat - inputVat),
     salesCount: sales.length, purchCount: purchases.length, salesReturnCount: salesRet.length, purchReturnCount: purchRet.length,
-    expenseCount: expenseBills.length, expenseVat: sum(purchaseRows.filter((r) => r.isExpense), "vat"),
+    expenseCount: expenseBills.length, expenseVat: sum(stdPurchRows.filter((r) => r.isExpense), "vat"),
     journalExpensePl,
     missingCustomerTrn: sales.filter((inv) => n(inv.totalVat) > 0 && inv.invoiceType === "tax" && inv.customerId && !(inv.customerTrn || customerById.get(inv.customerId)?.trnNumber)).length,
+    missingVendorTrn: noTrnPurchRows.filter((r) => !r.isReturn).length,
   };
 }
 

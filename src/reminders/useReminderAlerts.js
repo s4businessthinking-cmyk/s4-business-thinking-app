@@ -9,14 +9,14 @@ const isNative = () => { try { return Capacitor.isNativePlatform(); } catch { re
 const readJson = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || "") ?? fallback; } catch { return fallback; } };
 const writeJson = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage full */ } };
 
-function systemNotify(title, body, onClick) {
+export function systemNotify(title, body, onClick, tag = "s4-reminders") {
   if (isNative()) {
     LocalNotifications.schedule({ notifications: [{ id: Math.floor(Date.now() % 2000000000), title, body, schedule: { at: new Date(Date.now() + 1000) } }] }).catch(() => {});
     return;
   }
   try {
     if (typeof window === "undefined" || !("Notification" in window)) return;
-    const show = () => { const n = new Notification(title, { body, tag: "s4-reminders" }); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; };
+    const show = () => { const n = new Notification(title, { body, tag }); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; };
     if (Notification.permission === "granted") show();
     else if (Notification.permission === "default") Notification.requestPermission().then((p) => p === "granted" && show()).catch(() => {});
   } catch { /* not supported */ }

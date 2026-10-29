@@ -49,10 +49,11 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     const linkFrom = piSource || priorInv || {};
     const sourceFields = {
       ...((piSource ? piSource.purchaseOrderId : linkFrom.purchaseOrderId) ? { purchaseOrderId:piSource ? piSource.purchaseOrderId : linkFrom.purchaseOrderId, purchaseOrderNo:piSource ? piSource.purchaseOrderNo : (linkFrom.purchaseOrderNo||"") } : {}),
-      ...(piSource?.kind==="grn" ? { goodsReceiptId:piSource.id, goodsReceiptNo:piSource.no } : priorInv?.goodsReceiptId ? { goodsReceiptId:priorInv.goodsReceiptId, goodsReceiptNo:priorInv.goodsReceiptNo||"" } : {}),
+      ...(piSource?.kind==="grn" ? { goodsReceiptId:piSource.id, goodsReceiptNo:piSource.no, ...((piSource.ids||[]).length>1 ? { goodsReceiptIds:piSource.ids, goodsReceiptNos:piSource.nos } : {}) }
+        : priorInv?.goodsReceiptId ? { goodsReceiptId:priorInv.goodsReceiptId, goodsReceiptNo:priorInv.goodsReceiptNo||"", ...((priorInv.goodsReceiptIds||[]).length>1 ? { goodsReceiptIds:priorInv.goodsReceiptIds, goodsReceiptNos:priorInv.goodsReceiptNos } : {}) } : {}),
     };
-    return { ...sourceFields, shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate,
-      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
+    return { ...sourceFields, shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate, entryDate:piForm.entryDate||piForm.invoiceDate,
+      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
   };
 
   const savePurchaseInvoiceOffline = async (payload, successMessage) => {
@@ -300,7 +301,8 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       const payload = piBuild(status, piInvoiceNo);
       if (!payload) return;
       if (!editInvoiceId && payload.goodsReceiptId) {
-        const already = invoices.find(inv => inv.goodsReceiptId===payload.goodsReceiptId && inv.status!=="cancelled");
+        const ids = payload.goodsReceiptIds?.length ? payload.goodsReceiptIds : [payload.goodsReceiptId];
+        const already = invoices.find(inv => inv.status!=="cancelled" && (ids.includes(inv.goodsReceiptId) || (inv.goodsReceiptIds||[]).some(id=>ids.includes(id))));
         if (already) { toast(lang==="bn" ? `❌ ${payload.goodsReceiptNo}-এর বিল আগেই হয়েছে: ${already.invoiceNo}` : `❌ ${payload.goodsReceiptNo} is already billed as ${already.invoiceNo}`, "err"); return; }
       }
       if (status!=="draft" && !unlinkedStockOk(payload.items, lang)) return;

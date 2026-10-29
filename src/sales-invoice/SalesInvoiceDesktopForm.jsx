@@ -690,7 +690,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
           {isDelivery && !isDN && field(bn ? "ডেলিভারি নোট" : "DN No", <input style={inp()} value={form.deliveryNoteNo} onChange={(e) => setField("deliveryNoteNo", e.target.value)} />)}
-          {!isQuote && field(bn ? "গাড়ি নং" : "Vehicle No", <input style={inp()} value={form.vehicleNo || ""} placeholder="ABC-1234" onChange={(e) => setField("vehicleNo", e.target.value)} />)}
+          {!isSO && field(bn ? "গাড়ি নং" : "Vehicle No", <input style={inp()} value={form.vehicleNo || ""} placeholder="ABC-1234" onChange={(e) => setField("vehicleNo", e.target.value)} />)}
           <div>
             <div style={lbl}>Narration</div>
             <textarea style={inp({ height: isDelivery ? 32 : isQuote ? 92 : 62, resize: "none", padding: 6 })} value={form.note} onChange={(e) => setField("note", e.target.value)} />

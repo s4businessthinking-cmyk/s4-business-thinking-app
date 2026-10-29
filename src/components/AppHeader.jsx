@@ -52,7 +52,7 @@ export function Header({ t, lang, setLang, children, isDesktop, s, theme, setThe
           </div>
         )}
       </div>
-      <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+      <div style={{ display:"flex", gap:8, flexWrap:"nowrap", alignItems:"center", flexShrink:0 }}>
         {rightSlot}
         {!rightSlot && setTheme && (
           <button

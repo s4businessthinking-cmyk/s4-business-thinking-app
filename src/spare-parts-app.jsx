@@ -96,6 +96,7 @@ import BackupPanel from "./backup/BackupPanel.jsx";
 import { useShopFinance } from "./dashboard/shopFinance.js";
 import ChequeDueAlert, { chequeTypeIcon, chequeTypeLabel } from "./dashboard/ChequeDueAlert.jsx";
 import NotificationBell from "./dashboard/NotificationBell.jsx";
+import { useTaxAlerts } from "./reports/useTaxAlerts.js";
 import PartyFolderList, { FolderToggle, groupInvoicesByParty } from "./invoices/PartyFolderList.jsx";
 import { PM_CSS } from "./product-master/pmStyles";
 import { SI_CSS, SI_STATUS_COLOR, PM_TH, usePmMobile } from "./sales-invoice/siSkin.js";
@@ -292,6 +293,14 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
     setTabState(next);
   };
 
+  // A Bangla IME (phonetic typing) can fire a synthetic Ctrl/Meta keydown while composing a
+  // character inside a text field; skip the Ctrl+O / Ctrl+U / Ctrl+L shortcuts in that case so
+  // typing a vendor/customer name doesn't suddenly jump the whole app to a different tab.
+  const isTypingTarget = (target) => {
+    const tag = target?.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable;
+  };
+
   // Global desktop shortcut: open Product Master from anywhere in the app.
   useEffect(() => {
     const onProductMasterShortcut = (event) => {
@@ -346,6 +355,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   useEffect(() => {
     const onVendorShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "o") return;
+      if (isTypingTarget(event.target)) return;
       event.preventDefault();
       if (!(isOwner || perms.viewVendors === true || perms.manageVendors === true)) return;
       if (document.querySelector("[data-si-modal-open]")) return;
@@ -359,6 +369,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   useEffect(() => {
     const onCustomerShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "u") return;
+      if (isTypingTarget(event.target)) return;
       event.preventDefault();
       if (!isOwner) return;
       if (document.querySelector("[data-si-modal-open]")) return;
@@ -518,6 +529,11 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef } = useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors });
 
+  const taxAlertList = useTaxAlerts({
+    shopId: isOwner ? shopId : null, shop: localShop, products, customers, vendors, lang, toast,
+    onOpen: () => { setSettingsPage(null); setTab("tax"); },
+  });
+
   // "Jump here filtered to this party" from Vendor/Customer Master — one-shot, same convention as
   // globalFocusVendorId/globalFocusCustomerId (consumed once, then cleared by the receiving tab).
   const [securityChequeFocusParty, setSecurityChequeFocusParty] = useState(null);
@@ -532,7 +548,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const { addCo, addItToInvoice, applyGroupToMember, cancelEdit, cancelEditOrder, cancelOrder, closeOrderSupplierPicker, closePriceEditor, closeTeamMember, createStaffMember, delCo, delIt, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, handleEnterAdd, handleLogout, markRead, openOrderSupplierPicker, openPriceEditor, patchOrderOffline, resetStaffPassword, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderReceive, savePermissions, savePriceEditor, saveSupplierPhone, saveUserGroups, searchOrderSuppliers, selectOrderSupplierFromPicker, selectProductToOrder, sendOrder, setCo, setItemStatus, startEdit, startEditOrder, supplierPhone, updCurrentItem, waLinkGroup } = useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle });
 
-  const { canStaffSupplierArea, canStaffVouchers, closeMenu, currentTabLabel, filterOrders, filterOrdersByStatusPage, goBack, groupByDay, makeShopNo, notificationItems, renderOrderPageTabs, selectFromMenu, setOrderStatus, stPage, staffQuickNavKeys, tabLabelOf, unread, visibleTabs } = useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, team, th, toast, user });
+  const { canStaffSupplierArea, canStaffVouchers, closeMenu, currentTabLabel, filterOrders, filterOrdersByStatusPage, goBack, groupByDay, makeShopNo, notificationItems, renderOrderPageTabs, selectFromMenu, setOrderStatus, stPage, staffQuickNavKeys, tabLabelOf, unread, visibleTabs } = useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList, team, th, toast, user });
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
@@ -540,6 +556,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   useEffect(() => {
     const onLedgerShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "l") return;
+      if (isTypingTarget(event.target)) return;
       event.preventDefault();
       if (!isOwner || document.querySelector("[data-si-modal-open]")) return;
       setTab("globalLedger");

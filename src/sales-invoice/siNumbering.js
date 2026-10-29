@@ -71,15 +71,18 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
   };
 
   const siLoadDoc=(inv)=>{
-    siLoadedPaidRef.current = inv.paymentMethod==="cash" ? 0 : siN2(inv.amountPaid);
+    // A plain cash bill is always auto-paid — don't pre-fill amountPaid so switching to credit gives 0.
+    // A "partial cash" bill (cashPartial) tracks a real balance just like credit, so its paid amount loads back.
+    const isPlainCash = inv.paymentMethod==="cash" && !inv.cashPartial;
+    siLoadedPaidRef.current = isPlainCash ? 0 : siN2(inv.amountPaid);
     setSiForm({
       invoiceType:inv.invoiceType||"regular", invoiceDate:inv.invoiceDate,
       customerId:inv.customerId||"", customerName:inv.customerName||"",
       customerMobile:inv.customerMobile||"", customerAddress:inv.customerAddress||"",
       customerTrn:inv.customerTrn||"", paymentMethod:inv.paymentMethod||"cash",
+      cashPartial:!!inv.cashPartial,
       customerType:(customers||[]).find(c=>c.id===inv.customerId)?.customerType||"",
-      // Cash is always auto-paid — don't pre-fill amountPaid so switching to credit gives 0
-      amountPaid: inv.paymentMethod==="cash" ? "" : (inv.amountPaid>0?String(inv.amountPaid):""),
+      amountPaid: isPlainCash ? "" : (inv.amountPaid>0?String(inv.amountPaid):""),
       deliveryNoteNo:inv.deliveryNoteNo||"", vehicleNo:inv.vehicleNo||"", note:inv.note||"",
       refNo:inv.refNo||"", salesmanId:inv.salesmanId||"", salesmanName:inv.salesmanName||"",
       currency:inv.currency||"AED", stockLocation:inv.stockLocation||"main", stockLocationName:inv.stockLocationName||"Main",

@@ -16,7 +16,7 @@ import { itemBaseQty } from "../inventory/unitConversion";
 import { printMoneyReceipt, qtIsExpired } from "./siHelpers.js";
 import { salesSpecs } from "../product-master/productSpecs";
 
-export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canSeeCost, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintModal, siQtyRef, siQuickAddCustomer, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
+export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canSeeCost, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintModal, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
   // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
   // is rendered on every screen, not only on the list.
   const siPrintPrompt = siPrintModal&&(
@@ -43,10 +43,15 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
   if (siView==="list" || (siView==="form" && siWin.min && wideDesktop)) {
     const groups = groupInvoicesByParty(siFiltered, { idField:"customerId", nameField:"customerName" });
     const openGroup = siGroupMode==="folders" && siOpenParty ? (groups.find(g=>g.key===siOpenParty) || null) : null;
-    const rows = openGroup ? openGroup.invoices : siFiltered;
+    const allRows = openGroup ? openGroup.invoices : siFiltered;
+    // Thousands of rows in one flat table makes the page heavy to open and scroll — cap it
+    // (newest first, invoices are already sorted that way) and point to search/filter instead.
+    const LIST_ROW_LIMIT = 300;
+    const rows = !openGroup && allRows.length > LIST_ROW_LIMIT ? allRows.slice(0, LIST_ROW_LIMIT) : allRows;
+    const rowsTruncated = rows.length < allRows.length;
     const cashName = bnL ? "ক্যাশ (নাম ছাড়া)" : "Cash (no name)";
     const groupName = (g) => g.isCash ? cashName : g.name;
-    const rowsSum = rows.reduce((a,inv)=>{
+    const rowsSum = allRows.reduce((a,inv)=>{
       if (!["cancelled","draft"].includes(inv.status)) { a.total += siN2(inv.grandTotal); a.due += siRowDue(inv); }
       if (inv.status==="draft") a.drafts += 1;
       return a;
@@ -70,6 +75,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
         {siPrintPrompt}
         {receiptWindow}
+        {cashReceiptWindow}
         {ledgerWindow}
 
         <div className="pm-reference-title">
@@ -163,6 +169,11 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                   ← {bnL?"সব কাস্টমার":"All customers"} · {groupName(openGroup)}
                 </button>
               )}
+              {rowsTruncated&&(
+                <div className="si-hint" style={{ padding:"4px 8px" }}>
+                  {bnL?`প্রথম ${rows.length}টি দেখানো হচ্ছে (মোট ${allRows.length}) — খুঁজে বা ফিল্টার করে কমান`:`Showing the latest ${rows.length} of ${allRows.length} — search or filter to narrow it down`}
+                </div>
+              )}
               {siLoading ? <div className="si-empty">⏳</div>
                 : invoices.length===0 ? <div className="si-empty">{emptyText}</div>
                 : rows.length===0 ? <div className="si-empty">🔍 {t.si_noResults}</div>
@@ -212,7 +223,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                             <td title={inv.customerName||""}>{inv.customerName||"—"}{matches}</td>
                             {Object.keys(STATUSES).map(st=>(
                               <td key={st} className="si-center">
-                                {inv.status===st && <span style={{ color:STATUSES[st]?.color, fontWeight:900, fontSize:14 }}>✓</span>}
+                                {inv.status===st && <span style={{ color:STATUSES[st]?.color, fontWeight:900, fontSize:12 }}>{STATUSES[st]?.[lang]||st}</span>}
                                 {st==="open" && siExpiredBadge(inv)}
                               </td>
                             ))}
@@ -257,8 +268,9 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
     const { sub, disc, vat, grand, adjustment, roundOff } = siCalcTotals(inv.items||[], isTax&&!isInvDelivery, siInvoiceExtras(inv));
     const bal=grand-siN2(inv.amountPaid);
     const canEdit=siCanEditDoc(inv);
-    // cash invoice is always fully paid → no mark paid button
+    // plain cash invoice is always fully paid → no mark paid button; "partial cash" tracks a real balance instead
     const canPay=!isQuote&&!isInvCash&&["confirmed","partial"].includes(inv.status);
+    const canPayCash=!isQuote&&isInvCash&&inv.cashPartial&&["confirmed","partial"].includes(inv.status);
     const canConvert=!!onConvertQuote&&((isQuote&&["draft","open"].includes(inv.status)&&!qtIsExpired(inv))||(isDN&&inv.status==="confirmed"));
     const related = kind==="sales" ? receipts.filter(r=>(r.allocations||[]).some(a=>a.invoiceId===inv.id)) : [];
     const paidOnBill = kind!=="sales" || ["draft","cancelled"].includes(inv.status) ? 0 : siR2(siN2(inv.amountPaid)
@@ -285,6 +297,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         <style>{PM_CSS}</style>
         <style>{SI_CSS}</style>
         {receiptWindow}
+        {cashReceiptWindow}
 
         <div className="pm-reference-title">
           <strong style={{ color:siAccent }}>{siDocTitle} — {inv.invoiceNo}</strong>
@@ -303,8 +316,8 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                 {isSO&&vRow(bnL?"ডেলিভারির তারিখ":"Delivery by", inv.validUntil||"—")}
                 {!isSO&&inv.salesOrderNo&&vRow(bnL?"সেলস অর্ডার":"Sales Order", inv.salesOrderNo, { color:"#0e7490" })}
                 {inv.jobOrderNo&&vRow(bnL?"জব কার্ড":"Job Card", inv.jobOrderNo, { color:"#c2410c" })}
-                {!isQuote&&inv.deliveryNoteId&&vRow(bnL?"ডেলিভারি নোট":"Delivery Note", inv.deliveryNoteNo, { color:"#7e22ce" })}
-                {!isQuote&&!inv.deliveryNoteId&&(inv.deliveryNoteNo||inv.vehicleNo)&&vRow(t.si_deliverySection, [inv.deliveryNoteNo, inv.vehicleNo].filter(Boolean).join(" · "))}
+                {!isSO&&inv.deliveryNoteId&&vRow(bnL?"ডেলিভারি নোট":"Delivery Note", inv.deliveryNoteNo, { color:"#7e22ce" })}
+                {!isSO&&!inv.deliveryNoteId&&(inv.deliveryNoteNo||inv.vehicleNo)&&vRow(t.si_deliverySection, [inv.deliveryNoteNo, inv.vehicleNo].filter(Boolean).join(" · "))}
                 {(isQuote||isDN)&&inv.convertedInvoiceNo&&vRow(isSO&&inv.status==="delivered"?(bnL?"ডেলিভারি নোট":"Delivery Note"):(bnL?"ইনভয়েস":"Invoice"), inv.convertedInvoiceNo, { strong:true, color:"#15803d" })}
                 {!isQuote&&inv.quotationNo&&vRow(bnL?"কোটেশন":"Quotation", inv.quotationNo, { color:"#b45309" })}
                 {inv.salesmanName&&vRow(bnL?"সেলসম্যান":"Salesman", inv.salesmanName)}
@@ -347,7 +360,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                 <legend className="pm-panel-legend">💳 {t.si_payment}</legend>
                 <div className="si-panel-body">
                   <div className="si-total-row"><span>{t.si_paymentMethod}</span><b>{SI_PAY[inv.paymentMethod]?.icon} {SI_PAY[inv.paymentMethod]?.[lang]||"-"}</b></div>
-                  {isInvCash ? (
+                  {isInvCash&&!inv.cashPartial ? (
                     <div className="si-paid-box"><span>✅ {bnL?"নগদে সম্পূর্ণ পরিশোধিত":"Fully paid (cash)"}</span><span>{t.cur} {siFmt2(inv.amountPaid||grand)}</span></div>
                   ) : !isInvDelivery && (
                     <>
@@ -389,7 +402,9 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
           {canConvert&&isSO&&onConvertToDN&&<button type="button" className="pm-btn" onClick={()=>onConvertToDN(inv)}>🚚 {bnL?"ডেলিভারি নোট বানান":"Make Delivery Note"}</button>}
           {canConvert&&<button type="button" className="pm-btn" onClick={()=>onConvertQuote(inv)}>🧾 {bnL?"ইনভয়েসে রূপান্তর":"Convert to Invoice"}</button>}
           {canEdit&&<button type="button" className="pm-btn" onClick={()=>siOpenEdit(inv)}>✏️ {bnL?"এডিট":"Edit"}</button>}
+          <button type="button" className="pm-btn-secondary" onClick={()=>siOpenReminderForm(inv)}>⏰ {bnL?"রিমাইন্ডার":"Remind me"}</button>
           {canPay&&kind==="sales"&&<button type="button" className="pm-btn" onClick={()=>setReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })}>💰 {bnL?"টাকা গ্রহণ":"Receive Payment"}</button>}
+          {canPayCash&&kind==="sales"&&<button type="button" className="pm-btn" onClick={()=>setCashReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })}>💵 {bnL?"ক্যাশ রিসিট ভাউচার":"Cash Receipt Voucher"}</button>}
           {canCancelInv&&["confirmed","partial","paid","draft","open"].includes(inv.status)&&<button type="button" className="pm-btn pm-btn--danger" onClick={()=>siCancel(inv)}>{bnL?"বাতিল":"Cancel"}</button>}
           {siCanDeleteDoc(inv)&&<button type="button" className="pm-btn pm-btn--danger" onClick={()=>siDelete(inv)}>🗑 {bnL?"মুছুন":"Delete"}</button>}
           {isOwner&&!["draft","cancelled"].includes(inv.status)&&<span className="si-hint">{bnL?"মুছতে চাইলে আগে বাতিল করুন (স্টক ঠিক থাকবে)":"To delete, cancel first (keeps stock correct)"}</span>}
@@ -397,6 +412,22 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             <span className="si-hint">{bnL?"টাকা নেওয়া হয়েছে — এডিট করতে আগে রিসিট বাতিল করুন":"Payment received — cancel the receipt first to edit"}</span>
           )}
         </div>
+        {siReminderForm&&siReminderForm.invoiceId===inv.id&&(
+          <fieldset className="pm-panel" style={{ margin:"0 0 6px" }}>
+            <legend className="pm-panel-legend">⏰ {bnL?"রিমাইন্ডার সেট করুন":"Set a reminder"}</legend>
+            <div className="si-panel-body" style={{ gap:6 }}>
+              <div className="si-grid2">
+                <input type="date" className="pm-input" value={siReminderForm.date} onChange={e=>setSiReminderForm(p=>({ ...p, date:e.target.value }))} />
+                <input type="time" className="pm-input" value={siReminderForm.time} onChange={e=>setSiReminderForm(p=>({ ...p, time:e.target.value }))} />
+              </div>
+              <input className="pm-input" placeholder={bnL?"নোট (ঐচ্ছিক)":"Note (optional)"} value={siReminderForm.note} onChange={e=>setSiReminderForm(p=>({ ...p, note:e.target.value }))} />
+              <div style={{ display:"flex", gap:6 }}>
+                <button type="button" className="pm-btn pm-btn--primary" disabled={!siReminderForm.date} onClick={siSaveReminder}>✅ {bnL?"সেভ করুন":"Save"}</button>
+                <button type="button" className="pm-btn-secondary" onClick={()=>setSiReminderForm(null)}>{bnL?"বাতিল":"Cancel"}</button>
+              </div>
+            </div>
+          </fieldset>
+        )}
       </div>
     );
   }
@@ -504,22 +535,26 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         </>)}
 
         {fPanel(`${t.si_invoiceNo} & ${t.si_date}`, <>
-          {fRow(t.si_invoiceNo, <div className="si-val is-strong" style={{ color:siAccent, fontFamily:"Consolas, monospace" }}>{siInvoiceNo}</div>)}
-          {fRow(t.si_date, <input type="date" className="pm-input" value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />)}
-          {isQuote&&fRow(isSO?(bnL?"ডেলিভারির তারিখ":"Delivery by"):(bnL?"মেয়াদ":"Valid Until"), <input type="date" className="pm-input" value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
+          <div className="si-grid2">
+            {fField(t.si_invoiceNo, <div className="si-val is-strong" style={{ color:siAccent, fontFamily:"Consolas, monospace" }}>{siInvoiceNo}</div>)}
+            {fField(t.si_date, <input type="date" className="pm-input" value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />)}
+          </div>
+          {isQuote&&(
+            <div className="si-grid2">
+              {fField(isSO?(bnL?"ডেলিভারির তারিখ":"Delivery by"):(bnL?"মেয়াদ":"Valid Until"), <input type="date" className="pm-input" value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
+              <div />
+            </div>
+          )}
         </>)}
 
         {fPanel(t.si_customer, <>
           <button type="button" className="pm-btn" style={{ width:"100%", minHeight:siMobile?36:24, textAlign:"left" }} onClick={()=>setShowCustPicker(true)}>
             {siForm.customerId ? `✅ ${siForm.customerName} — ${bnL?"বদলান":"change"}` : `👥 ${t.si_selectCustomer}`}
           </button>
-          {fRow(bnL?"নাম":"Name", <input className="pm-input" placeholder={t.si_customerManual} value={siForm.customerName} onChange={e=>{
+          {!siForm.customerId&&fRow(bnL?"নাম":"Name", <input className="pm-input" placeholder={t.si_customerManual} value={siForm.customerName} onChange={e=>{
             siUpd("customerName",e.target.value);
             if (siForm.customerId) ["customerId","customerMobile","customerAddress","customerTrn","customerType","creditDays"].forEach(f=>siUpd(f,""));
           }} />)}
-          {fRow(bnL?"মোবাইল":"Mobile", <input className="pm-input" inputMode="tel" value={siForm.customerMobile} onChange={e=>siUpd("customerMobile",e.target.value)} />)}
-          {fRow(bnL?"ঠিকানা":"Address", <input className="pm-input" value={siForm.customerAddress} onChange={e=>siUpd("customerAddress",e.target.value)} />)}
-          {siForm.invoiceType==="tax"&&fRow("TRN", <input className="pm-input" style={{ fontFamily:"Consolas, monospace" }} placeholder="100XXXXXXXXXXXX" value={siForm.customerTrn} onChange={e=>siUpd("customerTrn",e.target.value)} />)}
         </>)}
 
         {fPanel(`📦 ${t.si_items}`, <>
@@ -678,7 +713,13 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
               {Object.entries(SI_PAY).map(([key,pm])=><option key={key} value={key}>{pm.icon} {pm[lang]}</option>)}
             </select>
           ))}
-          {formIsCash ? (
+          {formIsCash&&(
+            <label style={{ display:"flex", gap:6, alignItems:"center", fontSize:12.5 }}>
+              <input type="checkbox" checked={!!siForm.cashPartial} onChange={e=>setSiForm(p=>({ ...p, cashPartial:e.target.checked, amountPaid:"" }))} />
+              {bnL?"আংশিক নগদ — বাকিটা পরে নেব (একাধিক বিল একসাথে মেটানো যাবে)":"Partial cash — I'll collect the rest later (several bills can be settled together)"}
+            </label>
+          )}
+          {formIsCash&&!siForm.cashPartial ? (
             <div className="si-paid-box"><span>✅ {bnL?"নগদে সম্পূর্ণ পরিশোধিত":"Fully paid (cash)"}</span><span>{t.cur} {siFmt2(totals.grand)}</span></div>
           ) : (
             <>
@@ -693,7 +734,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
           )}
         </>)}
 
-        {!isQuote&&fPanel(`🚚 ${t.si_deliverySection}`, <>
+        {!isSO&&fPanel(`🚚 ${t.si_deliverySection}`, <>
           {fRow(t.si_deliveryNote, <input className="pm-input" placeholder="DN-0001" value={siForm.deliveryNoteNo} onChange={e=>siUpd("deliveryNoteNo",e.target.value)} />)}
           {fRow(t.si_vehicleNo, <input className="pm-input" placeholder="ABC-1234" value={siForm.vehicleNo} onChange={e=>siUpd("vehicleNo",e.target.value)} />)}
         </>)}

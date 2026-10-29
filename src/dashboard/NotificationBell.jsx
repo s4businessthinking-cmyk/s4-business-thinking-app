@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 // Header bell: badge with the number of things needing attention and a
 // dropdown list; each item jumps to the screen where it can be handled.
@@ -7,6 +7,11 @@ export default function NotificationBell({ lang, theme, items = [] }) {
   const dark = theme === "dark";
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
+  const btnRef = useRef(null);
+  // Fixed-viewport coords for the panel, measured from the bell button so it
+  // always stays on screen — an absolute panel anchored to the bell's own
+  // (often off-right) wrapper could run off the left edge on a narrow phone.
+  const [panelPos, setPanelPos] = useState(null);
   const count = items.reduce((a, it) => a + (it.count || 1), 0);
 
   useEffect(() => {
@@ -18,6 +23,19 @@ export default function NotificationBell({ lang, theme, items = [] }) {
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const place = () => {
+      const rect = btnRef.current.getBoundingClientRect();
+      const width = Math.min(340, window.innerWidth - 24);
+      const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
+      setPanelPos({ top: rect.bottom + 8, left, width });
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
   const colors = dark
     ? { bg: "#18181b", border: "#3f3f46", text: "#f4f4f5", muted: "#a1a1aa", hover: "#27272a", btn: "#27272a" }
     : { bg: "#ffffff", border: "#cbd5e1", text: "#0f172a", muted: "#64748b", hover: "#f1f5f9", btn: "#f1f5f9" };
@@ -25,6 +43,7 @@ export default function NotificationBell({ lang, theme, items = [] }) {
   return (
     <div ref={wrapRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
+        ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         title={bn ? "নোটিফিকেশন" : "Notifications"}
@@ -45,9 +64,9 @@ export default function NotificationBell({ lang, theme, items = [] }) {
         )}
       </button>
 
-      {open && (
+      {open && panelPos && (
         <div style={{
-          position: "absolute", right: 0, top: 46, width: "min(340px, calc(100vw - 24px))", maxHeight: "70vh", overflowY: "auto",
+          position: "fixed", top: panelPos.top, left: panelPos.left, width: panelPos.width, maxHeight: "70vh", overflowY: "auto",
           background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 14, zIndex: 1000,
           boxShadow: dark ? "0 18px 40px rgba(0,0,0,0.55)" : "0 18px 40px rgba(15,23,42,0.18)",
         }}>

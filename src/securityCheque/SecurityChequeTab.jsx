@@ -4,7 +4,6 @@ import { subscribeShopCollection } from "../offline/realtimeSync";
 import { logAudit } from "../utils/auditLog.js";
 import { usePmMobile, usePmFitHeight, SI_CSS } from "../sales-invoice/siSkin.js";
 import PartyPickerWindow, { VENDOR_PICKER_COLS, CUSTOMER_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
-import { compressImage } from "../vouchers/chequeDocs.js";
 import { readDocFile, openDocFile } from "../utils/docFiles.js";
 import { printSecurityChequeReceipt } from "./securityChequeReceipt.js";
 import { saveSecurityChequeDocs } from "./securityChequeDocs.js";
@@ -22,21 +21,29 @@ const label = (list, key, bn) => (list.find((x) => x.key === key) || {})[bn ? "b
 function PhotoField({ label: lbl, value, onChange, bn }) {
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const isPdf = String(value || "").startsWith("data:application/pdf");
   const pick = async (e) => {
     const file = e.target.files?.[0]; e.target.value = "";
     if (!file) return;
     setBusy(true);
-    try { onChange(await compressImage(file)); } catch (err) { alert(err.message); } finally { setBusy(false); }
+    try { onChange(await readDocFile(file, (b, en) => (bn ? b : en))); } catch (err) { alert(err.message); } finally { setBusy(false); }
   };
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: "#334155", marginBottom: 4 }}>{lbl}</div>
       <div onClick={() => inputRef.current?.click()}
         style={{ height: 110, borderRadius: 10, border: value ? "1px solid #cbd5e1" : "1.5px dashed #94a3b8", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", cursor: "pointer" }}>
-        {value ? <img src={value} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} /> : <span style={{ fontSize: 12, color: "#64748b" }}>{busy ? "…" : (bn ? "📷 ছবি তুলুন" : "📷 Take photo")}</span>}
+        {value
+          ? (isPdf ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>📄 PDF</span> : <img src={value} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />)
+          : <span style={{ fontSize: 12, color: "#64748b" }}>{busy ? "…" : (bn ? "📷 ছবি তুলুন / PDF" : "📷 Take photo / PDF")}</span>}
       </div>
-      {value && <button type="button" onClick={() => onChange("")} style={{ marginTop: 4, border: "none", background: "none", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "সরান" : "Remove"}</button>}
-      <input ref={inputRef} type="file" accept="image/*" onChange={pick} style={{ display: "none" }} />
+      {value && (
+        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+          {isPdf && <button type="button" onClick={() => openDocFile({ file: value, label: lbl })} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "দেখুন" : "View"}</button>}
+          <button type="button" onClick={() => onChange("")} style={{ border: "none", background: "none", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "সরান" : "Remove"}</button>
+        </div>
+      )}
+      <input ref={inputRef} type="file" accept="application/pdf,image/*" onChange={pick} style={{ display: "none" }} />
     </div>
   );
 }

@@ -97,6 +97,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
   const [refBank,setRefBank] = useState("");
   const [chequeDate,setChequeDate] = useState(piToday());
   const [distAmt,setDistAmt]       = useState("");
+  const [discount,setDiscount]     = useState("");
   const vendorBoxRef = useRef(null);
 
   // Pre-fill vendor if navigated here from an Invoice or the Supplier Ledger
@@ -119,6 +120,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
     setChequeReceivedBy(prefillVoucher.chequeReceivedBy||""); setVendorReceiptNo(prefillVoucher.vendorReceiptNo||""); setChequeMonth(prefillVoucher.chequeMonth||"");
     setRefNo(prefillVoucher.refNo||""); setRefBank(prefillVoucher.refBank||"");
     setNote(prefillVoucher.note||"");
+    setDiscount(piN2(prefillVoucher.discountAmount)>0 ? piFmt2(prefillVoucher.discountAmount) : "");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[prefillVoucher]);
 
@@ -155,6 +157,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
   const lbl={ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, marginBottom:4 };
 
   const handleSave = () => {
+    if (piN2(discount) > totalPayment + 0.001) { alert(lang==="bn"?"ছাড় মোট টাকার চেয়ে বেশি হতে পারবে না":"Discount cannot exceed the total"); return; }
     const allocations = openInvoices
       .filter(inv => piN2(amounts[inv.id])>0)
       .map(inv => ({ invoiceId:inv.id, invoiceNo:inv.invoiceNo, supplierInvoiceNo:inv.supplierInvoiceNo||"", invoiceDate:inv.invoiceDate||"", amount:piN2(amounts[inv.id]) }));
@@ -170,6 +173,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
       refNo: (method==="bank_transfer"||method==="card")?refNo:"",
       refBank: (method==="bank_transfer"||method==="card")?refBank:"",
       refDate: (method==="bank_transfer"||method==="card")?paymentDate:"",
+      ...(piN2(discount)>0 ? { discountAmount: piN2(discount) } : {}),
       allocations,
     });
   };
@@ -208,7 +212,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
                 <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>🏭 {vendor.name}</div>
                 {vendor.mobile&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:1 }}>📱 {vendor.mobile}</div>}
               </div>
-              <button onClick={()=>{ setVendor(null); setAmounts({}); }} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.pi_changeVendor}</button>
+              <button onClick={()=>{ setVendor(null); setAmounts({}); setDiscount(""); }} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.pi_changeVendor}</button>
             </div>
           )}
         </div>
@@ -321,9 +325,13 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
 
       {vendor&&openInvoices.length>0&&(
         <div style={{ position:isDesktop?"static":"sticky", bottom:0, background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:12 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+            <span style={{ fontSize:12, fontWeight:700, color:th.txtMuted }}>🏷️ {lang==="bn"?"ছাড় (ঐচ্ছিক)":"Discount (optional)"}</span>
+            <input style={{ ...inp(), width:110, flex:"0 0 110px", textAlign:"right" }} inputMode="decimal" placeholder="0.00" value={discount} onChange={e=>setDiscount(e.target.value)} />
+          </div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-            <span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span>
-            <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {piFmt2(totalPayment)}</span>
+            <span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{piN2(discount)>0?(lang==="bn"?"নেট পরিশোধ":"Net Payment"):t.pi_totalPayment}</span>
+            <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {piFmt2(Math.max(0, totalPayment-piN2(discount)))}</span>
           </div>
           <button onClick={handleSave} disabled={saving||totalPayment<=0} style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:(saving||totalPayment<=0)?"#1e3a5f":"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:(saving||totalPayment<=0)?"not-allowed":"pointer" }}>
             {saving?"...":t.pi_newPayment}
@@ -373,10 +381,10 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
           </>
         )}
         <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span><span style={{ fontSize:18, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span></div>
-        {isCheque&&piN2(voucher.discountAmount)>0&&(
+        {piN2(voucher.discountAmount)>0&&(
           <>
             <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏷️ {lang==="bn"?"ছাড়":"Discount"}</span><span style={{ fontSize:13, fontWeight:700, color:"#f59e0b" }}>{t.cur} {piFmt2(voucher.discountAmount)}</span></div>
-            <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>🖋️ {lang==="bn"?"চেকের পরিমাণ":"Cheque Amount"}</span><span style={{ fontSize:15, fontWeight:900, color:"#3b82f6" }}>{t.cur} {piFmt2(voucher.chequeAmount)}</span></div>
+            {isCheque&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>🖋️ {lang==="bn"?"চেকের পরিমাণ":"Cheque Amount"}</span><span style={{ fontSize:15, fontWeight:900, color:"#3b82f6" }}>{t.cur} {piFmt2(voucher.chequeAmount)}</span></div>}
           </>
         )}
         {voucher.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #f97316" }}>📝 {voucher.note}</div>}
@@ -412,7 +420,12 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
       {/* Actions */}
       {(isOwner||onCancel)&&(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button onClick={onPrint} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>
+          <button onClick={()=>onPrint?.()} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>
+          {(voucher.allocations||[]).length>1&&(
+            <button onClick={()=>onPrint?.({ summaryOnly:true })} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              🖨️ {lang==="bn"?"প্রিন্ট (সংক্ষিপ্ত — ইনভয়েস তালিকা ছাড়া)":"Print (Summary — no invoice list)"}
+            </button>
+          )}
           {isOwner&&!isCancelled&&isCheque&&voucher.chequeStatus==="pending"&&(
             <>
               <button onClick={()=>onSetChequeStatus("cleared")} style={{ padding:"12px", borderRadius:10, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_markCleared}</button>

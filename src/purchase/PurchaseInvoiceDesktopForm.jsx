@@ -10,6 +10,8 @@ import { PURCHASE_OPTION_DEFAULTS, PURCHASE_OPTION_LABELS, isForeign, rateOf } f
 import { CURRENCIES } from "../reports/taxDomain.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 import InvoiceScanWindow from "./scan/InvoiceScanWindow.jsx";
+import { printPurchaseInvoice } from "./purchasePrint.js";
+import { piToday } from "./purchaseShared.js";
 
 const ACCENT = "#c2410c";
 
@@ -99,7 +101,7 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
 }
 
 export default function PurchaseInvoiceDesktopForm({
-  lang = "en", t = {}, shopId, products = [], vendors = [], invoices = [],
+  lang = "en", t = {}, shopId, shop, products = [], vendors = [], invoices = [],
   form, setField, lines, setLines, current, setCurrent, totals, paid, balance,
   invoiceNo, editInvoiceId, saving, nameRef, qtyRef,
   helpers,
@@ -324,12 +326,12 @@ export default function PurchaseInvoiceDesktopForm({
           </div>
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
-          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
+          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>{bn ? "এন্ট্রি তারিখ" : "Entry Date"}</div>
+          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "170px minmax(300px,420px) 180px 1fr", gap: 10, padding: "2px 10px 8px", background: C.panel, borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: "grid", gridTemplateColumns: "170px minmax(260px,380px) 130px 180px 1fr", gap: 10, padding: "2px 10px 8px", background: C.panel, borderBottom: `1px solid ${C.border}` }}>
         <div>
           <div style={lbl}>Supplier Inv. No <span style={{ color: C.red }}>*</span></div>
           <input ref={supInvRef} style={inp(form.supplierInvoiceNo.trim() ? {} : { borderColor: C.red })} value={form.supplierInvoiceNo} placeholder={bn ? "সাপ্লায়ারের বিল নং" : "Supplier's bill no"}
@@ -358,6 +360,10 @@ export default function PurchaseInvoiceDesktopForm({
               onClose={() => { setVendorPickerOpen(false); setTimeout(() => vendorRef.current?.focus(), 30); }}
               onPick={(v) => { setVendorPickerOpen(false); onPickVendor(v); setTimeout(() => nameRef.current?.focus(), 60); }} />
           )}
+        </div>
+        <div>
+          <div style={lbl}>Invoice Date</div>
+          <input type="date" style={inp()} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
         </div>
         <div>
           <div style={lbl}>Mobile</div>
@@ -635,6 +641,12 @@ export default function PurchaseInvoiceDesktopForm({
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
           <button type="button" onClick={() => setShowSearch(true)} style={btn()}>🔍 {bn ? "খুঁজুন" : "Search"}</button>
+          {purchaseOptions.enablePrint && savedInvoice && (
+            <button type="button" onClick={() => {
+              const vm = vendors.find((v) => v.id === savedInvoice.vendorId);
+              printPurchaseInvoice({ ...savedInvoice, vendorAddress: savedInvoice.vendorAddress || vm?.address || "", vendorTrn: savedInvoice.vendorTrn || vm?.trnNumber || "" }, shop, lang);
+            }} style={btn()}>🖨️ {bn ? "প্রিন্ট" : "Print"}</button>
+          )}
           {onCancelInvoice && savedInvoice && ["draft", "confirmed", "partial", "paid"].includes(savedInvoice.status) && (
             <button type="button" onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
               style={btn("#fee2e2", C.red)}>⛔ {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
