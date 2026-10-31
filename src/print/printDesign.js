@@ -178,6 +178,64 @@ export function savePrintDesign(design) {
   try { localStorage.setItem(KEY, JSON.stringify(design)); return true; } catch { return false; }
 }
 
+const STYLE_SHOP_KEYS = ["template", "accent", "fontScale", "headerNote", "footerText", "showSignatures", "logoSize"];
+const LOGO_SHOP_MAX = 180000;
+
+function slimStyle(style = {}) {
+  const out = {};
+  STYLE_SHOP_KEYS.forEach((k) => { out[k] = style[k] ?? STYLE_DEFAULT[k]; });
+  if (typeof style.logo === "string" && style.logo.length && style.logo.length < LOGO_SHOP_MAX) {
+    out.logo = style.logo;
+  }
+  return out;
+}
+
+function dropHeavyImages(design) {
+  const next = { style: {}, layout: design.layout || {} };
+  DESIGN_DOCS.forEach(({ key }) => {
+    const s = { ...(design.style?.[key] || {}) };
+    delete s.logo;
+    next.style[key] = s;
+  });
+  return next;
+}
+
+export function savePrintDesignBestEffort(design) {
+  if (savePrintDesign(design)) return true;
+  return savePrintDesign(dropHeavyImages(design));
+}
+
+export function extractShopPrintDesign(design) {
+  const style = {};
+  DESIGN_DOCS.forEach(({ key }) => { style[key] = slimStyle(design?.style?.[key]); });
+  return { style };
+}
+
+export function mergeShopPrintDesign(design, shopPatch) {
+  if (!shopPatch?.style) return design;
+  const next = { ...design, style: { ...design.style } };
+  DESIGN_DOCS.forEach(({ key }) => {
+    if (shopPatch.style[key]) {
+      next.style[key] = { ...STYLE_DEFAULT, ...next.style[key], ...shopPatch.style[key] };
+    }
+  });
+  return next;
+}
+
+export function hasLocalPrintFooter(design) {
+  return DESIGN_DOCS.some(({ key }) => String(design?.style?.[key]?.footerText || "").trim());
+}
+
+/** Shop copy wins when present; otherwise keep the device copy. */
+export function hydratePrintDesignFromShop(shop) {
+  const local = loadPrintDesign();
+  const patch = shop?.printDesign;
+  if (!patch?.style) return { design: local, shouldUpload: hasLocalPrintFooter(local) };
+  const merged = mergeShopPrintDesign(local, patch);
+  savePrintDesignBestEffort(merged);
+  return { design: merged, shouldUpload: false };
+}
+
 // Shrinks an uploaded image so it fits in local storage.
 export function imageFileToDataUrl(file, { maxW = 400, type = "image/png", quality = 0.85 } = {}) {
   return new Promise((resolve, reject) => {

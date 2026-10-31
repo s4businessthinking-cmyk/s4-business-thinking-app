@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { loadPrintSettings, savePrintSettings, PAPER_SIZES, canPickPrinter, listPrinters, printHtmlDocument } from "./printSettings.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
-import { DESIGN_DOCS, TEMPLATES, SAMPLE_DATA, loadPrintDesign, savePrintDesign, renderLayoutDocument, imageFileToDataUrl } from "./printDesign.js";
+import { DESIGN_DOCS, TEMPLATES, SAMPLE_DATA, loadPrintDesign, savePrintDesign, savePrintDesignBestEffort, extractShopPrintDesign, hydratePrintDesignFromShop, renderLayoutDocument, imageFileToDataUrl } from "./printDesign.js";
+import { saveShopRecord } from "../offline/shopService";
 import PrintDesigner from "./PrintDesigner.jsx";
 
 const C = {
@@ -290,8 +291,8 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
             </div>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{bn ? "দোকানের নামের নিচে লেখা (যেমন: সব ধরনের গাড়ির পার্টস পাওয়া যায়)" : "Text under shop name (e.g. dealer of all spare parts)"}</div>
             <textarea rows={2} value={style.headerNote} onChange={(e) => setStyle("headerNote", e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: "1px solid #8797a9", fontFamily: font, fontSize: 12, padding: 4, marginBottom: 8 }} />
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{bn ? "নিচের লেখা / শর্তাবলী (খালি রাখলে ডিফল্ট)" : "Footer / terms (blank = default)"}</div>
-            <textarea rows={2} value={style.footerText} onChange={(e) => setStyle("footerText", e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: "1px solid #8797a9", fontFamily: font, fontSize: 12, padding: 4 }} />
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{bn ? "নিচের লেখা / শর্তাবলী (খালি রাখলে ডিফল্ট) — OK/Apply চাপলে দোকানে স্থায়ী সেভ" : "Footer / terms (blank = default) — OK/Apply saves them on the shop"}</div>
+            <textarea rows={8} value={style.footerText} onChange={(e) => setStyle("footerText", e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: "1px solid #8797a9", fontFamily: font, fontSize: 12, padding: 4, whiteSpace: "pre-wrap" }} placeholder={bn ? "যেমন: TERMS & CONDITIONS..." : "e.g. TERMS & CONDITIONS..."} />
             <Check checked={style.showSignatures} onChange={(v) => setStyle("showSignatures", v)}>{bn ? "স্বাক্ষরের জায়গা প্রিন্ট করো" : "Print signature lines"}</Check>
             <button type="button" style={{ ...winBtn(false), marginTop: 6 }} onClick={copyToAll}>
               {bn ? "এই ডিজাইন সব প্রিন্টে লাগাও" : "Use this style for all documents"}
@@ -307,32 +308,48 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
   );
 }
 
-export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCode, colorPrint, setColorPrint, isDesktop, toast, previewHtml }) {
+export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCode, colorPrint, setColorPrint, isDesktop, toast, previewHtml, shopId, shop, user, profile, onShopUpdated }) {
   const bn = lang === "bn";
   const [tab, setTab] = useState("general");
   const [draft, setDraft] = useState(loadPrintSettings);
   const [hideCode, setHideCode] = useState(!showCode);
   const [color, setColor] = useState(!!colorPrint);
   const [setupOpen, setSetupOpen] = useState(false);
-  const [design, setDesign] = useState(loadPrintDesign);
+  const [design, setDesign] = useState(() => hydratePrintDesignFromShop(shop).design);
   const [designerDoc, setDesignerDoc] = useState(null);
+  const [saving, setSaving] = useState(false);
   useEscapeKey(onClose, { level: 3 });
 
   const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
-  const apply = () => {
+  const apply = async () => {
+    if (saving) return false;
     savePrintSettings(draft);
     setShowCode?.(!hideCode);
     setColorPrint?.(color);
     const stored = loadPrintDesign();
-    if (!savePrintDesign({ ...stored, style: design.style })) {
+    const nextDesign = { ...stored, style: design.style };
+    if (!savePrintDesignBestEffort(nextDesign)) {
       toast?.(bn ? "⚠️ ডিজাইন সেভ হয়নি — লোগো/ছবি অনেক বড়" : "⚠️ Design not saved — logo/image too large", "err");
-      return;
+      return false;
     }
-    toast?.(bn ? "✅ প্রিন্ট সেটিংস সেভ হয়েছে" : "✅ Print settings saved");
+    if (shopId) {
+      setSaving(true);
+      try {
+        const updated = await saveShopRecord(shopId, { printDesign: extractShopPrintDesign(nextDesign) }, { ownerUid: user?.uid || shop?.ownerUid, profile, user });
+        onShopUpdated?.(updated);
+      } catch (error) {
+        toast?.(bn ? "⚠️ দোকানে সেভ হয়নি — আবার Apply চাপুন" : "⚠️ Could not save on the shop — press Apply again", "err");
+        setSaving(false);
+        return false;
+      }
+      setSaving(false);
+    }
+    toast?.(bn ? "✅ প্রিন্ট সেটিংস দোকানে সেভ হয়েছে — logout-এও থাকবে" : "✅ Print settings saved on the shop — they stay after logout");
+    return true;
   };
   const saveLayout = (kind, layout) => {
     const stored = loadPrintDesign();
-    if (!savePrintDesign({ ...stored, layout: { ...stored.layout, [kind]: layout } })) {
+    if (!savePrintDesignBestEffort({ ...stored, layout: { ...stored.layout, [kind]: layout } })) {
       toast?.(bn ? "⚠️ সেভ হয়নি — প্যাডের ছবি অনেক বড়, ছোট ছবি দিন" : "⚠️ Not saved — form image too large", "err");
       return false;
     }
@@ -404,8 +421,8 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
                 </Group>
                 <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.45 }}>
                   {bn
-                    ? "🖨️ এই সেটিংস আর ডিজাইন এই ডিভাইসেই থাকে — অন্য পিসিতে আলাদা করে সেট করতে হবে।"
-                    : "🖨️ These settings and designs are saved on this device — set them separately on each PC."}
+                    ? "🖨️ বিলের নিচের শর্তাবলী, লোগো আর টেমপ্লেট দোকানে সেভ হয় — logout করলেও থাকে, অন্য পিসি/মোবাইলেও আসবে। প্রিন্টার বেছে রাখা শুধু এই পিসিতে থাকে।"
+                    : "🖨️ Invoice terms, logo and template are saved on the shop — they stay after logout and reach other PCs/phones. The chosen printer stays on this PC only."}
                 </div>
               </>
             )}
@@ -439,9 +456,9 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
             }} />
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: 10 }}>
-          <button type="button" style={winBtn(true)} onClick={() => { apply(); onClose(); }}>OK</button>
+          <button type="button" style={winBtn(true)} disabled={saving} onClick={async () => { if (await apply()) onClose(); }}>OK</button>
           <button type="button" style={winBtn(false)} onClick={onClose}>{bn ? "বাতিল" : "Cancel"}</button>
-          <button type="button" style={winBtn(false)} onClick={apply}>{bn ? "প্রয়োগ" : "Apply"}</button>
+          <button type="button" style={winBtn(false)} disabled={saving} onClick={apply}>{saving ? (bn ? "সেভ হচ্ছে..." : "Saving...") : (bn ? "প্রয়োগ" : "Apply")}</button>
         </div>
       </div>
     </div>

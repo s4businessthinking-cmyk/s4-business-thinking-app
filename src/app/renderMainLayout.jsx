@@ -184,6 +184,8 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
 
       {printSettingsOpen && (
         <PrintSettingsWindow lang={lang} isDesktop={isDesktop} toast={toast}
+          shopId={shopId} shop={localShop} user={user} profile={profile}
+          onShopUpdated={(updated)=>setLocalShop((prev)=>({ ...(prev || {}), ...(updated || {}) }))}
           onClose={()=>setPrintSettingsOpen(false)}
           showCode={siShowCode} setShowCode={(v)=>{ setSiShowCode(v); saveSiShowCode(v); }}
           colorPrint={siColorPrint} setColorPrint={(v)=>{ setSiColorPrint(v); saveSiColor(v); }}

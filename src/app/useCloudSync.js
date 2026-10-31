@@ -3,7 +3,8 @@ import { doc, onSnapshot } from "../backend/firestore";
 import { getCloudSyncBlockReason, getShopCloudPulledAt, getSyncDashboardStatus, pullShopFromCloud, reconcileShopWithCloud, sortPulledRecords, uploadPendingShopChanges } from "../offline/cloudPullService";
 import { mergeProductCatalog } from "./mainAppHelpers.js";
 import { offlineCacheCloudRecords, offlineGetById } from "../offline/offlineRepository";
-import { saveCachedShop } from "../offline/shopService";
+import { saveCachedShop, saveShopRecord } from "../offline/shopService";
+import { extractShopPrintDesign, hydratePrintDesignFromShop } from "../print/printDesign.js";
 import { updateLocalUserProfile } from "../auth/localAuthService";
 import { useEffect } from "react";
 
@@ -33,6 +34,12 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
       offlineCacheCloudRecords("shops", [mergedForCache]).catch((err) =>
         console.warn("[S4 Offline] shop cache failed", err)
       );
+    }
+    const printSync = hydratePrintDesignFromShop(mergedForCache || next);
+    if (printSync.shouldUpload && shopId) {
+      saveShopRecord(shopId, { printDesign: extractShopPrintDesign(printSync.design) }, { ownerUid: user?.uid || next?.ownerUid })
+        .then((updated) => setLocalShop((prev) => mergeShopRecord(prev, updated)))
+        .catch((err) => console.warn("[S4 Print] shop terms upload failed", err));
     }
   };
 
