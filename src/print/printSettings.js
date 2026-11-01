@@ -71,6 +71,15 @@ export function paperHeightMm(key) {
   return (PAPER_SIZES.find((p) => p.key === key) || PAPER_SIZES[0]).heightMm || null;
 }
 
+// Empty item rows so a short bill still fills the middle of the page.
+export function invoiceBlankRows(itemCount, pageH, colCount) {
+  if (!pageH || !colCount) return "";
+  const target = pageH >= 290 ? 16 : pageH >= 270 ? 14 : pageH >= 200 ? 10 : 6;
+  const n = Math.max(0, target - (parseInt(itemCount, 10) || 0));
+  const cell = "<td>&nbsp;</td>".repeat(colCount);
+  return Array.from({ length: n }, () => `<tr class="blank">${cell}</tr>`).join("");
+}
+
 export function paperCss(key) {
   return (PAPER_SIZES.find((p) => p.key === key) || PAPER_SIZES[0]).css;
 }

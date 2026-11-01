@@ -469,7 +469,7 @@ body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:e
 .alloc-table th,.alloc-table td{padding:1.5mm 2mm!important;font-size:9pt!important}
 .alloc-table thead{display:table-header-group}
 .note-box{padding:2mm 3mm!important;margin-bottom:3mm!important;font-size:9pt!important}
-.sigs{margin-top:3mm!important;padding-top:1mm!important;gap:8mm!important}
+.sigs{margin-top:2mm!important;padding-top:1mm!important;gap:8mm!important}
 .sig-line{margin-top:8mm!important;padding-top:2px!important;font-size:8.5pt!important}
 .footer{padding:2mm!important;font-size:8pt!important;background:#fff!important}
 }`;
@@ -480,7 +480,7 @@ body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:e
 export function shopHeaderExtras(shop) {
   return {
     arabic: shop?.companyNameAr ? `<div class="shop-sub" dir="rtl" style="font-size:14px;font-weight:800">${esc(shop.companyNameAr)}</div>` : "",
-    details: [shop?.tradeLicenseNumber ? `License: ${esc(shop.tradeLicenseNumber)}` : "", shop?.fax ? `Fax: ${esc(shop.fax)}` : "", shop?.email ? esc(shop.email) : ""]
+    details: [shop?.fax ? `Fax: ${esc(shop.fax)}` : "", shop?.email ? esc(shop.email) : ""]
       .filter(Boolean).map((x) => `<div class="shop-sub">${x}</div>`).join(""),
   };
 }
@@ -491,7 +491,11 @@ export function applyDesign(html, kind, styleOverride) {
   const termsCss = `.footer.s4-terms{text-align:left!important;white-space:normal!important;line-height:1.35!important;height:auto!important;min-height:0!important;flex:none!important;padding:6px 12px!important}
 .s4-terms-title{text-align:center;font-weight:900;margin-bottom:4px}
 .s4-term-line{display:flex;align-items:flex-start;gap:4px;margin:1px 0}
-.s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}`;
+.s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}
+.sheet-mid{flex:1 1 auto!important;min-height:50mm!important;display:flex!important;flex-direction:column!important}
+.sheet-bot{flex:0 0 auto!important;margin-top:auto!important}
+table.items{height:100%!important;margin:0!important}
+tr.blank td{height:7mm;border-bottom:1px solid #999!important}`;
   let out = html.replace("</style>", `${templateCss(style)}${termsCss}</style>`);
   const shopName = /(<div class="shop-name">[\s\S]*?<\/div>)/;
   if (style.logo) out = out.replace(shopName, `<div class="s4-logo-wrap"><img class="s4-logo" src="${style.logo}" alt=""></div>$1`);
@@ -568,7 +572,9 @@ function tableHtml(el, kind, rows, layout, ox, oy, bn) {
   const colgroup = cols.map((c) => `<col style="width:${c.w}mm">`).join("");
   const cell = (c, v, head) => `<td style="${border}padding:0 1mm;height:${rowH}mm;overflow:hidden;white-space:nowrap;text-overflow:clip;text-align:${c.align || (RIGHT_COLS.has(c.key) ? "right" : c.key === "sl" ? "center" : "left")};${head ? "font-weight:700;" : ""}">${esc(v)}</td>`;
   const head = showHead ? `<tr>${cols.map((c) => cell(c, c.label || colLabel(kind, c.key, bn), true)).join("")}</tr>` : "";
-  const body = rows.map((r) => `<tr>${cols.map((c) => cell(c, r[c.key] ?? "", false)).join("")}</tr>`).join("");
+  const cap = tableCapacity(el, pre);
+  const filled = rows.length >= cap ? rows : [...rows, ...Array.from({ length: cap - rows.length }, () => ({}))];
+  const body = filled.map((r) => `<tr>${cols.map((c) => cell(c, r[c.key] ?? "", false)).join("")}</tr>`).join("");
   return `<table style="position:absolute;left:${el.x + ox}mm;top:${el.y + oy}mm;width:${el.w}mm;border-collapse:collapse;table-layout:fixed;font-size:${el.size || 10}pt">${colgroup}${head}${body}</table>`;
 }
 
