@@ -116,7 +116,7 @@ export default function SellingRatesPanel({
             </select>
           </div>
           <button type="button" className="pm-link-btn" onClick={onOpenNewCustomerType}>New Customer Type</button>
-          <button type="button" className="pm-btn-secondary" onClick={onPrintAlternateBarcode}>Print Alternate Barcode</button>
+          {onPrintAlternateBarcode && <button type="button" className="pm-btn-secondary" onClick={onPrintAlternateBarcode}>Print Alternate Barcode</button>}
         </div>
 
         <div className="pm-selling-fields">

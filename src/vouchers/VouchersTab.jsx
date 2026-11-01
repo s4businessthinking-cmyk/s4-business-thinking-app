@@ -38,7 +38,7 @@ const TILE_CSS = `
 `;
 
 export default function VouchersTab({
-  lang = "en", shopId, user, profile, isOwner, canJournal = false, cur = "AED", toast, shopName = "",
+  lang = "en", shopId, user, profile, isOwner, canJournal = false, canDelete = false, canPrint = false, cur = "AED", toast, shopName = "",
   makeNo, leaveGuard = null, customers = [], vendors = [], banks = [],
   onOpenReceipts, onOpenPayments, onOpenDebitNote, onOpenCreditNote,
 }) {
@@ -166,7 +166,7 @@ export default function VouchersTab({
   };
 
   const deleteRow = async (r) => {
-    if (!isOwner || r.status !== "cancelled") return;
+    if (!canDelete || r.status !== "cancelled") return;
     if (!window.confirm(L(`${r.voucherNo} একেবারে মুছে ফেলবেন?`, `Delete ${r.voucherNo} permanently?`))) return;
     try {
       await offlineRemove(COL, r.id);
@@ -337,8 +337,8 @@ export default function VouchersTab({
         </div>
         <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
           {editRow && !readOnly && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelRow(editRow)}>✖ {L("বাতিল", "Cancel voucher")}</button>}
-          {editRow && editRow.status === "cancelled" && isOwner && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => deleteRow(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
-          {editRow && <button type="button" className="pm-btn-secondary" onClick={() => printVoucher(editRow)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+          {editRow && editRow.status === "cancelled" && canDelete && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => deleteRow(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
+          {editRow && canPrint && <button type="button" className="pm-btn-secondary" onClick={() => printVoucher(editRow)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
           <button type="button" className="pm-btn-secondary" disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
           {!readOnly && (
@@ -398,7 +398,7 @@ export default function VouchersTab({
       <div className="si-toolbar">
         <button type="button" className="pm-btn-secondary" onClick={() => { setView(null); setForm(null); setEditId(null); }}>← {L("ভাউচার", "Vouchers")}</button>
         {canJournal && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন", "New")} {typeTitle}</button>}
-        <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>}
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (

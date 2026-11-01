@@ -18,7 +18,7 @@ const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/")
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const csvCell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
-export default function TaxReport({ lang = "en", shopId, shop, user, products = [], customers = [], vendors = [], shopName = "", toast, onShopUpdated }) {
+export default function TaxReport({ lang = "en", shopId, shop, user, products = [], customers = [], vendors = [], shopName = "", toast, onShopUpdated, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const settings = useMemo(() => taxSettingsOf(shop), [shop]);
@@ -539,7 +539,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
           {settings.ctEnabled && <button type="button" className={`pm-btn-secondary${view === "ct" ? " is-active" : ""}`} onClick={() => setView("ct")}>🏢 {L("কর্পোরেট ট্যাক্স", "Corporate Tax")}</button>}
         </div>
         <button type="button" className="pm-btn pm-btn--primary" onClick={fileNow}>🌐 {mobile ? L("জমা দিন", "File") : view === "ct" ? L("Corporate Tax জমা দিন", "File Corporate Tax") : L(`${tn} জমা দিন`, `File ${tn}`)}</button>
-        <button type="button" className="pm-btn-secondary" onClick={print} disabled={loading || badRange}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={print} disabled={loading || badRange}>🖨️ {L("প্রিন্ট", "Print")}</button>}
         <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={loading || badRange}>📥 Excel</button>
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}>🔄</button>
         <button type="button" className="pm-btn-secondary" onClick={openSettings}>⚙️ {L("সেটিং", "Settings")}</button>

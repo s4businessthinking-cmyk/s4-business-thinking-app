@@ -9,6 +9,7 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
   const [selInv,setSelInv]         = useState(null);
   const [editInvId,setEditInvId]   = useState(null);
   const [siPrintModal,setSiPrintModal] = useState(null); // invoice to print after confirm
+  const [siPrintPayAsk,setSiPrintPayAsk] = useState(false); // Cash vs Credit before print-confirm
   const [siInvoiceNo,setSiInvoiceNo]= useState("");
   const [siForm,setSiForm]         = useState(siEmptyForm());
   const [siLines,setSiLines]       = useState([]);
@@ -173,5 +174,5 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
       .catch(err=>console.warn("[S4 DN] legacy delivery note scan failed", err));
     return ()=>{ cancelled=true; };
   },[isDN, shopId]);
-  return { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiPrintModal, setSiSaving, setSiSearch, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siPrintModal, siQtyRef, siSaveLockRef, siSaving, siSearch, siSnapRef, siStatusF };
+  return { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiPrintModal, setSiPrintPayAsk, setSiSaving, setSiSearch, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siPrintModal, siPrintPayAsk, siQtyRef, siSaveLockRef, siSaving, siSearch, siSnapRef, siStatusF };
 }

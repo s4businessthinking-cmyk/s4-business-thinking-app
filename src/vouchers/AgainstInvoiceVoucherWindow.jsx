@@ -541,8 +541,8 @@ export default function AgainstInvoiceVoucherWindow({
               </div>
             ) : (
               <div style={{ display: "flex", gap: 6, marginRight: narrow ? 0 : "auto", flexWrap: "wrap", order: narrow ? 2 : 0 }}>
-                <button type="button" onClick={() => onPrint?.(viewing)} style={btn()}>🖨️ Print</button>
-                <button type="button" onClick={() => onPrint?.(viewing, { summaryOnly: true })} style={btn()}>🖨️ Print (Summary)</button>
+                {onPrint && <button type="button" onClick={() => onPrint(viewing)} style={btn()}>🖨️ Print</button>}
+                {onPrint && <button type="button" onClick={() => onPrint(viewing, { summaryOnly: true })} style={btn()}>🖨️ Print (Summary)</button>}
                 {!cancelled && viewing.method === "cheque" && onPrintCheque && (
                   <button type="button" onClick={() => onPrintCheque(viewing)} style={btn()}>🖨️ Print Cheque</button>
                 )}
@@ -597,19 +597,31 @@ function VoucherFindModal({ vouchers, isReceipt, lang, onClose, onPick }) {
   const bn = lang === "bn";
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [crit, setCrit] = useState({ no: "", party: "", amount: "" });
+  const [crit, setCrit] = useState({ no: "", party: "", amount: "", cheque: "", rcpt: "" });
   const rows = useMemo(() => vouchers.filter((v) => {
     const d = String(v.date || "").slice(0, 10);
     if (from && d < from) return false;
     if (to && d > to) return false;
-    return textMatch(v.no, crit.no, true) && textMatch(v.partyName, crit.party, true) && textMatch(f2(v.totalAmount), crit.amount, true);
+    return textMatch(v.no, crit.no, true) && textMatch(v.partyName, crit.party, true) && textMatch(f2(v.totalAmount), crit.amount, true)
+      && textMatch(v.chequeNo, crit.cheque, true) && textMatch(v.vendorReceiptNo || v.refNo, crit.rcpt, true);
   }), [vouchers, from, to, crit]);
+  const findStatus = (v) => {
+    if (v.status === "cancelled") return { text: bn ? "বাতিল" : "Cancelled", color: "#b91c1c" };
+    if (v.method === "cheque") {
+      const map = { pending: bn ? "পেন্ডিং" : "Pending", cleared: bn ? "ক্লিয়ার্ড" : "Cleared", bounced: bn ? "বাউন্স" : "Bounced" };
+      return { text: map[v.chequeStatus] || map.pending, color: v.chequeStatus === "cleared" ? "#166534" : v.chequeStatus === "bounced" ? "#b91c1c" : "#c2410c" };
+    }
+    return { text: METHOD_LABEL[v.method] || (bn ? "নগদ" : "Cash"), color: "#166534" };
+  };
   const columns = [
     { key: "no", label: "Voucher No", width: 100, bold: true, render: (v) => v.no },
-    { key: "date", label: "Date", width: 100, render: (v) => fmtDateLong(v.date) },
-    { key: "party", label: isReceipt ? "Customer" : "Vendor", width: 260, render: (v) => v.partyName || "—" },
-    { key: "mode", label: "Mode", width: 100, render: (v) => METHOD_LABEL[v.method] || "Cash" },
-    { key: "amt", label: "Amount", width: 110, align: "right", render: (v) => f2(v.totalAmount), color: (v) => (v.status === "cancelled" ? "#9ca3af" : undefined) },
+    { key: "date", label: "Date", width: 92, render: (v) => fmtDateLong(v.date) },
+    { key: "party", label: isReceipt ? "Customer" : "Vendor", width: 200, render: (v) => v.partyName || "—" },
+    { key: "mode", label: "Mode", width: 88, render: (v) => METHOD_LABEL[v.method] || "Cash" },
+    { key: "cheque", label: "Cheque No", width: 90, render: (v) => v.chequeNo || "—" },
+    { key: "rcpt", label: isReceipt ? "Ref No" : "Vendor Rcpt", width: 96, render: (v) => v.vendorReceiptNo || v.refNo || "—" },
+    { key: "amt", label: "Amount", width: 100, align: "right", render: (v) => f2(v.totalAmount), color: (v) => (v.status === "cancelled" ? "#9ca3af" : undefined) },
+    { key: "st", label: "Status", width: 110, render: (v) => { const s = findStatus(v); return <span style={{ color: s.color, fontWeight: 700 }}>{s.text}</span>; } },
   ];
   const box = (label, key) => (
     <label style={{ display: "grid", gap: 2 }}>
@@ -618,17 +630,19 @@ function VoucherFindModal({ vouchers, isReceipt, lang, onClose, onPick }) {
     </label>
   );
   return (
-    <Modal title={isReceipt ? "Find Receipt" : "Find Payment"} onClose={onClose} width={760}>
+    <Modal title={isReceipt ? "Find Receipt" : "Find Payment"} onClose={onClose} width={980}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span style={lbl}>From</span>
         <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}>To</span>
         <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr", gap: 6, marginBottom: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
         {box("Voucher No", "no")}
         {box(isReceipt ? "Customer" : "Vendor", "party")}
         {box("Amount", "amount")}
+        {box("Cheque No", "cheque")}
+        {box(isReceipt ? "Ref No" : "Vendor Rcpt", "rcpt")}
       </div>
       <div style={{ border: `1px solid ${C.border}`, height: "44vh", overflow: "auto" }}>
         <GridTable columns={columns} rows={rows} rowKey={(v) => v.id} onRowDoubleClick={onPick} minRows={14}

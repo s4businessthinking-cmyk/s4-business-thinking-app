@@ -21,6 +21,10 @@ function openIndexedDb() {
   if (idbPromise) return idbPromise;
   idbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
+    const timer = setTimeout(() => {
+      idbPromise = null;
+      reject(new Error("IndexedDB open timed out"));
+    }, 8000);
 
     request.onupgradeneeded = () => {
       const database = request.result;
@@ -29,13 +33,21 @@ function openIndexedDb() {
       }
     };
 
+    request.onblocked = () => {
+      clearTimeout(timer);
+      idbPromise = null;
+      reject(new Error("IndexedDB blocked"));
+    };
+
     request.onsuccess = () => {
+      clearTimeout(timer);
       const database = request.result;
       database.onclose = () => { idbPromise = null; };
       database.onversionchange = () => { database.close(); idbPromise = null; };
       resolve(database);
     };
     request.onerror = () => {
+      clearTimeout(timer);
       idbPromise = null;
       reject(request.error);
     };
@@ -159,6 +171,10 @@ export function queryRows(sql, params = []) {
 }
 
 export async function persistOfflineDb() {
+  try {
+    const { invalidateInvoiceRowsCache } = await import("../inventory/stockRowsCache.js");
+    invalidateInvoiceRowsCache();
+  } catch { /* stock cache is optional */ }
   return persist();
 }
 

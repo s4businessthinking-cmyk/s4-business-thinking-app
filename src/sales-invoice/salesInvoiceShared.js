@@ -1,4 +1,4 @@
-import { loadPrintDesign, layoutAppliesTo, amountInWords, renderLayoutDocument, shopHeaderExtras, applyDesign } from "../print/printDesign.js";
+import { loadPrintDesign, layoutAppliesTo, layoutForPrint, amountInWords, renderLayoutDocument, shopHeaderExtras, applyDesign } from "../print/printDesign.js";
 import { loadPrintSettings, docSettingsFor, paperCss, paperHeightMm, printWithSettings } from "../print/printSettings.js";
 import { PI_VOUCHER_METHODS, piFmt2, piN2 } from "../shared/appShared.jsx";
 
@@ -168,12 +168,8 @@ export function siUnitOptionsFor(prod, currentUnit) {
   return [...new Set([prod.unit || "Pcs", ...rows, currentUnit].filter(Boolean))];
 }
 
-export const SI_PAY     = {
-  cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
-  bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
-  cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
-  credit: { bn:"বাকি (ক্রেডিট)",  en:"Credit",         icon:"📅" },
-};
+import { SI_PAY, siIsSettledPay, siSettledPayLabel } from "./siPay.js";
+export { SI_PAY, siIsSettledPay, siSettledPayLabel };
 
 export const SI_STATUSES = {
   draft:     { bn:"ড্রাফট",        en:"Draft",     color:"#f59e0b", bg:"#451a03" },
@@ -249,6 +245,10 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const cur = invoice.currency || (isBn ? "৳" : "AED");
   const { sub, lineDisc, vat, grand, billDisc, adjustment, roundOff } = siCalcTotals(invoice.items||[], effectiveTax, siInvoiceExtras(invoice));
   const balance = grand - (invoice.amountPaid||0);
+  const paidAmt = siN2(invoice.amountPaid);
+  const isPartialPay = !isQuote && !isDelivery && paidAmt > 0.01 && balance > 0.01;
+  const isSettledPay = !isQuote && !isDelivery && paidAmt > 0.01 && balance <= 0.01;
+  const payLabel = SI_PAY[invoice.paymentMethod]?.[lang] || invoice.paymentMethod || "";
   const extraRowsHTML = [
     billDisc>0 ? `<div class="totals-row"><span class="tl">${isBn?"বিলের ছাড়":"Bill Discount"}${siN2(invoice.billDiscPerc)>0?` (${invoice.billDiscPerc}%)`:""}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(billDisc)}</span></div>` : "",
     adjustment ? `<div class="totals-row"><span class="tl">${isBn?"সমন্বয়":"Adjustment"}</span><span class="tv">${adjustment>0?"+":"-"} ${cur} ${siFmt2(Math.abs(adjustment))}</span></div>` : "",
@@ -291,7 +291,7 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   })();
   const custBalance = siN2(opts.customerBalance);
   const custBalanceHTML = ps.printCustomerBalance && !isQuote && !isDelivery && invoice.customerName && custBalance>0.01
-    ? `<div class="bal-box" style="background:#fff7ed;border-color:#f59e0b"><span style="font-weight:700;color:#b45309">📒 ${isBn?"কাস্টমারের মোট বাকি (সব বিল)":"Customer's total balance (all bills)"}</span><span style="font-size:15px;font-weight:900;color:#b45309">${cur} ${siFmt2(custBalance)}</span></div>`
+    ? `<div class="bal-box"><span style="font-weight:700">${isBn?"কাস্টমারের মোট বাকি (সব বিল)":"Customer's total balance (all bills)"}</span><span style="font-size:15px;font-weight:900">${cur} ${siFmt2(custBalance)}</span></div>`
     : "";
 
   const title = isSO
@@ -316,20 +316,33 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
       };
     });
     const noMoney = isQuote || isDelivery;
+    const vatSummaryText = (vatSummaryHTML.match(/<tbody>([\s\S]*?)<\/tbody>/)?.[1] || "")
+      .replace(/<tr>/g, "").replace(/<\/tr>/g, "\n").replace(/<[^>]+>/g, " ").replace(/[ \t]+/g, " ").trim();
     const fields = {
       shopName:shop?.companyName||"", shopAddress:[shop?.area,shop?.countryName].filter(Boolean).join(", "), shopPhone:shop?.mobile||"",
       shopNameAr:shop?.companyNameAr||"", shopLicense:shop?.tradeLicenseNumber||"", shopEmail:shop?.email||"",
-      shopTrn:isTax?(shop?.trnNumber||shop?.vatNumber||""):"", title, invoiceNo:invoice.invoiceNo||"", date:invoice.invoiceDate||"", time:timeText,
+      shopFax:shop?.fax||"", shopWebsite:shop?.website||"", shopVat:isTax?(shop?.vatNumber||""):"",
+      shopTrn:isTax?(shop?.trnNumber||shop?.vatNumber||""):"", headerNote:design.style?.invoice?.headerNote||"",
+      title, invoiceNo:invoice.invoiceNo||"", date:invoice.invoiceDate||"", time:timeText,
       customerName:invoice.customerName||"", customerMobile:invoice.customerMobile||"", customerAddress:invoice.customerAddress||"",
-      customerTrn:isTax?(invoice.customerTrn||""):"", customerCode:invoice.customerCode||"", refNo:invoice.refNo||"", salesman:ps.printSalesman?(invoice.salesmanName||""):"",
-      payment:noMoney?"":(SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod||""), userName:userNameHTML,
+      customerTrn:isTax?(invoice.customerTrn||""):"", customerCode:invoice.customerCode||"", refNo:invoice.refNo||"",
+      salesman:ps.printSalesman?(invoice.salesmanName||""):"",
+      payment:noMoney?"":payLabel, userName:userNameHTML,
+      quotationNo:invoice.quotationNo||"", salesOrderNo:invoice.salesOrderNo||"", jobOrderNo:invoice.jobOrderNo||"",
       deliveryNo:invoice.deliveryNoteNo||"", vehicleNo:invoice.vehicleNo||"", validUntil:isQuote?(invoice.validUntil||""):"",
+      dueDate:ps.printCreditPeriod?(invoice.dueDate||""):"", currency:cur,
       totalQty:String((invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)), subtotal:siFmt2(sub),
-      discount:lineDisc+billDisc>0?siFmt2(lineDisc+billDisc):"", vat:effectiveTax?siFmt2(vat):"", grandTotal:`${cur} ${siFmt2(grand)}`,
-      paid:!noMoney&&invoice.amountPaid>0?siFmt2(invoice.amountPaid):"", balance:!noMoney&&balance>0.01?siFmt2(balance):"",
+      discount:lineDisc>0?siFmt2(lineDisc):"", billDiscount:billDisc>0?siFmt2(billDisc):"",
+      vat:effectiveTax?siFmt2(vat):"", vatSummary:ps.printVatSummary?vatSummaryText:"",
+      adjustment:adjustment?siFmt2(adjustment):"", roundOff:roundOff?siFmt2(roundOff):"",
+      grandTotal:`${cur} ${siFmt2(grand)}`,
+      paid:(isPartialPay||isSettledPay)?siFmt2(paidAmt):"", balance:!noMoney&&balance>0.01?siFmt2(balance):"",
       customerBalance:custBalanceHTML?siFmt2(custBalance):"", amountWords:amountInWords(grand, cur), note:ps.printNarration?(invoice.note||""):"",
+      creditPeriod:ps.printCreditPeriod&&siN2(invoice.creditDays)>0?`${invoice.creditDays} ${isBn?"দিন":"days"}`:"",
+      terms:design.style?.invoice?.footerText||"",
+      bankDetails:[shop?.bankName, shop?.accountNumber, shop?.ibanNumber].filter(Boolean).join(" · "),
     };
-    return renderLayoutDocument(layout, "invoice", { fields, items, logo:design.style.invoice?.logo }, { copies:ds.copies, title:`${title} - ${invoice.invoiceNo}`, bn:isBn });
+    return renderLayoutDocument(layoutForPrint(layout, { hideVatDiscCols: hideVatCols }), "invoice", { fields, items, logo:design.style.invoice?.logo }, { copies:ds.copies, title:`${title} - ${invoice.invoiceNo}`, bn:isBn });
   }
 
   // B&W vs Color — clearly distinct
@@ -348,7 +361,7 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const rows = (invoice.items||[]).map((it,i)=>{
     const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
     const codeHtml = showCode&&!invoice.hideCodeInPrint&&(it.code||it.brand)
-      ? `<br><span style="font-size:10px;color:#6b7280">${[it.code&&("📋 "+it.code),it.brand&&("🏷️ "+it.brand)].filter(Boolean).join("  ")}</span>` : "";
+      ? `<br><span style="font-size:10px;color:#6b7280">${[it.code,it.brand].filter(Boolean).join("  ")}</span>` : "";
     if (isDelivery) {
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800;color:#7c3aed">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
     } else if (hideVatCols) {
@@ -373,13 +386,13 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
       ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">${cur} ${siFmt2(sub)}</span></div>${lineDisc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(lineDisc)}</span></div>`:""}<div class="totals-row" style="background:#fef9c3"><span class="tl" style="color:#92400e;font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv" style="color:#92400e">+ ${cur} ${siFmt2(vat)}</span></div>${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
     : `${lineDisc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv" style="color:#ef4444">- ${cur} ${siFmt2(lineDisc)}</span></div>`:""}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`;
 
-  const custHTML = `<div class="info-box"><div class="info-label">👤 ${isBn?"কাস্টমার":"Customer"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerCode?`<div class="info-sub">${isBn?"কোড":"Code"}: ${invoice.customerCode}</div>`:""}${invoice.customerMobile?`<div class="info-sub">📱 ${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">📍 ${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="color:#b45309;font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
+  const custHTML = `<div class="info-box"><div class="info-label">${isBn?"বিল টু":"Bill To"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerCode?`<div class="info-sub">${isBn?"কোড":"Code"}: ${invoice.customerCode}</div>`:""}${invoice.customerMobile?`<div class="info-sub">${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
 
   const payInfoHTML = isQuote
-    ? `<div class="info-box"><div class="info-label">📅 ${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">👤 ${invoice.createdByName||""}</div>${metaHTML}</div>`
+    ? `<div class="info-box"><div class="info-label">${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">${invoice.createdByName||""}</div>${metaHTML}</div>`
     : isDelivery
-    ? `<div class="info-box"><div class="info-label">📦 ${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">🚗 ${invoice.vehicleNo}</div>`:""}${invoice.createdByName?`<div class="info-sub">👤 ${invoice.createdByName}</div>`:""}${metaHTML}</div>`
-    : `<div class="info-box"><div class="info-label">💳 ${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${SI_PAY[invoice.paymentMethod]?.icon||""} ${SI_PAY[invoice.paymentMethod]?.[lang]||invoice.paymentMethod}</div><div class="info-sub">${SI_STATUSES[invoice.status]?.[lang]||invoice.status}</div>${metaHTML}</div>`;
+    ? `<div class="info-box"><div class="info-label">${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">${isBn?"গাড়ি":"Vehicle"}: ${invoice.vehicleNo}</div>`:""}${invoice.createdByName?`<div class="info-sub">${invoice.createdByName}</div>`:""}${metaHTML}</div>`
+    : `<div class="info-box"><div class="info-label">${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${payLabel}</div>${metaHTML}</div>`;
 
   const thermal = ds.paper==="80mm" || ds.paper==="58mm";
   // Full-page bill: in print the invoice box becomes a table at least one page tall (8 mm margins, 1 mm slack)
@@ -390,11 +403,10 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const rawDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} - ${invoice.invoiceNo}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 @page{size:${paperCss(ds.paper)};margin:${thermal?"3mm":"8mm"}}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
+body{font-family:'Segoe UI','Nirmala UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
 .invoice{max-width:820px;margin:0 auto;border:2px solid ${accentBorder};border-radius:${colorPrint?"12px":"4px"};overflow:hidden;box-shadow:${colorPrint?"0 4px 20px rgba(0,0,0,0.12)":"none"}}
 .hdr{background:${headerGrad};color:${headerText};padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:${colorPrint?"none":"2px solid #dee2e6"}}
 .shop-name{font-size:20px;font-weight:900}
@@ -412,8 +424,11 @@ thead tr{background:${theadBg};color:${theadText}}
 th{padding:9px 8px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.4px;font-weight:700}
 td{padding:8px;border-bottom:1px solid #e5e7eb;vertical-align:top}
 tbody tr:nth-child(even){background:#f9fafb}
-.totals{display:flex;justify-content:flex-end;margin-bottom:14px}
-.totals-box{width:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
+.totals-wrap{display:flex;align-items:stretch;gap:12px;margin-bottom:14px}
+.totals-left{flex:1;min-width:0;display:flex}
+.totals-left .words-box{flex:1;margin:0;display:flex;align-items:center}
+.totals{flex:0 0 300px;margin:0}
+.totals-box{width:100%;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden}
 .totals-row{display:flex;justify-content:space-between;padding:8px 13px;border-bottom:1px solid #f3f4f6}
 .tl{color:#6b7280;font-size:12px}
 .tv{font-weight:700;font-size:12px}
@@ -423,30 +438,36 @@ tbody tr:nth-child(even){background:#f9fafb}
 .pay-box{background:#f0fdf4;border:1px solid #22c55e;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .bal-box{background:#fef2f2;border:1px solid #ef4444;border-radius:8px;padding:9px 13px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .note-box{background:#fff7ed;border:1px solid #fdba74;border-radius:8px;padding:9px 13px;margin-bottom:14px;font-size:12px;color:#92400e}
+.words-box{background:#f8fafc;border:1px solid #cbd5e1;padding:8px 12px;margin-bottom:10px;font-size:12px;font-weight:600}
 ${isDelivery?`.recv-box{background:${colorPrint?"#f3e8ff":"#f8f9fa"};border:2px solid ${colorPrint?"#7c3aed":"#6b7280"};border-radius:8px;padding:14px;margin-bottom:14px}.recv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}.recv-item{border-top:1.5px solid #9ca3af;margin-top:36px;padding-top:6px;font-size:11px;color:#6b7280}`:""}
-.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px;padding-top:14px;border-top:1px dashed #e5e7eb}
-.sig-line{border-top:1.5px solid #9ca3af;margin-top:44px;padding-top:6px;font-size:11px;color:#6b7280;text-align:center}
-.footer{text-align:center;padding:11px 22px;background:${colorPrint?"#f9fafb":"#f0f0f0"};border-top:2px solid ${accentBorder};font-size:12px;color:${accentBorder};font-weight:700}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:10px;padding-top:4px;border-top:none;flex:none}
+.sig-line{border-top:1.5px solid #9ca3af;margin-top:22px;padding-top:4px;font-size:11px;color:#6b7280;text-align:center}
+.footer{text-align:center;padding:8px 12px;background:${colorPrint?"#f9fafb":"#f0f0f0"};border-top:2px solid ${accentBorder};font-size:12px;color:${accentBorder};font-weight:700;height:auto;flex:none}
 @media print{body{padding:0}.no-print{display:none!important}.invoice{border-radius:0;box-shadow:none}}
-${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr;gap:6px}.totals-box{width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
-${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}${pageH?`.fp-grow .body{padding-bottom:0}.fp-tail{padding-top:0}@media print{.invoice{display:table;width:100%;height:${pageH-17}mm;margin-top:0!important}.fp-r{display:table-row}.fp-grow{height:100%}}`:""}
+${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr;gap:6px}.totals-wrap{flex-direction:column;align-items:stretch}.totals{flex:1 1 auto;width:100%}.totals-box{width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
+${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}${pageH?`.invoice{display:block}
+.fp-grow,.fp-r,.fp-tail{display:block}
+.fp-grow .body,.fp-tail{padding-bottom:0}
+.fp-grow table{flex:none;height:auto}
+@media print{body{padding:0}.invoice{min-height:0!important;height:auto!important;margin-top:0!important}}`:""}
 </style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="padding:10px 28px;background:${grandBg};color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">🖨️ ${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
-<div class="invoice">${fpRow}<div class="hdr"><div class="shop-block"><div class="shop-name">🏢 ${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">📱 ${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px;color:${colorPrint?"inherit":"#b45309"}">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title" style="color:${colorPrint?"#fff":accentBorder}">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800;color:${colorPrint?"rgba(255,255,255,0.9)":"#333"}">${invoice.invoiceNo}</div><div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">📅 ${invoice.invoiceDate}${timeText?` &nbsp;🕒 ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no" style="color:${colorPrint?"rgba(255,255,255,0.8)":"#555"}">👤 ${userNameHTML}</div>`:""}</div></div>${fpEnd}
+<div class="invoice">${fpRow}<div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate}${timeText?`  ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no">${userNameHTML}</div>`:""}</div></div>${fpEnd}
 ${fpGrow}<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div>
 <table><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table>${pageH?`</div>${fpEnd}${fpRow}<div class="body fp-tail">`:""}
-${totalsHTML?`<div class="totals"><div class="totals-box">${totalsHTML}</div></div>`:""}
+${totalsHTML?`<div class="totals-wrap">${!isDelivery&&!isQuote?`<div class="totals-left"><div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div></div>`:""}<div class="totals"><div class="totals-box">${totalsHTML}</div></div></div>`:(!isDelivery&&!isQuote?`<div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div>`:"")}
 ${vatSummaryHTML}
-${!isDelivery&&!isQuote&&invoice.amountPaid>0?`<div class="pay-box"><span style="font-weight:700;color:#15803d">✅ ${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900;color:#15803d">${cur} ${siFmt2(invoice.amountPaid)}</span></div>`:""}
-${!isDelivery&&!isQuote&&balance>0.01?`<div class="bal-box"><span style="font-weight:700;color:#dc2626">⚠️ ${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900;color:#dc2626">${cur} ${siFmt2(balance)}</span></div>`:""}
-${isDelivery?`<div class="recv-box"><div style="font-size:11px;color:#7c3aed;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">✅ ${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
+${isPartialPay?`<div class="pay-box"><span style="font-weight:700">${isBn?"আংশিক পরিশোধ":"Part Received"}</span><span style="font-size:17px;font-weight:900">${cur} ${siFmt2(paidAmt)}</span></div>`:isSettledPay?`<div class="pay-box"><span style="font-weight:700">${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900">${cur} ${siFmt2(paidAmt)}</span></div>`:""}
+${!isDelivery&&!isQuote&&balance>0.01?`<div class="bal-box"><span style="font-weight:700">${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900">${cur} ${siFmt2(balance)}</span></div>`:""}
+${isDelivery?`<div class="recv-box"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
 ${custBalanceHTML}
-${ps.printNarration&&invoice.note?`<div class="note-box">📝 ${invoice.note}</div>`:""}
+${ps.printNarration&&invoice.note?`<div class="note-box">${invoice.note}</div>`:""}
+<div class="footer">${isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ।":"Thank you for your order."):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ।`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you.`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন।":"Please sign this challan upon delivery."):(isBn?"ব্যবসার জন্য ধন্যবাদ।":"Thank you for your business.")}</div>
 ${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
-</div>${fpEnd}${fpRow}<div class="footer">${isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ! 🙏":"Thank you for your order! 🙏"):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ! 🙏`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you! 🙏`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন 🚚":"Please sign this challan upon delivery 🚚"):(isBn?"ব্যবসার জন্য ধন্যবাদ! 🙏":"Thank you for your business! 🙏")}</div>${fpEnd}</div></body></html>`;
+</div>${fpEnd}</div></body></html>`;
   const doc = applyDesign(rawDoc, "invoice", opts.style || design.style.invoice);
   const copies = Math.max(1, Math.min(10, parseInt(ds.copies, 10) || 1));
   if (copies === 1) return doc;

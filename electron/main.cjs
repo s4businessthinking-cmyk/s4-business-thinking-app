@@ -11,6 +11,12 @@ const BACKUP_FILE_RE = /^(S4-backup-[\w-]+)-\d{8}-\d{4}\.s4backup$/;
 
 // Closing the window asks the page first (the owner is offered a data backup); the page then sends
 // s4-app:close-now. Quitting the app (auto-update install, app.quit) never asks.
+// Unpackaged `npx electron .` must not share the installed app's profile — two Chromiums on
+// the same userData lock IndexedDB and the window stays on the loading spinner forever.
+if (!app.isPackaged) {
+  app.setPath("userData", path.join(app.getPath("appData"), "s4-business-thinking-dev"));
+}
+
 let closeAllowed = false;
 app.on("before-quit", () => { closeAllowed = true; });
 
@@ -35,6 +41,8 @@ function startLocalServer(rootDir) {
       fs.readFile(filePath, (err, data) => {
         if (err) { res.writeHead(404); res.end(); return; }
         res.setHeader("Content-Type", STATIC_MIME[path.extname(filePath).toLowerCase()] || "application/octet-stream");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
         res.end(data);
       });
     });
@@ -49,6 +57,8 @@ async function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
+    show: false,
+    backgroundColor: "#eef6ff",
     title: "S4 Business Thinking",
     webPreferences: {
       contextIsolation: true,
@@ -56,6 +66,9 @@ async function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
+  // Open to the work area (same as the Windows maximize button) so the app matches the PC screen.
+  win.maximize();
+  win.once("ready-to-show", () => win.show());
   // The default menu bar grabs F10 on Windows, which the invoice screen needs for product search.
   win.removeMenu();
   // On Windows the page can lose keyboard focus while the window stays active, so text boxes stop taking input.
@@ -113,6 +126,7 @@ app.whenReady().then(() => {
   setupDialogIpc();
   setupBackupIpc();
   setupPrintIpc();
+  setupScanIpc();
   createWindow();
   setupAutoUpdater();
 });
@@ -127,7 +141,7 @@ function setupDialogIpc() {
       type: isConfirm ? "question" : "info",
       title: "S4 Business Thinking",
       message: String(message ?? ""),
-      buttons: isConfirm ? ["OK", "Cancel"] : ["OK"],
+      buttons: isConfirm ? ["Yes", "No"] : ["OK"],
       defaultId: 0,
       cancelId: isConfirm ? 1 : 0,
       noLink: true,
@@ -211,6 +225,10 @@ function setupBackupIpc() {
   });
 }
 
+const { execFile, spawn } = require("child_process");
+const { promisify } = require("util");
+const execFileAsync = promisify(execFile);
+
 const PRINT_HTML_MAX_BYTES = 8 * 1024 * 1024;
 
 function setupPrintIpc() {
@@ -239,7 +257,6 @@ function setupPrintIpc() {
     });
     try {
       await win.loadFile(file);
-      await new Promise((resolve) => setTimeout(resolve, 300));
       return await new Promise((resolve) => {
         // color:false — a silent job sent as "color" makes many printers switch to a slower
         // pipeline even for plain black text; these documents never need actual color ink.
@@ -250,6 +267,75 @@ function setupPrintIpc() {
     } finally {
       win.destroy();
       fs.promises.unlink(file).catch(() => {});
+    }
+  });
+}
+
+function runWiaScript(scriptPath) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("powershell.exe", [
+      "-NoProfile", "-STA", "-ExecutionPolicy", "Bypass", "-File", scriptPath,
+    ], { windowsHide: false });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch { /* ignore */ }
+      reject(new Error("scan timed out"));
+    }, 180000);
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+    child.on("error", (err) => { clearTimeout(timer); reject(err); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (code === 2) resolve({ cancelled: true, stdout, stderr });
+      else if (code === 0) resolve({ stdout, stderr });
+      else reject(Object.assign(new Error(String(stderr || "").trim() || "scan failed"), { code, stderr }));
+    });
+  });
+}
+
+function setupScanIpc() {
+  ipcMain.handle("s4-scan:acquire", async () => {
+    const scriptPath = path.join(app.getPath("temp"), `s4-wia-${Date.now()}.ps1`);
+    const script = [
+      "$ErrorActionPreference = 'Stop'",
+      "$jpeg = '{B96B3CAE-0728-11D3-9D7B-0000F81EF32E}'",
+      "try {",
+      "  $dialog = New-Object -ComObject WIA.CommonDialog",
+      "  $img = $null",
+      "  try { $img = $dialog.ShowAcquireImage(1, 0, 0, $jpeg, $false, $true, $true) } catch {}",
+      "  if (-not $img) { try { $img = $dialog.ShowAcquireImage() } catch {} }",
+      "  if (-not $img) { exit 2 }",
+      "  $tmp = Join-Path $env:TEMP ('s4-scan-' + [guid]::NewGuid().ToString('N') + '.jpg')",
+      "  if ($img.FormatID -ne $jpeg) {",
+      "    $ip = New-Object -ComObject WIA.ImageProcess",
+      "    [void]$ip.Filters.Add($ip.FilterInfos.Item('Convert').FilterID)",
+      "    $ip.Filters.Item(1).Properties.Item('FormatID').Value = $jpeg",
+      "    try { $ip.Filters.Item(1).Properties.Item('Quality').Value = 80 } catch {}",
+      "    $img = $ip.Apply($img)",
+      "  }",
+      "  if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }",
+      "  $img.SaveFile($tmp)",
+      "  Write-Output $tmp",
+      "} catch {",
+      "  [Console]::Error.WriteLine($_.Exception.Message)",
+      "  exit 1",
+      "}",
+    ].join("\r\n");
+    await fs.promises.writeFile(scriptPath, script, "utf8");
+    try {
+      const result = await runWiaScript(scriptPath);
+      if (result.cancelled) return { ok: false, cancelled: true };
+      const file = String(result.stdout || "").trim().split(/\r?\n/).filter(Boolean).pop();
+      if (!file) return { ok: false, cancelled: true };
+      const bytes = await fs.promises.readFile(file);
+      fs.promises.unlink(file).catch(() => {});
+      return { ok: true, dataUrl: `data:image/jpeg;base64,${bytes.toString("base64")}` };
+    } catch (err) {
+      if (Number(err?.code) === 2) return { ok: false, cancelled: true };
+      return { ok: false, error: String(err?.stderr || err?.message || "scan failed") };
+    } finally {
+      fs.promises.unlink(scriptPath).catch(() => {});
     }
   });
 }

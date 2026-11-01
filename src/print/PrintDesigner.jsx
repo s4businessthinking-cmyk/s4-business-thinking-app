@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  DESIGN_DOCS, LAYOUT_FIELDS, TABLE_COLS, LAYOUT_PAPERS, INVOICE_KINDS, SAMPLE_DATA,
+  DESIGN_DOCS, LAYOUT_FIELDS, LAYOUT_FIELD_GROUPS, FIELD_PRINT_SETTING, TABLE_COLS, LAYOUT_PAPERS, INVOICE_KINDS, SAMPLE_DATA,
   defaultLayout, renderLayoutDocument, tableCapacity, colLabel, imageFileToDataUrl,
 } from "./printDesign.js";
 import { printHtmlDocument } from "./printSettings.js";
@@ -199,6 +199,13 @@ export default function PrintDesigner({ kind, layout: initial, lang, logo = "", 
             <label style={{ fontSize: 11 }}>{bn ? "আগে লেবেল (pre-printed এ প্রিন্ট হবে না)" : "Label before value (not printed on pre-printed)"}
               <input value={sel.label || ""} onChange={(e) => set("label", e.target.value)} style={input({ width: "100%" })} />
             </label>
+            {FIELD_PRINT_SETTING[sel.field] && (
+              <div style={{ fontSize: 10, color: "#1e3a8a", lineHeight: 1.35 }}>
+                {bn
+                  ? `* Print Settings → General-এ এই অপশন চালু থাকলেই প্রিন্ট হবে।`
+                  : `* Prints only when the matching option is on in Print Settings → General.`}
+              </div>
+            )}
           </>
         )}
         {sel.type === "text" && (
@@ -311,11 +318,23 @@ export default function PrintDesigner({ kind, layout: initial, lang, logo = "", 
       <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
         <div style={{ width: 200, flexShrink: 0, overflowY: "auto", borderRight: `1px solid ${C.border}`, background: C.panel, padding: 8 }}>
           <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, color: "#1e3a8a" }}>{bn ? "তথ্য যোগ করুন" : "Add field"}</div>
-          {fields.map(([k, en, b]) => (
-            <button key={k} type="button" onClick={() => addEl({ type: "field", field: k, w: 60, h: 6, label: "" })}
-              style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 6px", marginBottom: 2, fontFamily: font, fontSize: 12, cursor: "pointer", border: "1px solid #b6c6dc", background: usedFields.has(k) ? "#e0ecfb" : "#fff", color: C.text }}>
-              {usedFields.has(k) ? "✓ " : "+ "}{bn ? b : en}
-            </button>
+          <div style={{ fontSize: 10, color: "#374151", lineHeight: 1.4, marginBottom: 6 }}>
+            {bn
+              ? "যে ঘর লাগবে সেটায় ক্লিক করে কাগজে বসান। * চিহ্নিত ঘর Print Settings-এর অপশনের সাথে মিলে — সেখানে বন্ধ থাকলে প্রিন্টে খালি থাকবে।"
+              : "Click a field to place it. * fields follow Print Settings — if that option is off, the field prints blank."}
+          </div>
+          {(LAYOUT_FIELD_GROUPS[kind] || [{ en: "Fields", bn: "তথ্য", fields }]).map((group) => (
+            <div key={group.en} style={{ marginBottom: 8 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#1e3a8a", margin: "6px 0 3px", textTransform: "uppercase", letterSpacing: 0.3 }}>
+                {bn ? group.bn : group.en}
+              </div>
+              {group.fields.map(([k, en, b]) => (
+                <button key={k} type="button" onClick={() => addEl({ type: "field", field: k, w: 60, h: 6, label: "" })}
+                  style={{ display: "block", width: "100%", textAlign: "left", padding: "4px 6px", marginBottom: 2, fontFamily: font, fontSize: 12, cursor: "pointer", border: "1px solid #b6c6dc", background: usedFields.has(k) ? "#e0ecfb" : "#fff", color: C.text }}>
+                  {usedFields.has(k) ? "✓ " : "+ "}{bn ? b : en}{FIELD_PRINT_SETTING[k] ? " *" : ""}
+                </button>
+              ))}
+            </div>
           ))}
           <div style={{ fontSize: 11, fontWeight: 700, margin: "10px 0 4px", color: "#1e3a8a" }}>{bn ? "অন্যান্য" : "Other"}</div>
           {!table && <button type="button" style={{ ...btn(false), width: "100%", marginBottom: 3 }} onClick={() => addEl({ type: "table", x: 15, y: 70, w: 180, h: 120, rowH: 7, header: true, grid: true, cols: TABLE_COLS[kind].slice(0, 4).map(([key]) => ({ key, w: 45 })) })}>▦ {bn ? "আইটেম টেবিল" : "Items table"}</button>}

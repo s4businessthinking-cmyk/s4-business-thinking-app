@@ -6,7 +6,7 @@ import { PM_CSS } from "../product-master/pmStyles";
 import { PM_TH, SI_CSS } from "./siSkin.js";
 import ProductInvoiceEntryInfo from "./ProductInvoiceEntryInfo.jsx";
 import { ProductTypeaheadInput } from "../components/ProductTypeaheadInput.jsx";
-import { SI_PAY, siCalcLine, siCalcTotals, siFmt2, siInvoiceExtras, siN2, siR2, siUnitOptionsFor } from "./salesInvoiceShared.js";
+import { SI_PAY, siCalcLine, siCalcTotals, siFmt2, siInvoiceExtras, siIsSettledPay, siN2, siR2, siSettledPayLabel, siUnitOptionsFor } from "./salesInvoiceShared.js";
 import SalesInvoiceDesktopForm from "./SalesInvoiceDesktopForm.jsx";
 import { SiCustomerPicker } from "./SiCustomerPicker.jsx";
 import { SiItemsTable } from "./SiItemsTable.jsx";
@@ -16,10 +16,10 @@ import { itemBaseQty } from "../inventory/unitConversion";
 import { printMoneyReceipt, qtIsExpired } from "./siHelpers.js";
 import { salesSpecs } from "../product-master/productSpecs";
 
-export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canSeeCost, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintModal, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
+export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
   // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
   // is rendered on every screen, not only on the list.
-  const siPrintPrompt = siPrintModal&&(
+  const siPrintPrompt = canPrintInv&&siPrintModal&&(
       <div className="pm-backdrop" style={{ zIndex:10000, alignItems:"center" }}>
         <style>{PM_CSS}</style>
         <div className="pm-window" style={{ maxWidth:380 }} role="dialog" aria-modal="true">
@@ -35,6 +35,25 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             <div className="pm-window-foot">
               <button type="button" className="pm-btn-secondary" onClick={()=>setSiPrintModal(null)}>{bnL?"না":"No"}</button>
               <button type="button" className="pm-btn pm-btn--primary" autoFocus onClick={()=>{ siPrint(siPrintModal); setSiPrintModal(null); }}>🖨️ {bnL?"হ্যাঁ, প্রিন্ট":"Yes, print"}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+  const siPrintPayPrompt = canPrintInv&&siPrintPayAsk&&(
+      <div className="pm-backdrop" style={{ zIndex:10000, alignItems:"center" }}>
+        <style>{PM_CSS}</style>
+        <div className="pm-window" style={{ maxWidth:400 }} role="dialog" aria-modal="true">
+          <div className="pm-window-title">
+            <span>🖨️ {bnL?"কীভাবে প্রিন্ট করবেন?":"Print as Cash or Credit?"}</span>
+            <button type="button" className="pm-window-close" onClick={()=>setSiPrintPayAsk(false)}>✕</button>
+          </div>
+          <div className="pm-window-body">
+            <div style={{ fontWeight:700, marginBottom:10 }}>{bnL?"এই বিল ক্যাশ না ক্রেডিট?":"Is this bill Cash or Credit?"}</div>
+            <div className="pm-window-foot" style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              <button type="button" className="pm-btn-secondary" onClick={()=>setSiPrintPayAsk(false)}>{bnL?"বাতিল":"Cancel"}</button>
+              <button type="button" className="pm-btn" style={{ background:"#b45309", color:"#fff" }} onClick={()=>siPrintAs("credit")}>📅 {bnL?"ক্রেডিট":"Credit"}</button>
+              <button type="button" className="pm-btn pm-btn--primary" autoFocus onClick={()=>siPrintAs("cash")}>💵 {bnL?"ক্যাশ":"Cash"}</button>
             </div>
           </div>
         </div>
@@ -73,7 +92,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
         )}
         {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
-        {siPrintPrompt}
+        {siPrintPrompt}{siPrintPayPrompt}
         {receiptWindow}
         {cashReceiptWindow}
         {ledgerWindow}
@@ -263,13 +282,14 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
   if (siView==="detail"&&selInv) {
     const inv=invoices.find(x=>x.id===selInv.id)||selInv;
     const isTax       = inv.invoiceType==="tax";
+    const isInvSettled = siIsSettledPay(inv.paymentMethod, inv.cashPartial);
     const isInvCash   = inv.paymentMethod==="cash";
     const isInvDelivery = inv.invoiceType==="delivery";
     const { sub, disc, vat, grand, adjustment, roundOff } = siCalcTotals(inv.items||[], isTax&&!isInvDelivery, siInvoiceExtras(inv));
     const bal=grand-siN2(inv.amountPaid);
     const canEdit=siCanEditDoc(inv);
-    // plain cash invoice is always fully paid → no mark paid button; "partial cash" tracks a real balance instead
-    const canPay=!isQuote&&!isInvCash&&["confirmed","partial"].includes(inv.status);
+    // settled cash/bank/card is always fully paid → no mark paid button; "partial cash" tracks a real balance instead
+    const canPay=!isQuote&&!isInvSettled&&!isInvCash&&["confirmed","partial"].includes(inv.status);
     const canPayCash=!isQuote&&isInvCash&&inv.cashPartial&&["confirmed","partial"].includes(inv.status);
     const canConvert=!!onConvertQuote&&((isQuote&&["draft","open"].includes(inv.status)&&!qtIsExpired(inv))||(isDN&&inv.status==="confirmed"));
     const related = kind==="sales" ? receipts.filter(r=>(r.allocations||[]).some(a=>a.invoiceId===inv.id)) : [];
@@ -293,7 +313,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
     const back = () => siLeaveDetail();
     return (
       <div ref={siRootRef} className="si-root" style={siRootStyle}>
-        {siPrintPrompt}
+        {siPrintPrompt}{siPrintPayPrompt}
         <style>{PM_CSS}</style>
         <style>{SI_CSS}</style>
         {receiptWindow}
@@ -360,8 +380,8 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                 <legend className="pm-panel-legend">💳 {t.si_payment}</legend>
                 <div className="si-panel-body">
                   <div className="si-total-row"><span>{t.si_paymentMethod}</span><b>{SI_PAY[inv.paymentMethod]?.icon} {SI_PAY[inv.paymentMethod]?.[lang]||"-"}</b></div>
-                  {isInvCash&&!inv.cashPartial ? (
-                    <div className="si-paid-box"><span>✅ {bnL?"নগদে সম্পূর্ণ পরিশোধিত":"Fully paid (cash)"}</span><span>{t.cur} {siFmt2(inv.amountPaid||grand)}</span></div>
+                  {isInvSettled ? (
+                    <div className="si-paid-box"><span>✅ {siSettledPayLabel(inv.paymentMethod, lang)}</span><span>{t.cur} {siFmt2(inv.amountPaid||grand)}</span></div>
                   ) : !isInvDelivery && (
                     <>
                       <div className="si-total-row"><span>{t.si_amountPaid}</span><b style={{ color:"#15803d" }}>{t.cur} {siFmt2(inv.amountPaid)}</b></div>
@@ -397,7 +417,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
 
         <div className="si-actions">
           <button type="button" className="pm-btn-secondary" onClick={back}>← {bnL?"তালিকা":"List"}</button>
-          <button type="button" className="pm-btn pm-btn--primary" onClick={()=>siPrint(inv)}>🖨️ {bnL?"প্রিন্ট":"Print"}</button>
+          {canPrintInv&&<button type="button" className="pm-btn pm-btn--primary" onClick={()=>siRequestPrint(inv)}>🖨️ {bnL?"প্রিন্ট":"Print"}</button>}
           {paidOnBill>0.01&&<button type="button" className="pm-btn" onClick={()=>printMoneyReceipt(inv, paidOnBill, shop, lang)} title={bnL?"বিলের সাথে নেওয়া টাকার রশিদ":"Receipt for the money taken with this bill"}>🧾 {bnL?"মানি রিসিট":"Money Receipt"}</button>}
           {canConvert&&isSO&&onConvertToDN&&<button type="button" className="pm-btn" onClick={()=>onConvertToDN(inv)}>🚚 {bnL?"ডেলিভারি নোট বানান":"Make Delivery Note"}</button>}
           {canConvert&&<button type="button" className="pm-btn" onClick={()=>onConvertQuote(inv)}>🧾 {bnL?"ইনভয়েসে রূপান্তর":"Convert to Invoice"}</button>}
@@ -435,7 +455,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
   // ══ FORM ══
   if (wideDesktop) return (
     <div style={{ position:"fixed", inset:siWin.max?0:"28px 40px", zIndex:1500, background:"#c7d8ee", padding:siWin.max?6:"0 6px 6px", boxSizing:"border-box", overflowX:"auto", overflowY:"hidden", display:"flex", flexDirection:"column", border:siWin.max?"none":"1px solid #2854ad", boxShadow:siWin.max?"none":"0 18px 50px rgba(2,6,23,0.45)" }}>
-      {siPrintPrompt}
+      {siPrintPrompt}{siPrintPayPrompt}
       <div onDoubleClick={siWin.toggleMax} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, margin:siWin.max?"-6px -6px 6px":"0 -6px 6px", padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", flexShrink:0, fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
         <span>{isSO?"SALES ORDER":isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"}{siInvoiceNo?` — ${siInvoiceNo}`:""}</span>
         <WindowButtons win={siWin} lang={lang} onClose={()=>{ if (siLeaveUnsavedOk()) setSiView("list"); }} />
@@ -472,9 +492,14 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         canDeleteInvoice={siCanDeleteDoc}
         canDiscount={canDiscount}
         canSeeCost={canSeeCost}
-        onPrintInvoice={(inv)=>siPrint(inv)}
+        onPrintInvoice={canPrintInv ? (inv)=>siRequestPrint(inv) : undefined}
         onOpenProductMaster={onOpenProductMaster}
         toast={toast}
+        onOpenReminder={siOpenReminderForm}
+        reminderForm={siReminderForm}
+        onChangeReminder={setSiReminderForm}
+        onSaveReminder={siSaveReminder}
+        onCloseReminder={()=>setSiReminderForm(null)}
       />
     </div>
   );
@@ -515,7 +540,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
 
   return (
     <div ref={siRootRef} className="si-root" style={siRootStyle}>
-      {siPrintPrompt}
+      {siPrintPrompt}{siPrintPayPrompt}
       <style>{PM_CSS}</style>
       {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
       <style>{SI_CSS}</style>
@@ -594,7 +619,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             {siCurrent.productId && !isQuote && (()=>{
               const prod = siFindProduct(siCurrent.productId);
               const inBill = [...siLines.filter(it=>it.productId===siCurrent.productId && it.id!==siEditLineId), siCurrent].reduce((sum,it)=>sum+itemBaseQty(it, prod),0);
-              return <StockBadge product={prod} products={products} shopId={shopId} refreshKey={invoices} lang={lang} extraQty={editInvId ? 0 : inBill} />;
+              return <StockBadge product={prod} products={products} shopId={shopId} refreshKey={invoices.length} lang={lang} extraQty={editInvId ? 0 : inBill} />;
             })()}
             {siCurrent.productId && (
               <ProductInvoiceEntryInfo
@@ -706,9 +731,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
           {fRow(bnL?"পেমেন্টের ধরন":"Payment method", (
             <select className="pm-input" value={siForm.paymentMethod} onChange={e=>{
               const key = e.target.value;
-              // Switching away from cash: clear auto-filled paid amount
-              if (siForm.paymentMethod==="cash" && key!=="cash") setSiForm(p=>({...p, paymentMethod:key, amountPaid:""}));
-              else siUpd("paymentMethod",key);
+              setSiForm(p=>({...p, paymentMethod:key, amountPaid:"", ...(key!=="cash" ? { cashPartial:false } : {})}));
             }}>
               {Object.entries(SI_PAY).map(([key,pm])=><option key={key} value={key}>{pm.icon} {pm[lang]}</option>)}
             </select>
@@ -719,8 +742,8 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
               {bnL?"আংশিক নগদ — বাকিটা পরে নেব (একাধিক বিল একসাথে মেটানো যাবে)":"Partial cash — I'll collect the rest later (several bills can be settled together)"}
             </label>
           )}
-          {formIsCash&&!siForm.cashPartial ? (
-            <div className="si-paid-box"><span>✅ {bnL?"নগদে সম্পূর্ণ পরিশোধিত":"Fully paid (cash)"}</span><span>{t.cur} {siFmt2(totals.grand)}</span></div>
+          {formIsSettled ? (
+            <div className="si-paid-box"><span>✅ {siSettledPayLabel(siForm.paymentMethod, lang)}</span><span>{t.cur} {siFmt2(totals.grand)}</span></div>
           ) : (
             <>
               {fRow(t.si_amountPaid, (
@@ -744,7 +767,25 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         ))}
       </div>
 
+      {siReminderForm&&editInvId&&siReminderForm.invoiceId===editInvId&&(
+        <fieldset className="pm-panel" style={{ margin:"8px 10px 0" }}>
+          <legend className="pm-panel-legend">⏰ {bnL?"রিমাইন্ডার সেট করুন":"Set a reminder"}</legend>
+          <div className="si-panel-body" style={{ gap:6 }}>
+            <div className="si-grid2">
+              <input type="date" className="pm-input" value={siReminderForm.date} onChange={e=>setSiReminderForm(p=>({ ...p, date:e.target.value }))} />
+              <input type="time" className="pm-input" value={siReminderForm.time} onChange={e=>setSiReminderForm(p=>({ ...p, time:e.target.value }))} />
+            </div>
+            <input className="pm-input" placeholder={bnL?"নোট (ঐচ্ছিক)":"Note (optional)"} value={siReminderForm.note} onChange={e=>setSiReminderForm(p=>({ ...p, note:e.target.value }))} />
+            <div style={{ display:"flex", gap:6 }}>
+              <button type="button" className="pm-btn pm-btn--primary" disabled={!siReminderForm.date} onClick={siSaveReminder}>✅ {bnL?"সেভ করুন":"Save"}</button>
+              <button type="button" className="pm-btn-secondary" onClick={()=>setSiReminderForm(null)}>{bnL?"বাতিল":"Cancel"}</button>
+            </div>
+          </div>
+        </fieldset>
+      )}
       <div className="si-actions si-sticky-actions">
+        {canPrintInv && <button type="button" className="pm-btn-secondary" onClick={()=>siRequestPrint(editInvId ? invoices.find(i=>i.id===editInvId) : null)} disabled={siSaving}>🖨️ {bnL?"প্রিন্ট":"Print"}</button>}
+        {editInvId && <button type="button" className="pm-btn-secondary" onClick={()=>siOpenReminderForm(invoices.find(i=>i.id===editInvId)||{ id:editInvId, invoiceNo:siInvoiceNo, customerName:siForm.customerName })}>⏰ {bnL?"রিমাইন্ডার":"Remind me"}</button>}
         <button type="button" className="pm-btn pm-btn--primary" onClick={siConfirm} disabled={siSaving}>
           {siSaving?"...":(isSO?(bnL?"✓ অর্ডার সেভ":"✓ Save Order"):isQuote?(bnL?"✅ কোটেশন সেভ":"✅ Save Quotation"):isDN?(bnL?"✅ ডেলিভারি নোট সেভ":"✅ Save Delivery Note"):(bnL?"✅ ইনভয়েস নিশ্চিত":"✅ Confirm Invoice"))}
         </button>

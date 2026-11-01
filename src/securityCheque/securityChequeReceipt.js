@@ -47,21 +47,21 @@ h2{text-align:center;font-size:15px;margin:0 0 8px}
 .partyline{border:1px solid #444;padding:6px 8px;margin:6px 0;font-size:10.5px}
 .typeline{border:1px solid #444;border-top:0;padding:6px 8px;margin:0 0 6px;font-size:10.5px;display:flex;gap:18px;flex-wrap:wrap}
 .topboxes{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:6px 0}
-.topbox{border:1.5px solid #222;padding:5px 8px;min-height:15mm}
+.topbox{border:1.5px solid #222;padding:4px 8px;min-height:12mm}
 .topbox b{display:block;font-size:8px;text-transform:uppercase;margin-bottom:3px}
 .topbox span{font-size:13px;font-weight:bold}
-table.detail{width:100%;border-collapse:collapse;margin:6px 0}
-table.detail th,table.detail td{border:1px solid #555;padding:5px 7px;text-align:left;font-size:10.5px}
+table.detail{width:100%;border-collapse:collapse;margin:5px 0}
+table.detail th,table.detail td{border:1px solid #555;padding:4px 6px;text-align:left;font-size:10.5px}
 table.detail th{width:16%;background:#f1f5f9}
 table.detail td{width:34%}
-.chequearea{border:1.5px dashed #333;height:55mm;display:flex;align-items:center;justify-content:center;text-align:center;margin:6px 0;font-size:11px;color:#555;overflow:hidden}
-.chequearea img,.chequearea embed{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
-.idrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}
-.idbox{height:30mm;border:1.5px dashed #333;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#555;overflow:hidden}
-.idbox img,.idbox embed{max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
-.conditions{font-size:9.5px;line-height:1.3;margin:8px 0}
+.chequearea{border:1.5px dashed #333;width:100%;height:55mm;display:flex;align-items:center;justify-content:center;text-align:center;margin:5px 0;font-size:11px;color:#555;overflow:hidden;padding:0}
+.chequearea img,.chequearea embed{width:100%;height:100%;object-fit:cover;display:block}
+.idrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:5px 0}
+.idbox{width:100%;aspect-ratio:85.6 / 54;max-height:54mm;border:1.5px dashed #333;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#555;overflow:hidden;padding:0}
+.idbox img,.idbox embed{width:100%;height:100%;object-fit:cover;display:block}
+.conditions{font-size:9.5px;line-height:1.3;margin:5px 0}
 .conditions ol{margin:3px 0 3px 18px;padding:0}
-.siggrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}
+.siggrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px}
 .sig{border-top:1px solid #333;padding-top:4px;font-size:9.5px}
 .footnote{font-size:8.5px;margin-top:8px;color:#444}
 </style></head><body><div class="wrap">
@@ -83,11 +83,11 @@ ${row2(bn ? "দায়িত্বে থাকা কর্মী" : "Respon
 ${row2(bn ? "রসিদ নম্বর" : "Receipt number", record.receiptNo, bn ? "রসিদের তারিখ" : "Receipt date", fmtDay(record.receiptDate))}
 </table>
 <div style="font-weight:800;font-size:10.5px;margin-top:4px">${bn ? "চেকের কপি — বড় সংযুক্তি এলাকা" : "CHEQUE COPY — LARGE ATTACHMENT AREA"}</div>
-<div class="chequearea">${photoBox(docs.chequePhoto, bn ? "চেকের কপি এখানে রাখুন" : "PLACE / PASTE CHEQUE COPY HERE")}</div>
+<div class="chequearea${docs.chequePhoto ? " filled" : ""}">${photoBox(docs.chequePhoto, bn ? "চেকের কপি এখানে রাখুন" : "PLACE / PASTE CHEQUE COPY HERE")}</div>
 <div style="font-weight:800;font-size:10.5px;margin-top:4px">${bn ? "প্রতিনিধির আইডি কার্ড — সামনে ও পেছনে" : "REPRESENTATIVE ID CARD — FRONT AND BACK"}</div>
 <div class="idrow">
-<div class="idbox">${photoBox(docs.idFront, bn ? "আইডি কার্ড সামনে" : "ID CARD FRONT")}</div>
-<div class="idbox">${photoBox(docs.idBack, bn ? "আইডি কার্ড পেছনে" : "ID CARD BACK")}</div>
+<div class="idbox${docs.idFront ? " filled" : ""}">${photoBox(docs.idFront, bn ? "আইডি কার্ড সামনে" : "ID CARD FRONT")}</div>
+<div class="idbox${docs.idBack ? " filled" : ""}">${photoBox(docs.idBack, bn ? "আইডি কার্ড পেছনে" : "ID CARD BACK")}</div>
 </div>
 <div class="conditions"><b>${bn ? "শর্ত / স্বীকৃতি" : "CONDITIONS / ACKNOWLEDGEMENT"}</b><ol>${conditions.map((c, i) => `<li>${esc(c)}</li>`).join("")}</ol></div>
 <div class="siggrid">

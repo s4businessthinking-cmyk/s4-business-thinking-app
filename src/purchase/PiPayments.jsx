@@ -3,38 +3,108 @@ import { PI_VOUCHER_METHODS, piFmt2, piN2, AutoTA } from "../shared/appShared.js
 import { useState, useRef, useEffect } from "react";
 import { UAE_BANKS } from "../cheque/chequeConfig.js";
 
+function paymentMethodKey(v) {
+  return String(v?.method || "cash").toLowerCase();
+}
+
+function paymentLeftover(v, invoices) {
+  return (v.allocations || []).some((a) => {
+    const inv = (invoices || []).find((i) => i.id === a.invoiceId);
+    return inv && String(inv.status || "").toLowerCase() !== "cancelled" && piN2(inv.balanceDue) > 0.01;
+  });
+}
+
+function paymentStatusKey(v, invoices) {
+  if (String(v.status || "").toLowerCase() === "cancelled") return "cancelled";
+  if (paymentLeftover(v, invoices)) return "partial";
+  if (paymentMethodKey(v) === "cheque") {
+    const chq = String(v.chequeStatus || "pending").toLowerCase();
+    if (chq === "cleared") return "cleared";
+    if (chq === "bounced") return "bounced";
+    return "pending";
+  }
+  return "settled";
+}
+
+const PMT_METHOD_COLS = ["cash", "cheque", "bank_transfer", "card"];
+const PMT_STATUS_COLS = ["cleared", "pending", "partial", "cancelled"];
+const PMT_STATUS_META = {
+  cleared:   { bn: "ক্লিয়ার", en: "Cleared", color: "#166534" },
+  pending:   { bn: "পেন্ডিং", en: "Pending", color: "#c2410c" },
+  partial:   { bn: "আংশিক", en: "Partial", color: "#7c3aed" },
+  cancelled: { bn: "বাতিল", en: "Cancel", color: "#b91c1c" },
+};
+
+function paymentListStatus(v, invoices, lang) {
+  const bn = lang === "bn";
+  const key = paymentStatusKey(v, invoices);
+  if (PMT_STATUS_META[key]) return { text: PMT_STATUS_META[key][lang === "bn" ? "bn" : "en"], color: PMT_STATUS_META[key].color };
+  if (key === "bounced") return { text: (PI_CHEQUE_STATUSES.bounced?.[lang]) || (bn ? "বাউন্স" : "Bounced"), color: PI_CHEQUE_STATUSES.bounced.color };
+  const method = PI_VOUCHER_METHODS[paymentMethodKey(v)];
+  return { text: method?.[lang] || (bn ? "নগদ" : "Cash"), color: "#166534" };
+}
+
 // ─── PI: PAYMENTS TAB — list of Vendor Payment Vouchers ───────
-export function PiPaymentsListTab({ payments, loading, t, lang, onOpen, mobile=false }) {
+export function PiPaymentsListTab({ payments, invoices = [], loading, t, lang, onOpen, mobile=false }) {
   const bn = lang==="bn";
   const [q,setQ] = useState("");
+  const [listF, setListF] = useState("ALL");
+  const statusPills = [
+    ["ALL", bn ? "সব" : "All"],
+    ["cleared", bn ? "ক্লিয়ার" : "Cleared"],
+    ["pending", bn ? "পেন্ডিং" : "Pending"],
+    ["partial", bn ? "আংশিক" : "Partial"],
+    ["cancelled", bn ? "বাতিল" : "Cancelled"],
+  ];
+  const methodPills = PMT_METHOD_COLS.map((m) => [m, PI_VOUCHER_METHODS[m]?.[lang] || m]);
   const filtered = payments.filter(p=>{
+    if (listF !== "ALL") {
+      if (PMT_METHOD_COLS.includes(listF)) {
+        if (paymentMethodKey(p) !== listF) return false;
+      } else {
+        const key = paymentStatusKey(p, invoices);
+        if (listF === "pending") { if (key !== "pending" && key !== "bounced") return false; }
+        else if (key !== listF) return false;
+      }
+    }
     if (!q.trim()) return true;
     const s = q.toLowerCase();
-    return (p.vendorName||"").toLowerCase().includes(s) || (p.paymentNo||"").toLowerCase().includes(s);
+    return [p.vendorName, p.paymentNo, p.chequeNo, p.vendorReceiptNo, p.method, p.chequeBank]
+      .some((v) => String(v || "").toLowerCase().includes(s));
   });
   const total = filtered.reduce((sum,p)=>sum+(p.status==="cancelled"?0:piN2(p.totalAmount)), 0);
-  const chequeOf = (v) => v.method==="cheque" && v.status!=="cancelled" ? (PI_CHEQUE_STATUSES[v.chequeStatus]||PI_CHEQUE_STATUSES.pending) : null;
   const statusCell = (v) => {
-    if (v.status==="cancelled") return <span className="si-badge" style={{ color:"#b91c1c" }}>{bn?"বাতিল":"Cancelled"}</span>;
-    const chq = chequeOf(v);
-    return chq ? <span className="si-badge" style={{ color:chq.color }}>{chq[lang]}</span> : null;
+    const st = paymentListStatus(v, invoices, lang);
+    return <span className="si-badge" style={{ color: st.color }}>{st.text}</span>;
   };
   return (
     <>
-      <div className="si-filters" style={{ padding:0 }}>
+      <div className="si-filters">
         <div className="si-search">
           <input className="pm-input" placeholder={t.pi_searchVoucherPh} value={q} onChange={e=>setQ(e.target.value)} />
           {q&&<button type="button" aria-label="Clear" onClick={()=>setQ("")}>✕</button>}
         </div>
+        <div className="si-pills">
+          {statusPills.map(([id, label]) => (
+            <button key={`st-${id}`} type="button" className={`pm-btn-secondary${listF===id?" is-active":""}`}
+              onClick={()=>setListF(id)}>{label}</button>
+          ))}
+        </div>
+        <div className="si-pills">
+          {methodPills.map(([id, label]) => (
+            <button key={`md-${id}`} type="button" className={`pm-btn-secondary${listF===id?" is-active":""}`}
+              onClick={()=>setListF(id)}>{label}</button>
+          ))}
+        </div>
       </div>
-      <div className="si-box" style={{ flex:1 }}>
+      <div className="si-box" style={{ flex:1, minWidth:0 }}>
         {loading ? <div className="si-empty">⏳</div>
           : payments.length===0 ? <div className="si-empty">💳 {t.pi_noVouchers}</div>
           : filtered.length===0 ? <div className="si-empty">🔍 {t.pi_noResults}</div>
           : mobile ? filtered.map(v=>(
             <button key={v.id} type="button" className="si-mrow" style={v.status==="cancelled"?{ opacity:0.6 }:undefined} onClick={()=>onOpen(v)}>
               <div className="si-mrow-top">
-                <span style={{ color:"#c2410c" }}>{PI_VOUCHER_METHODS[v.method]?.icon||"💵"} {v.paymentNo}</span>
+                <span style={{ color:"#c2410c" }}>{PI_VOUCHER_METHODS[paymentMethodKey(v)]?.icon||"💵"} {v.paymentNo}</span>
                 <span>{statusCell(v)}</span>
               </div>
               <div className="si-mrow-sub"><span>{v.vendorName||"—"}</span><b style={{ color:"#15803d" }}>{t.cur} {piFmt2(v.totalAmount)}</b></div>
@@ -42,27 +112,63 @@ export function PiPaymentsListTab({ payments, loading, t, lang, onOpen, mobile=f
                 <span>{v.paymentDate} · {(v.allocations||[]).length} {bn?"টি ইনভয়েস":"invoices"}</span>
                 {piN2(v.discountAmount)>0&&<span>{bn?"ছাড়":"Disc"} {piFmt2(v.discountAmount)}</span>}
               </div>
+              {(v.chequeNo || v.vendorReceiptNo) && (
+                <div className="si-mrow-sub">
+                  {v.chequeNo ? <span>📃 {v.chequeNo}</span> : null}
+                  {v.vendorReceiptNo ? <span>🧾 {v.vendorReceiptNo}</span> : null}
+                </div>
+              )}
             </button>
           ))
           : (
-            <table className="pm-table">
-              <colgroup><col style={{ width:100 }} /><col style={{ width:80 }} /><col /><col style={{ width:80 }} /><col style={{ width:60 }} /><col style={{ width:90 }} /><col style={{ width:110 }} /></colgroup>
+            <table className="pm-table" style={{ minWidth: 1240 }}>
+              <colgroup>
+                <col style={{ width:100 }} /><col style={{ width:80 }} /><col style={{ width:160 }} />
+                {PMT_METHOD_COLS.map((m) => <col key={m} style={{ width:74 }} />)}
+                <col style={{ width:90 }} /><col style={{ width:100 }} /><col style={{ width:56 }} /><col style={{ width:88 }} />
+                {PMT_STATUS_COLS.map((st) => <col key={st} style={{ width:74 }} />)}
+              </colgroup>
               <thead><tr>
-                <th>{bn?"ভাউচার":"Voucher"}</th><th>{bn?"তারিখ":"Date"}</th><th>{bn?"ভেন্ডর":"Vendor"}</th><th>{bn?"পদ্ধতি":"Method"}</th>
-                <th className="si-num">{bn?"ইনভয়েস":"Bills"}</th><th className="si-num">{bn?"টাকা":"Amount"}</th><th>{bn?"স্ট্যাটাস":"Status"}</th>
+                <th>{bn?"ভাউচার":"Voucher"}</th><th>{bn?"তারিখ":"Date"}</th><th>{bn?"ভেন্ডর":"Vendor"}</th>
+                {PMT_METHOD_COLS.map((m) => (
+                  <th key={m} className="si-center" title={PI_VOUCHER_METHODS[m]?.[lang]||m}>{PI_VOUCHER_METHODS[m]?.[lang]||m}</th>
+                ))}
+                <th>{bn?"চেক নং":"Cheque No"}</th><th>{bn?"ভেন্ডর রিসিট":"Vendor Rcpt"}</th>
+                <th className="si-num">{bn?"ইনভয়েস":"Bills"}</th><th className="si-num">{bn?"টাকা":"Amount"}</th>
+                {PMT_STATUS_COLS.map((st) => (
+                  <th key={st} className="si-center" title={PMT_STATUS_META[st][lang==="bn"?"bn":"en"]}>{PMT_STATUS_META[st][lang==="bn"?"bn":"en"]}</th>
+                ))}
               </tr></thead>
               <tbody>
                 {filtered.map(v=>{
                   const off = v.status==="cancelled";
+                  const method = paymentMethodKey(v);
+                  const stKey = paymentStatusKey(v, invoices);
                   return (
                     <tr key={v.id} className="pm-clickable" style={off?{ opacity:0.6 }:undefined} onClick={()=>onOpen(v)}>
                       <td className="si-strong" style={{ color:"#c2410c" }}>{v.paymentNo}</td>
                       <td>{v.paymentDate}</td>
                       <td title={v.vendorName||""}>{v.vendorName||"—"}</td>
-                      <td>{PI_VOUCHER_METHODS[v.method]?.icon||"💵"} {PI_VOUCHER_METHODS[v.method]?.[lang]||v.method||"-"}</td>
+                      {PMT_METHOD_COLS.map((m) => (
+                        <td key={m} className="si-center">
+                          {method===m && <span style={{ color:"#0f172a", fontWeight:800 }}>{PI_VOUCHER_METHODS[m]?.[lang]||m}</span>}
+                        </td>
+                      ))}
+                      <td style={{ fontFamily:"Consolas, monospace" }}>{v.chequeNo||"—"}</td>
+                      <td style={{ fontFamily:"Consolas, monospace" }}>{v.vendorReceiptNo||"—"}</td>
                       <td className="si-num">{(v.allocations||[]).length}</td>
                       <td className="si-num si-strong" style={off?{ textDecoration:"line-through" }:{ color:"#15803d" }}>{piFmt2(v.totalAmount)}</td>
-                      <td>{statusCell(v)}</td>
+                      {PMT_STATUS_COLS.map((st) => {
+                        const show = stKey === st || (st === "pending" && stKey === "bounced");
+                        const meta = stKey === "bounced" && st === "pending"
+                          ? { text: bn ? "বাউন্স" : "Bounced", color: "#b91c1c" }
+                          : { text: PMT_STATUS_META[st][lang==="bn"?"bn":"en"], color: PMT_STATUS_META[st].color };
+                        return (
+                          <td key={st} className="si-center">
+                            {show && <span style={{ color: meta.color, fontWeight: 900, fontSize: 12 }}>{meta.text}</span>}
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })}
@@ -420,7 +526,7 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
       {/* Actions */}
       {(isOwner||onCancel)&&(
         <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-          <button onClick={()=>onPrint?.()} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>
+          {onPrint && <button onClick={()=>onPrint()} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>}
           {(voucher.allocations||[]).length>1&&(
             <button onClick={()=>onPrint?.({ summaryOnly:true })} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>
               🖨️ {lang==="bn"?"প্রিন্ট (সংক্ষিপ্ত — ইনভয়েস তালিকা ছাড়া)":"Print (Summary — no invoice list)"}

@@ -1,5 +1,5 @@
 import { QT_VALID_DAYS, siAddDays, siEmptyForm, siToday } from "./siHelpers.js";
-import { SI_PAY, siN2 } from "./salesInvoiceShared.js";
+import { SI_PAY, siIsSettledPay, siN2 } from "./salesInvoiceShared.js";
 import { db } from "../firebase-config";
 import { deviceSerialTag, reserveShopSerial } from "../shared/appShared.jsx";
 import { doc, runTransaction } from "../backend/firestore";
@@ -73,7 +73,7 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
   const siLoadDoc=(inv)=>{
     // A plain cash bill is always auto-paid — don't pre-fill amountPaid so switching to credit gives 0.
     // A "partial cash" bill (cashPartial) tracks a real balance just like credit, so its paid amount loads back.
-    const isPlainCash = inv.paymentMethod==="cash" && !inv.cashPartial;
+    const isPlainCash = siIsSettledPay(inv.paymentMethod, inv.cashPartial);
     siLoadedPaidRef.current = isPlainCash ? 0 : siN2(inv.amountPaid);
     setSiForm({
       invoiceType:inv.invoiceType||"regular", invoiceDate:inv.invoiceDate,

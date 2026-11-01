@@ -1,4 +1,5 @@
 import { offlineGetById, offlineUpsert } from "./offlineRepository";
+import { capsSavedText } from "../utils/capsSavedText.js";
 
 export const S4_SHOP_CACHE_KEY = "s4-auth-shop-cache-v1";
 
@@ -88,14 +89,14 @@ export async function saveShopRecord(shopId, patch = {}, meta = {}) {
   const existing = (await loadShopRecord(shopId)) || { id: shopId, shopId, positions: [] };
   const now = new Date().toISOString();
 
-  const updated = {
+  const updated = capsSavedText({
     ...existing,
     ...patch,
     id: shopId,
     shopId,
     updatedAt: now,
     ...(existing.createdAt ? {} : { createdAt: now }),
-  };
+  });
 
   if (meta.ownerUid && !updated.ownerUid) {
     updated.ownerUid = meta.ownerUid;

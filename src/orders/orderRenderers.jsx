@@ -1,7 +1,27 @@
 import { OrderSupplierPicker, PriceCell } from "../components/OrderInputs.jsx";
 import { SC } from "../app/mainAppHelpers.js";
+import { printWithSettings } from "../print/printSettings.js";
+import { generateStatementHTML } from "../print/printDesign.js";
 
-export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, isDesktop, isOrderManager, isOwner, isSalesman, lang, markRead, openOrderSupplierPicker, openPriceEditor, s, saveSupplierPhone, selOrder, setCo, setItemStatus, setOrderStatus, setPinModal, setSelOrder, startEditOrder, supplierPhone, t, th, user, waLinkGroup }) {
+export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, isDesktop, isOrderManager, isOwner, isSalesman, lang, markRead, openOrderSupplierPicker, openPriceEditor, s, saveSupplierPhone, selOrder, setCo, setItemStatus, setOrderStatus, setPinModal, setSelOrder, shopName = "", startEditOrder, supplierPhone, t, th, user, waLinkGroup }) {
+  const printOrder = (order) => {
+    const no = getOrderDisplayNo(order);
+    printWithSettings(generateStatementHTML({
+      shopName,
+      title: `ORDER #${no}`,
+      subtitle: [order.createdByName, t.status?.[order.overall] || order.overall, order.note].filter(Boolean).join(" · "),
+      cols: [
+        { label: "#" }, { label: lang === "bn" ? "পণ্য" : "Item" }, { label: lang === "bn" ? "কোড" : "Code" },
+        { label: lang === "bn" ? "পরিমাণ" : "Qty" }, { label: lang === "bn" ? "দাম" : "Price", align: "right" },
+        { label: lang === "bn" ? "সাপ্লায়ার" : "Supplier" }, { label: lang === "bn" ? "স্ট্যাটাস" : "Status" },
+      ],
+      rows: (order.items || []).map((it, i) => [
+        String(i + 1), it.name || "", it.code || "", `${it.qty || ""} ${it.unit || ""}`.trim(),
+        it.price != null && it.price !== "" ? String(it.price) : "",
+        findOrderSupplier(it.co)?.name || "", t.status?.[it.status] || it.status || "",
+      ]),
+    }), { lang });
+  };
   // ── RENDER ORDER ITEMS (expanded detail view) ──
   const renderOrderItems = (order) => {
     return (
@@ -174,6 +194,9 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
               </div>
             )}
           </div>
+        )}
+        {can("printOrders")&&(
+          <button style={{ ...s.delOrderBtn, borderColor:"#1d4ed8", color:"#60a5fa" }} onClick={()=>printOrder(order)}>🖨️ {lang==="bn"?"প্রিন্ট":"Print"}</button>
         )}
         {can("deleteOrder")&&(
           <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>🗑️ {t.delOrder}</button>

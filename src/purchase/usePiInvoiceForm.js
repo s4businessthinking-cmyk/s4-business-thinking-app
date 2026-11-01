@@ -93,8 +93,8 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     const said = reasons.map(r => r.key==="vendor" ? (bnM?`সাপ্লায়ার: ${r.from} → ${r.to}`:`Vendor: ${r.from} → ${r.to}`)
       : r.key==="mrp" ? `M.R.P: ${piFmt2(r.from)} → ${piFmt2(r.to)}` : `Landing Cost: ${piFmt2(r.from)} → ${piFmt2(r.to)}`).join("\n");
     const ok = window.confirm(bnM
-      ? `"${prod.name}" — দোকানে আগের মাল আছে (${stock} ${prod.unit||"Pcs"})।\n${said}\n\nএই মাল কি আলাদা stock (নতুন ব্যাচ) হিসেবে রাখবেন?\nOK = আলাদা ব্যাচ, Cancel = আগের stock-এর সাথে মিশে যাবে`
-      : `"${prod.name}" — ${stock} ${prod.unit||"Pcs"} of earlier stock is on hand.\n${said}\n\nKeep this as separate stock (a new batch)?\nOK = separate batch, Cancel = merge with existing stock`);
+      ? `"${prod.name}" — দোকানে আগের মাল আছে (${stock} ${prod.unit||"Pcs"})।\n${said}\n\nএই মাল কি আলাদা stock (নতুন ব্যাচ) হিসেবে রাখবেন?\nYes = আলাদা ব্যাচ, No = আগের stock-এর সাথে মিশে যাবে`
+      : `"${prod.name}" — ${stock} ${prod.unit||"Pcs"} of earlier stock is on hand.\n${said}\n\nKeep this as separate stock (a new batch)?\nYes = separate batch, No = merge with existing stock`);
     if (!ok) return line;
     return { ...line, batchNo:nextBatchNo(piInvoiceNo, piLines), batchReasons:reasons.map(r => r.key) };
   };
@@ -220,7 +220,7 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     level: piView==="form" ? 2 : 1,
   });
 
-  const piCanEditInv = (inv) => ["draft","confirmed"].includes(inv?.status) && !isOpeningBill(inv) && !isBranchTransferBill(inv) && (isOwner || (canManagePurchase && inv.createdBy===user?.uid));
+  const piCanEditInv = (inv) => ["draft","confirmed","partial","paid"].includes(inv?.status) && !isOpeningBill(inv) && !isBranchTransferBill(inv) && (isOwner || (canManagePurchase && inv.createdBy===user?.uid));
   const piOpenFromDesktop = (inv) => {
     if (!piLeaveUnsavedOk()) return;
     // Every saved bill (paid, cancelled, opening balance, branch transfer too) opens on the desktop form read-only,

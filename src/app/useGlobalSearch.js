@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo } from "react";
 export function useGlobalSearch({ can, globalFocusProductId, isDesktop, isOwner, perms, products, setGlobalFocusCustomerId, setGlobalFocusProductId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenSalesInvoiceId, setTabState, startProductEdit, tab, tabRef }) {
   const globalSearchCan = useMemo(() => ({
     products: isOwner || can("viewProducts") || can("manageSales") || can("managePurchase"),
-    customers: isOwner,
+    customers: isOwner || can("manageCustomers"),
     vendors: isOwner || can("viewVendors") || can("manageVendors") || can("managePurchase"),
     sales: isOwner || can("manageSales"),
     purchase: isOwner || can("managePurchase"),
-  }), [isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageSales, perms.managePurchase]);
+  }), [isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageCustomers, perms.manageSales, perms.managePurchase]);
   const globalSearchCanAny = useMemo(
     () => Object.values(globalSearchCan).some(Boolean),
     [globalSearchCan],
@@ -37,7 +37,7 @@ export function useGlobalSearch({ can, globalFocusProductId, isDesktop, isOwner,
       return;
     }
     if (hit.kind === "customer") {
-      if (!isOwner) return;
+      if (!(isOwner || can("manageCustomers"))) return;
       if (!goTab("customers")) return;
       setGlobalFocusCustomerId(hit.id);
       return;
@@ -60,7 +60,7 @@ export function useGlobalSearch({ can, globalFocusProductId, isDesktop, isOwner,
       setGlobalOpenPurchaseInvoiceId(hit.id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [products, isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageSales, perms.managePurchase]);
+  }, [products, isOwner, perms.viewProducts, perms.viewVendors, perms.manageVendors, perms.manageCustomers, perms.manageSales, perms.managePurchase]);
 
   useEffect(() => {
     if (!globalFocusProductId || tab !== "products") return;

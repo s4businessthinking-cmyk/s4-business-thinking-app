@@ -468,6 +468,11 @@ const startEditOrder = (order) => {
   };
 
   const delCo = async (id) => {
+    if (!isOwner && !can("deleteCompanies")) return;
+    const name = (cos || []).find((c) => c.id === id)?.name || "";
+    if (!window.confirm(lang === "bn"
+      ? `এই কোম্পানি মুছে ফেলবেন?${name ? `\n${name}` : ""}\n\nYes = মুছবে, No = হবে না`
+      : `Delete this company?${name ? `\n${name}` : ""}\n\nYes = delete, No = keep`)) return;
     try {
       await offlineRemove("companies", id);
 
@@ -598,6 +603,10 @@ const startEditOrder = (order) => {
 
     setStaffSaving(true);
     try {
+      const startGroup = userGroups.find(g=>g.id===staffForm.groupId);
+      const startPerms = startGroup
+        ? groupPermissions(startGroup, DEFAULT_PERMISSIONS)
+        : { ...DEFAULT_PERMISSIONS };
       const member = await createShopStaffUser({
         username: staffForm.username.trim(),
         password: staffForm.password,
@@ -605,13 +614,19 @@ const startEditOrder = (order) => {
         shopId,
         position: staffForm.position || "Salesman",
         mobile: staffForm.mobile.trim(),
-        permissions: { ...DEFAULT_PERMISSIONS },
+        permissions: startPerms,
+        groupId: startGroup?.id || "",
       });
-      setTeam((prev) => mergeTeamMembers(prev, [member]));
-      const startGroup = userGroups.find(g=>g.id===staffForm.groupId);
+      setTeam((prev) => mergeTeamMembers(prev, [{ ...member, permissions: startPerms, groupId: startGroup?.id || "" }]));
       if (startGroup) {
-        try { await applyGroupToMember(member, startGroup); }
-        catch(err) { console.warn("[S4 Team] group apply failed", err); }
+        try { await applyGroupToMember({ ...member, permissions: startPerms }, startGroup); }
+        catch (err) {
+          console.warn("[S4 Team] group apply failed", err);
+          toast(lang==="bn"
+            ? "কর্মী হয়েছে, কিন্তু গ্রুপের টিক বসেনি — সেটিংস → টিম থেকে গ্রুপ আবার দিন"
+            : "Staff created, but group ticks were not applied — assign the group again from Settings → Team",
+            "err");
+        }
       }
       setStaffForm({ username:"", password:"", personName:"", mobile:"", position:"Salesman", groupId:staffForm.groupId||"" });
       toast(

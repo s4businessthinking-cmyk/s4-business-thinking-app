@@ -28,7 +28,7 @@ const emptyForm = (settings) => {
   };
 };
 
-export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner, canManage, cur = "AED", toast, shop = null, onShopUpdated, customers = [], products = [], makeNo, leaveGuard = null, onMakeInvoice }) {
+export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, cur = "AED", toast, shop = null, onShopUpdated, customers = [], products = [], makeNo, leaveGuard = null, onMakeInvoice }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const settings = useMemo(() => jobSettingsOf(shop), [shop]);
@@ -204,7 +204,7 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
     patchJob(j, { status: back, statusHistory: [...(j.statusHistory || []), { status: back, at: new Date().toISOString(), by: profile?.personName || "" }] }, L("আবার খোলা হয়েছে", "Reopened"));
   };
   const deleteJob = async (j) => {
-    if (!isOwner || j.status !== "cancelled") return;
+    if (!canDelete || j.status !== "cancelled") return;
     if (!window.confirm(L(`${j.jobNo} একেবারে মুছে ফেলবেন?`, `Delete ${j.jobNo} permanently?`))) return;
     try {
       await offlineRemove("jobOrders", j.id);
@@ -392,12 +392,12 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
         <div className="si-toolbar">
           <button type="button" className="pm-btn-secondary" onClick={() => { setView("list"); setSelId(null); }}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn-secondary" onClick={() => printJob(sel)}>🖨️ {L("জব কার্ড প্রিন্ট", "Print job card")}</button>
+          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => printJob(sel)}>🖨️ {L("জব কার্ড প্রিন্ট", "Print job card")}</button>}
           {canManage && !closed && <button type="button" className="pm-btn-secondary" onClick={() => openEdit(sel)}>✏️ {L("এডিট", "Edit")}</button>}
           {canManage && !closed && onMakeInvoice && <button type="button" className="pm-btn pm-btn--primary" onClick={() => makeInvoice(sel)}>🧾 {L("সেলস বিল বানান", "Make Sales Invoice")}</button>}
           {canManage && !closed && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => cancelJob(sel)}>✖ {L("বাতিল", "Cancel")}</button>}
           {canManage && sel.status === "cancelled" && <button type="button" className="pm-btn-secondary" onClick={() => reopenJob(sel)}>↺ {L("আবার খুলুন", "Reopen")}</button>}
-          {isOwner && sel.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteJob(sel)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canDelete && sel.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteJob(sel)}>🗑️ {L("মুছুন", "Delete")}</button>}
         </div>
         <div className="si-main is-all" style={{ overflow: "auto" }}>
           <div className="si-box" style={{ padding: 10 }}>
@@ -583,7 +583,7 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
           {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
         <span className="si-toolbar-gap" />
-        <button type="button" className="pm-btn-secondary" onClick={printReport} disabled={!reportRows.length}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={printReport} disabled={!reportRows.length}>🖨️ {L("প্রিন্ট", "Print")}</button>}
       </div>
       <div className="si-kpis">
         <div className="si-kpi"><span>{L("জব", "Jobs")}</span><b>{live.length}</b></div>

@@ -225,6 +225,8 @@ export function BranchTransferWorkspace({ lang, shopId, user, profile, team, pro
   const isOwner = profile?.role === "owner";
   const canSendTransfer = isOwner || profile?.permissions?.sendBranchTransfer === true;
   const canReceiveTransfer = canReceiveBranchTransferActor(actor);
+  const canDelete = isOwner || profile?.permissions?.deleteBranch === true;
+  const canPrint = isOwner || profile?.permissions?.printBranch === true;
   const [branches, setBranches] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, shopId);
   const [transfers, setTransfers] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.TRANSFERS, shopId);
   const [receivedRows] = useShopCollection(BRANCH_TRANSFER_COLLECTIONS.STOCK_BALANCES, shopId);
@@ -329,7 +331,7 @@ export function BranchTransferWorkspace({ lang, shopId, user, profile, team, pro
   );
   const shellTitle = `🚚 ${t.title}`;
 
-  return renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting });
+  return renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete, canPrint, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting });
 }
 
 export function BranchTransferPurchaseImport({ lang, th, s, shopId, user, profile, shop, settings, toast, onInvoiceCreated }) {

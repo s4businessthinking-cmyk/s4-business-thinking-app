@@ -296,10 +296,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   // A Bangla IME (phonetic typing) can fire a synthetic Ctrl/Meta keydown while composing a
   // character inside a text field; skip the Ctrl+O / Ctrl+U / Ctrl+L shortcuts in that case so
   // typing a vendor/customer name doesn't suddenly jump the whole app to a different tab.
-  const isTypingTarget = (target) => {
-    const tag = target?.tagName;
-    return tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable;
-  };
+  // Do NOT skip just because the focus is in an input — on the website Chrome would then
+  // steal Ctrl+U as view-source, Ctrl+O as Open file, and Ctrl+L as the address bar.
+  const isImeComposing = (event) => event.isComposing || event.keyCode === 229;
 
   // Global desktop shortcut: open Product Master from anywhere in the app.
   useEffect(() => {
@@ -355,29 +354,29 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   useEffect(() => {
     const onVendorShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "o") return;
-      if (isTypingTarget(event.target)) return;
+      if (isImeComposing(event)) return;
       event.preventDefault();
       if (!(isOwner || perms.viewVendors === true || perms.manageVendors === true)) return;
       if (document.querySelector("[data-si-modal-open]")) return;
       setTab("vendors");
     };
-    window.addEventListener("keydown", onVendorShortcut);
-    return () => window.removeEventListener("keydown", onVendorShortcut);
+    window.addEventListener("keydown", onVendorShortcut, true);
+    return () => window.removeEventListener("keydown", onVendorShortcut, true);
   }, [isOwner, perms.viewVendors, perms.manageVendors]);
 
   // Global desktop shortcut: Ctrl+U opens Customer Master.
   useEffect(() => {
     const onCustomerShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "u") return;
-      if (isTypingTarget(event.target)) return;
+      if (isImeComposing(event)) return;
       event.preventDefault();
-      if (!isOwner) return;
+      if (!(isOwner || perms.manageCustomers === true)) return;
       if (document.querySelector("[data-si-modal-open]")) return;
       setTab("customers");
     };
-    window.addEventListener("keydown", onCustomerShortcut);
-    return () => window.removeEventListener("keydown", onCustomerShortcut);
-  }, [isOwner]);
+    window.addEventListener("keydown", onCustomerShortcut, true);
+    return () => window.removeEventListener("keydown", onCustomerShortcut, true);
+  }, [isOwner, perms.manageCustomers]);
 
   // ── INVOICE STATE ──
   // items = confirmed invoice list (locked rows)
@@ -556,15 +555,15 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   useEffect(() => {
     const onLedgerShortcut = (event) => {
       if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || String(event.key).toLowerCase() !== "l") return;
-      if (isTypingTarget(event.target)) return;
+      if (isImeComposing(event)) return;
       event.preventDefault();
-      if (!isOwner || document.querySelector("[data-si-modal-open]")) return;
+      if (!(isOwner || perms.viewGlobalLedger === true) || document.querySelector("[data-si-modal-open]")) return;
       setTab("globalLedger");
     };
-    window.addEventListener("keydown", onLedgerShortcut);
-    return () => window.removeEventListener("keydown", onLedgerShortcut);
-  }, [isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
-  const { OrderCard, ownerLockedPanel } = createOrderRenderers({ can, canExpand, cancelOrder, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, isDesktop, isOrderManager, isOwner, isSalesman, lang, markRead, openOrderSupplierPicker, openPriceEditor, s, saveSupplierPhone, selOrder, setCo, setItemStatus, setOrderStatus, setPinModal, setSelOrder, startEditOrder, supplierPhone, t, th, user, waLinkGroup });
+    window.addEventListener("keydown", onLedgerShortcut, true);
+    return () => window.removeEventListener("keydown", onLedgerShortcut, true);
+  }, [isOwner, perms.viewGlobalLedger]);
+  const { OrderCard, ownerLockedPanel } = createOrderRenderers({ can, canExpand, cancelOrder, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, isDesktop, isOrderManager, isOwner, isSalesman, lang, markRead, openOrderSupplierPicker, openPriceEditor, s, saveSupplierPhone, selOrder, setCo, setItemStatus, setOrderStatus, setPinModal, setSelOrder, shopName: localShop?.companyName||"", startEditOrder, supplierPhone, t, th, user, waLinkGroup });
 
   const { tabContent } = renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth });
 
@@ -579,7 +578,7 @@ export default function App() {
 
   const [theme,setThemeState]=useState(loadTheme());
   const setTheme = (v) => { setThemeState(v); saveTheme(v); };
-  const th = THEMES[theme]||THEMES.dark;
+  const th = THEMES[theme]||THEMES.light;
   const s  = getStyles(th);
 
   const [user,setUser]=useState(null);
@@ -717,6 +716,7 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
+    const bootTimer = setTimeout(() => { if (!cancelled) setAuthReady(true); }, 12000);
     (async () => {
       try {
         const boot = await ensureLocalAuthBootstrap();
@@ -737,11 +737,12 @@ export default function App() {
       } catch (error) {
         console.error("[S4 Auth] local session restore failed", error);
       } finally {
+        clearTimeout(bootTimer);
         if (!cancelled) setAuthReady(true);
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(bootTimer); };
   }, []);
 
   // Mobile only: while signed in and in the foreground, keep sliding the 16h idle timeout

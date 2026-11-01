@@ -81,8 +81,8 @@ export const SI_CSS = `
 }
 .si-kpi span { font-size: 10px; color: #334155; white-space: nowrap; }
 .si-kpi b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.si-filters { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; align-items: center; }
-.si-filters .si-search { flex: 1 1 220px; position: relative; }
+.si-filters { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; align-items: center; width: 100%; min-width: 0; position: relative; z-index: 3; background: #eef2f7; }
+.si-filters .si-search { flex: 1 1 220px; position: relative; min-width: 0; }
 .si-filters .si-search .pm-input { padding-right: 20px; }
 .si-filters .si-search button {
   position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
@@ -92,7 +92,7 @@ export const SI_CSS = `
 .si-pills > button.is-active { background: #315eb8; color: #fff; border-color: #213f80; }
 .si-main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 0.38fr) minmax(0, 1fr); gap: 4px; padding: 0 4px 4px; }
 .si-main.is-all { grid-template-columns: minmax(0, 1fr); }
-.si-box { border: 1px solid #6680a7; background: #fff; overflow: auto; min-height: 0; }
+.si-box { border: 1px solid #6680a7; background: #fff; overflow: auto; min-height: 0; min-width: 0; }
 .si-root .pm-table { font-size: 10.5px; }
 .si-root .pm-table th { height: 18px; font-size: 10px; padding: 1px 4px; }
 .si-root .pm-table td { height: 19px; font-size: 10.5px; padding: 0 4px; border-bottom: 1px solid #e2e8f0; text-overflow: ellipsis; }
@@ -109,7 +109,7 @@ export const SI_CSS = `
 .si-party-row td:first-child { font-weight: 700; }
 .si-match { font-size: 9.5px; color: #15803d; }
 
-.si-body { flex: 1; min-height: 0; overflow: auto; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.si-body { flex: 1; min-height: 0; min-width: 0; overflow: auto; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
 .si-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px; }
 .si-panel-body { display: flex; flex-direction: column; gap: 3px; padding-top: 3px; }
 .si-root .pm-form-row { grid-template-columns: 96px minmax(0, 1fr); gap: 4px; }

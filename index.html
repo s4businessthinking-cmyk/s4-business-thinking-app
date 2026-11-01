@@ -11,6 +11,9 @@
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { background: #09090b; color: #e4e4e7; font-family: 'Segoe UI', system-ui, sans-serif; -webkit-tap-highlight-color: transparent; }
       input, textarea, select, button { font-family: inherit; }
+      input:not([type="password"]):not([type="email"]):not([type="number"]):not([type="date"]):not([type="time"]):not([type="datetime-local"]):not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([data-caps="off"]):not([autocomplete="username"]):not([autocomplete="current-password"]):not([autocomplete="new-password"]):not([autocomplete="one-time-code"]),
+      textarea:not([data-caps="off"]),
+      select:not([data-caps="off"]) { text-transform: uppercase; }
     </style>
   </head>
   <body>

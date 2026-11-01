@@ -43,7 +43,7 @@ const TEXT = {
   },
 };
 
-export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, user, profile, isOwner, canManage, products = [], toast, shopName = "", makeNo, leaveGuard = null }) {
+export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, products = [], toast, shopName = "", makeNo, leaveGuard = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const T = (key) => TEXT[kind][key][bn ? 0 : 1];
@@ -169,7 +169,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     }
   };
   const deleteDoc = async (r) => {
-    if (!isOwner || r.status !== "cancelled") return;
+    if (!canDelete || r.status !== "cancelled") return;
     if (!window.confirm(L(`${r.adjustNo} একেবারে মুছে ফেলবেন?`, `Delete ${r.adjustNo} permanently?`))) return;
     try {
       await offlineRemove("stockAdjustments", r.id);
@@ -358,10 +358,10 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
         </div>
         <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
           <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>
+          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
           {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => cancelDoc(r)}>⛔ {L("বাতিল করুন", "Cancel")}</button>}
-          {isOwner && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteDoc(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteDoc(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));

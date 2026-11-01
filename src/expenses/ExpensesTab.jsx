@@ -65,7 +65,7 @@ export function expenseCategoryLabel(row, bn) {
 const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "", partnerId: "", partnerUse: "", partnerPaid: "shop", enteredBy: "" });
 const ENTERED_BY_KEY = "s4_expense_entered_by";
 
-export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null, shop = null, employeeMode = false }) {
+export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null, shop = null, employeeMode = false, canDelete = false, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const taxCfg = useMemo(() => taxSettingsOf(shop), [shop]);
@@ -220,7 +220,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     if (!partnerId && !employeeMode && !form.employeeId) {
       const hit = matchPartnerName(form.paidTo, partnerDirectory);
       if (hit) {
-        if (!window.confirm(L(`"${hit.name}" একজন পার্টনার।\n\nটাকাটা কি দোকানের কাজে খরচ হয়েছে?\nOK = হ্যাঁ, দোকানের খরচ\nCancel = না, ফিরে গিয়ে ঠিক করব`, `"${hit.name}" is a partner.\n\nWas this money spent on shop work?\nOK = yes, a shop expense\nCancel = no, go back and fix it`))) {
+        if (!window.confirm(L(`"${hit.name}" একজন পার্টনার।\n\nটাকাটা কি দোকানের কাজে খরচ হয়েছে?\nYes = হ্যাঁ, দোকানের খরচ\nNo = না, ফিরে গিয়ে ঠিক করব`, `"${hit.name}" is a partner.\n\nWas this money spent on shop work?\nYes = yes, a shop expense\nNo = no, go back and fix it`))) {
           setForm((f) => ({ ...f, partnerId: hit.id, partnerUse: "" }));
           return;
         }
@@ -294,7 +294,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   };
 
   const deleteRow = async (r) => {
-    if (!isOwner || r.status !== "cancelled") return;
+    if (!canDelete || r.status !== "cancelled") return;
     if (!window.confirm(L(`${r.expenseNo} খরচটি একেবারে মুছে ফেলবেন?`, `Delete expense ${r.expenseNo} permanently?`))) return;
     try {
       await offlineRemove("expenses", r.id);
@@ -380,7 +380,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const toolbar = (
     <div className="si-toolbar">
       <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {employeeMode ? L("কর্মচারীর খরচ", "Employee Expense") : L("নতুন খরচ", "New Expense")}</button>
-      <button type="button" className="pm-btn-secondary" onClick={print} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>
+      {canPrint && <button type="button" className="pm-btn-secondary" onClick={print} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>}
       <span className="si-toolbar-gap" />
       <div className="si-pills">
         {quick.map(([key, label, f, t]) => (
@@ -702,7 +702,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
         </div>
         <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
           {editRow && !readOnly && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelRow(editRow)}>✖ {L("খরচ বাতিল", "Cancel expense")}</button>}
-          {editRow && editRow.status === "cancelled" && isOwner && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => deleteRow(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
+          {editRow && editRow.status === "cancelled" && canDelete && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => deleteRow(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
           <span className="si-toolbar-gap" />
           <button type="button" className="pm-btn-secondary" disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
           {!readOnly && (

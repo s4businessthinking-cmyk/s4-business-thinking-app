@@ -106,6 +106,54 @@ export const DEFAULT_PERMISSIONS = {
   manageEmployees: false,
   bankReconcile: false,
   manageJobs: false,
+  manageSecurityCheques: false,
+  viewAccounts: false,
+  viewTax: false,
+  viewPartners: false,
+  managePartners: false,
+  viewGlobalLedger: false,
+  viewAuditLog: false,
+  manageBackup: false,
+  deleteProducts: false,
+  printProducts: false,
+  deleteCustomers: false,
+  printCustomers: true,
+  deleteVendors: false,
+  printVendors: false,
+  deleteCompanies: false,
+  printCompanies: false,
+  deleteEmployees: false,
+  printEmployees: false,
+  printOrders: false,
+  printSales: true,
+  deletePurchase: false,
+  printPurchase: false,
+  deleteReturns: false,
+  printReturns: false,
+  deleteStock: false,
+  printStock: false,
+  deleteBranch: false,
+  printBranch: false,
+  deleteJobs: false,
+  printJobs: false,
+  deletePayments: false,
+  printPayments: false,
+  deleteExpenses: false,
+  printExpenses: false,
+  deleteVouchers: false,
+  printVouchers: false,
+  deletePdc: false,
+  printPdc: false,
+  deleteBankRec: false,
+  printBankRec: false,
+  deleteSecurityCheques: false,
+  printSecurityCheques: false,
+  printAccounts: false,
+  printTax: false,
+  deletePartners: false,
+  printPartners: false,
+  printLedger: false,
+  printAudit: false,
 };
 
 // Methods for the Vendor Payment Voucher system — cash & cheque only, as requested
@@ -475,5 +523,5 @@ vendorFooter: {
 
 };}
 
-// Fallback styles (dark) used by components before theme prop arrives
-export const _globalS = getStyles(THEMES.dark);
+// Fallback styles (light) used by components before theme prop arrives
+export const _globalS = getStyles(THEMES.light);

@@ -12,7 +12,11 @@ import { unitFactorFor } from "../inventory/unitConversion";
 import { averageCosts } from "../reports/averageCost.js";
 import { livePurchasesOf } from "../reports/reportFilters.js";
 
-export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user }) {
+function unmatchedPurchaseNames(items) {
+  return (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
+}
+
+export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onOpenProductMaster, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user }) {
   // ── Build payload ──
   const piBuild=(status, invoiceNoOverride)=>{
     if (!piForm.vendorName.trim()){ toast(lang==="bn"?"❌ Vendor / সাপ্লায়ারের নাম দিন — লিস্টে না থাকলে নাম লিখে দিন":"❌ Enter the vendor / supplier name — type it if it's not in the list","err"); return null; }
@@ -305,7 +309,15 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
         const already = invoices.find(inv => inv.status!=="cancelled" && (ids.includes(inv.goodsReceiptId) || (inv.goodsReceiptIds||[]).some(id=>ids.includes(id))));
         if (already) { toast(lang==="bn" ? `❌ ${payload.goodsReceiptNo}-এর বিল আগেই হয়েছে: ${already.invoiceNo}` : `❌ ${payload.goodsReceiptNo} is already billed as ${already.invoiceNo}`, "err"); return; }
       }
-      if (status!=="draft" && !unlinkedStockOk(payload.items, lang)) return;
+      const unmatched = unmatchedPurchaseNames(payload.items);
+      if (status !== "draft" && unmatched.length && !piForm.scanFilled && !unlinkedStockOk(payload.items, lang)) return;
+      if (status !== "draft" && unmatched.length && piForm.scanFilled) {
+        toast(lang==="bn"
+          ? `❌ মিলেনি — আগে Product Master-এ এন্ট্রি করুন, নাহলে ইনভয়েস সেভ হবে না: ${unmatched.slice(0, 5).join(", ")}${unmatched.length > 5 ? " …" : ""}`
+          : `❌ Unmatched items must be added in Product Master before this invoice can save: ${unmatched.slice(0, 5).join(", ")}${unmatched.length > 5 ? " …" : ""}`, "err");
+        onOpenProductMaster?.(unmatched[0]);
+        return;
+      }
       if (!piVendorTermsOk(payload, status)) return;
       if (!piSupplierInvoiceDuplicateOk(payload)) return;
       if (!editInvoiceId) payload.invoiceNo = await reservePiInvoiceNo();
@@ -334,7 +346,7 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     setPiView("list");
   };
   const piCancelInv = async (inv) => {
-    if (!isOwner && !can("managePurchase")) {
+    if (!isOwner && !can("deletePurchase")) {
       toast(lang==="bn" ? "পারচেজ বিল বাতিল করার অনুমতি নেই" : "You are not allowed to cancel purchase bills", "err");
       return;
     }
@@ -352,7 +364,9 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       toast(lang==="bn" ? `আগে পারচেজ রিটার্ন বাতিল করুন: ${nos}` : `Cancel the purchase return(s) first: ${nos}`, "err");
       return false;
     }
-    if (!window.confirm(t.pi_confirmCancel)) return false;
+    if (!window.confirm(lang==="bn"
+      ? `${inv.invoiceNo || ""} বাতিল করবেন?\n\nYes = বাতিল হবে\nNo = হবে না`
+      : `Cancel invoice ${inv.invoiceNo || ""}?\n\nYes = cancel it\nNo = keep it`)) return false;
     try {
       const nowIso = new Date().toISOString();
       const result = await offlinePatch("purchaseInvoices", inv.id, {
@@ -401,9 +415,15 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     } catch(e){ toast(e.message,"err"); return false; }
   };
   const piDelete = async (inv) => {
+    if (!isOwner && !can("deletePurchase")) {
+      toast(lang==="bn" ? "পারচেজ বিল মুছার অনুমতি নেই" : "You are not allowed to delete purchase bills", "err");
+      return;
+    }
     if (isOpeningBill(inv)) { toast(lang==="bn" ? "এটা Opening Balance বিল — ভেন্ডর মাস্টার থেকে শুরুর ব্যালেন্স বদলান।" : "This is an Opening Balance bill — change the opening balance in Vendor Master.", "err"); return; }
     if (isBranchTransferBill(inv)) { toast(lang==="bn" ? "এটা Branch Transfer রিসিভের বিল — Branch Transfer থেকে নিয়ন্ত্রণ হয়, এখানে বদলানো যাবে না।" : "This bill comes from a Branch Transfer receipt — manage it from Branch Transfer.", "err"); return; }
-    if (!window.confirm(t.pi_confirmDelete)) return;
+    if (!window.confirm(lang==="bn"
+      ? `${inv.invoiceNo || ""} একেবারে মুছে ফেলবেন?\n\nYes = মুছে যাবে\nNo = হবে না`
+      : `Delete invoice ${inv.invoiceNo || ""} permanently?\n\nYes = delete it\nNo = keep it`)) return;
     try {
       await offlineRemove("purchaseInvoices", inv.id);
 

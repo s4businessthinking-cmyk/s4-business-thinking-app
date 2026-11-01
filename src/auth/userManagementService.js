@@ -135,9 +135,10 @@ export function mergeTeamMembers(cloudTeam = [], localTeam = []) {
         ...existing,
         ...member,
         permissions: {
-          ...(existing.permissions || {}),
           ...(member.permissions || {}),
+          ...(existing.permissions || {}),
         },
+        groupId: existing.groupId != null ? existing.groupId : member.groupId,
         personName: member.personName || existing.personName,
         username: member.username || existing.username,
         email: member.email || existing.email,
@@ -332,6 +333,7 @@ async function syncTeamMemberToCloud(localUser, extras = {}) {
     countryName: extras.countryName || "",
     position: extras.position || (localUser.role === "owner" ? "মালিক" : "Salesman"),
     permissions: localUser.permissions,
+    ...(extras.groupId !== undefined ? { groupId: extras.groupId } : {}),
     localUserId: localUser.id,
     status: "active",
     updatedAt: new Date().toISOString(),
@@ -378,6 +380,7 @@ export async function createShopStaffUser({
   shopId,
   position = "Salesman",
   permissions = null,
+  groupId = "",
   mobile = "",
   area = "",
   email = "",
@@ -411,6 +414,7 @@ export async function createShopStaffUser({
     area,
     country,
     countryName,
+    groupId,
   });
 
   // Also write staff login index
@@ -432,6 +436,7 @@ export async function createShopStaffUser({
 
   return {
     ...member,
+    groupId,
     authEmail: authEmail.email,
   };
 }

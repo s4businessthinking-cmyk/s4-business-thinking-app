@@ -27,4 +27,7 @@ contextBridge.exposeInMainWorld("S4Desktop", {
     listPrinters: () => ipcRenderer.invoke("s4-print:list"),
     printHtml: (html, options) => ipcRenderer.invoke("s4-print:html", html, options),
   },
+  scan: {
+    acquire: () => ipcRenderer.invoke("s4-scan:acquire"),
+  },
 });

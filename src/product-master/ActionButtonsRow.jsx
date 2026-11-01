@@ -62,7 +62,7 @@ export default function ActionButtonsRow({
 
       <div className="pm-actions-middle">
         <div className="pm-opening-tools">
-          <button type="button" className="pm-btn-secondary" onClick={onPrintOpeningStockBarcodes}>Print Opening stock Barcodes</button>
+          {onPrintOpeningStockBarcodes && <button type="button" className="pm-btn-secondary" onClick={onPrintOpeningStockBarcodes}>Print Opening stock Barcodes</button>}
           <button type="button" className="pm-btn-secondary" onClick={onOpeningStockEntry} disabled={!canEdit}>Opening Stock Entry</button>
         </div>
         <button type="button" className="pm-btn-secondary pm-weighing-btn" onClick={onGenerateWeighingFile}>
@@ -72,7 +72,7 @@ export default function ActionButtonsRow({
           <button type="button" className="pm-btn" onClick={onNew} disabled={!canEdit}>New</button>
           <button type="button" className="pm-btn" onClick={onSave} disabled={!canEdit || busy || productMaintenanceActive}>{busy ? "Saving..." : <>Save<br />(Ctrl+S)</>}</button>
           <button type="button" className="pm-btn" onClick={onDelete} disabled={!hasProduct || !canDelete}>Delete</button>
-          <button type="button" className="pm-btn" onClick={onPrintBarcode}>Print<br />Barcode</button>
+          {onPrintBarcode && <button type="button" className="pm-btn" onClick={onPrintBarcode}>Print<br />Barcode</button>}
           <button type="button" className="pm-btn" onClick={onSearch}>Search<br />(F10)</button>
           <button type="button" className="pm-btn" onClick={onClose}>Close</button>
         </div>

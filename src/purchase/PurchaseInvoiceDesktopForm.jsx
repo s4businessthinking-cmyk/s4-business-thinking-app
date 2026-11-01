@@ -3,6 +3,7 @@ import { ProductNameLookup, ProductCodeLookup, codeLine } from "../sales-invoice
 import { C, inp, lbl, btn, th, td, splitRack, productBarcodeUnit, Modal, GridTable, todayIso, fmtDate, fmtDateLong, textMatch, sameProductLine } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { nsq } from "../utils/productSearch";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
+import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
 import PartyPickerWindow, { VENDOR_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
@@ -10,6 +11,7 @@ import { PURCHASE_OPTION_DEFAULTS, PURCHASE_OPTION_LABELS, isForeign, rateOf } f
 import { CURRENCIES } from "../reports/taxDomain.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 import InvoiceScanWindow from "./scan/InvoiceScanWindow.jsx";
+import { applyPurchaseScan } from "./scan/applyPurchaseScan.js";
 import { printPurchaseInvoice } from "./purchasePrint.js";
 import { piToday } from "./purchaseShared.js";
 
@@ -106,7 +108,7 @@ export default function PurchaseInvoiceDesktopForm({
   invoiceNo, editInvoiceId, saving, nameRef, qtyRef,
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine, onPickVendor, onCheckDuplicate,
-  onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast, canEditInvoice = () => true, onProductPatched,
+  onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, toast, canEditInvoice = () => true, onProductPatched, canPrint = false,
   purchaseOptions = PURCHASE_OPTION_DEFAULTS, baseCurrency = "AED", onSaveOptions, sourceNote = "",
 }) {
   const { piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS } = helpers;
@@ -117,21 +119,9 @@ export default function PurchaseInvoiceDesktopForm({
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   // a scanned bill fills the form; the user checks it and saves as usual
-  const billUnit = (u) => PI_UNITS.find((x) => x.toLowerCase() === String(u || "").toLowerCase().replace(/^pc$/, "pcs").replace(/^sets$/, "set")) || "Pcs";
   const applyScan = (res) => {
     setScanOpen(false);
-    if (res.vendor) onPickVendor(res.vendor);
-    else if (res.supplierName) setField("vendorName", res.supplierName); // not in the list: saved by name, as when typed
-    if (res.supplierInvoiceNo) setField("supplierInvoiceNo", res.supplierInvoiceNo);
-    if (res.invoiceDate) setField("invoiceDate", res.invoiceDate);
-    const toLine = (l) => ({
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, productId: l.product?.id || null,
-      name: l.product?.name || l.name, code: l.product?.code || l.code || "", brand: l.product?.brand || l.product?.company || "",
-      qty: String(l.qty), unit: l.product?.unit || billUnit(l.unit), unitCost: String(l.rate), discountPerc: "0",
-      discountFlat: l.discount ? String(l.discount) : "", taxPerc: String(l.vatPerc), salePrice: "",
-    });
-    setLines((prev) => [...prev.filter((x) => String(x.name || "").trim()), ...res.lines.map(toLine)]);
-    toast?.(bn ? `✅ ${res.lines.length}টি লাইন বসানো হয়েছে — মিলিয়ে নিয়ে Save করুন` : `✅ ${res.lines.length} line(s) filled — check them, then Save`);
+    applyPurchaseScan(res, { pickVendor: onPickVendor, setField, setLines, toast, lang });
   };
   const foreign = isForeign(form, baseCurrency);
   const billCur = foreign ? String(form.currency).toUpperCase() : baseCurrency;
@@ -153,12 +143,14 @@ export default function PurchaseInvoiceDesktopForm({
   const [codeChoices, setCodeChoices] = useState(null);
   const [codeOpenSignal, setCodeOpenSignal] = useState(0);
   const [stockMap, setStockMap] = useState(null);
+  const [stockRev, setStockRev] = useState(invoiceRowsCacheGen);
   const [showHistory, setShowHistory] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [productSearchName, setProductSearchName] = useState(null);
   const productById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
   const currentProduct = current.productId ? productById.get(current.productId) : null;
 
+  useEffect(() => subscribeInvoiceRowsCache(setStockRev), []);
   useEffect(() => {
     let cancelled = false;
     loadInvoiceRows()
@@ -167,7 +159,7 @@ export default function PurchaseInvoiceDesktopForm({
       })
       .catch((err) => console.warn("[S4 PI] stock load failed", err));
     return () => { cancelled = true; };
-  }, [products, invoices, shopId]);
+  }, [products, shopId, stockRev]);
 
   const navIndex = editInvoiceId ? invoices.findIndex((inv) => inv.id === editInvoiceId) : -1;
   const olderInvoice = editInvoiceId ? invoices[navIndex + 1] : invoices[0];
@@ -641,7 +633,7 @@ export default function PurchaseInvoiceDesktopForm({
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
           <button type="button" onClick={() => setShowSearch(true)} style={btn()}>🔍 {bn ? "খুঁজুন" : "Search"}</button>
-          {purchaseOptions.enablePrint && savedInvoice && (
+          {purchaseOptions.enablePrint && savedInvoice && canPrint && (
             <button type="button" onClick={() => {
               const vm = vendors.find((v) => v.id === savedInvoice.vendorId);
               printPurchaseInvoice({ ...savedInvoice, vendorAddress: savedInvoice.vendorAddress || vm?.address || "", vendorTrn: savedInvoice.vendorTrn || vm?.trnNumber || "" }, shop, lang);
@@ -663,7 +655,7 @@ export default function PurchaseInvoiceDesktopForm({
               <button type="button" onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
                 style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}>✏️ {bn ? "এডিট" : "Edit"}</button>
             ) : (
-              <button type="button" disabled title={bn ? "এই বিল এডিট করা যাবে না (পরিশোধিত / বাতিল / অনুমতি নেই)" : "This bill cannot be edited (paid / cancelled / no permission)"}
+              <button type="button" disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / ওপেনিং / ট্রান্সফার / অনুমতি নেই)" : "This bill cannot be edited (cancelled / opening / transfer / no permission)"}
                 style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}>🔒 {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
             )
           ) : (

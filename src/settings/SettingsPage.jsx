@@ -20,6 +20,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
         const bnS = lang==="bn";
         const plain = (v)=>String(v||"").replace(/^[^\p{L}\p{N}]+/u,"");
         const btCopy = isOwner ? branchTransferSettingsCopy(lang, branchTransferSettings.enabled) : null;
+        const may = (key) => isOwner || (profile?.permissions || {})[key] === true;
         const items = [
           { id:"profile", icon:"👤", label:plain(t.profileTitle), sub:profile.personName },
           isOwner && { id:"period", icon:"📅", label:bnS?"হিসাব বছর বন্ধ / লক":"Accounting period lock", sub:periodLock.lockDate?(bnS?`${periodLock.lockDate} পর্যন্ত বন্ধ`:`Closed up to ${periodLock.lockDate}`):(bnS?"লক নেই — পুরোনো এন্ট্রি বন্ধ করুন":"Not locked — close old entries") },
@@ -35,7 +36,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
           { id:"language", icon:"🌐", label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" },
           { id:"print", icon:"🖨️", label:bnS?"প্রিন্ট সেটিংস":"Print Settings", sub:bnS?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview", action:()=>setPrintSettingsOpen(true) },
           { id:"sync", icon:syncState==="connected"?"🟢":syncState==="offline"?"🔴":syncState==="reconnecting"?"🟠":"🟡", label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." },
-          isOwner && { id:"backup", icon:"💾", label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" },
+          (isOwner || may("manageBackup")) && { id:"backup", icon:"💾", label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" },
           { id:"license", icon:"🔐", label:bnS?"লাইসেন্স স্ট্যাটাস":"License status", sub:bnS?"ঐচ্ছিক লাইসেন্স অ্যাক্টিভেশন":"Optional license activation" },
           { id:"update", icon:"🔄", label:plain(t.updateTitle), sub:`v${APP_VERSION} · ${t.updateSub}` },
           { id:"help", icon:"❓", label:plain(t.helpTitle), sub:t.helpMenuSub },
@@ -211,8 +212,13 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
               {isOwner&&(
                 <div style={{ ...s.card, marginBottom:12, border:"1px solid #3b82f6" }}>
                   <div style={s.settingsLbl}>{t.addStaffTitle}</div>
+                  <div style={{ fontSize:12, color:"#71717a", marginBottom:8, lineHeight:1.5 }}>
+                    {bnS
+                      ? "প্রতি কর্মীর নিজস্ব username ও password — গ্রুপে দিলেও লগইন আলাদা থাকে। মালিক পরে টিম বা গ্রুপে যেকোনো অনুমতি টিক দিতে পারেন।"
+                      : "Each staff member has their own username and password — a group does not share a login. The owner can later tick any permission on Team or Groups."}
+                  </div>
                   <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.personName} value={staffForm.personName} onChange={e=>setStaffForm(p=>({...p,personName:e.target.value}))} />
-                  <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.usernameLbl} value={staffForm.username} onChange={e=>setStaffForm(p=>({...p,username:e.target.value}))} autoComplete="off" autoCapitalize="none" />
+                  <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.usernameLbl} value={staffForm.username} onChange={e=>setStaffForm(p=>({...p,username:e.target.value}))} autoComplete="off" autoCapitalize="none" data-caps="off" />
                   <input style={{ ...s.inp, marginBottom:8 }} type="password" placeholder={t.passwordLbl} value={staffForm.password} onChange={e=>setStaffForm(p=>({...p,password:e.target.value}))} autoComplete="new-password" />
                   <input style={{ ...s.inp, marginBottom:8 }} type="tel" placeholder={t.mobileLbl} value={staffForm.mobile} onChange={e=>setStaffForm(p=>({...p,mobile:e.target.value}))} />
                   <select style={{ ...s.sel, marginBottom:10 }} value={staffForm.position} onChange={e=>setStaffForm(p=>({...p,position:e.target.value}))}>
@@ -291,7 +297,8 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                             )}
                             <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>{t.permissionsTitle}</div>
                             <PermissionMatrix lang={lang} th={th} perms={mPerms} compact
-                              onToggle={(key,val)=>savePermissions(m,{ ...mPerms, [key]:val })} />
+                              onToggle={(key,val)=>savePermissions(m,{ ...mPerms, [key]:val })}
+                              onSetFlags={(perms)=>savePermissions(m, perms)} />
                             <div style={{ height:1, background:th.bgCard, margin:"10px 0 8px" }} />
                             <UserDefaultsEditor lang={lang} th={th} s={s} member={m} team={team} employees={teamEmployees} payOptions={SI_PAY}
                               onSave={(d)=>saveMemberDefaults(m, d)} />
@@ -445,7 +452,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
             </div>
           )}
 
-          {stPage==="backup"&&isOwner&&shopId&&(
+          {stPage==="backup"&&(isOwner||may("manageBackup"))&&shopId&&(
             <BackupPanel lang={lang} th={th} s={s} toast={toast} shopId={shopId} userId={user?.uid} />
           )}
 

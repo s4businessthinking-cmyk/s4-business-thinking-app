@@ -3,6 +3,9 @@ import { PM_CSS, PM_MOBILE_QUERY } from "../product-master/pmStyles";
 import { offlineCreate, offlineList, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { syncOpeningBill as syncPartyOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
+import { printWithSettings } from "../print/printSettings.js";
+import { generateStatementHTML } from "../print/printDesign.js";
+import { syncBothSidesParty } from "../utils/bothSidesParty.js";
 
 const PAY = {
   cash:   { bn:"নগদ",    en:"Cash" },
@@ -91,7 +94,12 @@ const toForm = (v) => Object.fromEntries(Object.keys(EMPTY_VENDOR).map((k) => {
   const raw = v?.[k];
   if (NUMBER_FIELDS.includes(k)) return [k, Number(raw) ? String(raw) : ""];
   return [k, raw == null ? "" : String(raw)];
-}).concat([["status", v?.status || "active"], ["paymentType", v?.paymentType || "cash"]]));
+}).concat([
+  ["status", v?.status || "active"],
+  ["paymentType", v?.paymentType || "cash"],
+  ["linkedCustomerId", v?.linkedCustomerId || ""],
+  ["alsoCustomer", !!v?.linkedCustomerId],
+]));
 
 const num = (v) => {
   const n = Number(String(v ?? "").replace(/,/g, ""));
@@ -116,9 +124,9 @@ function useMobileLayout() {
 }
 
 export default function VendorMasterScreen({
-  t, lang, shopId, user, vendors, toast, cur = "AED",
-  canEdit = false, canDelete = false, canPurchase = false, actorName = "", leaveGuard, onClose, onGoToPurchase, onGoToSecurityCheques, renderImport, nextCode,
-  focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved,
+  t, lang, shopId, user, vendors, customers = [], toast, cur = "AED",
+  canEdit = false, canDelete = false, canPrint = false, canPurchase = false, actorName = "", leaveGuard, onClose, onGoToPurchase, onGoToSecurityCheques, renderImport, nextCode, nextCustomerCode, shopName = "",
+  focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved, onCustomerSaved, onCustomerRemoved,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -133,6 +141,7 @@ export default function VendorMasterScreen({
   const [showImport, setShowImport] = useState(false);
   const rootRef = useRef(null);
   const seenSelected = useRef(false);
+  const holdId = useRef(null);
   const [fitHeight, setFitHeight] = useState(null);
   const [scSummary, setScSummary] = useState({ count: 0, total: 0 });
 
@@ -191,6 +200,7 @@ export default function VendorMasterScreen({
     setBaseline(JSON.stringify(next));
     setSelectedId(v?.id || null);
     seenSelected.current = !!v;
+    holdId.current = null;
   };
 
   useEffect(() => {
@@ -208,7 +218,12 @@ export default function VendorMasterScreen({
   const selectedVendor = selectedId ? vendors.find((v) => v.id === selectedId) : null;
   useEffect(() => {
     if (!selectedId || dirty) return;
-    if (!selectedVendor) { if (seenSelected.current) loadVendor(null); return; }
+    if (!selectedVendor) {
+      if (holdId.current === selectedId) return;
+      if (seenSelected.current) loadVendor(null);
+      return;
+    }
+    if (holdId.current === selectedId) holdId.current = null;
     seenSelected.current = true;
     const next = toForm(selectedVendor);
     if (JSON.stringify(next) !== baseline) { setForm(next); setBaseline(JSON.stringify(next)); }
@@ -287,22 +302,37 @@ export default function VendorMasterScreen({
     setSaving(true);
     try {
       let savedId = selectedId;
+      let savedDoc = payload;
       if (selectedId) {
-        await offlineUpdate("vendors", selectedId, payload);
+        const result = await offlineUpdate("vendors", selectedId, payload);
+        savedDoc = result.data || payload;
         toast(t.vm_updated);
       } else {
         if (nextCode) payload.vendorCode = await nextCode();
         const result = await offlineCreate("vendors", { ...payload, createdBy: user.uid, createdAt: now });
         savedId = result.documentId;
+        savedDoc = result.data || payload;
         toast(t.vm_saved);
       }
-      const saved = toForm(payload);
+      const link = await syncBothSidesParty({
+        from: "vendor", wantBoth: !!form.alsoCustomer, sourceId: savedId, sourceDoc: { ...savedDoc, id: savedId },
+        otherList: customers, shopId, user, nextOtherCode: nextCustomerCode,
+      });
+      if ((savedDoc.linkedCustomerId || "") !== (link.sourcePatch.linkedCustomerId || "")) {
+        const patched = await offlineUpdate("vendors", savedId, link.sourcePatch);
+        savedDoc = patched.data || { ...savedDoc, ...link.sourcePatch };
+      }
+      if (link.other) onCustomerSaved?.(link.other);
+      if (link.removedId) onCustomerRemoved?.(link.removedId);
+      if (link.keptBecauseUsed) toast(L("কাস্টমার বিল আছে, তাই কাস্টমার মাস্টারে আলাদা রেকর্ড থেকে গেছে", "Customer has bills, so it stays on Customer Master as its own record"));
+      holdId.current = savedId;
+      const saved = toForm(savedDoc);
       setForm(saved);
       setBaseline(JSON.stringify(saved));
       setSelectedId(savedId);
-      onPartySaved?.({ id: savedId, ...payload });
-      if (openingChanged || (selectedId === null && num(payload.openingBalance) > 0)) {
-        try { await syncOpeningBill(savedId, payload); }
+      onPartySaved?.({ id: savedId, ...savedDoc });
+      if (openingChanged || (selectedId === null && num(savedDoc.openingBalance) > 0)) {
+        try { await syncOpeningBill(savedId, savedDoc); }
         catch (err) { toast(err.message || String(err), "err"); }
       }
       if (navigator.onLine) {
@@ -333,6 +363,11 @@ export default function VendorMasterScreen({
     }
     if (!window.confirm(t.vm_confirmDelete)) return;
     try {
+      if (form.linkedCustomerId) {
+        await offlineUpdate("customers", form.linkedCustomerId, { linkedVendorId: "", updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }).catch(() => {});
+        const linked = customers.find((c) => c.id === form.linkedCustomerId);
+        if (linked) onCustomerSaved?.({ ...linked, linkedVendorId: "" });
+      }
       await offlineRemove("vendors", selectedId);
       toast(t.vm_deleted, "err");
       logAudit({ shopId, user, action: "delete", collection: "vendors", docId: selectedId, docNo: form.vendorName });
@@ -375,6 +410,32 @@ export default function VendorMasterScreen({
   );
 
   const statusLabel = (st) => STATUS[st]?.[bn ? "bn" : "en"] || st;
+  const printProfile = () => {
+    if (!selectedId) return;
+    const fields = [
+      [L("নাম", "Name"), form.vendorName], [L("কোড", "Code"), form.vendorCode],
+      [L("ক্যাটাগরি", "Category"), form.category], [L("স্ট্যাটাস", "Status"), statusLabel(form.status)],
+      [L("পেমেন্ট", "Payment"), PAY[form.paymentType]?.[bn ? "bn" : "en"] || form.paymentType],
+      [L("যোগাযোগ", "Contact"), form.contactPerson],
+      [L("মোবাইল", "Mobile"), form.mobileNumber], [L("ফোন", "Phone"), form.phoneNumber],
+      ["WhatsApp", form.whatsappNumber], [L("ইমেইল", "Email"), form.email],
+      [L("ঠিকানা", "Address"), form.address], [L("শহর", "City"), [form.area, form.city, form.emirate, form.country].filter(Boolean).join(", ")],
+      ["TRN", form.trnNumber], [L("ট্রেড লাইসেন্স", "Trade licence"), form.tradeLicenseNumber],
+      [L("ক্রেডিট লিমিট", "Credit limit"), form.creditLimit], [L("শর্ত", "Terms"), form.paymentTerms],
+      [L("নোট", "Notes"), form.notes],
+    ].filter(([, v]) => String(v || "").trim());
+    printWithSettings(generateStatementHTML({
+      shopName, title: L("সাপ্লায়ার প্রোফাইল", "SUPPLIER PROFILE"), subtitle: form.vendorCode || form.vendorName,
+      cols: [{ label: L("ফিল্ড", "Field") }, { label: L("বিবরণ", "Details") }], rows: fields,
+    }), { lang });
+  };
+  const printList = () => {
+    printWithSettings(generateStatementHTML({
+      shopName, title: L("সাপ্লায়ার তালিকা", "SUPPLIER LIST"), subtitle: `${filtered.length}`,
+      cols: [{ label: L("কোড", "Code") }, { label: L("নাম", "Name") }, { label: L("মোবাইল", "Mobile") }, { label: L("ক্যাটাগরি", "Category") }, { label: L("স্ট্যাটাস", "Status") }, { label: L("শহর", "City") }],
+      rows: filtered.map((v) => [v.vendorCode || "", v.vendorName || "", v.mobileNumber || v.phoneNumber || "", v.category || "", statusLabel(v.status || "active"), [v.area, v.city].filter(Boolean).join(" ")]),
+    }), { lang });
+  };
 
   return (
     <div ref={rootRef} className="vm-root" style={fitHeight ? { height: fitHeight } : undefined}>
@@ -413,6 +474,14 @@ export default function VendorMasterScreen({
             {panel(L("ভেন্ডর তথ্য", "Vendor Details"), <>
               {row(L("ভেন্ডরের নাম", "Vendor Name"), "vendorName", { required: true })}
               {row(L("ভেন্ডর কোড", "Vendor Code"), "vendorCode", { placeholder: L("সেভ করলে নিজে বসবে", "Auto on save"), readOnly: true, mono: true })}
+              <label className="pm-form-row" style={{ alignItems: "center" }}>
+                <span className="pm-label">{L("দুই দিকে", "Both sides")}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700 }}>
+                  <input type="checkbox" checked={!!form.alsoCustomer} onChange={(e) => upd("alsoCustomer", e.target.checked)} />
+                  {L("কাস্টমার হিসেবেও রাখুন", "Also keep as customer")}
+                  {form.alsoCustomer && form.linkedCustomerId ? ` · ${customers.find((c) => c.id === form.linkedCustomerId)?.customerCode || ""}` : ""}
+                </span>
+              </label>
               <div className="pm-form-row">
                 <label className="pm-label">{L("ক্যাটাগরি", "Category")}</label>
                 <select className="pm-input" value={form.category} onChange={(e) => upd("category", e.target.value)}>
@@ -530,6 +599,12 @@ export default function VendorMasterScreen({
         </button>
         {canDelete && (
           <button type="button" className="pm-btn pm-btn--danger" onClick={remove} disabled={!selectedId}>{L("মুছুন", "Delete")}</button>
+        )}
+        {canPrint && (
+          <button type="button" className="pm-btn-secondary" onClick={printProfile} disabled={!selectedId}>🖨️ {L("প্রোফাইল", "Profile")}</button>
+        )}
+        {canPrint && (
+          <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!filtered.length}>🖨️ {L("তালিকা", "List")}</button>
         )}
         {canDelete && renderImport && (
           <button type="button" className="pm-btn-secondary" onClick={() => setShowImport(true)}>{L("ইমপোর্ট", "Import")}</button>

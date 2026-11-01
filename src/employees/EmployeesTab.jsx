@@ -106,7 +106,7 @@ const emptyForm = () => ({ ...Object.fromEntries(ALL_FIELDS.map((f) => [f.k, ""]
 const PRESET_POSITIONS = ["Senior Salesman", "Junior Salesman", "Manager", "Cashier", "Storekeeper", "Delivery Man", "Accountant", "Supervisor", "Mechanic", "Driver"];
 const PRESET_POSITIONS_BN = ["সিনিয়র সেলসম্যান", "জুনিয়র সেলসম্যান", "ম্যানেজার", "ক্যাশিয়ার", "স্টোরকিপার", "ডেলিভারি ম্যান", "অ্যাকাউন্ট্যান্ট", "সুপারভাইজার", "মেকানিক", "ড্রাইভার"];
 
-export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwner, canManage, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, leaveGuard = null, alerts = [], focus = null, onFocusHandled, onOpenAlert }) {
+export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, leaveGuard = null, alerts = [], focus = null, onFocusHandled, onOpenAlert }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const canSeeSalary = isOwner;
@@ -255,7 +255,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
   };
 
   const remove = async (r) => {
-    if (!isOwner) return;
+    if (!canDelete) return;
     if (expenses.some((x) => x && !x.isDeleted && x.employeeId === r.id)) { toast?.(L("❌ এই কর্মচারীর খরচ লেখা আছে — মুছবেন না, \"চলে গেছেন\" করে দিন", "❌ This employee has expenses — mark as Left instead of deleting"), "err"); return; }
     if (!window.confirm(L(`${r.name} কে একেবারে মুছে ফেলবেন? তার ডকুমেন্টও মুছে যাবে।`, `Delete ${r.name} permanently? Their documents will be deleted too.`))) return;
     try {
@@ -556,8 +556,8 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
           )}
         </div>
         <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
-          {editRow && isOwner && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => remove(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
-          {editRow && <button type="button" className="pm-btn-secondary" onClick={() => printProfile(editRow)}>🖨️ {L("প্রোফাইল প্রিন্ট", "Print profile")}</button>}
+          {editRow && canDelete && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => remove(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
+          {editRow && canPrint && <button type="button" className="pm-btn-secondary" onClick={() => printProfile(editRow)}>🖨️ {L("প্রোফাইল প্রিন্ট", "Print profile")}</button>}
           <span className="si-toolbar-gap" />
           <button type="button" className="pm-btn-secondary" disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
           {!readOnly && <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editRow ? L("আপডেট", "Update") : L("সেভ", "Save")} (Ctrl+S)`}</button>}
@@ -651,7 +651,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
       </div>
       <div className="si-toolbar">
         {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন কর্মচারী", "New Employee")}</button>}
-        <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!filtered.length}>🖨️ {L("তালিকা প্রিন্ট", "Print list")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!filtered.length}>🖨️ {L("তালিকা প্রিন্ট", "Print list")}</button>}
       </div>
       <div className="si-kpis">
         <div className="si-kpi"><span>{L("কর্মরত", "Working")}</span><b>{activeList.length}</b></div>

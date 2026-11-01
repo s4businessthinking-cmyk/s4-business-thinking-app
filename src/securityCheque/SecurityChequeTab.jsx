@@ -5,10 +5,11 @@ import { logAudit } from "../utils/auditLog.js";
 import { usePmMobile, usePmFitHeight, SI_CSS } from "../sales-invoice/siSkin.js";
 import PartyPickerWindow, { VENDOR_PICKER_COLS, CUSTOMER_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
 import { readDocFile, openDocFile } from "../utils/docFiles.js";
+import { acquireScanImage } from "../utils/scanImage.js";
 import { printSecurityChequeReceipt } from "./securityChequeReceipt.js";
 import { saveSecurityChequeDocs } from "./securityChequeDocs.js";
 import {
-  PARTY_TYPES, DIRECTIONS, STATUSES, ID_TYPES, SECURITY_CHEQUE_FIELDS, SECURITY_CHEQUE_DOC_FLAGS,
+  PARTY_TYPES, DIRECTIONS, STATUSES, ID_TYPES, SECURITY_CHEQUE_DOC_FLAGS,
   emptySecurityCheque, validateSecurityCheque, liveSecurityCheques, isStale, r2,
   openInvoicesFor, outstandingBalanceFor,
 } from "./securityCheque.js";
@@ -18,41 +19,52 @@ const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/")
 const money = (v, cur) => `${cur} ${r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const label = (list, key, bn) => (list.find((x) => x.key === key) || {})[bn ? "bn" : "en"] || key;
 
-function PhotoField({ label: lbl, value, onChange, bn }) {
-  const inputRef = useRef(null);
+function PhotoField({ label: lbl, value, onChange, bn, kind = "id" }) {
   const [busy, setBusy] = useState(false);
   const isPdf = String(value || "").startsWith("data:application/pdf");
-  const pick = async (e) => {
-    const file = e.target.files?.[0]; e.target.value = "";
-    if (!file) return;
+  const cheque = kind === "cheque";
+  const run = async (folder) => {
     setBusy(true);
-    try { onChange(await readDocFile(file, (b, en) => (bn ? b : en))); } catch (err) { alert(err.message); } finally { setBusy(false); }
+    try {
+      const data = await acquireScanImage({ folder });
+      if (data) onChange(data);
+    } catch (err) { alert(err.message); } finally { setBusy(false); }
   };
   return (
     <div style={{ flex: 1, minWidth: 0 }}>
       <div style={{ fontSize: 11, fontWeight: 800, color: "#334155", marginBottom: 4 }}>{lbl}</div>
-      <div onClick={() => inputRef.current?.click()}
-        style={{ height: 110, borderRadius: 10, border: value ? "1px solid #cbd5e1" : "1.5px dashed #94a3b8", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", cursor: "pointer" }}>
+      <div onClick={() => !busy && run(false)}
+        style={{
+          width: "100%",
+          borderRadius: 10,
+          border: value ? "1px solid #cbd5e1" : "1.5px dashed #94a3b8",
+          background: "#f8fafc", overflow: "hidden", cursor: "pointer",
+          aspectRatio: cheque ? "2.4 / 1" : "85.6 / 54",
+          maxHeight: cheque ? 200 : 140,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
         {value
-          ? (isPdf ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>📄 PDF</span> : <img src={value} alt="" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />)
-          : <span style={{ fontSize: 12, color: "#64748b" }}>{busy ? "…" : (bn ? "📷 ছবি তুলুন / PDF" : "📷 Take photo / PDF")}</span>}
+          ? (isPdf
+            ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700, display: "block", padding: 24, textAlign: "center" }}>📄 PDF</span>
+            : <img src={value} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />)
+          : <span style={{ fontSize: 12, color: "#64748b", padding: 12, textAlign: "center" }}>{busy ? "…" : (bn ? "📷 স্ক্যান / ক্যামেরা" : "📷 Scan / camera")}</span>}
       </div>
-      {value && (
-        <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-          {isPdf && <button type="button" onClick={() => openDocFile({ file: value, label: lbl })} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "দেখুন" : "View"}</button>}
-          <button type="button" onClick={() => onChange("")} style={{ border: "none", background: "none", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "সরান" : "Remove"}</button>
-        </div>
-      )}
-      <input ref={inputRef} type="file" accept="application/pdf,image/*" onChange={pick} style={{ display: "none" }} />
+      <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+        <button type="button" onClick={() => run(false)} disabled={busy} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+          {bn ? "স্ক্যান" : "Scan"}
+        </button>
+        <button type="button" onClick={() => run(true)} disabled={busy} style={{ border: "none", background: "none", color: "#64748b", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+          {bn ? "ফোল্ডার" : "Folder"}
+        </button>
+        {value && isPdf && <button type="button" onClick={() => openDocFile({ file: value, label: lbl })} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "দেখুন" : "View"}</button>}
+        {value && <button type="button" onClick={() => onChange("")} style={{ border: "none", background: "none", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "সরান" : "Remove"}</button>}
+      </div>
     </div>
   );
 }
 
-export default function SecurityChequeTab({ lang = "en", shopId, user, profile, isOwner = false, canManage = false, cur = "AED", toast, shopName = "", shop = null, alerts = [], leaveGuard, customers = [], vendors = [], focusParty = null, onFocusPartyHandled }) {
+export default function SecurityChequeTab({ lang = "en", shopId, user, profile, isOwner = false, canManage = false, canDelete = false, canPrint = false, cur = "AED", toast, shopName = "", shop = null, alerts = [], leaveGuard, customers = [], vendors = [], focusParty = null, onFocusPartyHandled }) {
   const bn = lang === "bn";
-  if (!canManage) {
-    return <div className="pm-card" style={{ padding: 16 }}>{bn ? "সিকিউরিটি চেক মডিউল আপনার জন্য খোলা নেই।" : "Security Cheque module is not open for you."}</div>;
-  }
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile);
@@ -176,7 +188,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
 
   // Kept in memory (not lazy-loaded) so Print never has to await anything after the click —
   // an await before window.open() can silently drop the browser's printer-choice dialog.
-  const docsByRecordId = useMemo(() => Object.fromEntries(docRows.map((d) => [d.securityChequeId, d])), [docRows]);
+  const docsByRecordId = useMemo(() => Object.fromEntries(docRows.map((d) => [d.securityChequeId || d.id, d])), [docRows]);
 
   const all = useMemo(() => liveSecurityCheques(records, shopId), [records, shopId]);
   const filtered = useMemo(() => all.filter((r) => {
@@ -212,11 +224,22 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
   const save = async () => {
     const missing = validateSecurityCheque(form, bn);
     if (missing) { alert(bn ? `"${missing}" পূরণ করুন` : `Please fill "${missing}"`); return; }
+    if (!String(form.partyId || "").trim()) {
+      alert(bn ? "তালিকা থেকে পার্টি বাছাই করুন" : "Pick the party from the list");
+      return;
+    }
     setBusy(true);
     try {
       const amount = parseFloat(String(form.amount).replace(/,/g, "")) || 0;
       const hasDocs = ["idFront", "idBack", "chequePhoto", "receiptFile", "signedReceiptCopy", "agreementFile", "returnEvidence"].some((k) => docs[k]);
-      const payload = { ...form, shopId, amount, hasDocs, updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" };
+      const payload = {
+        ...form, shopId, amount, hasDocs,
+        chequeCopy: !!(form.chequeCopy || docs.chequePhoto),
+        idCopy: !!(form.idCopy || docs.idFront || docs.idBack),
+        signedReceipt: !!(form.signedReceipt || docs.signedReceiptCopy),
+        agreementCopy: !!(form.agreementCopy || docs.agreementFile),
+        updatedAt: new Date().toISOString(), updatedBy: user?.uid || "",
+      };
       let id = editId;
       if (id) {
         await offlineUpdate("securityCheques", id, payload);
@@ -224,9 +247,10 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
         payload.createdAt = new Date().toISOString();
         payload.createdBy = user?.uid || "";
         const created = await offlineCreate("securityCheques", payload);
-        id = created?.id || created;
+        id = created?.documentId || created?.data?.id || "";
+        if (!id) throw new Error("create returned no id");
       }
-      if (hasDocs) await saveSecurityChequeDocs({ id, shopId }, docs, user?.uid || "");
+      await saveSecurityChequeDocs({ id, shopId }, docs, user?.uid || "");
       await logAudit({ shopId, user, profile, action: editId ? "update" : "create", collection: "securityCheques", docId: id, docNo: form.chequeNo, amount, note: form.party });
       if (receiptFileChanged && docs.receiptFile) {
         await logAudit({ shopId, user, profile, action: "receiptAttached", collection: "securityCheques", docId: id, docNo: form.receiptNo, note: `${form.party} — ${form.receiptFileName}` });
@@ -281,12 +305,27 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
     await logAudit({ shopId, user, profile, action: "presented", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, amount: r.amount, note: r.party });
   };
   const deleteRecord = async (r) => {
-    if (!isOwner) return;
+    if (!canDelete) return;
     if (!window.confirm(bn ? "এই রেকর্ড মুছবেন? এটি ফেরানো যাবে না।" : "Delete this record? This cannot be undone.")) return;
     await offlineRemove("securityCheques", r.id);
+    try { await offlineRemove("securityChequeDocs", r.id); } catch { /* no docs row */ }
     await logAudit({ shopId, user, profile, action: "delete", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, note: r.party });
     if (editId === r.id) closeForm();
   };
+
+  useEffect(() => {
+    if (!leaveGuard || !form) return undefined;
+    const guard = {
+      leave: () => window.confirm(bn ? "সেভ করা হয়নি। বের হবেন?" : "Changes are not saved. Leave anyway?"),
+      back: () => { closeForm(); return true; },
+    };
+    leaveGuard.current = guard;
+    return () => { if (leaveGuard.current === guard) leaveGuard.current = null; };
+  }, [leaveGuard, form, bn]);
+
+  if (!canManage) {
+    return <div className="pm-card" style={{ padding: 16 }}>{bn ? "সিকিউরিটি চেক মডিউল আপনার জন্য খোলা নেই।" : "Security Cheque module is not open for you."}</div>;
+  }
 
   const card = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, marginBottom: 10 };
   const fieldStyle = { width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13, boxSizing: "border-box", fontFamily: "inherit", background: "#fff", color: "#0f172a" };
@@ -555,9 +594,9 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
               </div>
 
               <div style={card}>
-                <PhotoField bn={bn} label={bn ? "চেকের ছবি / স্ক্যান" : "Cheque photo / scan"} value={docs.chequePhoto} onChange={(v) => setDocs((d) => ({ ...d, chequePhoto: v }))} />
+                <PhotoField bn={bn} kind="cheque" label={bn ? "চেকের ছবি / স্ক্যান" : "Cheque photo / scan"} value={docs.chequePhoto} onChange={(v) => setDocs((d) => ({ ...d, chequePhoto: v }))} />
                 <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 4 }}>
-                  {bn ? "স্ক্যানার/প্রিন্টার দিয়ে স্ক্যান করা ছবিটা ফাইল হিসেবে এখানে বাছাই করুন — সফটওয়্যার নিজে থেকে স্ক্যানার চালু করে না, স্ক্যান করা কপিটা বেছে নিতে হবে।" : "Pick the scanned/photographed file here after scanning it on your scanner or printer — the app can't trigger the scanner itself, you pick the resulting file."}
+                  {bn ? "স্ক্যান চাপলে পিসিতে স্ক্যানার/প্রিন্টার খুলবে, মোবাইলে ক্যামেরা। স্ক্যান হয়ে সরাসরি এই বক্সে বসবে। ফোল্ডার থেকেও বেছে নিতে পারবেন।" : "Scan opens the PC scanner/printer, or the phone camera. The scan lands in this box. You can still pick a file from a folder."}
                 </div>
               </div>
 
@@ -576,7 +615,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={card}>
                   <div style={{ fontWeight: 800, fontSize: 12.5, marginBottom: 6 }}>{bn ? "রেকর্ড অ্যাকশন" : "Record actions"} — {bn ? "স্ট্যাটাস" : "Status"}: <b>{label(STATUSES, form.status, bn)}</b></div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    <button type="button" onClick={() => printSecurityChequeReceipt(form, shop, lang, cur, docs)} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>🖨️ {bn ? "A4 রসিদ প্রিন্ট" : "Print A4 receipt"}</button>
+                    {canPrint && <button type="button" onClick={() => printSecurityChequeReceipt(form, shop, lang, cur, docs)} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>🖨️ {bn ? "A4 রসিদ প্রিন্ট" : "Print A4 receipt"}</button>}
                     {form.status === "held" && !form.closureRequested && (
                       <button type="button" onClick={() => requestClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "বন্ধের অনুরোধ" : "Request closure"}</button>
                     )}
@@ -592,7 +631,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                     {isOwner && form.status === "held" && (
                       <button type="button" onClick={() => markPresented(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "ব্যাংকে জমা মার্ক (মালিক)" : "Mark presented (owner)"}</button>
                     )}
-                    {isOwner && (
+                    {canDelete && (
                       <button type="button" onClick={() => deleteRecord(form)} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#b91c1c", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🗑️ {bn ? "ডিলিট" : "Delete"}</button>
                     )}
                   </div>

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { AUDIT_ACTIONS, AUDIT_COLLECTION_LABELS } from "../utils/auditLog.js";
+import { printWithSettings } from "../print/printSettings.js";
+import { generateStatementHTML } from "../print/printDesign.js";
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtWhen = (iso) => {
@@ -9,7 +11,7 @@ const fmtWhen = (iso) => {
   return `${localDay(d)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
-export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDesktop }) {
+export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDesktop, canPrint = false, shopName = "" }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [rows, setRows] = useState([]);
@@ -69,10 +71,32 @@ export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDe
     return <span style={{ padding: "2px 9px", borderRadius: 20, fontSize: 11, fontWeight: 800, color: m.color, background: `${m.color}1f`, whiteSpace: "nowrap" }}>{bn ? m.bn : m.en}</span>;
   };
   const shown = filtered.slice(0, limit);
+  const printList = () => {
+    printWithSettings(generateStatementHTML({
+      shopName, title: L("অডিট লগ", "AUDIT LOG"),
+      subtitle: `${from || "Start"} — ${to || "Today"} · ${shown.length}`,
+      cols: [
+        { label: L("সময়", "When") }, { label: L("কে", "Who") }, { label: L("কাজ", "Action") },
+        { label: L("ধরন", "Type") }, { label: L("নম্বর", "No.") }, { label: L("টাকা", "Amount"), align: "right" },
+        { label: L("বিস্তারিত", "Details") },
+      ],
+      rows: shown.map((r) => [
+        fmtWhen(r.createdAt), r.byName || "—", bn ? actMeta(r.action).bn : actMeta(r.action).en,
+        collLabel(r.collection), r.docNo || "—", money(r.amount), r.note || "",
+      ]),
+    }), { lang });
+  };
 
   return (
     <div style={{ maxWidth: isDesktop ? 1100 : 660, margin: "0 auto", padding: isDesktop ? "24px 28px 60px" : "18px 14px 60px" }}>
-      <div style={{ fontSize: 16, fontWeight: 900, color: "#7c3aed", marginBottom: 4 }}>🕵️ {L("অডিট লগ", "Audit Log")}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 16, fontWeight: 900, color: "#7c3aed" }}>🕵️ {L("অডিট লগ", "Audit Log")}</div>
+        {canPrint && (
+          <button type="button" onClick={printList} disabled={!shown.length} style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${th.border}`, background: th.bgInp, color: th.txtPrimary, fontWeight: 800, cursor: shown.length ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+            🖨️ {L("প্রিন্ট", "Print")}
+          </button>
+        )}
+      </div>
       <div style={{ fontSize: 12, color: th.txtMuted, marginBottom: 12 }}>{L("কে কখন কী বাতিল, মুছে বা এডিট করেছে — এটা কেউ বদলাতে বা মুছতে পারে না।", "Who cancelled, deleted or edited what, and when. Nobody can change or delete these entries.")}</div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>

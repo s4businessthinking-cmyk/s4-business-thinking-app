@@ -1,4 +1,4 @@
-import { siCalcLine, siN2, siFmt2, SI_UNITS, SI_STATUSES, SI_PAY, siProductRateRows, siCalcTotals, siInvoiceExtras, printPaymentVoucher, siR2, siUnitOptionsFor, generatePaymentVoucherHTML, generateSalesInvoiceHTML } from "./salesInvoiceShared.js";
+import { siCalcLine, siN2, siFmt2, SI_UNITS, SI_STATUSES, SI_PAY, siProductRateRows, siCalcTotals, siInvoiceExtras, printPaymentVoucher, siR2, siUnitOptionsFor, generatePaymentVoucherHTML, generateSalesInvoiceHTML, siIsSettledPay } from "./salesInvoiceShared.js";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { nsmatch, DEFAULT_PERMISSIONS, reserveShopSerial, deviceSerialTag, nextPartyCode, billLeaveGuard, applyInvoiceStockEffect, unlinkedStockOk, voucherParties, toVoucherView, PI_VOUCHER_METHODS, AutoTA } from "../shared/appShared.jsx";
 import { useEscapeKey, useWindowState, MinimizedChip, WindowButtons } from "../components/WindowChrome.jsx";
@@ -49,6 +49,7 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   const siPerm = (key) => isOwner || { ...DEFAULT_PERMISSIONS, ...(profile?.permissions||{}) }[key] === true;
   const canDiscount = siPerm("giveDiscount");
   const canCancelInv = siPerm("cancelInvoices");
+  const canPrintInv = siPerm("printSales") || siPerm("manageSales");
   const canCustBalance = siPerm("viewCustomerBalance");
   const canSeeCost = siPerm("manageProducts") || siPerm("managePurchase");
   // A sales order behaves like a quotation (no stock, no money) until it becomes a delivery note or an invoice.
@@ -90,7 +91,7 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     if (siView==="form") { if (siLeaveUnsavedOk()) setSiView("list"); }
     else { setSiView("list"); setSelInv(null); }
   }, { enabled: siView!=="list" && !siWin.min, level: siView==="form" ? 2 : 1 });
-  const { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiPrintModal, setSiSaving, setSiSearch, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siPrintModal, siQtyRef, siSaveLockRef, siSaving, siSearch, siSnapRef, siStatusF } = useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, isOwner, kind, setDnMigrateTick, setInvoices, setSiLoading, shopId, syncRefreshKey, user });
+  const { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiPrintModal, setSiPrintPayAsk, setSiSaving, setSiSearch, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siPrintModal, siPrintPayAsk, siQtyRef, siSaveLockRef, siSaving, siSearch, siSnapRef, siStatusF } = useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, isOwner, kind, setDnMigrateTick, setInvoices, setSiLoading, shopId, syncRefreshKey, user });
 
   const { bumpShopSiSerial, reserveSiInvoiceNo, siLoadDoc, siOpenEdit, siOpenNew, siPreviewNextInvoiceNo } = createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, isDN, isOwner, isQuote, isSO, kind, lang, profile, serialField, serialRe, setEditInvId, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiView, setSourceQuote, shop, shopId, siEmptyCurrent, siInvoiceNo, siLoadedPaidRef, siSnapRef, team, toast, user });
   useEffect(()=>{
@@ -142,9 +143,35 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
 
   const { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint } = useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, editInvId, invoices, isDN, isOwner, isQuote, kind, lang, productFromMaster, receipts, setEditInvId, setLedgerWin, setSelInv, setShowCustPicker, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiOpenParty, setSiSearch, setSiView, setSourceQuote, shop, siColorPrint, siCurrent, siEmptyCurrent, siForm, siLines, siMobile, siNavReturn, siOpenEdit, siOpenParty, siPerm, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siShowCode, siSnapRef, siView, siWin, t, user });
 
-  const { siConfirm, siSaveDraft } = createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siSaveLockRef, sourceQuote, t, toast, user });
+  const { siConfirm, siSaveDraft } = createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user });
 
-  const { cashReceiptWindow, ledgerWindow, receiptWindow, siCancel, siDelete } = createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user });
+  const siHasPrintableLines = siLines.some((it) => String(it.name || "").trim());
+  const siRequestPrint = (inv) => {
+    if (!canPrintInv) return;
+    if (inv && inv.status !== "draft") {
+      siPrint(inv);
+      return;
+    }
+    if (!inv && !siHasPrintableLines) { toast(t.si_errItems, "err"); return; }
+    if (inv && inv.status === "draft" && inv.id !== editInvId) siOpenEdit(inv);
+    if (isQuote || isDN || siForm.invoiceType === "delivery") {
+      if (inv) { siPrint(inv); return; }
+      siConfirm({ print: "direct" });
+      return;
+    }
+    setSiPrintPayAsk(true);
+  };
+  const siPrintAs = (choice) => {
+    setSiPrintPayAsk(false);
+    const current = siForm.paymentMethod;
+    const method = choice === "credit" ? "credit" : (current === "bank" || current === "card" ? current : "cash");
+    if (method !== current) {
+      setSiForm((p) => ({ ...p, paymentMethod: method, ...(method === "credit" ? { amountPaid: "", cashPartial: false } : { cashPartial: false }) }));
+    }
+    siConfirm({ print: "direct", paymentMethod: method, cashPartial: false });
+  };
+
+  const { cashReceiptWindow, ledgerWindow, receiptWindow, siCancel, siDelete } = createSiReceiptActions({ COL, billReturns, canCancelInv, canPrintInv, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user });
 
   // Memoized: invoices can be thousands of rows, and this component re-renders on
   // every keystroke anywhere in the form, not just the search box.
@@ -172,9 +199,10 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   ];
   const formIsTax      = siForm.invoiceType==="tax";
   const formIsCash     = siForm.paymentMethod==="cash";
+  const formIsSettled  = siIsSettledPay(siForm.paymentMethod, siForm.cashPartial);
   const totals=formIsDelivery ? siCalcTotals(siDeliveryLines(siLines), false) : siCalcTotals(siLines, formIsTax, siInvoiceExtras(siForm));
-  // plain cash: auto fully paid, delivery: 0; "partial cash" tracks the typed amount like credit
-  const formPaid = formIsDelivery || isQuote ? 0 : (formIsCash && !siForm.cashPartial) ? totals.grand : siN2(siForm.amountPaid);
+  // cash / bank / card: auto fully paid; delivery: 0; credit / cheque / partial-cash: typed amount
+  const formPaid = formIsDelivery || isQuote ? 0 : formIsSettled ? totals.grand : siN2(siForm.amountPaid);
   const balance  = Math.max(0, totals.grand - formPaid);
 
   // ══ LIST ══
@@ -202,7 +230,7 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     // doesn't have it — clearing it on the very first, still-empty render would drop the open request.
     if (!openInvoiceId) return;
     const inv = invoices.find((i) => i.id === openInvoiceId);
-    if (inv) { onOpenInvoiceHandled?.(); siOpenInvoice(inv); }
+    if (inv) { onOpenInvoiceHandled?.(); if (wideDesktop) siOpenFromDesktop(inv); else siOpenInvoice(inv); }
     else if (invoices.length > 0) { onOpenInvoiceHandled?.(); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openInvoiceId, invoices, kind]);
@@ -214,21 +242,28 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   const siOpenReminderForm = (inv) => setSiReminderForm({ invoiceId: inv.id, invoiceNo: inv.invoiceNo || "", customerName: inv.customerName || "", date: siToday(), time: "", note: "" });
   const siSaveReminder = async () => {
     if (!siReminderForm?.date) return;
+    if (!shopId || !user?.uid) {
+      toast?.(bnL ? "❌ লগইন ছাড়া রিমাইন্ডার সেভ হবে না" : "❌ Sign in to save a reminder", "err");
+      return;
+    }
     try {
+      const at = new Date().toISOString();
       await offlineCreate("reminders", {
         title: `${siDocTitle} ${siReminderForm.invoiceNo}${siReminderForm.customerName ? ` — ${siReminderForm.customerName}` : ""}`,
         note: siReminderForm.note || "", dueDate: siReminderForm.date, dueTime: siReminderForm.time || "",
         repeat: "none", remindBefore: 0, assignedTo: "", assignedToName: "", private: false, status: "open", shopId,
-        createdBy: user?.uid || "", createdByName: profile?.name || profile?.username || "",
+        createdAt: at, updatedAt: at, createdBy: user.uid, updatedBy: user.uid,
+        createdByName: profile?.personName || profile?.username || "",
         linkType: kind, linkId: siReminderForm.invoiceId, linkLabel: siReminderForm.invoiceNo,
       });
       setSiReminderForm(null);
       toast?.(bnL ? "✅ রিমাইন্ডার সেট হয়েছে" : "✅ Reminder set");
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
       toast?.(e.message || String(e), "err");
     }
   };
   const siRootStyle = siFitH && !siMobile ? { height:siFitH } : undefined;
 
-  return renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canSeeCost, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintModal, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop });
+  return renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop });
 }

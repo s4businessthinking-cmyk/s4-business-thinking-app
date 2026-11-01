@@ -26,7 +26,7 @@ const ENTRY_TYPES = [
   { key: "withdrawal", dir: "out", bn: "নগদ উত্তোলন", en: "Cash withdrawal" },
 ];
 
-export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner, canManage, cur = "AED", toast, shopName = "" }) {
+export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, cur = "AED", toast, shopName = "" }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [data, setData] = useState(null);
@@ -311,7 +311,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
         <input type="date" className="pm-input" style={{ width: 140 }} value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} />
         <input className="pm-input" inputMode="decimal" style={{ width: 150 }} placeholder={L("স্টেটমেন্টের ব্যালেন্স", "Statement balance")} value={stmt} onChange={(e) => setStmt(e.target.value)} />
         {canManage && <button type="button" className="pm-btn pm-btn--primary" disabled={!!busy || stmt === ""} onClick={saveStatement}>💾 {L("সেভ", "Save")}</button>}
-        <button type="button" className="pm-btn-secondary" onClick={print}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={print}>🖨️ {L("প্রিন্ট", "Print")}</button>}
       </div>
       <div className="si-kpis">
         {kpi(L("বই অনুযায়ী ব্যালেন্স", "Balance as per books"), `${cur} ${money(rec.bookBalance)}`)}
@@ -382,7 +382,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
       {statements.length > 0 && (
         <div className="si-box" style={{ maxHeight: 150, overflow: "auto", marginTop: 4 }}>
           <table className="pm-table">
-            <thead><tr><th>{L("সেভ করা রিকনসিলিয়েশন", "Saved reconciliations")}</th><th className="si-num">{L("স্টেটমেন্ট", "Statement")}</th><th className="si-num">{L("বই", "Books")}</th><th className="si-num">{L("পার্থক্য", "Difference")}</th><th>{L("করেছেন", "By")}</th>{isOwner && <th style={{ width: 40 }} />}</tr></thead>
+            <thead><tr><th>{L("সেভ করা রিকনসিলিয়েশন", "Saved reconciliations")}</th><th className="si-num">{L("স্টেটমেন্ট", "Statement")}</th><th className="si-num">{L("বই", "Books")}</th><th className="si-num">{L("পার্থক্য", "Difference")}</th><th>{L("করেছেন", "By")}</th>{canDelete && <th style={{ width: 40 }} />}</tr></thead>
             <tbody>
               {statements.map((s) => (
                 <tr key={s.id} className="pm-clickable" onClick={() => { setAsOf(s.asOf); setStmt(String(s.statementBalance ?? "")); }}>
@@ -391,7 +391,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
                   <td className="si-num">{money(s.bookBalance)}</td>
                   <td className="si-num" style={{ color: Math.abs(n(s.difference)) < 0.005 ? "#15803d" : "#b91c1c" }}>{money(s.difference)}</td>
                   <td>{s.createdByName || ""}</td>
-                  {isOwner && <td><button type="button" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={async (e) => { e.stopPropagation(); if (!window.confirm(L("এটা মুছবেন?", "Delete this?"))) return; await offlineRemove("bankReconciliations", s.id); setRecDocs((l) => l.filter((d) => d.id !== s.id)); syncSoon(); }}>🗑️</button></td>}
+                  {canDelete && <td><button type="button" style={{ border: 0, background: "none", cursor: "pointer" }} onClick={async (e) => { e.stopPropagation(); if (!window.confirm(L("এটা মুছবেন?", "Delete this?"))) return; await offlineRemove("bankReconciliations", s.id); setRecDocs((l) => l.filter((d) => d.id !== s.id)); syncSoon(); }}>🗑️</button></td>}
                 </tr>
               ))}
             </tbody>

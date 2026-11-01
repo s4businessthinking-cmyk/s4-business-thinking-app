@@ -1,5 +1,14 @@
+import { printWithSettings } from "../print/printSettings.js";
+import { generateStatementHTML } from "../print/printDesign.js";
 
-export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm, editPh, isDesktop, isOwner, lang, newNm, newPh, s, saveEdit, setEditNm, setEditPh, setNewNm, setNewPh, setShowAdd, setTab, showAdd, startEdit, t, th, vendors }) {
+export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm, editPh, isDesktop, isOwner, lang, newNm, newPh, s, saveEdit, setEditNm, setEditPh, setNewNm, setNewPh, setShowAdd, setTab, showAdd, startEdit, t, th, vendors, canDelete = false, canPrint = false, shopName = "" }) {
+  const printList = () => {
+    printWithSettings(generateStatementHTML({
+      shopName, title: lang === "bn" ? "কোম্পানি তালিকা" : "COMPANY LIST", subtitle: `${cos.length}`,
+      cols: [{ label: lang === "bn" ? "নাম" : "Name" }, { label: lang === "bn" ? "ফোন" : "Phone" }],
+      rows: cos.map((c) => [c.name || "", c.phone ? `+${c.phone}` : ""]),
+    }), { lang });
+  };
   return (
   <div style={isDesktop?s.desktopPanel:s.panel}>
 
@@ -32,6 +41,11 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
         flexWrap:"wrap"
       }}>
 
+        {canPrint && (
+          <button type="button" style={s.addCoBtn} onClick={printList} disabled={!cos.length}>
+            🖨️ {lang==="bn"?"প্রিন্ট":"Print"}
+          </button>
+        )}
         <button
           style={s.addCoBtn}
           onClick={()=>setShowAdd(!showAdd)}
@@ -243,7 +257,7 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
                   <div style={{ display:"flex", gap:6 }}>
                     {c.phone&&<a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" style={{ ...s.waBtn, padding:"6px 10px" }}>💬</a>}
                     <button style={s.edBtn} onClick={()=>startEdit(c)}>✏️</button>
-                    <button style={s.dlBtn} onClick={()=>delCo(c.id)}>🗑️</button>
+                    {canDelete && <button style={s.dlBtn} onClick={()=>delCo(c.id)}>🗑️</button>}
                   </div>
                 </div>
               )}

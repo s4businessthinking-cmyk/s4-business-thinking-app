@@ -113,7 +113,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
             onSearchChange={setPmSearch}
             category={pmCatFilter}
             onCategoryChange={setPmCatFilter}
-            canDelete={isOwner}
+            canDelete={isOwner||can("deleteProducts")}
             canEdit={canManageProducts}
             canSeeCost={canSeeProductCost}
             saving={savingProduct}
@@ -135,30 +135,34 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
             onExport={canSeeProductCost ? ()=>exportProductsCsv(getFilteredProducts()).catch(hErr) : undefined}
             onImportRecords={importProductRecords}
             onGenerateWeighingFile={()=>exportWeighingBarcodeCsv(getFilteredProducts())}
-            onPrintBarcodes={printProductBarcodes}
+            onPrintBarcodes={(isOwner||can("printProducts")) ? printProductBarcodes : undefined}
             notify={(message,kind)=>toast(message, kind==="err"?"err":"ok")}
           />
         </div>
       )}
 
       {orderModuleEnabled&&(isOwner||can("manageCompanies"))&&tab==="companies"&&(
-  <CompaniesScreen {...{ addCo, cancelEdit, cos, delCo, editId, editNm, editPh, isDesktop, isOwner, lang, newNm, newPh, s, saveEdit, setEditNm, setEditPh, setNewNm, setNewPh, setShowAdd, setTab, showAdd, startEdit, t, th, vendors }} />
+  <CompaniesScreen {...{ addCo, cancelEdit, cos, delCo, editId, editNm, editPh, isDesktop, isOwner, lang, newNm, newPh, s, saveEdit, setEditNm, setEditPh, setNewNm, setNewPh, setShowAdd, setTab, showAdd, startEdit, t, th, vendors, canDelete: isOwner||can("deleteCompanies"), canPrint: isOwner||can("printCompanies"), shopName: localShop?.companyName||"" }} />
       )}
 
-      {isOwner&&tab==="customers"&&(
+      {(isOwner||can("manageCustomers"))&&tab==="customers"&&(
         <CustomerMasterScreen
           t={t} lang={lang} cur={t.cur||"AED"}
           shopId={shopId} user={user}
-          customers={customers} team={team} toast={toast}
-          canEdit canDelete canSales
+          customers={customers} vendors={vendors} team={team} toast={toast}
+          canEdit={isOwner||can("manageCustomers")} canDelete={isOwner||can("deleteCustomers")} canPrint={isOwner||can("printCustomers")} canSales={isOwner||can("manageSales")}
+          shopName={localShop?.companyName||""}
           actorName={profile?.personName||""}
           leaveGuard={billLeaveGuard}
           focusPartyId={globalFocusCustomerId}
           onFocusPartyHandled={()=>setGlobalFocusCustomerId(null)}
           onPartySaved={(row)=>setCustomers((prev)=>mergePartyRow(prev, row, "customerName"))}
           onPartyRemoved={(id)=>setCustomers((prev)=>prev.filter((c)=>c.id!==id))}
+          onVendorSaved={(row)=>setVendors((prev)=>mergePartyRow(prev, row, "vendorName"))}
+          onVendorRemoved={(id)=>setVendors((prev)=>prev.filter((v)=>v.id!==id))}
           onClose={()=>setTab("dashboard")}
           nextCode={()=>nextPartyCode(shopId, "customers", customers)}
+          nextVendorCode={()=>nextPartyCode(shopId, "vendors", vendors)}
           onGoToSales={(customer)=>{
             if (tabRef.current !== "sales" && billLeaveGuard.current && !billLeaveGuard.current.leave()) return;
             setTabState("sales");
@@ -184,14 +188,18 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
         <VendorMasterScreen
           t={t} lang={lang} cur={t.cur||"AED"}
           shopId={shopId} user={user}
-          vendors={vendors} toast={toast} canDelete={isOwner} canEdit={isOwner||can("manageVendors")}
+          vendors={vendors} customers={customers} toast={toast} canDelete={isOwner||can("deleteVendors")} canPrint={isOwner||can("printVendors")} canEdit={isOwner||can("manageVendors")}
+          shopName={localShop?.companyName||""}
           leaveGuard={billLeaveGuard}
           focusPartyId={globalFocusVendorId}
           onFocusPartyHandled={()=>setGlobalFocusVendorId(null)}
           onPartySaved={(row)=>setVendors((prev)=>mergePartyRow(prev, row, "vendorName"))}
           onPartyRemoved={(id)=>setVendors((prev)=>prev.filter((v)=>v.id!==id))}
+          onCustomerSaved={(row)=>setCustomers((prev)=>mergePartyRow(prev, row, "customerName"))}
+          onCustomerRemoved={(id)=>setCustomers((prev)=>prev.filter((c)=>c.id!==id))}
           onClose={()=>setTab("dashboard")}
           nextCode={()=>nextPartyCode(shopId, "vendors", vendors)}
+          nextCustomerCode={()=>nextPartyCode(shopId, "customers", customers)}
           canPurchase={isOwner||can("managePurchase")}
           actorName={profile?.personName||""}
           onGoToPurchase={(isOwner||can("managePurchase")) ? (vendor)=>{
@@ -246,7 +254,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {(tab==="purchaseOrder"||tab==="goodsReceipt")&&(isOwner||can("managePurchase"))&&(
         <PurchaseDocsTab key={tab} kind={tab==="purchaseOrder"?"po":"grn"} lang={lang} shopId={shopId} user={user} profile={profile}
-          isOwner={isOwner} canManage={isOwner||can("managePurchase")} products={products} vendors={vendors} toast={toast}
+          isOwner={isOwner} canManage={isOwner||can("managePurchase")} canDelete={isOwner||can("deletePurchase")} canPrint={isOwner||can("printPurchase")||can("managePurchase")} products={products} vendors={vendors} toast={toast}
           wideDesktop={windowWidth >= 1100}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} makeNo={makeShopNo} leaveGuard={billLeaveGuard}
           incoming={tab==="goodsReceipt"?grnIncoming:null} onIncomingHandled={()=>setGrnIncoming(null)}
@@ -288,7 +296,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
             setPmEditId(null); setPmShowAdd(true); setPmOverSales(true);
           } : undefined}
           productFromMaster={pmPickForSales}
-          onCustomerCreated={(created) => setCustomers((prev) => [...prev, created].sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||"")))}
+          onCustomerCreated={(created) => setCustomers((prev) => mergePartyRow(prev, created, "customerName"))}
         />
       )}
 
@@ -314,12 +322,13 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       {tab==="pdc"&&(isOwner||can("managePdc"))&&(
         <PdcWindow inline lang={lang} cur={t.cur||"AED"} shopId={shopId} userId={user?.uid||""}
           shopName={localShop?.companyName||""}
-          onOpenVoucher={(raw)=>printPaymentVoucher(raw, localShop, lang)} />
+          canPrint={isOwner||can("printPdc")} canDelete={isOwner||can("deletePdc")}
+          onOpenVoucher={(isOwner||can("printPayments")) ? (raw)=>printPaymentVoucher(raw, localShop, lang) : undefined} />
       )}
 
       {tab==="securityCheque"&&(isOwner||can("manageSecurityCheques"))&&(
         <SecurityChequeTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
-          canManage={isOwner||can("manageSecurityCheques")} cur={t.cur||"AED"} toast={toast}
+          canManage={isOwner||can("manageSecurityCheques")} canDelete={isOwner||can("deleteSecurityCheques")} canPrint={isOwner||can("printSecurityCheques")} cur={t.cur||"AED"} toast={toast}
           shopName={localShop?.companyName||""} shop={localShop} alerts={securityChequeAlertList}
           customers={customers} vendors={vendors}
           focusParty={securityChequeFocusParty} onFocusPartyHandled={()=>setSecurityChequeFocusParty(null)}
@@ -328,17 +337,20 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {(tab==="expenses"||tab==="employeeExpense")&&(isOwner||can("manageExpenses"))&&(
         <ExpensesTab key={tab} employeeMode={tab==="employeeExpense"} lang={lang} th={th} s={s} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
+          canDelete={isOwner||can("deleteExpenses")} canPrint={isOwner||can("printExpenses")}
           cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} shop={localShop} />
       )}
 
       {tab==="employees"&&(isOwner||can("manageEmployees"))&&(
         <EmployeesTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} canManage={isOwner||can("manageEmployees")}
+          canDelete={isOwner||can("deleteEmployees")} canPrint={isOwner||can("printEmployees")}
           cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} leaveGuard={billLeaveGuard}
           alerts={employeeAlertList} focus={empFocus} onFocusHandled={()=>setEmpFocus(null)} onOpenAlert={openEmployeeAlert} />
       )}
 
       {tab==="jobCard"&&(isOwner||can("manageJobs"))&&(
         <JobCardTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} canManage={isOwner||can("manageJobs")}
+          canDelete={isOwner||can("deleteJobs")} canPrint={isOwner||can("printJobs")}
           cur={t.cur||"AED"} toast={toast} shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))}
           customers={customers} products={products} makeNo={makeShopNo} leaveGuard={billLeaveGuard}
           onMakeInvoice={(isOwner||can("manageSales")) ? (src)=>{ setQuoteToConvert(src); setTabState("sales"); } : undefined} />
@@ -346,6 +358,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {tab==="bankRec"&&(isOwner||can("bankReconcile"))&&(
         <BankRecTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner} canManage={isOwner||can("bankReconcile")}
+          canDelete={isOwner||can("deleteBankRec")} canPrint={isOwner||can("printBankRec")}
           cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} />
       )}
 
@@ -356,7 +369,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {tab==="vouchers"&&(isOwner||canStaffVouchers)&&(
         <VouchersTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
-          canJournal={isOwner||can("accountVouchers")} cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""}
+          canJournal={isOwner||can("accountVouchers")} canDelete={isOwner||can("deleteVouchers")} canPrint={isOwner||can("printVouchers")} cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""}
           makeNo={makeShopNo} leaveGuard={billLeaveGuard} customers={customers} vendors={vendors} banks={UAE_BANKS.map(b=>b.name)}
           onOpenReceipts={(isOwner||can("manageSales")) ? ()=>{ setTab("sales"); setSiVoucherReq(Date.now()); } : undefined}
           onOpenPayments={canStaffSupplierArea&&(isOwner||can("vendorPayments")) ? ()=>{ setTab("purchase"); setPiVoucherReq(Date.now()); } : undefined}
@@ -366,13 +379,13 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {(tab==="salesReturn"||tab==="purchaseReturn")&&(isOwner||can("manageReturns"))&&(
         <ReturnsTab key={tab} kind={tab==="salesReturn"?"sales":"purchase"} lang={lang} th={th} shopId={shopId} user={user} profile={profile}
-          isOwner={isOwner} canManage={isOwner||can("manageReturns")} cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast}
+          isOwner={isOwner} canManage={isOwner||can("manageReturns")} canDelete={isOwner||can("deleteReturns")} canPrint={isOwner||can("printReturns")} cur={t.cur||"AED"} isDesktop={isDesktop} toast={toast}
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
       )}
 
       {tab==="stockAdjust"&&(isOwner||can("stockAdjust"))&&(
         <StockAdjustmentTab lang={lang} th={th} shopId={shopId} user={user} profile={profile} products={products}
-          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} isDesktop={isDesktop} wideDesktop={windowWidth >= 1100} toast={toast}
+          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} canDelete={isOwner||can("deleteStock")} canPrint={isOwner||can("printStock")} isDesktop={isDesktop} wideDesktop={windowWidth >= 1100} toast={toast}
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
       )}
       {tab==="reminders"&&(
@@ -391,30 +404,31 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
       {(tab==="loosen"||tab==="bundle")&&(isOwner||can("stockAdjust"))&&(
         <StockConvertTab key={tab} kind={tab} lang={lang} shopId={shopId} user={user} profile={profile} products={products}
-          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} toast={toast}
+          isOwner={isOwner} canManage={isOwner||can("stockAdjust")} canDelete={isOwner||can("deleteStock")} canPrint={isOwner||can("printStock")} toast={toast}
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard} />
       )}
 
-      {tab==="auditLog"&&isOwner&&(
-        <AuditLogTab lang={lang} th={th} shopId={shopId} cur={t.cur||"AED"} isDesktop={isDesktop} />
+      {tab==="auditLog"&&(isOwner||can("viewAuditLog"))&&(
+        <AuditLogTab lang={lang} th={th} shopId={shopId} cur={t.cur||"AED"} isDesktop={isDesktop} canPrint={isOwner||can("printAudit")} shopName={localShop?.companyName||""} />
       )}
 
-      {tab==="globalLedger"&&isOwner&&(
-        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} />
+      {tab==="globalLedger"&&(isOwner||can("viewGlobalLedger"))&&(
+        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} canPrint={isOwner||can("printLedger")} />
       )}
-      {tab==="accounts"&&isOwner&&ownerUnlocked&&(
+      {tab==="accounts"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
         <ProfitLossReport lang={lang} th={th} s={s} shopId={shopId} products={products}
-          shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} />
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} canPrint={isOwner||can("printAccounts")} />
       )}
       {tab==="accounts"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব নিকাশ (Accounts) লক করা":"Accounts are locked")}
-      {tab==="tax"&&isOwner&&ownerUnlocked&&(
+      {tab==="tax"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewTax")))&&(
         <TaxReport lang={lang} shopId={shopId} shop={localShop} user={user} products={products} customers={customers} vendors={vendors}
-          shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
+          shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} canPrint={isOwner||can("printTax")} />
       )}
       {tab==="tax"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ট্যাক্স / VAT লক করা":"Tax / VAT is locked")}
-      {tab==="partners"&&isOwner&&ownerUnlocked&&(
+      {tab==="partners"&&((isOwner&&ownerUnlocked)||(!isOwner&&(can("viewPartners")||can("managePartners"))))&&(
         <PartnersTab lang={lang} shopId={shopId} user={user} profile={profile} cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""}
-          shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} products={products} alerts={partnerAlertList} isOwner={isOwner} />
+          shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} products={products} alerts={partnerAlertList} isOwner={isOwner}
+          canManage={isOwner||can("managePartners")} canDelete={isOwner||can("deletePartners")} canPrint={isOwner||can("printPartners")} />
       )}
       {tab==="partners"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"পার্টনারের হিসাব লক করা":"Partners are locked")}
 

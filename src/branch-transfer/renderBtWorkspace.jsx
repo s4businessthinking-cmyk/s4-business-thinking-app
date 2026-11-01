@@ -4,7 +4,7 @@ import { NewTransferForm } from "./BtNewTransferForm.jsx";
 import { TransferDetail } from "./BtTransferDetail.jsx";
 import { statusLabel } from "./branchTransferDomain.js";
 
-export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting }) {
+export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete = false, canPrint = false, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting }) {
   if (view === "new" && canSendTransfer) {
   return (
       <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={L("নতুন ট্রান্সফার", "New Transfer")} titleRight={shellTitle}>
@@ -18,7 +18,7 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
   if (sel) {
     return (
       <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={<>{sel.transferNo} <StatusBadge status={sel.status} lang={lang} /></>} titleRight={shellTitle}>
-        <TransferDetail lang={lang} mobile={mobile} transfer={sel} isOwner={isOwner} canManage={canSendTransfer}
+        <TransferDetail lang={lang} mobile={mobile} transfer={sel} isOwner={isOwner} canManage={canSendTransfer} canDelete={canDelete} canPrint={canPrint}
           canReceive={canReceiveRow(sel)} canCreateInvoice={canInvoiceRow(sel)} busy={busy}
           onStatus={changeStatus} onDelete={deleteTransfer} onReceive={setReceiving} onCreateInvoice={createInvoice}
           onPrint={printTransfer} onBack={backToList} />

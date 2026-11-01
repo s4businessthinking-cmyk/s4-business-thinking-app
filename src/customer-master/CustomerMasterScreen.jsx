@@ -4,6 +4,9 @@ import { VM_CSS } from "../vendor-master/VendorMasterScreen.jsx";
 import { offlineCreate, offlineList, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { syncOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
+import { printWithSettings } from "../print/printSettings.js";
+import { generateStatementHTML } from "../print/printDesign.js";
+import { syncBothSidesParty } from "../utils/bothSidesParty.js";
 
 export const EMPTY_CUSTOMER = {
   customerName:"", customerCode:"", customerType:"", status:"active",
@@ -37,7 +40,12 @@ const toForm = (c) => Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map((k) => 
   const raw = c?.[k];
   if (NUMBER_FIELDS.includes(k)) return [k, Number(raw) ? String(raw) : ""];
   return [k, raw == null ? "" : String(raw)];
-}).concat([["status", c?.status || "active"], ["paymentType", c?.paymentType || "cash"]]));
+}).concat([
+  ["status", c?.status || "active"],
+  ["paymentType", c?.paymentType || "cash"],
+  ["linkedVendorId", c?.linkedVendorId || ""],
+  ["alsoVendor", !!c?.linkedVendorId],
+]));
 
 const num = (v) => {
   const n = Number(String(v ?? "").replace(/,/g, ""));
@@ -72,9 +80,9 @@ function masterCustomerTypes(shopId) {
 }
 
 export default function CustomerMasterScreen({
-  t, lang, shopId, user, customers, team = [], toast, cur = "AED",
-  canEdit = false, canDelete = false, canSales = false, actorName = "", leaveGuard, onClose, onGoToSales, onGoToSecurityCheques, renderImport, nextCode,
-  focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved,
+  t, lang, shopId, user, customers, vendors = [], team = [], toast, cur = "AED",
+  canEdit = false, canDelete = false, canPrint = false, canSales = false, actorName = "", leaveGuard, onClose, onGoToSales, onGoToSecurityCheques, renderImport, nextCode, nextVendorCode, shopName = "",
+  focusPartyId = null, onFocusPartyHandled, onPartySaved, onPartyRemoved, onVendorSaved, onVendorRemoved,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -90,6 +98,7 @@ export default function CustomerMasterScreen({
   const [showImport, setShowImport] = useState(false);
   const rootRef = useRef(null);
   const seenSelected = useRef(false);
+  const holdId = useRef(null);
   const [fitHeight, setFitHeight] = useState(null);
   const [scSummary, setScSummary] = useState({ count: 0, total: 0 });
 
@@ -148,6 +157,7 @@ export default function CustomerMasterScreen({
     setBaseline(JSON.stringify(next));
     setSelectedId(c?.id || null);
     seenSelected.current = !!c;
+    holdId.current = null;
   };
 
   useEffect(() => {
@@ -164,7 +174,12 @@ export default function CustomerMasterScreen({
   const selectedCustomer = selectedId ? customers.find((c) => c.id === selectedId) : null;
   useEffect(() => {
     if (!selectedId || dirty) return;
-    if (!selectedCustomer) { if (seenSelected.current) loadCustomer(null); return; }
+    if (!selectedCustomer) {
+      if (holdId.current === selectedId) return;
+      if (seenSelected.current) loadCustomer(null);
+      return;
+    }
+    if (holdId.current === selectedId) holdId.current = null;
     seenSelected.current = true;
     const next = toForm(selectedCustomer);
     if (JSON.stringify(next) !== baseline) { setForm(next); setBaseline(JSON.stringify(next)); }
@@ -259,22 +274,37 @@ export default function CustomerMasterScreen({
     setSaving(true);
     try {
       let savedId = selectedId;
+      let savedDoc = payload;
       if (selectedId) {
-        await offlineUpdate("customers", selectedId, payload);
+        const result = await offlineUpdate("customers", selectedId, payload);
+        savedDoc = result.data || payload;
         toast(t.cm_updated);
       } else {
         if (nextCode) payload.customerCode = await nextCode();
         const result = await offlineCreate("customers", { ...payload, createdBy: user.uid, createdAt: now });
         savedId = result.documentId;
+        savedDoc = result.data || payload;
         toast(t.cm_saved);
       }
-      const saved = toForm(payload);
+      const link = await syncBothSidesParty({
+        from: "customer", wantBoth: !!form.alsoVendor, sourceId: savedId, sourceDoc: { ...savedDoc, id: savedId },
+        otherList: vendors, shopId, user, nextOtherCode: nextVendorCode,
+      });
+      if ((savedDoc.linkedVendorId || "") !== (link.sourcePatch.linkedVendorId || "")) {
+        const patched = await offlineUpdate("customers", savedId, link.sourcePatch);
+        savedDoc = patched.data || { ...savedDoc, ...link.sourcePatch };
+      }
+      if (link.other) onVendorSaved?.(link.other);
+      if (link.removedId) onVendorRemoved?.(link.removedId);
+      if (link.keptBecauseUsed) toast(L("ভেন্ডর বিল আছে, তাই ভেন্ডর মাস্টারে আলাদা রেকর্ড থেকে গেছে", "Vendor has bills, so it stays on Vendor Master as its own record"));
+      holdId.current = savedId;
+      const saved = toForm(savedDoc);
       setForm(saved);
       setBaseline(JSON.stringify(saved));
       setSelectedId(savedId);
-      onPartySaved?.({ id: savedId, ...payload });
-      if (openingChanged || (selectedId === null && num(payload.openingBalance) > 0)) {
-        try { await syncOpening(savedId, payload); }
+      onPartySaved?.({ id: savedId, ...savedDoc });
+      if (openingChanged || (selectedId === null && num(savedDoc.openingBalance) > 0)) {
+        try { await syncOpening(savedId, savedDoc); }
         catch (err) { toast(err.message || String(err), "err"); }
       }
       if (navigator.onLine) {
@@ -305,6 +335,11 @@ export default function CustomerMasterScreen({
     }
     if (!window.confirm(t.cm_confirmDelete)) return;
     try {
+      if (form.linkedVendorId) {
+        await offlineUpdate("vendors", form.linkedVendorId, { linkedCustomerId: "", updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }).catch(() => {});
+        const linked = vendors.find((v) => v.id === form.linkedVendorId);
+        if (linked) onVendorSaved?.({ ...linked, linkedCustomerId: "" });
+      }
       await offlineRemove("customers", selectedId);
       toast(t.cm_deleted, "err");
       logAudit({ shopId, user, action: "delete", collection: "customers", docId: selectedId, docNo: form.customerName });
@@ -358,6 +393,31 @@ export default function CustomerMasterScreen({
   const statusLabel = (st) => STATUS[st]?.[bn ? "bn" : "en"] || st;
   const payLabel = (p) => PAY[p]?.[bn ? "bn" : "en"] || p;
   const blockedForSale = !selectedCustomer || ["inactive", "blocked"].includes(selectedCustomer.status || "active");
+  const printProfile = () => {
+    if (!selectedId) return;
+    const fields = [
+      [L("নাম", "Name"), form.customerName], [L("কোড", "Code"), form.customerCode],
+      [L("ধরন", "Type"), form.customerType], [L("স্ট্যাটাস", "Status"), statusLabel(form.status)],
+      [L("পেমেন্ট", "Payment"), payLabel(form.paymentType)], [L("যোগাযোগ", "Contact"), form.contactPerson],
+      [L("মোবাইল", "Mobile"), form.mobileNumber], [L("ফোন", "Phone"), form.phoneNumber],
+      ["WhatsApp", form.whatsappNumber], [L("ইমেইল", "Email"), form.email],
+      [L("ঠিকানা", "Address"), form.address], [L("শহর", "City"), [form.area, form.city, form.emirate, form.country].filter(Boolean).join(", ")],
+      ["TRN", form.trnNumber], [L("ট্রেড লাইসেন্স", "Trade licence"), form.tradeLicenseNumber],
+      [L("ক্রেডিট লিমিট", "Credit limit"), form.creditLimit], [L("শর্ত", "Terms"), form.paymentTerms],
+      [L("নোট", "Notes"), form.notes],
+    ].filter(([, v]) => String(v || "").trim());
+    printWithSettings(generateStatementHTML({
+      shopName, title: L("কাস্টমার প্রোফাইল", "CUSTOMER PROFILE"), subtitle: form.customerCode || form.customerName,
+      cols: [{ label: L("ফিল্ড", "Field") }, { label: L("বিবরণ", "Details") }], rows: fields,
+    }), { lang });
+  };
+  const printList = () => {
+    printWithSettings(generateStatementHTML({
+      shopName, title: L("কাস্টমার তালিকা", "CUSTOMER LIST"), subtitle: `${filtered.length}`,
+      cols: [{ label: L("কোড", "Code") }, { label: L("নাম", "Name") }, { label: L("মোবাইল", "Mobile") }, { label: L("ধরন", "Type") }, { label: L("স্ট্যাটাস", "Status") }, { label: L("শহর", "City") }],
+      rows: filtered.map((c) => [c.customerCode || "", c.customerName || "", c.mobileNumber || c.phoneNumber || "", c.customerType || "", statusLabel(c.status || "active"), [c.area, c.city].filter(Boolean).join(" ")]),
+    }), { lang });
+  };
 
   return (
     <div ref={rootRef} className="vm-root" style={fitHeight ? { height: fitHeight } : undefined}>
@@ -395,6 +455,14 @@ export default function CustomerMasterScreen({
             {panel(L("কাস্টমার তথ্য", "Customer Details"), <>
               {row(L("কাস্টমারের নাম", "Customer Name"), "customerName", { required: true })}
               {row(L("কাস্টমার কোড", "Customer Code"), "customerCode", { placeholder: L("সেভ করলে নিজে বসবে", "Auto on save"), readOnly: true, mono: true })}
+              <label className="pm-form-row" style={{ alignItems: "center" }}>
+                <span className="pm-label">{L("দুই দিকে", "Both sides")}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700 }}>
+                  <input type="checkbox" checked={!!form.alsoVendor} onChange={(e) => upd("alsoVendor", e.target.checked)} />
+                  {L("ভেন্ডর হিসেবেও রাখুন", "Also keep as vendor")}
+                  {form.alsoVendor && form.linkedVendorId ? ` · ${vendors.find((v) => v.id === form.linkedVendorId)?.vendorCode || ""}` : ""}
+                </span>
+              </label>
               {select(L("কাস্টমার ধরন", "Customer Type"), "customerType", [["", "—"], ...typeOptions.map((c) => [c, c])])}
               {select(L("স্ট্যাটাস", "Status"), "status", Object.keys(STATUS).map((st) => [st, statusLabel(st)]))}
               {row(L("যোগাযোগ ব্যক্তি", "Contact Person"), "contactPerson")}
@@ -506,6 +574,12 @@ export default function CustomerMasterScreen({
         </button>
         {canDelete && (
           <button type="button" className="pm-btn pm-btn--danger" onClick={remove} disabled={!selectedId}>{L("মুছুন", "Delete")}</button>
+        )}
+        {canPrint && (
+          <button type="button" className="pm-btn-secondary" onClick={printProfile} disabled={!selectedId}>🖨️ {L("প্রোফাইল", "Profile")}</button>
+        )}
+        {canPrint && (
+          <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!filtered.length}>🖨️ {L("তালিকা", "List")}</button>
         )}
         {canDelete && renderImport && (
           <button type="button" className="pm-btn-secondary" onClick={() => setShowImport(true)}>{L("ইমপোর্ট", "Import")}</button>

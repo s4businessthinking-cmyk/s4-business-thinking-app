@@ -82,6 +82,53 @@ export const PERMISSIONS_LIST = [
   { key: "bankReconcile",    bn: "ব্যাংক হিসাব মেলানো",            en: "Bank Reconciliation" },
   { key: "manageJobs",       bn: "জব কার্ড / সার্ভিস কাজ",          en: "Job Cards / Service Jobs" },
   { key: "manageSecurityCheques", bn: "সিকিউরিটি চেক ম্যানেজ করা",  en: "Manage Security Cheques" },
+  { key: "viewAccounts",      bn: "হিসাব নিকাশ / লাভ-ক্ষতি দেখা",   en: "View Accounts / P&L" },
+  { key: "viewTax",           bn: "ট্যাক্স / VAT দেখা",              en: "View Tax / VAT" },
+  { key: "viewPartners",      bn: "পার্টনার দেখা",                    en: "View Partners" },
+  { key: "managePartners",    bn: "পার্টনার যোগ ও এডিট",              en: "Add / Edit Partners" },
+  { key: "viewGlobalLedger",  bn: "গ্লোবাল লেজার দেখা",               en: "View Global Ledger" },
+  { key: "viewAuditLog",      bn: "অডিট লগ দেখা",                     en: "View Audit Log" },
+  { key: "manageBackup",      bn: "ব্যাকআপ ও রিস্টোর",                en: "Backup & Restore" },
+  { key: "deleteProducts", bn: "পণ্য মুছা", en: "Delete Products" },
+  { key: "printProducts", bn: "পণ্য প্রিন্ট", en: "Print Products" },
+  { key: "deleteCustomers", bn: "কাস্টমার মুছা", en: "Delete Customers" },
+  { key: "printCustomers", bn: "কাস্টমার প্রিন্ট", en: "Print Customers" },
+  { key: "deleteVendors", bn: "সাপ্লায়ার মুছা", en: "Delete Suppliers" },
+  { key: "printVendors", bn: "সাপ্লায়ার প্রিন্ট", en: "Print Suppliers" },
+  { key: "deleteCompanies", bn: "কোম্পানি মুছা", en: "Delete Companies" },
+  { key: "printCompanies", bn: "কোম্পানি প্রিন্ট", en: "Print Companies" },
+  { key: "deleteEmployees", bn: "কর্মচারী মুছা", en: "Delete Employees" },
+  { key: "printEmployees", bn: "কর্মচারী প্রিন্ট", en: "Print Employees" },
+  { key: "printOrders", bn: "অর্ডার প্রিন্ট", en: "Print Orders" },
+  { key: "printSales", bn: "বিক্রয় প্রিন্ট", en: "Print Sales" },
+  { key: "deletePurchase", bn: "ক্রয় মুছা / বাতিল", en: "Delete / Cancel Purchase" },
+  { key: "printPurchase", bn: "ক্রয় প্রিন্ট", en: "Print Purchase" },
+  { key: "deleteReturns", bn: "রিটার্ন মুছা", en: "Delete Returns" },
+  { key: "printReturns", bn: "রিটার্ন প্রিন্ট", en: "Print Returns" },
+  { key: "deleteStock", bn: "স্টক সমন্বয় মুছা", en: "Delete Stock Adjustments" },
+  { key: "printStock", bn: "স্টক প্রিন্ট", en: "Print Stock" },
+  { key: "deleteBranch", bn: "Branch ট্রান্সফার মুছা", en: "Delete Branch Transfers" },
+  { key: "printBranch", bn: "Branch ট্রান্সফার প্রিন্ট", en: "Print Branch Transfers" },
+  { key: "deleteJobs", bn: "জব কার্ড মুছা", en: "Delete Job Cards" },
+  { key: "printJobs", bn: "জব কার্ড প্রিন্ট", en: "Print Job Cards" },
+  { key: "deletePayments", bn: "সাপ্লায়ার পেমেন্ট মুছা", en: "Delete Supplier Payments" },
+  { key: "printPayments", bn: "সাপ্লায়ার পেমেন্ট প্রিন্ট", en: "Print Supplier Payments" },
+  { key: "deleteExpenses", bn: "খরচ মুছা", en: "Delete Expenses" },
+  { key: "printExpenses", bn: "খরচ প্রিন্ট", en: "Print Expenses" },
+  { key: "deleteVouchers", bn: "ভাউচার মুছা", en: "Delete Vouchers" },
+  { key: "printVouchers", bn: "ভাউচার প্রিন্ট", en: "Print Vouchers" },
+  { key: "deletePdc", bn: "PDC মুছা", en: "Delete PDC" },
+  { key: "printPdc", bn: "PDC প্রিন্ট", en: "Print PDC" },
+  { key: "deleteBankRec", bn: "ব্যাংক মেলানো মুছা", en: "Delete Bank Rec" },
+  { key: "printBankRec", bn: "ব্যাংক মেলানো প্রিন্ট", en: "Print Bank Rec" },
+  { key: "deleteSecurityCheques", bn: "সিকিউরিটি চেক মুছা", en: "Delete Security Cheques" },
+  { key: "printSecurityCheques", bn: "সিকিউরিটি চেক প্রিন্ট", en: "Print Security Cheques" },
+  { key: "printAccounts", bn: "লাভ-ক্ষতি প্রিন্ট", en: "Print P&L" },
+  { key: "printTax", bn: "ট্যাক্স প্রিন্ট", en: "Print Tax" },
+  { key: "deletePartners", bn: "পার্টনার মুছা", en: "Delete Partners" },
+  { key: "printPartners", bn: "পার্টনার প্রিন্ট", en: "Print Partners" },
+  { key: "printLedger", bn: "লেজার প্রিন্ট", en: "Print Ledger" },
+  { key: "printAudit", bn: "অডিট লগ প্রিন্ট", en: "Print Audit Log" },
 ];
 
 export const SC = {
@@ -103,9 +150,26 @@ export const WA_STYLE_KEY = "wa-msg-style";
 
 export const THEME_KEY    = "s4-theme";
 
+const UI_DEFAULTS_REV_KEY = "s4-ui-defaults-rev";
+const UI_DEFAULTS_REV = "2-en-light";
+
+function applyFactoryUiDefaults() {
+  try {
+    if (localStorage.getItem(UI_DEFAULTS_REV_KEY) === UI_DEFAULTS_REV) return;
+    const lang = localStorage.getItem(LANG_KEY);
+    const theme = localStorage.getItem(THEME_KEY);
+    const stillOldFactory = (!lang || lang === "bn") && (!theme || theme === "dark");
+    if (stillOldFactory) {
+      if (!lang || lang === "bn") localStorage.setItem(LANG_KEY, "en");
+      if (!theme || theme === "dark") localStorage.setItem(THEME_KEY, "light");
+    }
+    localStorage.setItem(UI_DEFAULTS_REV_KEY, UI_DEFAULTS_REV);
+  } catch {}
+}
+
 export const ORDER_PREFIX = "S4-";
 
-export const loadLang     = () => { try { return localStorage.getItem(LANG_KEY)||"bn"; } catch { return "bn"; } };
+export const loadLang     = () => { try { applyFactoryUiDefaults(); return localStorage.getItem(LANG_KEY)||"en"; } catch { return "en"; } };
 
 export const saveLang     = (l) => { try { localStorage.setItem(LANG_KEY,l); } catch {} };
 
@@ -113,7 +177,7 @@ export const loadWaStyle  = () => { try { return localStorage.getItem(WA_STYLE_K
 
 export const saveWaStyle  = (v) => { try { localStorage.setItem(WA_STYLE_KEY,v); } catch {} };
 
-export const loadTheme    = () => { try { return localStorage.getItem(THEME_KEY)||"dark"; } catch { return "dark"; } };
+export const loadTheme    = () => { try { applyFactoryUiDefaults(); return localStorage.getItem(THEME_KEY)||"light"; } catch { return "light"; } };
 
 export const saveTheme    = (v) => { try { localStorage.setItem(THEME_KEY,v); } catch {} };
 
@@ -294,6 +358,20 @@ export function mergePartyRow(prev, row, nameKey) {
   const ix = prev.findIndex((p) => p.id === id);
   const merged = { ...(ix >= 0 ? prev[ix] : {}), ...row, id };
   const next = ix >= 0 ? prev.map((p, i) => (i === ix ? merged : p)) : [...prev, merged];
+  return next.sort((a, b) => String(a[nameKey] || "").localeCompare(String(b[nameKey] || "")));
+}
+
+/** Cloud snapshot can arrive before a just-saved party has been uploaded; keep those local rows. */
+export function mergeCloudPartyList(prev, cloudDocs, nameKey) {
+  const ids = new Set((cloudDocs || []).map((d) => d.id).filter(Boolean));
+  const extra = (prev || []).filter((p) => p?.id && !ids.has(p.id));
+  const seen = new Set();
+  const next = [];
+  for (const row of [...(cloudDocs || []), ...extra]) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    next.push(row);
+  }
   return next.sort((a, b) => String(a[nameKey] || "").localeCompare(String(b[nameKey] || "")));
 }
 

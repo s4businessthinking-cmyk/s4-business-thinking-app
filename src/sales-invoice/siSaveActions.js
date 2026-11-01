@@ -3,12 +3,12 @@ import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlineGetById, offlineUpdate } from "../offline/offlineRepository";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { siAddDays, siDeliveryLines, siResolveRate, sourceDocOf } from "./siHelpers.js";
-import { siCalcLine, siCalcTotals, siFmt2, siInvoiceExtras, siN2 } from "./salesInvoiceShared.js";
+import { siCalcLine, siCalcTotals, siFmt2, siInvoiceExtras, siIsSettledPay, siN2 } from "./salesInvoiceShared.js";
 import { itemBaseQty, unitFactorFor } from "../inventory/unitConversion";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 
-export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siSaveLockRef, sourceQuote, t, toast, user }) {
-  const siBuild=(status, invoiceNoOverride)=>{
+export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user }) {
+  const siBuild=(status, invoiceNoOverride, extras={})=>{
     if (String(siCurrent.name||"").trim()) {
       toast(lang==="bn"?"❌ উপরের ঘরে একটা আইটেম আছে যা বিলে যোগ হয়নি — Add চাপুন বা ঘরটা খালি করুন":"❌ An item in the entry row is not added to the bill yet — press Add or clear it","err");
       return null;
@@ -68,12 +68,13 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     if (status==="draft" && priorDoc && !isQuote && priorDoc.status && priorDoc.status!=="draft") {
       toast(lang==="bn"?"❌ সেভ করা বিলকে আবার Draft করা যাবে না":"❌ A saved invoice cannot be turned back into a draft","err"); return null;
     }
-    const isCash      = siForm.paymentMethod==="cash";
-    // A plain cash bill is always auto-paid in full (unchanged, original behaviour). "Partial cash" is an
-    // explicit opt-in for transport-style customers who pay cash but in a lump sum later across several
-    // bills — it tracks a real balance and receipts exactly like a credit bill, while keeping paymentMethod:"cash".
-    const cashPartial = isCash && !!siForm.cashPartial;
-    const plainCash   = isCash && !cashPartial;
+    const paymentMethod = extras.paymentMethod || siForm.paymentMethod;
+    const isCash      = paymentMethod==="cash";
+    // Cash / bank transfer / card settle the bill in full. "Partial cash" is an explicit opt-in
+    // for transport-style customers who pay cash later across several bills.
+    // Print-as-Cash passes cashPartial:false so a leftover partial tick cannot save the bill unpaid.
+    const cashPartial = isCash && (extras.cashPartial != null ? !!extras.cashPartial : !!siForm.cashPartial);
+    const plainCash   = siIsSettledPay(paymentMethod, cashPartial);
     // Receipts may have been posted since the form was opened: apply only the user's change on top of the latest paid amount.
     const typedPaid   = siN2(siForm.amountPaid);
     const trackedPaid = priorDoc && !plainCash
@@ -111,7 +112,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       : priorDoc?.jobOrderId ? { jobOrderId:priorDoc.jobOrderId, jobOrderNo:priorDoc.jobOrderNo||"" }
       : priorDoc?.quotationId ? { quotationId:priorDoc.quotationId, quotationNo:priorDoc.quotationNo||"" } : {};
     const docType = isDN ? "delivery" : isQuote ? (isTax ? "tax" : "regular") : (siForm.invoiceType||"tax");
-    return { ...quoteFields, shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:docType, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerCode:siForm.customerId?((customers||[]).find(c=>c.id===siForm.customerId)?.customerCode||""):"", customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod:siForm.paymentMethod, cashPartial, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:priorDoc?.createdBy||user.uid, createdByName:priorDoc?.createdByName||profile.personName,
+    return { ...quoteFields, shopId, invoiceNo:invoiceNoOverride ?? siInvoiceNo, invoiceType:docType, invoiceDate:siForm.invoiceDate, customerId:siForm.customerId||null, customerCode:siForm.customerId?((customers||[]).find(c=>c.id===siForm.customerId)?.customerCode||""):"", customerName:siForm.customerName.trim(), customerMobile:siForm.customerMobile.trim(), customerAddress:siForm.customerAddress.trim(), customerTrn:siForm.customerTrn.trim(), items:builtItems, subtotal:parseFloat(siFmt2(sub)), totalDiscount:parseFloat(siFmt2(disc)), totalVat:parseFloat(siFmt2(vat)), grandTotal:parseFloat(siFmt2(grand)), paymentMethod, cashPartial, amountPaid:parseFloat(siFmt2(paid)), balanceDue:parseFloat(siFmt2(bal)), status:derivedStatus, deliveryNoteNo:siForm.deliveryNoteNo.trim(), vehicleNo:siForm.vehicleNo.trim(), note:siForm.note.trim(), createdBy:priorDoc?.createdBy||user.uid, createdByName:priorDoc?.createdByName||profile.personName,
       refNo:String(siForm.refNo||"").trim(),
       salesmanId:siForm.salesmanId||"", salesmanName:String(siForm.salesmanName||"").trim(),
       currency:siForm.currency||"AED",
@@ -265,6 +266,10 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice save sync failed", err));
     }
 
+    if (options.print === "direct") {
+      siPrint?.(savedInvoice);
+    }
+
     if (!editInvId) {
       siOpenNew(null, payload.invoiceNo);
     } else {
@@ -272,7 +277,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       setSiView("detail");
     }
 
-    if (options.print) {
+    if (options.print === true) {
       setSiPrintModal(savedInvoice);
     }
 
@@ -303,7 +308,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
           return;
         }
       }
-      const p = siBuild(status, siInvoiceNo);
+      const p = siBuild(status, siInvoiceNo, options);
       if (!p) return;
       if (!siCustomerTermsOk(p)) return;
       if (!(await siStockOk(p))) return;
@@ -318,6 +323,9 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     }
   };
   const siSaveDraft = () => siSaveRun("draft", t.si_saved);
-  const siConfirm = () => siSaveRun("confirmed", t.si_confirmed, { print:true });
+  const siConfirm = (options) => {
+    const extra = options && typeof options === "object" && !options.nativeEvent ? options : {};
+    return siSaveRun("confirmed", t.si_confirmed, { print:true, ...extra });
+  };
   return { siConfirm, siSaveDraft };
 }

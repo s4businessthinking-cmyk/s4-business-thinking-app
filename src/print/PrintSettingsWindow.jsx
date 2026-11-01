@@ -244,8 +244,8 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
             </button>
             <div style={{ fontSize: 11, color: "#374151", marginTop: 6, lineHeight: 1.45 }}>
               {bn
-                ? "কাগজের উপর নাম, তারিখ, আইটেম টেবিল, টোটাল — যেটা যেখানে চান মাউস দিয়ে বসান। আগে থেকে ছাপানো প্যাড থাকলে \"Pre-printed\" টিক দিন — তখন শুধু কাস্টমারের তথ্য প্রিন্ট হবে।"
-                : "Place name, date, item table, totals anywhere on the paper. For a pre-printed pad tick \"Pre-printed\" so only the data is printed."}
+                ? "কাগজের উপর নাম, তারিখ, আইটেম টেবিল, টোটাল — যেটা যেখানে চান মাউস দিয়ে বসান। বাঁ পাশ থেকে ফিল্ড যোগ করুন। Print Settings-এর অপশন (বিক্রেতা, সময়, নোট, বাকির মেয়াদ, কাস্টমারের বাকি, VAT সারাংশ) ডিজাইনারেও একইভাবে কাজ করবে — বন্ধ থাকলে সেই ঘর খালি থাকবে। আগে থেকে ছাপানো প্যাড থাকলে \"Pre-printed\" টিক দিন।"
+                : "Place name, date, item table, totals anywhere on the paper. Add fields from the left. Print Settings options (salesman, time, note, credit period, customer balance, VAT summary) also apply in the designer — off means that field prints blank. For a pre-printed pad tick \"Pre-printed\"."}
             </div>
           </Group>
 
@@ -285,10 +285,37 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
               {style.logo && (
                 <>
                   <button type="button" style={{ ...winBtn(false), minWidth: 0 }} onClick={() => setStyle("logo", "")}>✕</button>
-                  <input type="range" min={30} max={110} value={style.logoSize} onChange={(e) => setStyle("logoSize", parseInt(e.target.value, 10))} title={bn ? "লোগোর সাইজ" : "Logo size"} />
+                  <input type="range" min={20} max={280} value={style.logoSize || 56} onChange={(e) => setStyle("logoSize", parseInt(e.target.value, 10))} title={bn ? "লোগোর সাইজ" : "Logo size"} />
+                  <span style={{ fontSize: 12, minWidth: 36 }}>{style.logoSize || 56}px</span>
                 </>
               )}
             </div>
+            {style.logo && (
+              <div style={{ display: "grid", gap: 6, margin: "0 0 10px", padding: "8px", background: "#fff", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{bn ? "লোগোর জায়গা — বাটন বা স্লাইড দিয়ে সরান" : "Logo place — move with buttons or sliders"}</div>
+                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  {[["left", bn ? "বাঁয়ে" : "Left"], ["center", bn ? "মাঝে" : "Center"], ["right", bn ? "ডানে" : "Right"]].map(([k, label]) => (
+                    <button key={k} type="button" onClick={() => setStyle("logoAlign", k)}
+                      style={{ ...winBtn(style.logoAlign === k), minWidth: 0, background: style.logoAlign === k ? "#0a64d8" : winBtn(false).background, color: style.logoAlign === k ? "#fff" : C.text }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ minWidth: 70 }}>{bn ? "বাঁ / ডান" : "Left / Right"}</span>
+                  <input type="range" min={-160} max={220} value={style.logoX || 0} onChange={(e) => setStyle("logoX", parseInt(e.target.value, 10))} style={{ flex: 1 }} />
+                  <span style={{ width: 28, textAlign: "right" }}>{style.logoX || 0}</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                  <span style={{ minWidth: 70 }}>{bn ? "উপর / নিচ" : "Up / Down"}</span>
+                  <input type="range" min={-80} max={140} value={style.logoY || 0} onChange={(e) => setStyle("logoY", parseInt(e.target.value, 10))} style={{ flex: 1 }} />
+                  <span style={{ width: 28, textAlign: "right" }}>{style.logoY || 0}</span>
+                </label>
+                <div style={{ fontSize: 11, color: "#374151" }}>
+                  {bn ? "আরও স্বাধীনভাবে সরাতে Design ট্যাবে \"ডিজাইনার খুলুন\" চাপুন — সেখানে লোগো মাউস দিয়ে টেনে রাখা যায়।" : "For free drag-and-drop, open the Designer — you can pull the logo anywhere."}
+                </div>
+              </div>
+            )}
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{bn ? "দোকানের নামের নিচে লেখা (যেমন: সব ধরনের গাড়ির পার্টস পাওয়া যায়)" : "Text under shop name (e.g. dealer of all spare parts)"}</div>
             <textarea rows={2} value={style.headerNote} onChange={(e) => setStyle("headerNote", e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: "1px solid #8797a9", fontFamily: font, fontSize: 12, padding: 4, marginBottom: 8 }} />
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{bn ? "নিচের লেখা / শর্তাবলী (খালি রাখলে ডিফল্ট) — OK/Apply চাপলে দোকানে স্থায়ী সেভ" : "Footer / terms (blank = default) — OK/Apply saves them on the shop"}</div>

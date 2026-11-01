@@ -8,7 +8,7 @@ export function damagedQuantityForLine(transfer, lineId) {
   }, 0);
 }
 
-export function TransferDetail({ lang, mobile, transfer, isOwner, canManage, canReceive, canCreateInvoice, busy, onStatus, onDelete, onReceive, onCreateInvoice, onPrint, onBack }) {
+export function TransferDetail({ lang, mobile, transfer, isOwner, canManage, canReceive, canCreateInvoice, canDelete = false, canPrint = false, busy, onStatus, onDelete, onReceive, onCreateInvoice, onPrint, onBack }) {
   const t = bt(lang);
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -167,14 +167,14 @@ export function TransferDetail({ lang, mobile, transfer, isOwner, canManage, can
       </div>
       <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
         <button type="button" className="pm-btn-secondary" disabled={busy} onClick={onBack}>← {L("তালিকা", "List")}</button>
-        <button type="button" className="pm-btn-secondary" onClick={() => onPrint(transfer)}>🖨️ {L("চালান প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => onPrint(transfer)}>🖨️ {L("চালান প্রিন্ট", "Print")}</button>}
         <span className="si-toolbar-gap" />
         {canManage && status === "draft" && <button type="button" className="pm-btn-secondary" disabled={busy} onClick={() => onStatus(transfer, "packed")}>📦 {t.packed}</button>}
         {canManage && ["draft", "packed"].includes(status) && <button type="button" className="pm-btn pm-btn--primary" disabled={busy} onClick={() => onStatus(transfer, "dispatched")}>🚚 {t.dispatch}</button>}
         {canManage && status === "dispatched" && <button type="button" className="pm-btn-secondary" disabled={busy} onClick={() => onStatus(transfer, "in_transit")}>🛣️ {t.inTransit}</button>}
         {canManage && status === "discrepancy" && remaining === 0 && <button type="button" className="pm-btn pm-btn--primary" disabled={busy} onClick={() => onStatus(transfer, "received")}>✓ {t.completed}</button>}
         {canManage && !["received", "cancelled"].includes(status) && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={busy} onClick={askCancel}>⛔ {t.cancel}</button>}
-        {isOwner && status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={busy} onClick={() => { if (window.confirm(L(`ট্রান্সফার ${transfer.transferNo || ""} একেবারে মুছে ফেলবেন?`, `Delete transfer ${transfer.transferNo || ""} permanently?`))) onDelete(transfer); }}>🗑️ {L("মুছুন", "Delete")}</button>}
+        {canDelete && status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={busy} onClick={() => { if (window.confirm(L(`ট্রান্সফার ${transfer.transferNo || ""} একেবারে মুছে ফেলবেন?`, `Delete transfer ${transfer.transferNo || ""} permanently?`))) onDelete(transfer); }}>🗑️ {L("মুছুন", "Delete")}</button>}
         {canReceive && <button type="button" className="pm-btn pm-btn--primary" disabled={busy} onClick={() => onReceive(transfer)}>📥 {t.receive}</button>}
     </div>
     </>

@@ -4,6 +4,7 @@ import { nsq } from "../utils/productSearch";
 import { parseScaleBarcode } from "./scaleBarcode";
 import { salesSpecs } from "../product-master/productSpecs";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
+import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 import { itemBaseQty } from "../inventory/unitConversion";
 import { listShopRecords } from "../branch-transfer/branchTransferService";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
@@ -11,6 +12,7 @@ import { PM_CSS } from "../product-master/pmStyles";
 import { printWithSettings } from "../print/printSettings.js";
 import { splitRack } from "./rackLocation.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
+import { siIsSettledPay } from "./salesInvoiceShared.js";
 
 const CURRENCIES = ["AED", "USD", "SAR", "OMR", "QAR", "KWD", "BHD", "INR", "BDT", "EUR"];
 
@@ -155,6 +157,7 @@ export default function SalesInvoiceDesktopForm({
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine,
   onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast, canEditInvoice = () => true,
+  onOpenReminder, reminderForm, onChangeReminder, onSaveReminder, onCloseReminder,
   kind = "sales", sourceQuoteNo = "", sourceIsDN = false, sourceKind = "", onConvertQuote, onConvertToDN, canDiscount = true, canSeeCost = false,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
@@ -168,7 +171,7 @@ export default function SalesInvoiceDesktopForm({
   const docName = isSO ? "SALES ORDER" : isQuote ? "QUOTATION" : isDN ? "DELIVERY NOTE" : "SALES INVOICE";
   const isDelivery = isDN || (kind === "sales" && form.invoiceType === "delivery");
   const isTax = form.invoiceType === "tax" && !isDelivery;
-  const isCash = form.paymentMethod === "cash";
+  const isCash = siIsSettledPay(form.paymentMethod, form.cashPartial);
   const cur = form.currency || "AED";
 
   const codeRef = useRef(null);
@@ -186,6 +189,7 @@ export default function SalesInvoiceDesktopForm({
   const [codeOpenSignal, setCodeOpenSignal] = useState(0);
   const [branches, setBranches] = useState([]);
   const [stockMap, setStockMap] = useState(null);
+  const [stockRev, setStockRev] = useState(invoiceRowsCacheGen);
   const [showHistory, setShowHistory] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [productSearchName, setProductSearchName] = useState(null);
@@ -200,6 +204,7 @@ export default function SalesInvoiceDesktopForm({
     return () => { cancelled = true; };
   }, [shopId]);
 
+  useEffect(() => subscribeInvoiceRowsCache(setStockRev), []);
   useEffect(() => {
     let cancelled = false;
     loadInvoiceRows()
@@ -208,7 +213,7 @@ export default function SalesInvoiceDesktopForm({
       })
       .catch((err) => console.warn("[S4 SI] stock load failed", err));
     return () => { cancelled = true; };
-  }, [products, invoices, shopId]);
+  }, [products, shopId, stockRev]);
 
   const navIndex = editInvId ? invoices.findIndex((inv) => inv.id === editInvId) : -1;
   const olderInvoice = editInvId ? invoices[navIndex + 1] : invoices[0];
@@ -676,8 +681,13 @@ export default function SalesInvoiceDesktopForm({
           ))}
           {!isQuote && !isDN && field("Pay Mode", (
             <select style={inp()} value={form.paymentMethod} disabled={isDelivery}
-              onChange={(e) => { setField("paymentMethod", e.target.value); if (e.target.value === "cash") setField("amountPaid", ""); }}>
-              {Object.entries(SI_PAY).map(([k, v]) => <option key={k} value={k}>{v[lang] || v.en}</option>)}
+              onChange={(e) => {
+                const key = e.target.value;
+                setField("paymentMethod", key);
+                setField("amountPaid", "");
+                if (key !== "cash") setField("cashPartial", false);
+              }}>
+              {Object.entries(SI_PAY).map(([k, v]) => <option key={k} value={k}>{v.icon} {v[lang] || v.en}</option>)}
             </select>
           ))}
           {field("Crdt. Period", (
@@ -749,8 +759,16 @@ export default function SalesInvoiceDesktopForm({
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
           <button type="button" onClick={() => setShowSearch(true)} style={btn()}>🔍 {bn ? "খুঁজুন" : "Search"}</button>
-          <button type="button" disabled={!savedInvoice} onClick={() => savedInvoice && onPrintInvoice(savedInvoice)}
-            style={btn("#e7eef9", C.label, { opacity: savedInvoice ? 1 : 0.5 })}>🖨️ {bn ? "প্রিন্ট" : "Print"}</button>
+          {onPrintInvoice && (() => {
+            const canPrintNow = !!savedInvoice || lines.some((it) => String(it.name || "").trim());
+            return (
+              <button type="button" disabled={!canPrintNow} onClick={() => onPrintInvoice(savedInvoice)}
+                style={btn("#e7eef9", C.label, { opacity: canPrintNow ? 1 : 0.5 })}>🖨️ {bn ? "প্রিন্ট" : "Print"}</button>
+            );
+          })()}
+          {onOpenReminder && savedInvoice && (
+            <button type="button" onClick={() => onOpenReminder(savedInvoice)} style={btn("#fef3c7", "#92400e")}>⏰ {bn ? "রিমাইন্ডার" : "Remind me"}</button>
+          )}
           {onConvertToDN && savedInvoice && ["draft", "open"].includes(savedInvoice.status) && (
             <button type="button" onClick={() => onConvertToDN(savedInvoice)} disabled={saving}
               style={btn("#6d28d9", "#fff")}>🚚 {bn ? "ডেলিভারি নোট বানান" : "Make Delivery Note"}</button>
@@ -832,6 +850,23 @@ export default function SalesInvoiceDesktopForm({
               setTimeout(() => { if (document.activeElement === document.body) nameRef.current?.focus(); }, 120);
             }} />
         </div>
+      )}
+
+      {reminderForm && savedInvoice && reminderForm.invoiceId === savedInvoice.id && (
+        <Modal title={bn ? "রিমাইন্ডার সেট করুন" : "Set a reminder"} width={420} onClose={onCloseReminder}>
+          <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ fontSize: 12, color: C.label, fontWeight: 700 }}>{savedInvoice.invoiceNo}{savedInvoice.customerName ? ` — ${savedInvoice.customerName}` : ""}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input type="date" style={inp()} value={reminderForm.date} onChange={(e) => onChangeReminder?.((p) => ({ ...p, date: e.target.value }))} />
+              <input type="time" style={inp()} value={reminderForm.time} onChange={(e) => onChangeReminder?.((p) => ({ ...p, time: e.target.value }))} />
+            </div>
+            <input style={inp()} placeholder={bn ? "নোট (ঐচ্ছিক)" : "Note (optional)"} value={reminderForm.note} onChange={(e) => onChangeReminder?.((p) => ({ ...p, note: e.target.value }))} />
+            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+              <button type="button" onClick={onCloseReminder} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
+              <button type="button" disabled={!reminderForm.date} onClick={onSaveReminder} style={btn("#15803d", "#fff")}>✅ {bn ? "সেভ করুন" : "Save"}</button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {showSearch && (

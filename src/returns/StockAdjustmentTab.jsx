@@ -35,7 +35,7 @@ export const ADJUST_REASONS = [
 
 const ACCENT = "#0891b2";
 
-export default function StockAdjustmentTab({ lang = "en", th, shopId, user, profile, isOwner, canManage, products = [], isDesktop, wideDesktop = false, toast, shopName = "", makeNo, leaveGuard = null }) {
+export default function StockAdjustmentTab({ lang = "en", th, shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, products = [], isDesktop, wideDesktop = false, toast, shopName = "", makeNo, leaveGuard = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const reasonLabel = (key) => (ADJUST_REASONS.find((r) => r.key === key) || ADJUST_REASONS[ADJUST_REASONS.length - 1])[bn ? "bn" : "en"];
@@ -283,7 +283,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
   };
 
   const deleteAdj = async (r) => {
-    if (!isOwner || r.status !== "cancelled") return;
+    if (!canDelete || r.status !== "cancelled") return;
     if (!window.confirm(L(`${r.adjustNo} একেবারে মুছে ফেলবেন?`, `Delete ${r.adjustNo} permanently?`))) return;
     try {
       await offlineRemove("stockAdjustments", r.id);
@@ -797,8 +797,8 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
         </div>
         <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
           <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
-          <button type="button" className="pm-btn-secondary" disabled={!stockMap} onClick={() => printCountSheet(sheet, false)}>🖨️ {L("খালি গণনা শীট", "Blank count sheet")}</button>
-          <button type="button" className="pm-btn-secondary" disabled={!stockMap || !sum.entered} onClick={() => printCountSheet(sheet, true)}>🖨️ {L("ফলাফল প্রিন্ট", "Print result")}</button>
+          {canPrint && <button type="button" className="pm-btn-secondary" disabled={!stockMap} onClick={() => printCountSheet(sheet, false)}>🖨️ {L("খালি গণনা শীট", "Blank count sheet")}</button>}
+          {canPrint && <button type="button" className="pm-btn-secondary" disabled={!stockMap || !sum.entered} onClick={() => printCountSheet(sheet, true)}>🖨️ {L("ফলাফল প্রিন্ট", "Print result")}</button>}
           {sum.entered > 0 && (
             <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => {
               if (window.confirm(L("সব গোনা সংখ্যা মুছে নতুন করে শুরু করবেন?", "Clear all counted numbers and start over?"))) setCounted({});
@@ -873,10 +873,10 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
         </div>
         <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
           <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>
+          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
           {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => cancelAdj(r)}>⛔ {L("বাতিল করুন", "Cancel")}</button>}
-          {isOwner && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteAdj(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteAdj(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));

@@ -50,7 +50,7 @@ const STATUS = {
   cancelled: ["বাতিল", "Cancelled", "#6b7280"],
 };
 
-export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user, profile, isOwner, canManage, products = [], vendors = [], toast, shopName = "", cur = "AED", makeNo, leaveGuard = null, incoming = null, onIncomingHandled, onMakePurchase, onMakeReceipt, wideDesktop = false }) {
+export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, products = [], vendors = [], toast, shopName = "", cur = "AED", makeNo, leaveGuard = null, incoming = null, onIncomingHandled, onMakePurchase, onMakeReceipt, wideDesktop = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const K = KIND[kind];
@@ -251,6 +251,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     }
   };
   const remove = async (r) => {
+    if (!canDelete) return;
     if (!window.confirm(L(`${noOf(r)} একেবারে মুছে ফেলবেন?`, `Delete ${noOf(r)} permanently?`))) return;
     try {
       await offlineRemove(K.col, r.id);
@@ -720,7 +721,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         </div>
         <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
           <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>
+          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
           {canBill && isPO && onMakeReceipt && <button type="button" className="pm-btn" onClick={() => onMakeReceipt({ ...r, docNo: noOf(r) }, forBill(remaining))}>📥 {L("মাল গ্রহণ করুন", "Receive Goods")}</button>}
           {canBill && onMakePurchase && <button type="button" className="pm-btn pm-btn--primary" onClick={() => onMakePurchase(kind, { ...r, docNo: noOf(r) }, forBill(remaining))}>🧾 {L("পারচেজ বিল বানান", "Make Purchase Bill")}</button>}
           <span className="si-toolbar-gap" />
@@ -729,7 +730,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
           {mine(r) && isPO && r.status === "closed" && <button type="button" className="pm-btn-secondary" onClick={() => setStatus(r, "open", L("অর্ডার আবার খোলা হয়েছে", "Order reopened"))}>🔓 {L("আবার খুলুন", "Reopen")}</button>}
           {mine(r) && live && nothingIn && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => { if (window.confirm(L(`${noOf(r)} বাতিল করবেন?${isPO ? "" : " স্টক থেকে বাদ যাবে।"}`, `Cancel ${noOf(r)}?${isPO ? "" : " Its stock is taken back out."}`))) setStatus(r, "cancelled", L("🚫 বাতিল হয়েছে", "🚫 Cancelled")); }}>⛔ {L("বাতিল", "Cancel")}</button>}
           {!nothingIn && live && !isPO && <span className="si-hint">{L("বিল হয়ে গেছে — বদলাতে আগে পারচেজ বিল বাতিল করুন", "Already billed — cancel the purchase bill first to change it")}</span>}
-          {isOwner && !live && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => remove(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canDelete && !live && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => remove(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));

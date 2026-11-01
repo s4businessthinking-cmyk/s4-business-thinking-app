@@ -528,7 +528,7 @@ async function reverseDispatchMovements(transfer, actor) {
 
 export async function deleteBranchTransfer({ transfer: given, actor }) {
   if (!given?.id) throw new Error("TRANSFER_REQUIRED");
-  if (!isOwnerActor(actor)) throw new Error("OWNER_REQUIRED");
+  if (!isOwnerActor(actor) && actor?.permissions?.deleteBranch !== true) throw new Error("OWNER_REQUIRED");
   const transfer = await freshTransfer(given);
   if (transfer.status !== BRANCH_TRANSFER_STATUSES.CANCELLED) throw new Error("TRANSFER_NOT_CANCELLED");
   await offlineRemove(BRANCH_TRANSFER_COLLECTIONS.TRANSFERS, transfer.id);

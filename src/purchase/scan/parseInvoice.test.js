@@ -54,7 +54,7 @@ test("dates in the usual formats", () => {
   assert.equal(parseDate("14.10.2026"), "2026-10-14");
 });
 
-test("matching: barcode, code, linked before for this vendor, name suggestion, none", () => {
+test("matching: barcode, code, linked before for this vendor; name only when there is no reference", () => {
   const products = [
     { id: "p1", name: "Oil Filter Toyota Corolla", code: "OF-90915" },
     { id: "p2", name: "Brake Pad Front", code: "BPF-1", moreBarcodes: ["BP-4471"] },
@@ -65,10 +65,16 @@ test("matching: barcode, code, linked before for this vendor, name suggestion, n
   const [oil, brake, spark, air] = parseInvoice(rows(SAMPLE)).lines;
   assert.deepEqual([matchLine(oil, idx, "v1").status, matchLine(oil, idx, "v1").product.id, matchLine(oil, idx, "v1").how], ["exact", "p1", "code"]);
   assert.deepEqual([matchLine(brake, idx, "v1").product.id, matchLine(brake, idx, "v1").how], ["p2", "barcode"]);
-  assert.deepEqual([matchLine(spark, idx, "v1").status, matchLine(spark, idx, "v1").product.id], ["suggest", "p3"]);
+  // BKR6E is a reference that is not in the shop — do not pick Spark Plug by name
+  assert.equal(matchLine(spark, idx, "v1").status, "none");
   assert.deepEqual([matchLine(air, idx, "v1").product.id, matchLine(air, idx, "v1").how], ["p4", "linked before"]);
-  assert.equal(matchLine(air, idx, "v2").how, "name"); // the link is per vendor
+  // other vendor + a reference that is not in the shop: no name fallback
+  assert.equal(matchLine(air, idx, "v2").status, "none");
   assert.equal(matchLine({ name: "Radiator Cap", code: "", raw: "Radiator Cap" }, idx, "v1").status, "none");
+  // no reference on the bill: code / model / name may match, but only when the vendor is known
+  const byName = matchLine({ name: "Spark Plug NGK", code: "", raw: "Spark Plug NGK" }, idx, "v1");
+  assert.deepEqual([byName.status, byName.product.id, byName.how], ["suggest", "p3", "name"]);
+  assert.equal(matchLine({ name: "Spark Plug NGK", code: "", raw: "Spark Plug NGK" }, idx, "").status, "none");
 });
 
 test("vendor by TRN, else by name", () => {

@@ -1,5 +1,7 @@
-// Matches a scanned invoice to the shop's vendors and products. Order: barcode / more barcodes, code / model,
-// what was linked before for this vendor (product.supplierAliases), then name similarity (suggestions only).
+// Matches a scanned invoice to the shop's products.
+// If the bill line has a reference / part / barcode: match only those numbers (plus brand to pick
+// among several). Product name is not used. If the vendor was not recognised, a reference is required.
+// Lines with no reference number fall back to code / model / name — only when the vendor matched.
 
 export const norm = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9ঀ-৿]+/g, "");
 const words = (v) => String(v || "").toLowerCase().split(/[^a-z0-9ঀ-৿]+/).filter((w) => w.length > 1);
@@ -51,15 +53,21 @@ function oneEdit(a, b) {
   return edits + (a.length - i) + (b.length - j) <= 1;
 }
 
+const codesOf = (p) => [p.code, p.model].map((v) => String(v || "").trim()).filter(Boolean);
+
 export function buildProductIndex(products) {
   const byBarcode = new Map(), byCode = new Map(), byAlias = new Map(), byPart = new Map();
   const list = (products || []).filter((p) => p?.id && !p.isDeleted);
   for (const p of list) {
     for (const b of barcodesOf(p)) if (!byBarcode.has(b)) byBarcode.set(b, p);
-    const c = norm(p.code);
-    if (c && !byCode.has(c)) byCode.set(c, p);
+    for (const raw of codesOf(p)) {
+      const c = norm(raw);
+      if (c && !byCode.has(c)) byCode.set(c, p);
+    }
     for (const a of Array.isArray(p.supplierAliases) ? p.supplierAliases : []) if (!byAlias.has(a)) byAlias.set(a, p);
-    for (const t of new Set([...partTokens(p.code), ...partTokens(p.barcode), ...partTokens(p.ean), ...(Array.isArray(p.moreBarcodes) ? p.moreBarcodes.flatMap(partTokens) : [])])) {
+    const partSources = [...codesOf(p), p.barcode, p.ean, ...(Array.isArray(p.moreBarcodes) ? p.moreBarcodes : []),
+      ...(Array.isArray(p.unitPrices) ? p.unitPrices.map((r) => r.barcode) : [])];
+    for (const t of new Set(partSources.flatMap(partTokens))) {
       if (!byPart.has(t)) byPart.set(t, new Set());
       byPart.get(t).add(p);
     }
@@ -67,52 +75,74 @@ export function buildProductIndex(products) {
   return { products: list, byBarcode, byCode, byAlias, byPart };
 }
 
+export function lineHasRef(line) {
+  if (line?.code && /\d/.test(line.code)) return true;
+  return partTokens(`${line?.code || ""} ${line?.raw || ""} ${line?.name || ""}`).length > 0;
+}
+
 const sideOf = (s) => (/\b(LH|L\/H|LEFT)\b/i.test(s) ? "L" : /\b(RH|R\/H|RIGHT)\b/i.test(s) ? "R" : "");
 
-// -> { status: "exact" | "suggest" | "none", product, how, candidates: [{ product, score }] }
-export function matchLine(line, index, vendorId) {
+function matchByRef(line, index) {
   const code = norm(line.code);
   const tryKeys = [code, ...words(line.raw).filter((w) => /\d/.test(w) && w.length >= 4).map(norm)];
   for (const k of tryKeys) if (k && index.byBarcode.has(k)) return { status: "exact", product: index.byBarcode.get(k), how: "barcode", candidates: [] };
   for (const k of tryKeys) if (k && index.byCode.has(k)) return { status: "exact", product: index.byCode.get(k), how: "code", candidates: [] };
-  const alias = index.byAlias.get(aliasKey(vendorId, line));
-  if (alias) return { status: "exact", product: alias, how: "linked before", candidates: [] };
 
-  // part number inside the shop's codes; OCR slips of one character only as suggestions.
-  // Not the whole row: its qty / rate / amount would read as part numbers.
   const parts = partTokens(`${line.code || ""} ${line.name || ""}`);
-  const hits = new Map(); // product -> { exact, fuzzy }
+  const hits = new Map();
   const hit = (p, kind) => { const h = hits.get(p) || { exact: 0, fuzzy: 0 }; h[kind]++; hits.set(p, h); };
   for (const t of parts) {
     const exact = index.byPart?.get(t);
     if (exact) { exact.forEach((p) => hit(p, "exact")); continue; }
     if (t.length >= 6) for (const [k, set] of index.byPart || []) if (k.length >= 6 && oneEdit(t, k)) set.forEach((p) => hit(p, "fuzzy"));
   }
-  if (hits.size) {
-    // the bill's brand ("LG", "DFT", "ELR" for ELRING) in the product's code / company / brand
-    const brands = words(line.brand).filter((b) => /[a-z]/.test(b));
-    const side = sideOf(line.raw || `${line.code} ${line.name}`);
-    const scored = [...hits].map(([p, h]) => {
-      const hay = `${p.code || ""} ${p.name || ""} ${p.company || ""} ${p.brand || ""}`;
-      let score = h.exact * 3 + h.fuzzy * 1.5 + nameScore(line.name, p.name);
-      const hw = words(hay);
-      if (brands.some((b) => hw.some((w) => w === b || (b.length >= 3 && w.startsWith(b))))) score += 2;
-      const ps = sideOf(hay);
-      if (side && ps) score += side === ps ? 1 : -2;
-      return { product: p, score, exact: h.exact > 0 };
-    }).sort((a, b) => b.score - a.score);
-    const [top, second] = scored;
-    const sure = top.exact && (!second || top.score - second.score >= 2);
-    return { status: sure ? "exact" : "suggest", product: top.product, how: top.exact ? "part no" : "part no (close)", candidates: scored.slice(0, 8) };
-  }
+  if (!hits.size) return null;
+  const brands = words(line.brand).filter((b) => /[a-z]/.test(b));
+  const side = sideOf(line.raw || `${line.code} ${line.name}`);
+  const scored = [...hits].map(([p, h]) => {
+    const hay = `${p.code || ""} ${p.model || ""} ${p.company || ""} ${p.brand || ""}`;
+    let score = h.exact * 3 + h.fuzzy * 1.5;
+    const hw = words(hay);
+    if (brands.some((b) => hw.some((w) => w === b || (b.length >= 3 && w.startsWith(b))))) score += 2;
+    const ps = sideOf(hay);
+    if (side && ps) score += side === ps ? 1 : -2;
+    return { product: p, score, exact: h.exact > 0 };
+  }).sort((a, b) => b.score - a.score);
+  const [top, second] = scored;
+  const sure = top.exact && (!second || top.score - second.score >= 2);
+  return { status: sure ? "exact" : "suggest", product: top.product, how: top.exact ? "part no" : "part no (close)", candidates: scored.slice(0, 8) };
+}
 
+function matchByNameCodeModel(line, index) {
   const candidates = index.products
-    .map((p) => ({ product: p, score: Math.max(nameScore(line.name, p.name), line.code && p.code ? nameScore(line.code, p.code) : 0) }))
+    .map((p) => ({
+      product: p,
+      score: Math.max(
+        nameScore(line.name, p.name),
+        nameScore(line.name, p.model),
+        line.code && p.code ? nameScore(line.code, p.code) : 0,
+        line.code && p.model ? nameScore(line.code, p.model) : 0,
+      ),
+    }))
     .filter((c) => c.score >= 0.34)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
   if (candidates.length) return { status: "suggest", product: candidates[0].product, how: "name", candidates };
   return { status: "none", product: null, how: "", candidates: [] };
+}
+
+// -> { status: "exact" | "suggest" | "none", product, how, candidates: [{ product, score }] }
+export function matchLine(line, index, vendorId) {
+  const refHit = matchByRef(line, index);
+  if (refHit) return refHit;
+  if (vendorId) {
+    const alias = index.byAlias.get(aliasKey(vendorId, line));
+    if (alias) return { status: "exact", product: alias, how: "linked before", candidates: [] };
+  }
+  // A reference on the bill that matched nothing: do not fall back to product name.
+  // No vendor recognised: only a reference number may pick a product.
+  if (lineHasRef(line) || !vendorId) return { status: "none", product: null, how: "", candidates: [] };
+  return matchByNameCodeModel(line, index);
 }
 
 // Vendor by TRN, then by mobile / name similarity.

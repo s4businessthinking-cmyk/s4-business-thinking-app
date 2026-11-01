@@ -11,7 +11,7 @@ const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, m
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const monthStart = () => { const d = new Date(); return localDay(new Date(d.getFullYear(), d.getMonth(), 1)); };
 
-export default function ProfitLossReport({ lang = "en", th, s, shopId, products = [], shopName = "", cur = "AED", isDesktop }) {
+export default function ProfitLossReport({ lang = "en", th, s, shopId, products = [], shopName = "", cur = "AED", isDesktop, canPrint = false }) {
   const bn = lang === "bn";
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(() => localDay());
@@ -121,7 +121,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
         <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
       <div className="si-toolbar">
-        <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!report || badRange}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!report || badRange}>🖨️ {L("প্রিন্ট", "Print")}</button>}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}>🔄 {L("রিফ্রেশ", "Refresh")}</button>
         <span className="si-toolbar-gap" />
         <div className="si-pills">

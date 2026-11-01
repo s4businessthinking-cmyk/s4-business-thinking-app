@@ -158,6 +158,12 @@ export function createSiLineActions({ canManageCustomers, customers, isDN, isQuo
     }
     const name = String(customerName || "").trim();
     if (!name) return;
+    const existing = (customers || []).find((c) => String(c.customerName || "").trim().toLowerCase() === name.toLowerCase());
+    if (existing) {
+      siSelectCustomer(existing);
+      toast(lang === "bn" ? "এই নামে কাস্টমার আগে থেকেই আছে" : "A customer with this name already exists");
+      return;
+    }
 
     try {
       const now = new Date().toISOString();

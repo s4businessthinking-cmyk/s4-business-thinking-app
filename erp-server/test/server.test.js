@@ -362,6 +362,9 @@ test("backup: owner exports and restores own shop only", async () => {
   assert.ok(!after.docs.some((d) => d.id === "x9"));
 
   assert.equal((await api("/v1/backup/restore", { backup: { format: "nope" } }, owner.idToken)).status, 400);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageBackup: true } }, true)])).status, 200);
+  assert.equal((await api("/v1/backup/export", { shopId: "shop1" }, sales.idToken)).status, 200);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageBackup: false } }, true)])).status, 200);
 });
 
 test("realtime: rejects bad token", async () => {
@@ -397,16 +400,21 @@ test("rules: sales bills, receipts and customers follow the staff permissions", 
 
   assert.equal((await commit(owner.idToken, [set("customers", "rc1", { shopId: "shop1", customerName: "Del Me" })])).status, 200);
   assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "customers", id: "rc1" }])).status, 403);
-  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "customers", id: "rc1" }])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageCustomers: true } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "customers", id: "rc1" }])).status, 403, "manageCustomers does not delete");
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { deleteCustomers: true } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "customers", id: "rc1" }])).status, 200);
 
   assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpi1", { shopId: "shop1", invoiceNo: "PI-R1", status: "confirmed", createdBy: sales.uid })])).status, 403, "purchase needs managePurchase");
   assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { managePurchase: true } }, true)])).status, 200);
   assert.equal((await commit(sales.idToken, [set("purchaseInvoices", "rpi1", { shopId: "shop1", invoiceNo: "PI-R1", status: "confirmed", createdBy: sales.uid })])).status, 200);
   assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "rpi1", data: { note: "edit" } }])).status, 200);
   assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "rpi1", data: { status: "cancelled" } }])).status, 403);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { managePurchase: true, deletePurchase: true } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "purchaseInvoices", id: "rpi1", data: { status: "cancelled" } }])).status, 200);
 });
 
-test("rules: partners and partner money are owner-only", async () => {
+test("rules: partners stay closed until the owner ticks view/manage", async () => {
   assert.equal((await commit(owner.idToken, [set("partners", "pt1", { shopId: "shop1", name: "Karim", sharePercent: 40 })])).status, 200);
   assert.equal((await commit(owner.idToken, [set("partnerEntries", "pe1", { shopId: "shop1", kind: "capitalIn", partnerId: "pt1", amount: 5000 })])).status, 200);
   assert.equal((await commit(sales.idToken, [set("partners", "pt2", { shopId: "shop1", name: "Me", sharePercent: 99 })])).status, 403);
@@ -414,11 +422,17 @@ test("rules: partners and partner money are owner-only", async () => {
   assert.equal((await api("/v1/db/get", { collection: "partners", id: "pt1" }, sales.idToken)).status, 403);
   assert.equal((await api("/v1/db/query", { collection: "partnerEntries", filters: [["shopId", "==", "shop1"]] }, sales.idToken)).docs.length, 0);
   assert.equal((await api("/v1/db/query", { collection: "partnerEntries", filters: [["shopId", "==", "shop1"]] }, owner.idToken)).docs.length, 1);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { viewPartners: true } }, true)])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "partners", id: "pt1" }, sales.idToken)).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "partnerEntries", id: "pe1", data: { amount: 1 } }])).status, 403, "view does not write");
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { viewPartners: true, managePartners: true } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("partners", "pt2", { shopId: "shop1", name: "Me", sharePercent: 10 })])).status, 200);
   assert.equal((await commit(owner.idToken, [{ op: "update", collection: "partnerEntries", id: "pe1", data: { status: "cancelled" } }])).status, 200);
   assert.equal((await commit(outsider.idToken, [set("partners", "pt3", { shopId: "shop1", name: "X" })])).status, 403);
   assert.equal((await commit(owner.idToken, [set("partnerDocs", "pd1", { shopId: "shop1", partnerId: "pt1", label: "ID", file: "data:image/png;base64,AA" })])).status, 200);
-  assert.equal((await api("/v1/db/get", { collection: "partnerDocs", id: "pd1" }, sales.idToken)).status, 403);
-  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "partnerDocs", id: "pd1" }])).status, 403);
+  assert.equal((await api("/v1/db/get", { collection: "partnerDocs", id: "pd1" }, sales.idToken)).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "partnerDocs", id: "pd1" }])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: {} }, true)])).status, 200);
 });
 
 test("rules: the accounting period lock blocks old-dated changes", async () => {
@@ -501,8 +515,11 @@ test("rules: vendors, returns, stock adjustments, audit log and master lists fol
   assert.equal((await commit(sales.idToken, [set("auditLogs", "ra1", log)])).status, 200);
   assert.equal((await commit(sales.idToken, [upd("auditLogs", "ra1", { note: "x" })])).status, 403);
   assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "auditLogs", id: "ra1" }])).status, 403, "audit entries are permanent");
-  assert.equal((await api("/v1/db/get", { collection: "auditLogs", id: "ra1" }, sales.idToken)).status, 403, "only the owner reads the log");
+  assert.equal((await api("/v1/db/get", { collection: "auditLogs", id: "ra1" }, sales.idToken)).status, 403, "audit is closed without the tick");
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { viewAuditLog: true } }, true)])).status, 200);
+  assert.equal((await api("/v1/db/get", { collection: "auditLogs", id: "ra1" }, sales.idToken)).status, 200);
   assert.equal((await api("/v1/db/get", { collection: "auditLogs", id: "ra1" }, owner.idToken)).status, 200);
+  assert.equal((await perms({})).status, 200);
 
   const ml = { shopId: "shop1", kind: "units", records: [{ id: 1, symbol: "Pcs" }], updatedAt: "2026-01-01T00:00:00Z" };
   assert.equal((await commit(sales.idToken, [set("masterLists", "shop1_units", ml)])).status, 403, "lists need manageProducts");

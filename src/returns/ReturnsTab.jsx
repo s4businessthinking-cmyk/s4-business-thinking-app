@@ -84,7 +84,7 @@ export function returnsAsLedgerVouchers(returns, kind) {
     }));
 }
 
-export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, user, profile, isOwner, canManage, cur = "AED", isDesktop, toast, shopName = "", makeNo, leaveGuard = null }) {
+export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, cur = "AED", isDesktop, toast, shopName = "", makeNo, leaveGuard = null }) {
   const K = RETURN_KINDS[kind];
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -262,7 +262,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
   };
 
   const deleteReturn = async (r) => {
-    if (!isOwner || r.status !== "cancelled") return;
+    if (!canDelete || r.status !== "cancelled") return;
     if (!window.confirm(L(`${r.returnNo} একেবারে মুছে ফেলবেন?`, `Delete ${r.returnNo} permanently?`))) return;
     try {
       await offlineRemove(K.col, r.id);
@@ -552,10 +552,10 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
         </div>
         <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
           <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>
+          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
           {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelReturn(r)}>⛔ {L("রিটার্ন বাতিল", "Cancel Return")}</button>}
-          {isOwner && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteReturn(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteReturn(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));

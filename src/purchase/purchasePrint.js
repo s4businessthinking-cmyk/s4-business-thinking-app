@@ -60,11 +60,10 @@ export function generatePurchaseInvoiceHTML(invoice, shop, lang, opts = {}) {
   const rawDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} - ${invoice.invoiceNo}</title>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700;900&family=Noto+Sans:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
 @page{size:A4;margin:8mm}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
+body{font-family:'Segoe UI','Nirmala UI',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:20px}
 .invoice{max-width:820px;margin:0 auto;border:2px solid ${accentBorder};border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.12)}
 .hdr{background:${headerGrad};color:${headerText};padding:18px 22px;display:flex;justify-content:space-between;align-items:flex-start}
 .shop-name{font-size:20px;font-weight:900}

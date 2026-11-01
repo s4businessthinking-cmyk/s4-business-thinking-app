@@ -10,7 +10,7 @@ import { printPaymentVoucher, siFmt2, siN2 } from "./salesInvoiceShared.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import { siToday } from "./siHelpers.js";
 
-export function createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user }) {
+export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrintInv = false, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user }) {
   // ── Receipts against Bill ── (credit bills only — a "partial cash" bill is settled via the Cash Receipt Voucher instead)
   const getCustomerOpenInvoices = (partyId, partyName) => invoices
     .filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01 && inv.paymentMethod!=="cash"
@@ -181,12 +181,12 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcp
         saving={rcptSaving}
         onSave={async (d)=>{ const c = await siSaveReceipt(d); return c ? toVoucherView(c,"receipt") : null; }}
         onCancelVoucher={canCancelInv ? async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; } : undefined}
-        onDeleteVoucher={isOwner ? (v)=>siDeleteReceipt(v.raw) : undefined}
+        onDeleteVoucher={canCancelInv ? (v)=>siDeleteReceipt(v.raw) : undefined}
         onSetChequeStatus={async (v,st)=>{
           if (st==="bounced" && !canCancelInv) { toast(lang==="bn"?"❌ চেক বাউন্স করার অনুমতি নেই":"❌ You don't have permission to bounce cheques","err"); return null; }
           const u = await siSetReceiptCheque(v.raw, st); return u ? toVoucherView(u,"receipt") : null;
         }}
-        onPrint={(v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts)}
+        onPrint={canPrintInv ? (v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts) : undefined}
         onClose={()=>{
           setReceiptWin(null);
           if (siNavReturn === "ledger") {
@@ -213,14 +213,14 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcp
         saving={cashRcptSaving}
         onSave={async (d)=>{ setCashRcptSaving(true); try { const c = await siSaveReceipt({ ...d, method:"cash" }); return c ? toVoucherView(c,"receipt") : null; } finally { setCashRcptSaving(false); } }}
         onCancelVoucher={canCancelInv ? async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; } : undefined}
-        onDeleteVoucher={isOwner ? (v)=>siDeleteReceipt(v.raw) : undefined}
-        onPrint={(v,opts)=>{
+        onDeleteVoucher={canCancelInv ? (v)=>siDeleteReceipt(v.raw) : undefined}
+        onPrint={canPrintInv ? (v,opts)=>{
           const allocDetail = (v.raw.allocations||[]).map(a=>{
             const inv = invoices.find(i=>i.id===a.invoiceId);
             return { invoiceId:a.invoiceId, invoiceAmount:inv?.grandTotal||0, balanceAfter:inv?.balanceDue||0 };
           });
           printPaymentVoucher(v.raw, shop, lang, { ...opts, allocDetail, title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" });
-        }}
+        } : undefined}
         onClose={()=>setCashReceiptWin(null)}
       />
     );
@@ -259,7 +259,9 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcp
       toast(lang==="bn" ? `আগে সেলস রিটার্ন বাতিল করুন: ${nos}` : `Cancel the sales return(s) first: ${nos}`, "err");
       return false;
     }
-    if (!window.confirm(t.si_confirmCancel)) return false;
+    if (!window.confirm(lang==="bn"
+      ? `${inv.invoiceNo || ""} বাতিল করবেন?\n\nYes = বাতিল হবে\nNo = হবে না`
+      : `Cancel invoice ${inv.invoiceNo || ""}?\n\nYes = cancel it\nNo = keep it`)) return false;
     try {
       const nowIso = new Date().toISOString();
       const result = await offlineUpdate(COL, inv.id, {
@@ -350,7 +352,9 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, cashRcp
 
   const siDelete = async (inv) => {
     if (isOpeningBill(inv)) { toast(lang==="bn" ? "এটা Opening Balance বিল — কাস্টমার মাস্টার থেকে শুরুর ব্যালেন্স বদলান।" : "This is an Opening Balance bill — change the opening balance in Customer Master.", "err"); return; }
-    if (!window.confirm(t.si_confirmDelete)) return;
+    if (!window.confirm(lang==="bn"
+      ? `${inv.invoiceNo || ""} একেবারে মুছে ফেলবেন?\n\nYes = মুছে যাবে\nNo = হবে না`
+      : `Delete invoice ${inv.invoiceNo || ""} permanently?\n\nYes = delete it\nNo = keep it`)) return;
     try {
       await offlineRemove(COL, inv.id);
 

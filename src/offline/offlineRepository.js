@@ -17,6 +17,7 @@ import {
   purgeCleanLocalRecords,
 } from "./sqliteDb";
 import { LOCKED_COLLECTIONS, activePeriodLock, assertPeriodOpen } from "../accounts/periodLock.js";
+import { capsSavedText, repairSystemEnums } from "../utils/capsSavedText.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -30,12 +31,13 @@ function safeData(data) {
 }
 
 export async function offlineCreate(collectionName, data = {}, options = {}) {
-  const documentId = data.id || data.uid || data.docId || uuidv4();
+  const incoming = capsSavedText(data);
+  const documentId = incoming.id || incoming.uid || incoming.docId || uuidv4();
 
   const record = safeData({
-    ...data,
+    ...incoming,
     id: documentId,
-    _offline_created_at: data._offline_created_at || nowIso(),
+    _offline_created_at: incoming._offline_created_at || nowIso(),
   });
 
   if (activePeriodLock() && LOCKED_COLLECTIONS[collectionName]) {
@@ -74,10 +76,11 @@ export async function offlineCreate(collectionName, data = {}, options = {}) {
 export async function offlineUpdate(collectionName, documentId, patch = {}, options = {}) {
   const existing = await offlineGetById(collectionName, documentId);
   const stamp = nowIso();
+  const incoming = capsSavedText(patch);
 
   const record = safeData({
     ...(existing?.data || {}),
-    ...patch,
+    ...incoming,
     id: documentId,
     _offline_updated_at: stamp,
   });
@@ -89,7 +92,7 @@ export async function offlineUpdate(collectionName, documentId, patch = {}, opti
   const syncResult = await enqueueSync(collectionName, documentId, "UPDATE", {
     collectionName,
     documentId,
-    data: { ...patch, id: documentId, _offline_updated_at: stamp },
+    data: { ...incoming, id: documentId, _offline_updated_at: stamp },
   }, { skipPersist: !!options.deferPersist });
 
   if (!syncResult?.ok) {
@@ -118,7 +121,8 @@ export async function offlineUpdate(collectionName, documentId, patch = {}, opti
 export async function offlinePatch(collectionName, documentId, patch = {}, base = null, options = {}) {
   const existing = await offlineGetById(collectionName, documentId);
   const stamp = nowIso();
-  const record = { ...(existing?.data || base || {}), ...patch, id: documentId, _offline_updated_at: stamp };
+  const incoming = capsSavedText(patch);
+  const record = { ...(existing?.data || base || {}), ...incoming, id: documentId, _offline_updated_at: stamp };
   assertPeriodOpen(collectionName, "update", existing?.data || base || null, record);
 
   await saveLocalRecord(collectionName, documentId, record, { skipPersist: true });
@@ -126,7 +130,7 @@ export async function offlinePatch(collectionName, documentId, patch = {}, base 
   const syncResult = await enqueueSync(collectionName, documentId, "UPDATE", {
     collectionName,
     documentId,
-    data: { ...patch, id: documentId, _offline_updated_at: stamp },
+    data: { ...incoming, id: documentId, _offline_updated_at: stamp },
   }, { skipPersist: !!options.deferPersist });
 
   if (!syncResult?.ok) {
@@ -140,13 +144,14 @@ export async function offlinePatch(collectionName, documentId, patch = {}, base 
 
 export async function offlineUpsert(collectionName, documentId, data = {}) {
   const existing = await offlineGetById(collectionName, documentId);
+  const incoming = capsSavedText(data);
 
   const record = safeData({
     ...(existing?.data || {}),
-    ...data,
+    ...incoming,
     id: documentId,
     _offline_created_at:
-      existing?.data?._offline_created_at || data._offline_created_at || nowIso(),
+      existing?.data?._offline_created_at || incoming._offline_created_at || nowIso(),
   });
 
   assertPeriodOpen(collectionName, existing?.data ? "update" : "create", existing?.data || null, record);
@@ -212,7 +217,7 @@ export async function offlineRemove(collectionName, documentId) {
 }
 
 export async function offlineList(collectionName) {
-  const records = await getLocalRecords(collectionName);
+  const records = (await getLocalRecords(collectionName)).map((r) => repairSystemEnums(r));
 
   return {
     ok: true,
@@ -227,13 +232,13 @@ export async function offlineList(collectionName) {
 export async function offlineBulkUpsert(collectionName, records = [], options = {}) {
   return bulkEnqueueUpsert(
     collectionName,
-    records.map((data) => ({ documentId: data.id, data: safeData(data) })),
+    records.map((data) => ({ documentId: data.id, data: safeData(capsSavedText(data)) })),
     options,
   );
 }
 
 export async function offlineGetById(collectionName, documentId) {
-  return getLocalRecord(collectionName, documentId);
+  return repairSystemEnums(await getLocalRecord(collectionName, documentId));
 }
 
 export async function offlineSearch(collectionName, keyword = "") {

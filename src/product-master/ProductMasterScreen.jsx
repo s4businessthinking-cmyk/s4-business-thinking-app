@@ -19,6 +19,7 @@ import GlobalSearchModal from "./modals/GlobalSearchModal";
 import AdditionalBarcodeConfirmModal from "./modals/AdditionalBarcodeConfirmModal";
 import ClearProductsModal from "./modals/ClearProductsModal";
 import { offlineUpsert } from "../offline/offlineRepository";
+import { capsSavedText } from "../utils/capsSavedText.js";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 
 const DEFAULT_UNIT_RECORDS = [
@@ -469,7 +470,7 @@ export default function ProductMasterScreen({
             masterCustomerTypes={customerTypeRecords.map((record) => record.name)}
             onOpenNewUnit={() => setActiveModal("newUnit")}
             onOpenNewCustomerType={() => setActiveModal("newCustomerType")}
-            onPrintAlternateBarcode={printAlternateUnitBarcodes}
+            onPrintAlternateBarcode={onPrintBarcodes ? printAlternateUnitBarcodes : undefined}
             validateBarcode={validateSellingRateBarcode}
             enabled={!!form.multiCustomerRatesEnabled}
           />
@@ -499,7 +500,7 @@ export default function ProductMasterScreen({
           onSave={onSave}
           onDelete={onDelete}
           onClose={onClose}
-          onPrintBarcode={() => setActiveModal("printBarcode")}
+          onPrintBarcode={onPrintBarcodes ? () => setActiveModal("printBarcode") : undefined}
           onSearch={openSearch}
           onDefaultDiscount={() => setActiveModal("defaultDiscount")}
           onSetReorderLevel={() => setActiveModal("reorderLevel")}
@@ -512,7 +513,7 @@ export default function ProductMasterScreen({
           onSpecification={() => setActiveModal("specification")}
           onPhotoSetting={() => setActiveModal("photo")}
           onOpeningStockEntry={() => setActiveModal("openingStock")}
-          onPrintOpeningStockBarcodes={printOpeningStockBarcodes}
+          onPrintOpeningStockBarcodes={onPrintBarcodes ? printOpeningStockBarcodes : undefined}
           onGenerateWeighingFile={onGenerateWeighingFile}
         />
       </div>
@@ -524,10 +525,11 @@ export default function ProductMasterScreen({
           notify={notify}
           onClose={close}
           onRecordsChange={(records) => {
-            setUnitRecords(records);
-            pushMasterList("units", records);
-            upd("customUnits", records.map((record) => record.symbol));
-            upd("unitDefinitions", records);
+            const capped = capsSavedText(records);
+            setUnitRecords(capped);
+            pushMasterList("units", capped);
+            upd("customUnits", capped.map((record) => record.symbol));
+            upd("unitDefinitions", capped);
           }}
         />
       )}
@@ -537,9 +539,10 @@ export default function ProductMasterScreen({
           notify={notify}
           onClose={close}
           onRecordsChange={(records) => {
-            setCustomerTypeRecords(records);
-            pushMasterList("customerTypes", records);
-            upd("customerTypes", records.map((record) => record.name));
+            const capped = capsSavedText(records);
+            setCustomerTypeRecords(capped);
+            pushMasterList("customerTypes", capped);
+            upd("customerTypes", capped.map((record) => record.name));
           }}
         />
       )}

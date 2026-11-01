@@ -30,8 +30,11 @@ export default defineConfig({
     VitePWA({
       disable: disablePwa,
       registerType: "autoUpdate",
+      includeAssets: ["ocr/**", "sql-wasm.wasm"],
       workbox: {
         // The main bundle is over the 2 MiB default; it must stay precached for offline start.
+        // .wasm / .gz are the OCR + PDF workers — without them Scan Bill dies offline.
+        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2,wasm,gz,mjs}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         skipWaiting: true,
         clientsClaim: true,

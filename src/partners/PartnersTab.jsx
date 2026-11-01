@@ -25,16 +25,15 @@ const emptyPartner = () => ({ ...Object.fromEntries(PARTNER_FIELDS.map((f) => [f
 const PARTNER_KEYS = [...PARTNER_FIELDS.map((f) => f.k), "photo"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-export default function PartnersTab({ lang = "en", shopId, user, profile, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, products = [], alerts = [], isOwner = false }) {
+export default function PartnersTab({ lang = "en", shopId, user, profile, cur = "AED", toast, shopName = "", shop = null, onShopUpdated, products = [], alerts = [], isOwner = false, canManage = false, canDelete = false, canPrint = false }) {
   const bn = lang === "bn";
-  if (!isOwner) {
-    return (
-      <div className="pm-card" style={{ padding: 16 }}>
-        {bn ? "পার্টনার ও লাভ-ভাগ শুধু মালিক দেখতে পারেন।" : "Partners and profit sharing are owner-only."}
-      </div>
-    );
-  }
   const L = (b, e) => (bn ? b : e);
+  const canWrite = isOwner || canManage;
+  const denyWrite = () => {
+    if (canWrite) return false;
+    toast?.(L("শুধু দেখার অনুমতি আছে — মালিক এডিট টিক দিলে লেখা যাবে", "View only — the owner must tick edit to change this"), "err");
+    return true;
+  };
   const settings = partnerSettingsOf(shop);
   const today = localDay();
   const [partners, setPartners] = useState([]);
@@ -88,7 +87,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   const directory = useMemo(() => partnerDirectoryFrom(all, shopId), [all, shopId]);
   const dirKey = JSON.stringify(directory);
   useEffect(() => {
-    if (!shopId || !all.length || dirKey === JSON.stringify(partnerDirectoryOf(shop))) return;
+    if (!canWrite || !shopId || !all.length || dirKey === JSON.stringify(partnerDirectoryOf(shop))) return;
     saveShopRecord(shopId, { partnerDirectory: directory }, { ownerUid: user?.uid, profile, user })
       .then((updated) => onShopUpdated?.(updated))
       .catch((e) => console.warn("[S4 partners] directory save failed", e));
@@ -103,6 +102,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   const syncSoon = () => { if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {}); };
 
   const savePartner = async () => {
+    if (denyWrite()) return;
     const f = form;
     const name = f.name.trim();
     const fail = (sec, msg) => { setSection(sec); toast?.(msg, "err"); };
@@ -156,6 +156,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
     catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); }
   };
   const saveDoc = async () => {
+    if (denyWrite()) return;
     if (!docForm || !editId) return;
     if (!docForm.file) { toast?.(L("❌ ছবি বা PDF বাছুন", "❌ Choose a photo or PDF"), "err"); return; }
     const t = PARTNER_DOC_TYPES.find((x) => x[0] === docForm.docType) || PARTNER_DOC_TYPES[PARTNER_DOC_TYPES.length - 1];
@@ -173,6 +174,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
     } catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); } finally { setBusy(false); }
   };
   const deleteDoc = async (d) => {
+    if (!canDelete) { toast?.(L("পার্টনার মুছার অনুমতি নেই", "No permission to delete partners"), "err"); return; }
     if (!window.confirm(L(`"${d.label}" মুছে ফেলবেন?`, `Delete "${d.label}"?`))) return;
     try {
       await offlineRemove("partnerDocs", d.id);
@@ -207,6 +209,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   };
 
   const saveEntry = async () => {
+    if (denyWrite()) return;
     const f = entryForm;
     const amount = r2(f.amount);
     if (!f.partnerId) { toast?.(L("❌ পার্টনার বাছুন", "❌ Pick a partner"), "err"); return; }
@@ -228,6 +231,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   };
 
   const cancelEntry = async (e) => {
+    if (denyWrite()) return;
     if (!window.confirm(L("এই লেনদেন বাতিল করবেন? হিসাব থেকে বাদ যাবে।", "Cancel this entry? It drops out of the accounts."))) return;
     try {
       const patch = { status: "cancelled", cancelledAt: new Date().toISOString(), cancelledBy: user?.uid || "", ...stamp() };
@@ -239,6 +243,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   };
 
   const saveSettings = async () => {
+    if (denyWrite()) return;
     try {
       const next = partnerSettingsOf({ partnerSettings: settingsForm });
       const updated = await saveShopRecord(shopId, { partnerSettings: next }, { ownerUid: user?.uid, profile, user });
@@ -258,6 +263,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   const periodOptions = useMemo(() => [periodOf(today, settings), ...endedPeriods(today, settings, 8)], [today, settings.frequency, settings.startMonth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const postDistribution = async () => {
+    if (denyWrite()) return;
     if (!preview || !range) return;
     if (overlap) { toast?.(L(`❌ এই সময়ের লাভ আগেই ভাগ করা হয়েছে (${overlap.label})`, `❌ Profit for this time is already shared (${overlap.label})`), "err"); return; }
     if (!preview.allocations.length) { toast?.(L("❌ এই সময়ে কোনো পার্টনার নেই", "❌ No partners in this period"), "err"); return; }
@@ -362,7 +368,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
                   <b style={{ fontSize: 12 }}>{d.label}</b>
                   {d.number && <span className="si-muted" style={{ fontSize: 11 }}>{d.number}</span>}
                   {d.expiryDate && <span style={{ fontSize: 11, fontWeight: 700, color: left < 0 ? "#b91c1c" : left <= 30 ? "#b45309" : "#15803d" }}>{left < 0 ? L("মেয়াদ শেষ", "Expired") : L("মেয়াদ", "Expires")} {fmtDay(d.expiryDate)}</span>}
-                  <button type="button" onClick={() => deleteDoc(d)} style={{ border: 0, background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11, textAlign: "left", padding: 0 }}>🗑️ {L("মুছুন", "Delete")}</button>
+                  {canDelete && <button type="button" onClick={() => deleteDoc(d)} style={{ border: 0, background: "none", color: "#b91c1c", cursor: "pointer", fontSize: 11, textAlign: "left", padding: 0 }}>🗑️ {L("মুছুন", "Delete")}</button>}
                 </div>
               );
             })}
@@ -413,7 +419,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
           )}
         </div>
         <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
-          {editId && <button type="button" className="pm-btn-secondary" disabled={busy} onClick={printProfile}>🖨️ {L("প্রোফাইল প্রিন্ট", "Print profile")}</button>}
+          {editId && canPrint && <button type="button" className="pm-btn-secondary" disabled={busy} onClick={printProfile}>🖨️ {L("প্রোফাইল প্রিন্ট", "Print profile")}</button>}
           <span className="si-toolbar-gap" />
           <button type="button" className="pm-btn-secondary" disabled={busy} onClick={() => setForm(null)}>{L("বন্ধ", "Close")}</button>
           <button type="button" className="pm-btn pm-btn--primary" disabled={busy} onClick={savePartner}>💾 {L("সেভ", "Save")}</button>
@@ -612,7 +618,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
     <div className="si-box" style={{ minHeight: 0, overflow: "auto" }}>
       <div className="si-filters" style={{ padding: 6 }}>
         <select className="pm-input" style={{ maxWidth: 260 }} value={stmtPartner?.id || ""} onChange={(e) => setStmtId(e.target.value)}>{all.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-        <button type="button" className="pm-btn-secondary" disabled={!stmt} onClick={printStatement}>🖨️ {L("প্রিন্ট", "Print")}</button>
+        {canPrint && <button type="button" className="pm-btn-secondary" disabled={!stmt} onClick={printStatement}>🖨️ {L("প্রিন্ট", "Print")}</button>}
         <button type="button" className="pm-btn-secondary" disabled={!stmt || !stmtPartner?.mobile} onClick={sendWhatsApp}>💬 WhatsApp</button>
       </div>
       {stmt && (

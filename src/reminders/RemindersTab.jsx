@@ -52,7 +52,7 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
         if (filter === "due" && !["overdue", "today", "soon"].includes(state)) return false;
         if (filter === "mine" && (state === "done" || (r.assignedTo && r.assignedTo !== uid && r.createdBy !== uid))) return false;
         if (filter === "done" && state !== "done") return false;
-        return !needle || `${r.title} ${r.note || ""}`.toLowerCase().includes(needle);
+        return !needle || `${r.title} ${r.note || ""} ${r.linkLabel || ""}`.toLowerCase().includes(needle);
       })
       .sort((a, b) => (a.state === "done") - (b.state === "done") || String(a.r.dueDate).localeCompare(String(b.r.dueDate)) || String(a.r.dueTime || "").localeCompare(String(b.r.dueTime || "")));
   }, [visible, filter, q, today, nowTime, uid]);

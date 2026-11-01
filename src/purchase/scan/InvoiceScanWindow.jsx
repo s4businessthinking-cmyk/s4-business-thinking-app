@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import { C, inp, lbl, btn, th, td } from "../../sales-invoice/SalesInvoiceDesktopForm.jsx";
-import { readInvoiceFile } from "./invoiceText.js";
+import { readInvoiceFile, fileFromDataUrl } from "./invoiceText.js";
 import { parseInvoice } from "./parseInvoice.js";
 import { buildProductIndex, matchLine, matchVendor, nameScore, aliasKey } from "./matchInvoice.js";
 import { offlinePatch } from "../../offline/offlineRepository";
@@ -14,6 +14,9 @@ const STATUS = { exact: ["✅", "#15803d"], suggest: ["⚠️", "#b45309"], none
 export default function InvoiceScanWindow({ lang = "en", products = [], vendors = [], onApply, onClose, onOpenProductMaster, onProductPatched }) {
   const bn = lang === "bn";
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
+  const canScanner = typeof window !== "undefined" && typeof window.S4Desktop?.scan?.acquire === "function";
+  const canCamera = typeof window !== "undefined" && (!!window.Capacitor?.isNativePlatform?.() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ""));
   const [phase, setPhase] = useState("pick"); // pick -> reading -> review
   const [step, setStep] = useState("");
   const [error, setError] = useState("");
@@ -30,7 +33,7 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
     if (!file) return;
     setError(""); setPhase("reading");
     try {
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(bn ? "অনেকক্ষণ ধরে পড়া শেষ হচ্ছে না — ডিভাইসটি এই ফাইল পড়তে পারছে না।" : "Taking far too long — this device could not read the file.")), 45000));
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error(bn ? "অনেকক্ষণ ধরে পড়া শেষ হচ্ছে না — ডিভাইসটি এই ফাইল পড়তে পারছে না।" : "Taking far too long — this device could not read the file.")), 90000));
       const res = await Promise.race([readInvoiceFile(file, (s) => setStep(s)), timeout]);
       const inv = parseInvoice(res.rows);
       setPreview(res.previewUrl); setSource(res.source);
@@ -41,7 +44,7 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
       // rows whose prices could not be read are kept only when their part number finds a product; rate left empty
       const loose = (inv.loose || []).map((l) => ({ l, m: matchLine(l, index, vid) })).filter(({ m }) => m.product && m.how !== "name");
       setLines([...inv.lines.map((l) => ({ l, m: matchLine(l, index, vid) })), ...loose].map(({ l, m }, i) => (
-        { key: i, use: !l.loose || m.status === "exact", line: l, productId: m.product?.id || "", status: m.status, how: m.how, candidates: m.candidates,
+        { key: i, use: true, line: l, productId: m.product?.id || "", status: m.status, how: m.how, candidates: m.candidates,
           qty: String(l.qty), rate: l.loose ? "" : String(l.rate), discount: l.discount ? String(l.discount) : "", vatPerc: String(l.vatPerc || 0), learn: false })));
       setPhase("review");
       if (!inv.lines.length && !loose.length) setError(bn ? "কোনো আইটেমের লাইন পড়া যায়নি — নিচে নিজে যোগ করুন বা পরিষ্কার PDF / ছবি দিন।" : "No item lines could be read — add them below, or try a clearer PDF / photo.");
@@ -49,6 +52,18 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
       console.warn("[S4 Scan] read failed", err);
       setError((bn ? "ফাইল পড়া যায়নি: " : "Could not read the file: ") + (err?.message || err));
       setPhase("pick");
+    }
+  };
+
+  const startScanner = async () => {
+    setError("");
+    try {
+      const r = await window.S4Desktop.scan.acquire();
+      if (r?.cancelled || !r) return;
+      if (!r.ok || !r.dataUrl) throw new Error(r?.error || (bn ? "স্ক্যানার ছবি দেয়নি" : "Scanner did not return an image"));
+      await start(fileFromDataUrl(r.dataUrl, "scanner.jpg"));
+    } catch (err) {
+      setError((bn ? "স্ক্যান হয়নি: " : "Scan failed: ") + (err?.message || err));
     }
   };
 
@@ -70,9 +85,11 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
 
   const apply = () => {
     if (!used.length) { alert(bn ? "অন্তত একটা লাইন দিন" : "Keep at least one line"); return; }
-    if (unlinked && !window.confirm(bn
-      ? `${unlinked}টি লাইনে কোনো product বাছাই হয়নি — এগুলোর stock হিসাব হবে না। তবুও বসাবেন?`
-      : `${unlinked} line(s) have no product — their stock is not tracked. Fill the form anyway?`)) return;
+    if (unlinked) {
+      alert(bn
+        ? `${unlinked}টি লাইন মিলেনি — বিলের লেখা ফর্মে বসবে। সেভের আগে Product Master-এ এগুলো এন্ট্রি করতে হবে, নাহলে ইনভয়েস সেভ হবে না।`
+        : `${unlinked} line(s) did not match — the bill text will fill the form. Add them in Product Master before Save, or the invoice will not save.`);
+    }
     // remember the products linked by hand for this supplier (product.supplierAliases, syncs like any product edit)
     // (only for users who may edit products: the same permission opens Product Master, see onOpenProductMaster)
     if (vendorId && onOpenProductMaster) for (const l of used) {
@@ -105,12 +122,19 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
         {phase !== "review" && (
           <div style={{ padding: 24, display: "grid", gap: 14, justifyItems: "center", textAlign: "center" }}>
             <div style={{ fontSize: 14, color: C.label, maxWidth: 620, lineHeight: 1.5 }}>
-              {bn ? "সাপ্লায়ারের বিলের PDF, ছবি বা স্ক্রিনশট দিন। সফটওয়্যার পড়ে আইটেম মিলিয়ে দেখাবে — আপনি দেখে নিয়ে Purchase ফর্মে বসাবেন, তারপর নিজে Save করবেন।"
-                : "Give the supplier's bill as a PDF, photo or screenshot. The software reads it and matches the items; you check them, fill the purchase form, then save it yourself."}
+              {bn ? "সাপ্লায়ারের বিল দিন — PDF, ছবি, ফোনের ক্যামেরা বা পিসির স্ক্যানার। সফটওয়্যার পড়ে আইটেম মিলিয়ে দেখাবে; আপনি দেখে Purchase ফর্মে বসাবেন, তারপর Save করবেন।"
+                : "Give the supplier's bill as a PDF, photo, phone camera or PC scanner. The software reads it and matches the items; you check them, fill the purchase form, then save it yourself."}
             </div>
-            <input ref={fileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => start(e.target.files?.[0])} />
+            <input ref={fileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; start(f); }} />
+            <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; start(f); }} />
             {phase === "pick"
-              ? <button type="button" onClick={() => fileRef.current?.click()} style={btn("#1d4ed8", "#fff", { height: 40, padding: "0 26px", fontSize: 14 })}>📂 {bn ? "PDF / ছবি বাছাই করুন" : "Choose PDF / picture"}</button>
+              ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+                  <button type="button" onClick={() => fileRef.current?.click()} style={btn("#1d4ed8", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}>📂 {bn ? "PDF / ছবি" : "PDF / picture"}</button>
+                  {canCamera && <button type="button" onClick={() => cameraRef.current?.click()} style={btn("#0f766e", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}>📷 {bn ? "ক্যামেরা" : "Camera"}</button>}
+                  {canScanner && <button type="button" onClick={startScanner} style={btn("#15803d", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}>🖨️ {bn ? "স্ক্যানার" : "Scanner"}</button>}
+                </div>
+              )
               : <div style={{ fontWeight: 700, color: "#1e3a8a" }}>⏳ {stepText[step] || (bn ? "পড়া হচ্ছে…" : "Reading…")}</div>}
             {error && <div style={{ color: C.red, fontWeight: 700 }}>{error}</div>}
             <div style={{ fontSize: 11.5, color: "#4b5f86", maxWidth: 620 }}>

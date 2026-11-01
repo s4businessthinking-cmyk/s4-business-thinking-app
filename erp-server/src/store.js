@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { allowed, isOwnerOfShop, makeRuleContext, RULES, UNSCOPED_LIST_COLLECTIONS } from "./rules.js";
+import { allowed, canBackupShop, isOwnerOfShop, makeRuleContext, RULES, UNSCOPED_LIST_COLLECTIONS } from "./rules.js";
 import { matchesQuery, sortDocs, shopFilterValue, validateQuery } from "./query.js";
 import { fail } from "./errors.js";
 import { createMutex, deepEqual, isPlainObject } from "./util.js";
@@ -285,7 +285,7 @@ export function createStore({ db }) {
 
   async function assertShopOwner(uid, shopId) {
     const ctx = await ctxFor(uid);
-    if (!shopId || !(await isOwnerOfShop(ctx, shopId))) fail("permission-denied", "Only the shop owner can back up or restore this shop.");
+    if (!shopId || !(await canBackupShop(ctx, shopId))) fail("permission-denied", "Only the shop owner or a staff member with backup permission can back up or restore this shop.");
   }
 
   // Full copy of one shop: every collection, every document, as stored.

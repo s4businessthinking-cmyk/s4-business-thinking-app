@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, inp, lbl, btn, th, td, todayIso, fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
-import { offlineGetById, offlinePatch } from "../offline/offlineRepository";
+import { offlineGetById, offlinePatch, offlineRemove } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 
@@ -70,7 +70,7 @@ export async function postponeCheque(type, voucher, newChequeDate, uid) {
 }
 
 // Old-ERP "Post Dated Cheques" register for both supplier payments (issued) and customer receipts (received).
-export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "", shopName = "", inline = false, onOpenVoucher, onClose }) {
+export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "", shopName = "", inline = false, onOpenVoucher, onClose, canPrint = false, canDelete = false }) {
   const bn = lang === "bn";
   const [type, setType] = useState("received");
   const [bank, setBank] = useState("");
@@ -104,11 +104,11 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
   const banks = useMemo(() => [...new Set(allRows.map((r) => r.bank).filter(Boolean))].sort(), [allRows]);
   const today = todayIso();
   const rows = useMemo(() => allRows
-    .filter((r) => includePosted || r.chequeStatus === "pending")
+    .filter((r) => includePosted || r.chequeStatus === "pending" || (canDelete && (r.chequeStatus === "bounced" || r.raw?.status === "cancelled")))
     .filter((r) => !bank || r.bank === bank)
     .filter((r) => { const d = r.chequeDate || r.date; return (!from || d >= from) && (!to || d <= to); })
     .sort((a, b) => String(a.chequeDate || a.date).localeCompare(String(b.chequeDate || b.date)) || String(a.no).localeCompare(String(b.no))),
-  [allRows, includePosted, bank, from, to]);
+  [allRows, includePosted, bank, from, to, canDelete]);
 
   const edit = (r) => edits[r.id] || { status: r.chequeStatus, postDate: r.clearedAt || today };
   const setEdit = (r, patch) => setEdits((p) => ({ ...p, [r.id]: { ...edit(r), ...patch } }));
@@ -146,6 +146,28 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
       bounced ? (bn ? `❌ ${bounced}টি চেক বাউন্স` : `❌ ${bounced} cheque(s) bounced`) : "",
       failed.length ? (bn ? `⚠️ হয়নি: ${failed.join(", ")}` : `⚠️ Failed: ${failed.join(", ")}`) : "",
     ].filter(Boolean).join("\n"));
+  };
+
+  const canDeleteSel = !!selId && (() => {
+    const r = rows.find((x) => x.id === selId);
+    return !!r && (r.raw?.status === "cancelled" || r.chequeStatus === "bounced");
+  })();
+  const deleteSelected = async () => {
+    const r = rows.find((x) => x.id === selId);
+    if (!canDelete || !r) return;
+    if (!(r.raw?.status === "cancelled" || r.chequeStatus === "bounced")) {
+      alert(bn ? "আগে চেক বাউন্স/ভাউচার বাতিল করুন, তারপর মুছুন।" : "Bounce or cancel the voucher first, then delete.");
+      return;
+    }
+    if (!window.confirm(bn ? `${r.chequeNo || r.no} মুছবেন?` : `Delete ${r.chequeNo || r.no}?`)) return;
+    try {
+      await offlineRemove(TYPES[type].col, r.id);
+      setSelId(null);
+      setReloadTick((n) => n + 1);
+      if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
+    } catch (err) {
+      alert(err?.message || String(err));
+    }
   };
 
   const printList = () => {
@@ -203,7 +225,8 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             {onOpenVoucher && <button type="button" onClick={() => sel && onOpenVoucher(sel.raw)} disabled={!sel} style={btn()}><u>V</u>iew</button>}
             <button type="button" onClick={save} disabled={saving || !changed.length} style={btn("#15803d", "#fff")}>{saving ? "…" : <><u>S</u>ave</>}</button>
-            <button type="button" onClick={printList} disabled={!rows.length} style={btn()}><u>P</u>rint</button>
+            {canPrint && <button type="button" onClick={printList} disabled={!rows.length} style={btn()}><u>P</u>rint</button>}
+            {canDelete && <button type="button" onClick={deleteSelected} disabled={!canDeleteSel} style={btn("#7f1d1d", "#fff")}>{bn ? "মুছুন" : "Delete"}</button>}
             {onClose && <button type="button" onClick={onClose} style={btn()}><u>C</u>lose</button>}
           </div>
         </div>

@@ -26,14 +26,18 @@ async function clearStaleShellWebCache() {
   if (!isNative && !isElectron) return;
 
   try {
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.unregister()));
-    }
-    if ("caches" in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((key) => caches.delete(key)));
-    }
+    const limit = new Promise((resolve) => setTimeout(resolve, 2500));
+    const work = (async () => {
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.unregister()));
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+    })();
+    await Promise.race([work, limit]);
   } catch (error) {
     console.warn("[S4] Shell cache cleanup failed", error);
   }
@@ -120,6 +124,20 @@ clearStaleShellWebCache()
 if (typeof window !== "undefined" && window.S4Desktop?.dialog) {
   window.alert = (message) => { window.S4Desktop.dialog.alert(message); };
   window.confirm = (message) => window.S4Desktop.dialog.confirm(message);
+}
+
+// Browser keys that the ERP uses as app shortcuts. Without capture+preventDefault,
+// Chrome steals them: Ctrl+U = view-source, Ctrl+O = Open file, Ctrl+L = address bar, F3 = Find.
+if (typeof window !== "undefined") {
+  window.addEventListener("keydown", (e) => {
+    if (e.isComposing || e.keyCode === 229) return;
+    const key = String(e.key).toLowerCase();
+    const mod = e.ctrlKey || e.metaKey;
+    const steal =
+      (mod && !e.shiftKey && !e.altKey && (key === "u" || key === "o" || key === "l")) ||
+      e.key === "F3";
+    if (steal) e.preventDefault();
+  }, true);
 }
 
 // Ctrl+A outside a text field would highlight the whole UI (menus, buttons, grids).

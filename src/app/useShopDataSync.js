@@ -2,7 +2,7 @@ import { DEFAULT_PERMISSIONS } from "../shared/appShared.jsx";
 import { SHOP_PULL_COLLECTIONS, getCloudSyncBlockReason, getShopCloudPulledAt, shouldAutoPullShop } from "../offline/cloudPullService";
 import { assembleShopTeam, backfillLegacyTeamMembers, backfillShopStaffCloudRecords, listShopTeamMembers } from "../auth/userManagementService";
 import { auth, db } from "../firebase-config";
-import { backfillPartyCodes } from "./mainAppHelpers.js";
+import { backfillPartyCodes, mergeCloudPartyList } from "./mainAppHelpers.js";
 import { collection, doc, onSnapshot, orderBy, query, where } from "../backend/firestore";
 import { loadShopRecord } from "../offline/shopService";
 import { offlineCacheCloudRecords, offlineList } from "../offline/offlineRepository";
@@ -114,7 +114,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
     lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("employees"); },
   });
   const partnerAlertList = usePartnerAlerts({
-    shopId, enabled: isOwner, shop: localShop, lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("partners"); },
+    shopId, enabled: isOwner || can("viewPartners") || can("managePartners"), shop: localShop, lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("partners"); },
   });
   const securityChequeAlertList = useSecurityChequeAlerts({
     shopId, enabled: isOwner || can("manageSecurityCheques"), lang, toast, cur: t.cur || "AED", onOpen: () => { setSettingsPage(null); setTab("securityCheque"); },
@@ -431,10 +431,9 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       }
 
       const docs = snap.docs
-        .map(d => ({ id:d.id, ...d.data() }))
-        .sort((a,b)=>(a.vendorName||"").localeCompare(b.vendorName||""));
+        .map(d => ({ id:d.id, ...d.data() }));
 
-      setVendors(docs);
+      setVendors((prev) => mergeCloudPartyList(prev, docs, "vendorName"));
       offlineCacheCloudRecords("vendors", docs).catch(err => console.warn("[S4 Offline] vendor cache failed", err));
       setSyncState("connected");
     };
@@ -490,10 +489,9 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       }
 
       const docs = snap.docs
-        .map(d=>({ id:d.id, ...d.data() }))
-        .sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
+        .map(d=>({ id:d.id, ...d.data() }));
 
-      setCustomers(docs);
+      setCustomers((prev) => mergeCloudPartyList(prev, docs, "customerName"));
       offlineCacheCloudRecords("customers", docs).catch(err => console.warn("[S4 Offline] customer cache failed", err));
       setSyncState("connected");
     };

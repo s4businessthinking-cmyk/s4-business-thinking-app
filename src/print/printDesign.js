@@ -12,12 +12,14 @@ export const TEMPLATES = [
   { key: "classic", en: "Classic", bn: "ক্লাসিক", accent: "", sample: ["#16a34a", "#f9fafb", "#1f2937"] },
   { key: "modern", en: "Modern", bn: "মডার্ন", accent: "#0f766e", sample: ["#ffffff", "#0f766e", "#0f766e"] },
   { key: "simple", en: "Simple (B&W)", bn: "সাধারণ (সাদা-কালো)", accent: "#000000", sample: ["#ffffff", "#ffffff", "#000000"] },
+  { key: "pro", en: "Professional (B&W)", bn: "প্রফেশনাল (সাদা-কালো)", accent: "#000000", sample: ["#ffffff", "#111111", "#000000"] },
   { key: "bold", en: "Bold", bn: "বোল্ড", accent: "#1d4ed8", sample: ["#1d4ed8", "#ffffff", "#111111"] },
   { key: "compact", en: "Compact", bn: "কমপ্যাক্ট", accent: "", sample: ["#e5e7eb", "#f9fafb", "#374151"] },
 ];
 
 const STYLE_DEFAULT = {
-  template: "classic", accent: "", fontScale: 100, logo: "", logoSize: 56,
+  template: "pro", accent: "", fontScale: 100, logo: "", logoSize: 56,
+  logoAlign: "left", logoX: 0, logoY: 0,
   headerNote: "", footerText: "", showSignatures: true,
 };
 
@@ -28,24 +30,53 @@ export const INVOICE_KINDS = [
   { key: "delivery", en: "Delivery Note", bn: "ডেলিভারি চালান" },
 ];
 
+// [key, English, Bangla] — invoice groups so the designer works like an invoice engine.
+const INVOICE_FIELD_GROUPS = [
+  { en: "Shop", bn: "দোকান", fields: [
+    ["shopName", "Shop name", "দোকানের নাম"], ["shopNameAr", "Shop name (Arabic)", "দোকানের আরবি নাম"],
+    ["shopAddress", "Shop address", "দোকানের ঠিকানা"], ["shopPhone", "Shop phone", "দোকানের ফোন"],
+    ["shopFax", "Shop fax", "দোকানের ফ্যাক্স"], ["shopEmail", "Shop email", "দোকানের ইমেইল"],
+    ["shopWebsite", "Shop website", "দোকানের ওয়েবসাইট"],
+    ["shopTrn", "Shop TRN", "দোকানের TRN"], ["shopVat", "Shop VAT no", "দোকানের VAT নং"],
+    ["shopLicense", "Shop license no", "দোকানের লাইসেন্স নং"],
+    ["headerNote", "Header note", "হেডার নোট"],
+  ] },
+  { en: "Bill / document", bn: "বিল / ডকুমেন্ট", fields: [
+    ["title", "Document title", "শিরোনাম (Tax Invoice…)"],
+    ["invoiceNo", "Invoice no", "ইনভয়েস নং"], ["date", "Date", "তারিখ"], ["time", "Time", "সময়"],
+    ["refNo", "Ref / LPO no", "রেফ / LPO নং"], ["quotationNo", "Quotation no", "কোটেশন নং"],
+    ["salesOrderNo", "Sales order no", "সেলস অর্ডার নং"], ["jobOrderNo", "Job card no", "জব কার্ড নং"],
+    ["validUntil", "Valid until", "মেয়াদ"], ["deliveryNo", "Delivery note no", "ডেলিভারি নোট নং"],
+    ["vehicleNo", "Vehicle no", "গাড়ির নম্বর"], ["userName", "User", "ইউজার"],
+  ] },
+  { en: "Customer", bn: "কাস্টমার", fields: [
+    ["customerName", "Customer name", "কাস্টমারের নাম"], ["customerCode", "Customer code", "কাস্টমার কোড"],
+    ["customerMobile", "Customer mobile", "কাস্টমারের মোবাইল"],
+    ["customerAddress", "Customer address", "কাস্টমারের ঠিকানা"], ["customerTrn", "Customer TRN", "কাস্টমারের TRN"],
+  ] },
+  { en: "Payment", bn: "পেমেন্ট", fields: [
+    ["payment", "Payment method", "পেমেন্ট পদ্ধতি"], ["salesman", "Salesman", "বিক্রেতা"],
+    ["creditPeriod", "Credit period", "বাকির মেয়াদ"], ["dueDate", "Due date", "শেষ তারিখ"],
+    ["currency", "Currency", "মুদ্রা"],
+  ] },
+  { en: "Totals", bn: "টোটাল", fields: [
+    ["totalQty", "Total qty", "মোট পরিমাণ"], ["subtotal", "Subtotal", "সাব-টোটাল"],
+    ["discount", "Line discount", "লাইনের ছাড়"], ["billDiscount", "Bill discount", "বিলের ছাড়"],
+    ["vat", "VAT", "VAT"], ["vatSummary", "VAT summary", "VAT সারাংশ"],
+    ["adjustment", "Adjustment", "সমন্বয়"], ["roundOff", "Round off", "রাউন্ড অফ"],
+    ["grandTotal", "Grand total", "সর্বমোট"], ["amountWords", "Amount in words", "কথায় টাকার অঙ্ক"],
+    ["paid", "Part received", "আংশিক পরিশোধ"], ["balance", "Balance due", "বাকি"],
+    ["customerBalance", "Customer total due", "কাস্টমারের মোট বাকি"],
+  ] },
+  { en: "Notes / bank", bn: "নোট / ব্যাংক", fields: [
+    ["note", "Note / Narration", "নোট"], ["terms", "Terms & conditions", "শর্তাবলী"],
+    ["bankDetails", "Bank details", "ব্যাংক বিবরণ"],
+  ] },
+];
+
 // [key, English, Bangla]
 export const LAYOUT_FIELDS = {
-  invoice: [
-    ["shopName", "Shop name", "দোকানের নাম"], ["shopAddress", "Shop address", "দোকানের ঠিকানা"], ["shopPhone", "Shop phone", "দোকানের ফোন"],
-    ["shopTrn", "Shop TRN/VAT", "দোকানের TRN/VAT"], ["shopNameAr", "Shop name (Arabic)", "দোকানের আরবি নাম"],
-    ["shopLicense", "Shop license no", "দোকানের লাইসেন্স নং"], ["shopEmail", "Shop email", "দোকানের ইমেইল"], ["title", "Document title", "শিরোনাম (Tax Invoice…)"],
-    ["invoiceNo", "Invoice no", "ইনভয়েস নং"], ["date", "Date", "তারিখ"], ["time", "Time", "সময়"],
-    ["customerName", "Customer name", "কাস্টমারের নাম"], ["customerMobile", "Customer mobile", "কাস্টমারের মোবাইল"],
-    ["customerAddress", "Customer address", "কাস্টমারের ঠিকানা"], ["customerTrn", "Customer TRN", "কাস্টমারের TRN"],
-    ["customerCode", "Customer code", "কাস্টমার কোড"],
-    ["refNo", "Ref / LPO no", "রেফ / LPO নং"], ["salesman", "Salesman", "বিক্রেতা"], ["payment", "Payment method", "পেমেন্ট পদ্ধতি"],
-    ["userName", "User", "ইউজার"], ["deliveryNo", "Delivery note no", "ডেলিভারি নোট নং"], ["vehicleNo", "Vehicle no", "গাড়ির নম্বর"],
-    ["validUntil", "Valid until", "মেয়াদ"], ["totalQty", "Total qty", "মোট পরিমাণ"],
-    ["subtotal", "Subtotal", "সাব-টোটাল"], ["discount", "Discount", "ছাড়"], ["vat", "VAT", "VAT"],
-    ["grandTotal", "Grand total", "সর্বমোট"], ["paid", "Paid", "পরিশোধিত"], ["balance", "Balance due", "বাকি"],
-    ["customerBalance", "Customer total due", "কাস্টমারের মোট বাকি"], ["amountWords", "Amount in words", "কথায় টাকার অঙ্ক"],
-    ["note", "Note / Narration", "নোট"],
-  ],
+  invoice: INVOICE_FIELD_GROUPS.flatMap((g) => g.fields),
   voucher: [
     ["shopName", "Shop name", "দোকানের নাম"], ["shopAddress", "Shop address", "দোকানের ঠিকানা"], ["shopPhone", "Shop phone", "দোকানের ফোন"],
     ["shopNameAr", "Shop name (Arabic)", "দোকানের আরবি নাম"], ["title", "Document title", "শিরোনাম"], ["voucherNo", "Voucher no", "ভাউচার নং"], ["date", "Date", "তারিখ"],
@@ -59,6 +90,24 @@ export const LAYOUT_FIELDS = {
     ["partyMobile", "Mobile", "মোবাইল"], ["period", "Period", "সময়কাল"], ["printDate", "Print date", "প্রিন্টের তারিখ"],
     ["totalDebit", "Total debit", "মোট ডেবিট"], ["totalCredit", "Total credit", "মোট ক্রেডিট"], ["closing", "Closing balance", "শেষ ব্যালান্স"],
   ],
+};
+
+export const LAYOUT_FIELD_GROUPS = {
+  invoice: INVOICE_FIELD_GROUPS,
+  voucher: [{ en: "Voucher", bn: "ভাউচার", fields: LAYOUT_FIELDS.voucher }],
+  statement: [{ en: "Statement", bn: "স্টেটমেন্ট", fields: LAYOUT_FIELDS.statement }],
+};
+
+// Designer field → Print Settings toggle. Empty when that setting is off.
+export const FIELD_PRINT_SETTING = {
+  time: "printTime",
+  salesman: "printSalesman",
+  userName: "printUserName",
+  note: "printNarration",
+  creditPeriod: "printCreditPeriod",
+  dueDate: "printCreditPeriod",
+  customerBalance: "printCustomerBalance",
+  vatSummary: "printVatSummary",
 };
 
 export const TABLE_COLS = {
@@ -76,7 +125,7 @@ export const TABLE_COLS = {
 
 const RIGHT_COLS = new Set(["rate", "disc", "excl", "vatAmt", "total", "amount", "debit", "credit", "balance", "qty"]);
 // Shown only on the last page when the item table runs over several pages.
-const TOTAL_FIELDS = new Set(["subtotal", "discount", "vat", "grandTotal", "paid", "balance", "customerBalance", "amountWords", "note", "totalQty", "totalDebit", "totalCredit", "closing", "amount"]);
+const TOTAL_FIELDS = new Set(["subtotal", "discount", "billDiscount", "vat", "vatSummary", "adjustment", "roundOff", "grandTotal", "paid", "balance", "customerBalance", "amountWords", "note", "terms", "bankDetails", "totalQty", "totalDebit", "totalCredit", "closing", "amount"]);
 
 export const LAYOUT_PAPERS = [
   { key: "A4", w: 210, h: 297 }, { key: "A5", w: 148, h: 210 }, { key: "A5L", label: "A5 Landscape", w: 210, h: 148 },
@@ -138,6 +187,7 @@ function defaultElements(kind) {
     F("amountWords", 15, 224, 105, 12, { size: 9, label: "In words:" }),
     F("paid", 125, 252, 70, 6, { align: "right", label: "Paid:" }), F("balance", 125, 258, 70, 6, { align: "right", bold: true, label: "Balance:" }),
     F("note", 15, 240, 95, 10, { size: 9, label: "Note:" }),
+    F("terms", 15, 268, 180, 10, { size: 8, label: "Terms:" }), F("bankDetails", 15, 262, 110, 5, { size: 8, label: "Bank:" }),
     L(15, 280, 60), T("Customer Signature", 15, 281, 60, 5, { size: 9, align: "center" }),
     L(135, 280, 60), T("Authorized Signature", 135, 281, 60, 5, { size: 9, align: "center" }),
   ];
@@ -178,7 +228,7 @@ export function savePrintDesign(design) {
   try { localStorage.setItem(KEY, JSON.stringify(design)); return true; } catch { return false; }
 }
 
-const STYLE_SHOP_KEYS = ["template", "accent", "fontScale", "headerNote", "footerText", "showSignatures", "logoSize"];
+const STYLE_SHOP_KEYS = ["template", "accent", "fontScale", "headerNote", "footerText", "showSignatures", "logoSize", "logoAlign", "logoX", "logoY"];
 const LOGO_SHOP_MAX = 180000;
 
 function slimStyle(style = {}) {
@@ -262,6 +312,25 @@ export function imageFileToDataUrl(file, { maxW = 400, type = "image/png", quali
 
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+function termsHtml(value) {
+  const lines = String(value || "").replace(/\r/g, "").split("\n");
+  return lines.map((raw, index) => {
+    const line = raw.trim().replace(/^\*{1,2}(.*?)\*{1,2}$/, "$1");
+    if (!line) return "";
+    if (index === 0 && /terms?\s*&?\s*conditions?/i.test(line)) {
+      return `<div class="s4-terms-title">${esc(line)}</div>`;
+    }
+    if (/^thank you\b/i.test(line)) {
+      return `<div class="s4-terms-thanks">${esc(line)}</div>`;
+    }
+    const numbered = line.match(/^(\d+[.)])\s*(.*)$/);
+    if (numbered) {
+      return `<div class="s4-term-line"><span class="s4-term-no">${esc(numbered[1])}</span><span>${esc(numbered[2])}</span></div>`;
+    }
+    return `<div class="s4-term-line"><span>${esc(line)}</span></div>`;
+  }).join("");
+}
+
 // ─── Amount in words ───────────────────────────────────────────
 const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
 const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
@@ -306,6 +375,33 @@ thead tr{background:${ac}!important;color:#fff!important}.grand-row{background:$
 .amount-box{border-color:${ac}!important;background:#fff!important}.amount-val,.amount-label{color:${ac}!important}
 .footer{background:#fff!important;color:${ac}!important;border-top:1px solid ${ac}!important}`;
   }
+  if (t.key === "pro") {
+    css += `*{box-shadow:none!important;border-radius:0!important}
+.invoice,.receipt{border:1px solid #000!important;border-radius:0!important;box-shadow:none!important}
+.hdr{background:#fff!important;color:#000!important;border-bottom:2px solid #000!important;padding:10px 12px!important}
+.hdr *,.inv-title,.inv-no,.rc-title,.rc-no,.shop-name,.shop-sub{color:#000!important}
+.shop-name{font-size:16pt!important;letter-spacing:0.3px}
+.inv-title,.rc-title{font-size:13pt!important;letter-spacing:1px;border:1px solid #000;padding:4px 8px;display:inline-block}
+.body{padding:10px 12px!important}
+.info-grid{gap:8px!important;margin-bottom:8px!important}
+.info-box{background:#fff!important;border:1px solid #000!important;border-radius:0!important;padding:6px 8px!important}
+.info-label{color:#000!important;font-size:8pt!important;letter-spacing:0.4px}
+.info-value,.info-sub{color:#000!important}
+table,table th,table td{border:1px solid #000!important}
+thead tr{background:#fff!important;color:#000!important}
+th{border-bottom:2px solid #000!important;font-size:8.5pt!important}
+td{border-bottom:1px solid #000!important}
+tbody tr:nth-child(even){background:#fff!important}
+.totals-box,.pay-box,.bal-box,.note-box,.amount-box{background:#fff!important;border:1px solid #000!important;border-radius:0!important}
+.totals-row{background:#fff!important;border-bottom:1px solid #000!important}
+.tl,.tv,.gl,.gv,.amount-label,.amount-val{color:#000!important}
+.grand-row{background:#fff!important;border-top:2px solid #000!important;border-bottom:2px solid #000!important}
+.gl,.gv{color:#000!important;font-weight:900!important}
+.words-box{border:1px solid #000;padding:6px 8px;margin:0 0 8px;font-size:10pt}
+.sigs{border-top:1px solid #000!important}
+.sig-line{border-top:1px solid #000!important;color:#000!important}
+.footer{background:#fff!important;color:#000!important;border-top:1px solid #000!important;text-align:left!important}`;
+  }
   if (t.key === "simple") {
     css += `*{box-shadow:none!important}.invoice,.receipt{border:1px solid #000!important;border-radius:0!important}
 .hdr{background:#fff!important;color:#000!important;border-bottom:1px solid #000!important}.hdr *,.inv-title,.inv-no,.rc-title,.rc-no{color:#000!important}
@@ -334,7 +430,22 @@ th{padding:5px!important}td{padding:4px 5px!important}.totals-row{padding:4px 10
   const scale = Math.max(70, Math.min(140, parseInt(style.fontScale, 10) || 100));
   if (scale !== 100) css += `.invoice,.receipt{zoom:${scale / 100}}`;
   if (!style.showSignatures) css += ".sigs,.recv-grid{display:none!important}";
-  if (style.logo) css += `.s4-logo{display:block;max-height:${parseInt(style.logoSize, 10) || 56}px;max-width:200px;margin-bottom:6px}`;
+  if (style.logo) {
+    const x = Math.max(-160, Math.min(220, parseInt(style.logoX, 10) || 0));
+    const y = Math.max(-80, Math.min(140, parseInt(style.logoY, 10) || 0));
+    const size = Math.max(20, Math.min(280, parseInt(style.logoSize, 10) || 56));
+    const place = style.logoAlign === "center"
+      ? `left:calc(50% + ${x}px);top:${8 + y}px;transform:translateX(-50%)`
+      : style.logoAlign === "right"
+        ? `right:${8 - x}px;top:${8 + y}px;left:auto`
+        : `left:${8 + x}px;top:${8 + y}px`;
+    css += `.hdr{position:relative!important}
+.s4-logo-wrap{position:absolute;${place};z-index:2;width:auto;margin:0;line-height:0;pointer-events:none}
+.s4-logo{display:block;height:${size}px;width:auto;max-width:${Math.round(size * 2.8)}px;object-fit:contain;margin:0}`;
+    if (style.logoAlign !== "center" && style.logoAlign !== "right") {
+      css += `.shop-block{padding-left:${size + 14 + Math.max(0, x)}px}`;
+    }
+  }
   css += `@media print{
 @page{size:A4;margin:8mm 10mm}
 body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:economy;print-color-adjust:economy}
@@ -358,8 +469,8 @@ body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:e
 .alloc-table th,.alloc-table td{padding:1.5mm 2mm!important;font-size:9pt!important}
 .alloc-table thead{display:table-header-group}
 .note-box{padding:2mm 3mm!important;margin-bottom:3mm!important;font-size:9pt!important}
-.sigs{margin-top:5mm!important;padding-top:2mm!important;gap:8mm!important}
-.sig-line{margin-top:14mm!important;padding-top:2px!important;font-size:8.5pt!important}
+.sigs{margin-top:3mm!important;padding-top:1mm!important;gap:8mm!important}
+.sig-line{margin-top:8mm!important;padding-top:2px!important;font-size:8.5pt!important}
 .footer{padding:2mm!important;font-size:8pt!important;background:#fff!important}
 }`;
   return css;
@@ -377,11 +488,15 @@ export function shopHeaderExtras(shop) {
 // Applies the chosen template, logo, header note and footer text to a built-in document.
 export function applyDesign(html, kind, styleOverride) {
   const style = styleOverride || loadPrintDesign().style[kind] || STYLE_DEFAULT;
-  let out = html.replace("</style>", `${templateCss(style)}</style>`);
+  const termsCss = `.footer.s4-terms{text-align:left!important;white-space:normal!important;line-height:1.35!important;height:auto!important;min-height:0!important;flex:none!important;padding:6px 12px!important}
+.s4-terms-title{text-align:center;font-weight:900;margin-bottom:4px}
+.s4-term-line{display:flex;align-items:flex-start;gap:4px;margin:1px 0}
+.s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}`;
+  let out = html.replace("</style>", `${templateCss(style)}${termsCss}</style>`);
   const shopName = /(<div class="shop-name">[\s\S]*?<\/div>)/;
-  if (style.logo) out = out.replace(shopName, `<img class="s4-logo" src="${style.logo}" alt="">$1`);
+  if (style.logo) out = out.replace(shopName, `<div class="s4-logo-wrap"><img class="s4-logo" src="${style.logo}" alt=""></div>$1`);
   if (style.headerNote) out = out.replace(shopName, `$1<div class="shop-sub" style="white-space:pre-line">${esc(style.headerNote)}</div>`);
-  if (style.footerText) out = out.replace(/<div class="footer">[\s\S]*?<\/div>/, `<div class="footer" style="white-space:pre-line">${esc(style.footerText)}</div>`);
+  if (style.footerText) out = out.replace(/<div class="footer">[\s\S]*?<\/div>/, `<div class="footer s4-terms">${termsHtml(style.footerText)}</div>`);
   return out;
 }
 
@@ -395,7 +510,7 @@ export function generateStatementHTML({ shopName = "", title = "", subtitle = ""
 <style>
 @page{size:${paper};margin:8mm}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Noto Sans','Segoe UI',Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:16px}
+body{font-family:'Segoe UI','Nirmala UI',Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:16px}
 .invoice{max-width:900px;margin:0 auto;border:2px solid #374151;border-radius:4px;overflow:hidden}
 .hdr{background:#f8f9fa;color:#111;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #dee2e6}
 .shop-name{font-size:19px;font-weight:900}.shop-sub{font-size:11px;opacity:0.75;margin-top:3px}
@@ -422,6 +537,20 @@ export function layoutAppliesTo(layout, invoice) {
   if (!invoice) return true;
   const k = invoice.docKind === "quotation" || invoice.docKind === "salesOrder" ? "quotation" : invoice.invoiceType === "delivery" || invoice.docKind === "delivery" ? "delivery" : invoice.invoiceType === "tax" ? "tax" : "regular";
   return layout.appliesTo?.[k] !== false;
+}
+
+const VAT_DISC_COLS = new Set(["disc", "excl", "vatPerc", "vatAmt"]);
+
+export function layoutForPrint(layout, { hideVatDiscCols } = {}) {
+  if (!layout || !hideVatDiscCols) return layout;
+  return {
+    ...layout,
+    elements: (layout.elements || []).map((el) => {
+      if (el.type !== "table" || !Array.isArray(el.cols)) return el;
+      const cols = el.cols.filter((c) => !VAT_DISC_COLS.has(c.key));
+      return cols.length === el.cols.length ? el : { ...el, cols };
+    }),
+  };
 }
 
 export function colLabel(kind, key, bn) {
@@ -484,7 +613,7 @@ export function renderLayoutDocument(layout, kind, data, { copies = 1, title = "
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(title)}</title><style>
 @page{size:${W}mm ${H}mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Noto Sans Bengali','Segoe UI',Arial,sans-serif;color:#000;background:#fff}
+body{font-family:'Segoe UI','Nirmala UI',Arial,sans-serif;color:#000;background:#fff}
 .pg{position:relative;width:${W}mm;height:${H}mm;overflow:hidden;page-break-after:always;break-after:page}
 .pg:last-child{page-break-after:auto;break-after:auto}
 .el{position:absolute;overflow:hidden;white-space:pre-wrap;line-height:1.2}
@@ -494,13 +623,20 @@ body{font-family:'Noto Sans Bengali','Segoe UI',Arial,sans-serif;color:#000;back
 export const SAMPLE_DATA = {
   invoice: {
     fields: {
-      shopName: "S4 Auto Spare Parts", shopAddress: "Industrial Area 4, Sharjah", shopPhone: "+971 50 000 0000", shopTrn: "100000000000003",
+      shopName: "S4 Auto Spare Parts", shopAddress: "Industrial Area 4, Sharjah", shopPhone: "+971 50 000 0000",
+      shopFax: "+971 6 000 0000", shopTrn: "100000000000003", shopVat: "100000000000003",
       shopNameAr: "اس فور لقطع غيار السيارات", shopLicense: "CN-1234567", shopEmail: "info@s4parts.ae",
+      shopWebsite: "www.s4parts.ae", headerNote: "Genuine spare parts",
       title: "TAX INVOICE", invoiceNo: "SI-0001", date: "04/10/2026", time: "10:30", customerName: "Al Noor Garage", customerMobile: "+971 55 111 2222",
       customerAddress: "Ajman", customerTrn: "100222333000003", customerCode: "C-0001", refNo: "LPO-778", salesman: "Rahim", payment: "Credit", userName: "Admin",
-      deliveryNo: "DN-0005", vehicleNo: "SHJ 12345", validUntil: "15/10/2026", totalQty: "7",
-      subtotal: "1,250.00", discount: "50.00", vat: "60.00", grandTotal: "1,260.00", paid: "500.00", balance: "760.00",
+      quotationNo: "QT-0044", salesOrderNo: "SO-0012", jobOrderNo: "JC-0008",
+      deliveryNo: "DN-0005", vehicleNo: "SHJ 12345", validUntil: "15/10/2026", dueDate: "14/10/2026", currency: "AED",
+      totalQty: "7", subtotal: "1,250.00", discount: "50.00", billDiscount: "20.00", vat: "60.00",
+      vatSummary: "5%  1,180.00 + 59.00 = 1,239.00", adjustment: "", roundOff: "1.00",
+      grandTotal: "1,260.00", paid: "500.00", balance: "760.00", creditPeriod: "10 days",
       customerBalance: "3,450.00", amountWords: amountInWords(1260), note: "Goods once sold will not be taken back.",
+      terms: "1. Goods once sold will not be taken back.\n2. Warranty as per manufacturer.",
+      bankDetails: "ENBD · 101234567890 · AE070331234567890123456",
     },
     items: [
       { sl: "1", code: "BP-101", name: "Brake Pad Front", qty: "2", unit: "Pcs", rate: "150.00", disc: "—", excl: "300.00", vatPerc: "5%", vatAmt: "15.00", total: "315.00" },

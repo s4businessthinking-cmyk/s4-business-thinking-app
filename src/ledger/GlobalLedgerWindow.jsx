@@ -26,7 +26,7 @@ const TYPE_LABEL = {
   distribution: ["লাভ বণ্টন", "Profit share"], bank: ["ব্যাংক এন্ট্রি", "Bank entry"],
 };
 
-export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose, embedded = false }) {
+export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose, embedded = false, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const win = useWindowState({ maximized: true });
@@ -142,7 +142,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
             </label>
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               {selected && <button type="button" onClick={() => setSelKey("")} style={btn()}>⚖️ {L("ট্রায়াল ব্যালেন্স", "Trial balance")}</button>}
-              <button type="button" onClick={print} disabled={!ledger} style={btn("#dbeafe", "#1e40af")}>🖨️ {L("প্রিন্ট", "Print")}</button>
+              {canPrint && <button type="button" onClick={print} disabled={!ledger} style={btn("#dbeafe", "#1e40af")}>🖨️ {L("প্রিন্ট", "Print")}</button>}
             </span>
           </div>
 
