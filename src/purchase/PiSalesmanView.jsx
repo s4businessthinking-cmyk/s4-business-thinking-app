@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useFirebaseAuthReady } from "../auth/useFirebaseAuthReady.js";
 import { offlineList, offlineCacheCloudRecords } from "../offline/offlineRepository";
 import { query, collection, where, orderBy, onSnapshot } from "../backend/firestore";
@@ -13,9 +13,13 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
   const authSyncReady = useFirebaseAuthReady();
 
   // Local-first, then Firebase live listener; always cache to SQLite for offline.
+  const listKeyRef = useRef("");
   useEffect(()=>{
     if (!shopId) return;
-    setLoading(true);
+    if (listKeyRef.current !== shopId) {
+      listKeyRef.current = shopId;
+      setLoading(true);
+    }
     let unsub1=()=>{};
     let unsub2=null;
     let cancelled=false;
@@ -38,12 +42,11 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
         const rows = sortRows(records
           .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
           .filter(inv => inv.shopId === shopId));
-        if (rows.length) {
-          setInvoices(rows);
-          setLoading(false);
-        }
+        setInvoices(rows);
+        setLoading(false);
       } catch (err) {
         console.warn("[S4 Offline] PiSalesmanView local load failed", err);
+        if (!cancelled) setLoading(false);
       }
     };
 

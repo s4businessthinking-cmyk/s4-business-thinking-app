@@ -81,9 +81,13 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
   const { bumpShopPiSerial, genPaymentNo, piFormatPaymentNo, piMaxLocalPaymentSerial, piPreviewNextInvoiceNo, reservePiInvoiceNo } = createPiNumbering({ editInvoiceId, invoices, isOwner, payments, piInvoiceNo, setPiInvoiceNo, shop, shopId });
 
   // ── Payment Vouchers listener + offline SQLite cache fallback ──
+  const pmtListKeyRef = useRef("");
   useEffect(()=>{
     if (!shopId) return;
-    setPmtLoading(true);
+    if (pmtListKeyRef.current !== shopId) {
+      pmtListKeyRef.current = shopId;
+      setPmtLoading(true);
+    }
     let unsub1=()=>{};
     let unsub2=null;
 
@@ -101,13 +105,13 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
       const res = await offlineList("purchasePayments");
       const rawRows = Array.isArray(res) ? res : (res.records || []).map(r => r.data || r);
       const rows = rawRows.filter(p => p.shopId === shopId);
-      if (rows.length) setPayments(sortPiPayments(rows));
+      setPayments(sortPiPayments(rows));
       return rows.length;
     };
 
     loadOfflinePiPayments()
-      .then((count) => { if (count > 0 || !authSyncReady) setPmtLoading(false); })
-      .catch(err => { console.warn("[S4 Offline] purchasePayments offline load failed", err); if (!authSyncReady) setPmtLoading(false); });
+      .then(() => { setPmtLoading(false); })
+      .catch(err => { console.warn("[S4 Offline] purchasePayments offline load failed", err); setPmtLoading(false); });
 
     const applyCloudPayments = async (rows) => {
       let merged = rows;
@@ -161,7 +165,7 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
 
   const { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource } = usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors });
 
-  const { piCancelInv, piConfirm, piDelete, piEarlyDuplicateCheck, piGoToMakePayment, piSaveDraft, refreshAverageCosts } = createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onOpenProductMaster, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user });
+  const { piCancelInv, piConfirm, piDelete, piEarlyDuplicateCheck, piGoToMakePayment, piSaveDraft, refreshAverageCosts } = createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onOpenProductMaster, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shop, shopId, t, toast, user });
   // One-time catch-up per shop and device: Avg. Cost of products saved before it followed the purchases.
   useEffect(() => {
     if (!shopId || piLoading || !invoices.length || !products.length) return;
@@ -197,11 +201,15 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
   const piOpenInvoice = (inv) => { if (!piLeaveMinOk()) return; setSelInvoice(inv); setPiView("detail"); };
   useEffect(() => {
     if (!openInvoiceId) return;
-    onOpenInvoiceHandled?.();
     const inv = invoices.find((i) => i.id === openInvoiceId);
-    if (!inv) return;
-    setPiSubTab("invoices");
-    piOpenInvoice(inv);
+    if (inv) {
+      onOpenInvoiceHandled?.();
+      setPiSubTab("invoices");
+      if (wideDesktop) piOpenFromDesktop(inv);
+      else piOpenInvoice(inv);
+    } else if (invoices.length > 0) {
+      onOpenInvoiceHandled?.();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openInvoiceId, invoices]);
   const [scanOpen, setScanOpen] = useState(false);

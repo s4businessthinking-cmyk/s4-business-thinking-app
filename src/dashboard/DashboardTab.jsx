@@ -4,7 +4,7 @@ import ChequeDueAlert from "./ChequeDueAlert.jsx";
 import DashboardQuickNav from "./DashboardQuickNav.jsx";
 
 // ─── DASHBOARD TAB ───────────────────────────────────────────
-export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu, globalSearchCan, onGlobalSearchNavigate, globalSearchCur, globalSearchCanSeeCost }) {
+export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu, globalSearchCan, onGlobalSearchNavigate, globalSearchCur, globalSearchCanSeeCost, shopId }) {
   const myOrders   = isOwner ? orders : orders.filter(o=>o.createdBy===userUid);
   const isLightDash = th.bgCard === "#ffffff" || th.bgRoot === "#f1f5f9";
   const pending    = myOrders.filter(o=>o.overall==="pending").length;
@@ -254,6 +254,7 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
             isMobile
             cur={globalSearchCur || t.cur || "AED"}
             canSeeCost={globalSearchCanSeeCost}
+            shopId={shopId}
           />
         </div>
       )}
@@ -284,6 +285,7 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
           onNavigate={onGlobalSearchNavigate}
           cur={globalSearchCur || t.cur || "AED"}
           canSeeCost={globalSearchCanSeeCost}
+          shopId={shopId}
         />
       )}
 

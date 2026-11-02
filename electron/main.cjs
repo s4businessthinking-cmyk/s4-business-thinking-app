@@ -98,6 +98,14 @@ async function createWindow() {
     closeAllowed = true;
     win.close();
   });
+  ipcMain.on("s4-app:hide", (event) => {
+    if (event.sender === win.webContents && !win.isDestroyed()) win.hide();
+  });
+  ipcMain.on("s4-app:show", (event) => {
+    if (event.sender !== win.webContents || win.isDestroyed()) return;
+    win.show();
+    win.focus();
+  });
   // Websites (tax portal, WhatsApp) open in the user's own browser where their logins are saved; print previews stay in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url) && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url)) {

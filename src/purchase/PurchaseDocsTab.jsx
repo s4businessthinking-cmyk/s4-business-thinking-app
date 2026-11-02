@@ -11,7 +11,7 @@ import { logAudit } from "../utils/auditLog.js";
 import { MinimizedChip, useEscapeKey, useWindowState, WindowButtons } from "../components/WindowChrome.jsx";
 import { C, btn, inp, lbl, td, th, productBarcodeUnit } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { nsq } from "../utils/productSearch";
-import { orderLines, orderProgress, billOfReceipt, docTotals } from "./purchaseDocs.js";
+import { orderLines, orderProgress, billOfReceipt, docTotals, pendingProductCount, orderLineKey, applyBackorderToOrder, backorderItemsFromShortage } from "./purchaseDocs.js";
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const fq = (v) => String(parseFloat(n2(v).toFixed(4)));
@@ -44,6 +44,7 @@ const STATUS = {
   open: ["অপেক্ষায়", "Pending", "#0369a1"],
   partial: ["আংশিক এসেছে", "Partly received", "#a16207"],
   received: ["সব এসেছে", "Received", "#15803d"],
+  invoiced: ["ইনভয়েস হয়েছে", "Invoiced", "#15803d"],
   closed: ["বন্ধ", "Closed", "#475569"],
   confirmed: ["স্টকে যোগ হয়েছে", "In stock", "#0f766e"],
   billed: ["বিল হয়েছে", "Billed", "#15803d"],
@@ -67,6 +68,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   const [filter, setFilter] = useState("active");
   // Delivery Note (Received) only: pick several, bill them together as one Purchase Invoice.
   const [combineSel, setCombineSel] = useState(() => new Set());
+  const [notGot, setNotGot] = useState(() => new Set());
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({});
   const [lines, setLines] = useState([]);
@@ -139,6 +141,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     setEditId(null); setView("form");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incoming]);
+  useEffect(() => { setNotGot(new Set()); }, [sel?.id]);
 
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const pickVendorByName = (name) => {
@@ -265,6 +268,44 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     }
   };
 
+  const toggleNotGot = (key) => setNotGot((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const createBackorderFrom = async (order, missed, { open = true } = {}) => {
+    const items = backorderItemsFromShortage(missed.map((l) => ({ ...l, shortage: n2(l.qty ?? l.shortage) })));
+    if (!items.length) return null;
+    const totals = docTotals(items, true);
+    const nowIso = new Date().toISOString();
+    const orderNo = await makeNo(K.serial, K.prefix, rows.map(noOf));
+    const note = L(`${noOf(order)}-এ পাওয়া যায়নি — অন্য সাপ্লায়ারকে অর্ডার দিন`, `Not received on ${noOf(order)} — order from another supplier`);
+    const res = await offlineCreate(K.col, {
+      shopId, orderNo, orderDate: localDay(), refNo: order.orderNo || noOf(order), vendorId: null, vendorName: "", vendorMobile: "",
+      note, items, subtotal: totals.sub, totalTax: totals.tax, grandTotal: totals.grand, expectedDate: "",
+      sourceOrderId: order.id, sourceOrderNo: order.orderNo || noOf(order),
+      status: "open", createdAt: nowIso, createdBy: user?.uid || "", createdByName: profile?.personName || "",
+    });
+    const saved = { ...res.data, id: res.documentId };
+    const patchedItems = applyBackorderToOrder(order, missed.map((l) => ({ ...l, shortage: n2(l.qty ?? l.shortage) })));
+    await offlinePatch(K.col, order.id, { items: patchedItems, backorderOrderId: saved.id, backorderOrderNo: saved.orderNo, updatedAt: nowIso, updatedBy: user?.uid || "" }, order);
+    setRows((list) => [saved, ...list.map((x) => (x.id === order.id ? { ...x, items: patchedItems, backorderOrderId: saved.id, backorderOrderNo: saved.orderNo } : x))]);
+    logAudit({ shopId, user, profile, action: "create", collection: K.col, docId: saved.id, docNo: saved.orderNo, amount: saved.grandTotal, note: `${items.length} from ${noOf(order)}` });
+    toast?.(L(`${items.length}টি পণ্য নতুন অর্ডার ${saved.orderNo}-এ গেছে — সাপ্লায়ার বাছুন`, `${items.length} product(s) moved to new order ${saved.orderNo} — pick a supplier`));
+    setNotGot(new Set());
+    if (open) { setSel(saved); setView("detail"); }
+    return saved;
+  };
+  const billFromOrder = async (r, remainingLines) => {
+    const missed = remainingLines.filter((l) => notGot.has(orderLineKey(l)));
+    const got = remainingLines.filter((l) => !notGot.has(orderLineKey(l)));
+    if (missed.length) {
+      if (!got.length && !window.confirm(L("সব পণ্য পাওয়া যায়নি — এগুলো আলাদা পারচেজ অর্ডারে যাবে। সাপ্লায়ার পরে বাছবেন। চালাবেন?", "None of the products were received — they will move to a new purchase order. Pick the supplier after. Continue?"))) return;
+      try { await createBackorderFrom(r, missed, { open: !got.length }); }
+      catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); if (!got.length) return; }
+    }
+    if (got.length) onMakePurchase?.(kind, { ...r, docNo: noOf(r) }, forBill(got));
+  };
   const linkedDocs = (r) => (isPO
     ? [...receipts.filter((g) => g.purchaseOrderId === r.id && g.status !== "cancelled").map((g) => ({ no: g.grnNo, date: g.receiveDate, what: L("মাল গ্রহণ", "Goods received") })),
       ...bills.filter((p) => p.purchaseOrderId === r.id && p.status !== "cancelled").map((p) => ({ no: p.invoiceNo, date: p.invoiceDate, what: L("পারচেজ বিল", "Purchase bill") }))]
@@ -297,14 +338,20 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   const sorted = useMemo(() => [...rows].sort((a, b) => String(b[K.dateKey] || b.createdAt || "").localeCompare(String(a[K.dateKey] || a.createdAt || "")) || String(noOf(b)).localeCompare(String(noOf(a)))), [rows, K.dateKey]);
   const withState = useMemo(() => sorted.map((r) => ({ r, st: stateOf(r) })), [sorted, bills, receipts, isPO]);
   const pendingStates = isPO ? ["open", "partial"] : ["confirmed"];
+  const invoicedStates = isPO ? ["received", "invoiced", "closed"] : ["billed"];
   const filtered = useMemo(() => withState.filter(({ r, st }) => {
     if (filter === "active" && st === "cancelled") return false;
     if (filter === "pending" && !pendingStates.includes(st)) return false;
+    if (filter === "invoiced" && !invoicedStates.includes(st)) return false;
     const q = search.trim().toLowerCase();
-    return !q || [noOf(r), r.vendorName, r.note, r.supplierRef, r.purchaseOrderNo, ...(r.items || []).map((it) => `${it.name} ${it.code || ""}`)].join(" ").toLowerCase().includes(q);
+    return !q || [noOf(r), r.vendorName, r.note, r.supplierRef, r.purchaseOrderNo, r.sourceOrderNo, r.backorderOrderNo, ...(r.items || []).map((it) => `${it.name} ${it.code || ""}`)].join(" ").toLowerCase().includes(q);
   }), [withState, filter, search, isPO]);
   const liveRows = useMemo(() => withState.filter(({ st }) => st !== "cancelled"), [withState]);
   const pendingCount = useMemo(() => withState.filter(({ st }) => pendingStates.includes(st)).length, [withState, isPO]);
+  const invoicedCount = useMemo(() => withState.filter(({ st }) => invoicedStates.includes(st)).length, [withState, isPO]);
+  const missingCount = useMemo(() => isPO
+    ? withState.filter(({ st }) => pendingStates.includes(st)).reduce((n, { r }) => n + pendingProductCount(r, bills, receipts), 0)
+    : 0, [withState, bills, receipts, isPO, pendingStates]);
   const value = useMemo(() => liveRows.reduce((t, { r }) => t + n2(r.grandTotal), 0), [liveRows]);
 
   // A vendor often sends several delivery notes before one combined bill — pick several (same
@@ -345,7 +392,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
               {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {T("newBtn")}</button>}
               <span className="si-toolbar-gap" />
               <div className="si-pills">
-                {[["active", L("সব", "All")], ["pending", isPO ? L("বাকি আছে", "Pending") : L("বিল হয়নি", "Not billed")], ["cancelledToo", L("বাতিলসহ", "With cancelled")]].map(([k, label]) => (
+                {[["active", L("সব", "All")], ["pending", isPO ? L("বাকি আছে", "Pending") : L("বিল হয়নি", "Not billed")], ["invoiced", isPO ? L("ইনভয়েস হয়েছে", "Invoiced") : L("বিল হয়েছে", "Billed")], ["cancelledToo", L("বাতিলসহ", "With cancelled")]].map(([k, label]) => (
                   <button key={k} type="button" className={`pm-btn-secondary${filter === k ? " is-active" : ""}`} onClick={() => setFilter(k)}>{label}</button>
                 ))}
               </div>
@@ -357,6 +404,8 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
             <div className="si-kpis">
               <div className="si-kpi"><span>{L("মোট", "Total")}</span><b>{liveRows.length}</b></div>
               <div className="si-kpi"><span>{isPO ? L("মাল বাকি", "Pending") : L("বিল হয়নি", "Not billed")}</span><b style={{ color: "#b45309" }}>{pendingCount}</b></div>
+              {isPO && <div className="si-kpi"><span>{L("পাওয়া যায়নি", "Not received")}</span><b style={{ color: "#b45309" }}>{missingCount}</b></div>}
+              <div className="si-kpi"><span>{isPO ? L("ইনভয়েস হয়েছে", "Invoiced") : L("বিল হয়েছে", "Billed")}</span><b style={{ color: "#15803d" }}>{invoicedCount}</b></div>
               <div className="si-kpi"><span>{L("মূল্য", "Value")}</span><b>{cur} {fm(value)}</b></div>
             </div>
             {combinable && combineSel.size > 0 && (
@@ -381,7 +430,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                     )}
                     <button type="button" className="si-mrow" style={{ flex: 1, ...(r.status === "cancelled" ? { opacity: 0.6 } : undefined) }} onClick={() => { setSel(r); setView("detail"); }}>
                       <div className="si-mrow-top"><span style={{ color: K.accent }}>{noOf(r)}</span>{badge(r)}</div>
-                      <div className="si-mrow-sub"><span>{fmtDay(r[K.dateKey])} · {r.vendorName}</span><span>{cur} {fm(r.grandTotal)}</span></div>
+                      <div className="si-mrow-sub"><span>{fmtDay(r[K.dateKey])} · {r.vendorName || (r.sourceOrderNo ? L("সাপ্লায়ার বাছুন", "Pick supplier") : "")}{isPO && pendingProductCount(r, bills, receipts) > 0 ? ` · ${pendingProductCount(r, bills, receipts)} ${L("পাওয়া যায়নি", "not received")}` : ""}</span><span>{cur} {fm(r.grandTotal)}</span></div>
                     </button>
                   </div>
                 )) : (
@@ -392,7 +441,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                       <th style={{ width: 100 }}>{L("নম্বর", "No")}</th>
                       <th>{L("সাপ্লায়ার", "Supplier")}</th>
                       <th style={{ width: 110 }}>{isPO ? L("কবে আসবে", "Expected") : L("সাপ্লায়ার DN", "Supplier DN")}</th>
-                      <th style={{ width: 56 }} className="si-center">{L("লাইন", "Lines")}</th>
+                      <th style={{ width: 90 }} className="si-center">{L("লাইন", "Lines")}</th>
                       <th style={{ width: 110 }} className="si-num">{L("মূল্য", "Value")}</th>
                       <th style={{ width: 120 }} className="si-center">{L("অবস্থা", "Status")}</th>
                     </tr></thead>
@@ -410,9 +459,9 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                           )}
                           <td>{fmtDay(r[K.dateKey])}</td>
                           <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : K.accent }}>{noOf(r)}</td>
-                          <td title={r.vendorName}>{r.vendorName}</td>
+                          <td title={r.vendorName}>{r.vendorName || (r.sourceOrderNo ? L("সাপ্লায়ার বাছুন", "Pick supplier") : "")}</td>
                           <td>{isPO ? fmtDay(r.expectedDate) : (r.supplierRef || "")}</td>
-                          <td className="si-center">{(r.items || []).length}</td>
+                          <td className="si-center">{(r.items || []).length}{isPO && pendingProductCount(r, bills, receipts) > 0 ? <span style={{ color: "#b45309" }}> · {pendingProductCount(r, bills, receipts)} {L("বাকি", "left")}</span> : null}</td>
                           <td className="si-num">{fm(r.grandTotal)}</td>
                           <td className="si-center">{badge(r)}</td>
                         </tr>
@@ -679,11 +728,19 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
               {isPO && r.expectedDate && <div>{L("কবে আসবে", "Expected on")}: {fmtDay(r.expectedDate)}</div>}
               {!isPO && r.supplierRef && <div>{L("সাপ্লায়ারের DN নং", "Supplier DN No")}: {r.supplierRef}</div>}
               {r.purchaseOrderNo && <div>{L("পারচেজ অর্ডার", "Purchase Order")}: <b>{r.purchaseOrderNo}</b></div>}
+              {r.sourceOrderNo && <div>{L("আগের অর্ডার", "From order")}: <b>{r.sourceOrderNo}</b> — {L("যে পণ্য পাওয়া যায়নি", "items not received")}</div>}
+              {r.backorderOrderNo && <div>{L("পাওয়া যায়নি — নতুন অর্ডার", "Not received — new order")}: <b style={{ color: "#b45309" }}>{r.backorderOrderNo}</b></div>}
               {r.note && <div className="si-muted">{r.note}</div>}
               <div className="si-muted">{L("লিখেছেন", "By")}: {r.createdByName || "—"}</div>
               {links.length > 0 && <div style={{ gridColumn: "1 / -1" }}>{L("যা হয়েছে", "Made from it")}: {links.map((d) => `${d.what} ${d.no} (${fmtDay(d.date)})`).join(" · ")}</div>}
             </div>
           </fieldset>
+          {isPO && remaining.length > 0 && live && (
+            <div className="si-hint" style={{ color: "#b45309", fontWeight: 700 }}>
+              {L("যে পণ্য আসেনি, «পাওয়া যায়নি» টিক দিন — তারপর ইনভয়েস করুন। টিক দেওয়া পণ্য আলাদা অর্ডারে যাবে।", "Tick “Not received” on products that did not arrive, then invoice. Ticked products go to a new purchase order.")}
+              {notGot.size > 0 ? ` · ${notGot.size} ${L("টি টিক দেওয়া", "ticked")}` : ""}
+            </div>
+          )}
           <div className="si-box">
             <table className="pm-table">
               <thead><tr>
@@ -693,6 +750,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                 <th style={{ width: 80 }} className="si-num">{isPO ? L("অর্ডার", "Ordered") : L("এসেছে", "Received")}</th>
                 {isPO && <th style={{ width: 80 }} className="si-num">{L("এসেছে", "Received")}</th>}
                 {isPO && <th style={{ width: 80 }} className="si-num">{L("বাকি", "Pending")}</th>}
+                {isPO && canBill && <th style={{ width: 110 }} className="si-center">{L("পাওয়া যায়নি", "Not received")}</th>}
                 <th style={{ width: 60 }}>{L("একক", "Unit")}</th>
                 <th style={{ width: 90 }} className="si-num">{L("দাম", "Rate")}</th>
                 <th style={{ width: 100 }} className="si-num">{L("মোট", "Amount")}</th>
@@ -706,6 +764,16 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                     <td className="si-num">{fq(it.qty)}</td>
                     {isPO && <td className="si-num" style={{ color: "#15803d" }}>{fq(it.received)}</td>}
                     {isPO && <td className="si-num si-strong" style={{ color: it.remaining > 0 ? "#b45309" : "#64748b" }}>{fq(it.remaining)}</td>}
+                    {isPO && canBill && (
+                      <td className="si-center" onClick={(e) => e.stopPropagation()}>
+                        {it.remaining > 1e-9 && (
+                          <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontWeight: 800, color: notGot.has(orderLineKey(it)) ? "#b45309" : "#64748b" }}>
+                            <input type="checkbox" checked={notGot.has(orderLineKey(it))} onChange={() => toggleNotGot(orderLineKey(it))} />
+                            {L("পাওয়া যায়নি", "Not received")}
+                          </label>
+                        )}
+                      </td>
+                    )}
                     <td>{it.unit || ""}</td>
                     <td className="si-num">{n2(it.unitCost) > 0 ? fm(it.unitCost) : "—"}</td>
                     <td className="si-num">{n2(it.unitCost) > 0 ? fm(n2(it.qty) * n2(it.unitCost)) : "—"}</td>
@@ -723,7 +791,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
           <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
           {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
           {canBill && isPO && onMakeReceipt && <button type="button" className="pm-btn" onClick={() => onMakeReceipt({ ...r, docNo: noOf(r) }, forBill(remaining))}>📥 {L("মাল গ্রহণ করুন", "Receive Goods")}</button>}
-          {canBill && onMakePurchase && <button type="button" className="pm-btn pm-btn--primary" onClick={() => onMakePurchase(kind, { ...r, docNo: noOf(r) }, forBill(remaining))}>🧾 {L("পারচেজ বিল বানান", "Make Purchase Bill")}</button>}
+          {canBill && onMakePurchase && <button type="button" className="pm-btn pm-btn--primary" onClick={() => billFromOrder(r, remaining)}>🧾 {notGot.size ? L("ইনভয়েস + বাকি অর্ডার", "Invoice + leftover order") : L("পারচেজ বিল বানান", "Make Purchase Bill")}</button>}
           <span className="si-toolbar-gap" />
           {mine(r) && live && nothingIn && <button type="button" className="pm-btn-secondary" onClick={() => openEdit(r)}>✏️ {L("এডিট", "Edit")}</button>}
           {mine(r) && isPO && st === "partial" && <button type="button" className="pm-btn-secondary" onClick={() => { if (window.confirm(L("বাকি মাল আর আসবে না — অর্ডারটা বন্ধ করবেন?", "The rest will not come — close this order?"))) setStatus(r, "closed", L("অর্ডার বন্ধ হয়েছে", "Order closed")); }}>🔒 {L("বন্ধ করুন", "Close")}</button>}

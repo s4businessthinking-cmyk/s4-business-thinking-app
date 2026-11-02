@@ -44,3 +44,10 @@ erp/backend/django_app/*.pyc
 
 # Old Firebase data exports (shop data, never commit)
 old-firebase-export-*.json
+
+# Local scratch / demos (never ship in release commits)
+.claude/
+WhatsApp Image *.jpeg
+WhatsApp Image *.jpg
+Security_Cheque_Handover_Receipt_A4.pdf
+Security_Cheque_Module_Updated_Demo.html

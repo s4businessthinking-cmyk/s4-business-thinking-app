@@ -71,10 +71,16 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
     return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
   },[shopId, kind, authSyncReady, syncRefreshKey]);
 
-  // Local-first list, then Firebase; SQLite cache stays in background
+  // Local-first list, then Firebase; SQLite cache stays in background.
+  // Do not flash the spinner again when auth/sync refreshes — only when the list key changes.
+  const siListKeyRef = useRef("");
   useEffect(()=>{
     if (!shopId) return;
-    setSiLoading(true);
+    const listKey = `${shopId}:${COL}`;
+    if (siListKeyRef.current !== listKey) {
+      siListKeyRef.current = listKey;
+      setSiLoading(true);
+    }
     let u1=()=>{};
     let u2=null;
     let cancelled=false;
@@ -114,13 +120,16 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
         return rows.length;
       }
 
-      if (localRows.length) setInvoices(sortSiInvoices(localRows));
+      setInvoices(sortSiInvoices(localRows));
       return localRows.length;
     };
 
     loadOfflineSiInvoices()
-      .then((count) => { if (!cancelled && count > 0) setSiLoading(false); })
-      .catch(err => console.warn("[S4 Offline] salesInvoices offline load failed", err));
+      .then(() => { if (!cancelled) setSiLoading(false); })
+      .catch(err => {
+        console.warn("[S4 Offline] salesInvoices offline load failed", err);
+        if (!cancelled) setSiLoading(false);
+      });
 
     const applyCloudRows = (rows) => {
       if (cancelled) return;

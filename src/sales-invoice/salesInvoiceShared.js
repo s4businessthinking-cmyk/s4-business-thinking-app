@@ -1,5 +1,5 @@
 import { loadPrintDesign, layoutAppliesTo, layoutForPrint, amountInWords, renderLayoutDocument, shopHeaderExtras, applyDesign } from "../print/printDesign.js";
-import { loadPrintSettings, docSettingsFor, paperCss, paperHeightMm, invoiceBlankRows, printWithSettings } from "../print/printSettings.js";
+import { loadPrintSettings, docSettingsFor, paperCss, paperHeightMm, printWithSettings } from "../print/printSettings.js";
 import { PI_VOUCHER_METHODS, piFmt2, piN2 } from "../shared/appShared.jsx";
 
 // ─── PI: VOUCHER — PRINTABLE HTML ───────────────────────────────
@@ -246,27 +246,34 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const { sub, lineDisc, vat, grand, billDisc, adjustment, roundOff } = siCalcTotals(invoice.items||[], effectiveTax, siInvoiceExtras(invoice));
   const balance = grand - (invoice.amountPaid||0);
   const paidAmt = siN2(invoice.amountPaid);
-  const isPartialPay = !isQuote && !isDelivery && paidAmt > 0.01 && balance > 0.01;
-  const isSettledPay = !isQuote && !isDelivery && paidAmt > 0.01 && balance <= 0.01;
   const payLabel = SI_PAY[invoice.paymentMethod]?.[lang] || invoice.paymentMethod || "";
+  const moneyTxt = (n, sign="") => {
+    const v = siN2(n);
+    if (sign === "-") return `- ${siFmt2(Math.abs(v))}`;
+    if (sign === "+") return `${v<0?"-":"+"} ${siFmt2(Math.abs(v))}`;
+    return siFmt2(v);
+  };
+  const totalsLine = (label, value) => `<div class="totals-row"><span class="tl">${label}</span><span class="tv">${value}</span></div>`;
+  const printDiscount = ds.printDiscount !== false;
+  const printRoundOff = ds.printRoundOff !== false;
   const extraRowsHTML = [
-    billDisc>0 ? `<div class="totals-row"><span class="tl">${isBn?"বিলের ছাড়":"Bill Discount"}${siN2(invoice.billDiscPerc)>0?` (${invoice.billDiscPerc}%)`:""}</span><span class="tv">- ${cur} ${siFmt2(billDisc)}</span></div>` : "",
-    adjustment ? `<div class="totals-row"><span class="tl">${isBn?"সমন্বয়":"Adjustment"}</span><span class="tv">${adjustment>0?"+":"-"} ${cur} ${siFmt2(Math.abs(adjustment))}</span></div>` : "",
-    roundOff ? `<div class="totals-row"><span class="tl">Round Off</span><span class="tv">${roundOff>0?"+":"-"} ${cur} ${siFmt2(Math.abs(roundOff))}</span></div>` : "",
+    printDiscount ? totalsLine(`${isBn?"বিলের ছাড়":"Bill Discount"}${siN2(invoice.billDiscPerc)>0?` (${invoice.billDiscPerc}%)`:""}`, moneyTxt(billDisc, "-")) : "",
+    totalsLine(isBn?"সমন্বয়":"Adjustment", moneyTxt(adjustment, "+")),
+    printRoundOff ? totalsLine("Round Off", moneyTxt(roundOff, "+")) : "",
   ].join("");
   // Reference, salesman, delivery and credit details print inside the payment / validity / delivery box
   // (no separate line or boxes above the items).
-  const metaRows = [
-    invoice.refNo ? ["Ref", invoice.refNo] : null,
-    invoice.quotationNo ? [isBn?"কোটেশন":"Quotation", invoice.quotationNo] : null,
-    invoice.salesOrderNo ? [isBn?"সেলস অর্ডার":"Sales Order", invoice.salesOrderNo] : null,
-    invoice.jobOrderNo ? [isBn?"জব কার্ড":"Job Card", invoice.jobOrderNo] : null,
-    ps.printSalesman&&invoice.salesmanName ? [isBn?"বিক্রেতা":"Salesman", invoice.salesmanName] : null,
-    !isDelivery&&invoice.deliveryNoteNo ? [isBn?"ডেলিভারি নোট নং":"Delivery Note No.", invoice.deliveryNoteNo] : null,
-    !isDelivery&&invoice.vehicleNo ? [isBn?"গাড়ির নম্বর":"Vehicle No.", invoice.vehicleNo] : null,
-    ps.printCreditPeriod&&siN2(invoice.creditDays)>0 ? [isBn?"বাকির মেয়াদ":"Credit", `${invoice.creditDays} ${isBn?"দিন":"days"}`] : null,
-  ].filter(Boolean);
-  const metaHTML = metaRows.map(([label, value]) => `<div class="info-sub" style="color:#374151">${label}: <b>${value}</b></div>`).join("");
+  const infoLine = (label, value) => `<div class="info-sub">${label}: <b>${value || "—"}</b></div>`;
+  const metaHTML = [
+    infoLine("Ref", invoice.refNo),
+    invoice.quotationNo ? infoLine(isBn?"কোটেশন":"Quotation", invoice.quotationNo) : "",
+    invoice.salesOrderNo ? infoLine(isBn?"সেলস অর্ডার":"Sales Order", invoice.salesOrderNo) : "",
+    invoice.jobOrderNo ? infoLine(isBn?"জব কার্ড":"Job Card", invoice.jobOrderNo) : "",
+    ps.printSalesman ? infoLine(isBn?"বিক্রেতা":"Salesman", invoice.salesmanName) : "",
+    !isDelivery ? infoLine(isBn?"ডেলিভারি নোট নং":"Delivery Note No.", invoice.deliveryNoteNo) : "",
+    !isDelivery ? infoLine(isBn?"গাড়ির নম্বর":"Vehicle No.", invoice.vehicleNo) : "",
+    ps.printCreditPeriod ? infoLine(isBn?"বাকির মেয়াদ":"Credit", siN2(invoice.creditDays)>0 ? `${invoice.creditDays} ${isBn?"দিন":"days"}` : "") : "",
+  ].join("");
   const hideVatCols = isTax && !isDelivery && ds.hideVatDiscCols;
   const userNameHTML = ps.printUserName && invoice.createdByName ? invoice.createdByName : "";
   const timeText = ps.printTime && invoice.createdAt
@@ -291,7 +298,7 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   })();
   const custBalance = siN2(opts.customerBalance);
   const custBalanceHTML = ps.printCustomerBalance && !isQuote && !isDelivery && invoice.customerName && custBalance>0.01
-    ? `<div class="bal-box"><span style="font-weight:700">${isBn?"কাস্টমারের মোট বাকি (সব বিল)":"Customer's total balance (all bills)"}</span><span style="font-size:15px;font-weight:900">${cur} ${siFmt2(custBalance)}</span></div>`
+    ? `<div class="bal-box"><span style="font-weight:700">${isBn?"কাস্টমারের মোট বাকি (সব বিল)":"Customer's total balance (all bills)"}</span><span style="font-size:15px;font-weight:900">${siFmt2(custBalance)}</span></div>`
     : "";
 
   const title = isSO
@@ -332,11 +339,11 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
       deliveryNo:invoice.deliveryNoteNo||"", vehicleNo:invoice.vehicleNo||"", validUntil:isQuote?(invoice.validUntil||""):"",
       dueDate:ps.printCreditPeriod?(invoice.dueDate||""):"", currency:cur,
       totalQty:String((invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)), subtotal:siFmt2(sub),
-      discount:lineDisc>0?siFmt2(lineDisc):"", billDiscount:billDisc>0?siFmt2(billDisc):"",
+      discount:printDiscount?siFmt2(lineDisc):"", billDiscount:printDiscount?siFmt2(billDisc):"",
       vat:effectiveTax?siFmt2(vat):"", vatSummary:ps.printVatSummary?vatSummaryText:"",
-      adjustment:adjustment?siFmt2(adjustment):"", roundOff:roundOff?siFmt2(roundOff):"",
-      grandTotal:`${cur} ${siFmt2(grand)}`,
-      paid:(isPartialPay||isSettledPay)?siFmt2(paidAmt):"", balance:!noMoney&&balance>0.01?siFmt2(balance):"",
+      adjustment:siFmt2(adjustment), roundOff:printRoundOff?siFmt2(roundOff):"",
+      grandTotal:siFmt2(grand),
+      paid:noMoney?"":siFmt2(paidAmt), balance:noMoney?"":siFmt2(Math.max(0, balance)),
       customerBalance:custBalanceHTML?siFmt2(custBalance):"", amountWords:amountInWords(grand, cur), note:ps.printNarration?(invoice.note||""):"",
       creditPeriod:ps.printCreditPeriod&&siN2(invoice.creditDays)>0?`${invoice.creditDays} ${isBn?"দিন":"days"}`:"",
       terms:design.style?.invoice?.footerText||"",
@@ -359,14 +366,14 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     const codeHtml = showCode&&!invoice.hideCodeInPrint&&(it.code||it.brand)
       ? `<br><span style="font-size:10px;color:#6b7280">${[it.code,it.brand].filter(Boolean).join("  ")}</span>` : "";
     if (isDelivery) {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     } else if (hideVatCols) {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     } else if (isTax) {
       const base = siN2(it.unitPrice)*siN2(it.qty) - d;
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right">${cur} ${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${cur} ${siFmt2(v)}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right">${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${siFmt2(v)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     } else {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${cur} ${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     }
   }).join("");
 
@@ -376,24 +383,26 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
       ? `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"VAT বাদে":"Excl.VAT"}</th><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
       : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
 
+  const paidBalHTML = (!isDelivery && !isQuote)
+    ? `${totalsLine(isBn?"পরিশোধিত":"Paid", moneyTxt(paidAmt))}${totalsLine(isBn?"বাকি":"Balance Due", moneyTxt(Math.max(0, balance)))}`
+    : "";
+  const discTotalHTML = printDiscount ? totalsLine(isBn?"ছাড়":"Discount", moneyTxt(lineDisc, "-")) : "";
   const totalsHTML = isDelivery
-    ? `${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
+    ? `${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${siFmt2(grand)}</span></div>`
     : isTax
-      ? `<div class="totals-row"><span class="tl">${isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)"}</span><span class="tv">${cur} ${siFmt2(sub)}</span></div>${lineDisc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv">- ${cur} ${siFmt2(lineDisc)}</span></div>`:""}<div class="totals-row"><span class="tl" style="font-weight:700">VAT (${isBn?"মোট":"Total"})</span><span class="tv">+ ${cur} ${siFmt2(vat)}</span></div>${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`
-    : `${lineDisc>0?`<div class="totals-row"><span class="tl">${isBn?"ছাড়":"Discount"}</span><span class="tv">- ${cur} ${siFmt2(lineDisc)}</span></div>`:""}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${cur} ${siFmt2(grand)}</span></div>`;
+      ? `${totalsLine(isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)", moneyTxt(sub))}${discTotalHTML}${totalsLine(`VAT (${isBn?"মোট":"Total"})`, moneyTxt(vat, "+"))}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`
+      : `${totalsLine(isBn?"সাব-টোটাল":"Subtotal", moneyTxt(sub))}${discTotalHTML}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`;
 
-  const custHTML = `<div class="info-box"><div class="info-label">${isBn?"বিল টু":"Bill To"}</div><div class="info-value">${invoice.customerName||"—"}</div>${invoice.customerCode?`<div class="info-sub">${isBn?"কোড":"Code"}: ${invoice.customerCode}</div>`:""}${invoice.customerMobile?`<div class="info-sub">${invoice.customerMobile}</div>`:""} ${invoice.customerAddress?`<div class="info-sub">${invoice.customerAddress}</div>`:""} ${isTax&&invoice.customerTrn?`<div class="info-sub" style="font-weight:700;font-size:12px">TRN: ${invoice.customerTrn}</div>`:""}</div>`;
+  const custHTML = `<div class="info-box"><div class="info-label">${isBn?"বিল টু":"Bill To"}</div><div class="info-value">${invoice.customerName||"—"}</div>${infoLine(isBn?"কোড":"Code", invoice.customerCode)}${infoLine(isBn?"মোবাইল":"Mobile", invoice.customerMobile)}${infoLine(isBn?"ঠিকানা":"Address", invoice.customerAddress)}${isTax?infoLine("TRN", invoice.customerTrn):""}</div>`;
 
   const payInfoHTML = isQuote
-    ? `<div class="info-box"><div class="info-label">${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div><div class="info-sub">${invoice.createdByName||""}</div>${metaHTML}</div>`
+    ? `<div class="info-box"><div class="info-label">${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div>${infoLine(isBn?"ইউজার":"User", invoice.createdByName)}${metaHTML}</div>`
     : isDelivery
-    ? `<div class="info-box"><div class="info-label">${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${invoice.vehicleNo?`<div class="info-sub">${isBn?"গাড়ি":"Vehicle"}: ${invoice.vehicleNo}</div>`:""}${invoice.createdByName?`<div class="info-sub">${invoice.createdByName}</div>`:""}${metaHTML}</div>`
-    : `<div class="info-box"><div class="info-label">${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${payLabel}</div>${metaHTML}</div>`;
+    ? `<div class="info-box"><div class="info-label">${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${infoLine(isBn?"গাড়ি":"Vehicle", invoice.vehicleNo)}${infoLine(isBn?"ইউজার":"User", invoice.createdByName)}${metaHTML}</div>`
+    : `<div class="info-box"><div class="info-label">${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${payLabel||"—"}</div>${metaHTML}</div>`;
 
   const thermal = ds.paper==="80mm" || ds.paper==="58mm";
   const pageH = !thermal && ds.fullPage !== false ? paperHeightMm(ds.paper) : null;
-  const colCount = isDelivery || hideVatCols ? 5 : isTax ? 9 : 6;
-  const emptyRows = invoiceBlankRows((invoice.items||[]).length, pageH, colCount);
   const sheetH = pageH ? `${pageH - 16}mm` : "auto";
   const rawDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -412,18 +421,17 @@ body{font-family:'Times New Roman','Nirmala UI',serif;font-size:12px;color:#111;
 .inv-title{font-size:15px;font-weight:900;text-align:right;letter-spacing:1px;border:1px solid #111;padding:3px 8px;display:inline-block}
 .inv-no{font-size:12px;text-align:right;margin-top:3px}
 .body{padding:8px 12px}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0;border:1px solid #111}
-.info-box{background:#fff;padding:7px 10px;border:none;border-right:1px solid #111}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0;border:1px solid #111;align-items:stretch}
+.info-box{background:#fff;padding:7px 10px;border:none;border-right:1px solid #111;min-height:38mm}
 .info-box:last-child{border-right:none}
 .info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.4px;color:#111;font-weight:700;margin-bottom:2px}
 .info-value{font-size:13px;font-weight:700;color:#111}
 .info-sub{font-size:11px;color:#111;margin-top:2px}
-table.items{width:100%;border-collapse:collapse;margin:0;font-size:11px;height:100%;flex:1}
+table.items{width:100%;border-collapse:collapse;margin:0;font-size:11px;height:auto}
 table.items th,table.items td{border:1px solid #111;padding:5px 6px;vertical-align:top}
 thead tr{background:${theadBg};color:${theadText}}
 th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.3px;font-weight:700}
 tbody tr:nth-child(even){background:#fff}
-tr.blank td{height:7.2mm;border-bottom:1px solid #999}
 .totals-wrap{display:flex;align-items:stretch;gap:10px;margin:8px 0}
 .totals-left{flex:1;min-width:0;display:flex}
 .totals-left .words-box{flex:1;margin:0;display:flex;align-items:center}
@@ -442,7 +450,7 @@ ${isDelivery?`.recv-box{background:#fff;border:1px solid #111;padding:10px;margi
 .sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:6px;padding:4px 8px 10px}
 .sig-line{border-top:1px solid #111;margin-top:22px;padding-top:4px;font-size:11px;text-align:center}
 .footer{text-align:left;padding:6px 12px;background:#fff;border-top:1px solid #111;font-size:11px;color:#111;font-weight:600}
-@media print{body{padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;border-radius:0!important;box-shadow:none!important;${pageH?`min-height:${sheetH}!important;`:""}display:flex!important;flex-direction:column!important}}
+@media print{html,body{height:100%!important;padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;border-radius:0!important;box-shadow:none!important;${pageH?`min-height:100%!important;`:""}display:flex!important;flex-direction:column!important}.sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}}
 ${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px;min-height:0!important;display:block}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr}.totals-wrap{flex-direction:column}.totals{flex:1 1 auto;width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
 ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
 </style></head><body>
@@ -453,12 +461,10 @@ ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
 <div class="invoice">
 <div class="sheet-top"><div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate}${timeText?`  ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no">${userNameHTML}</div>`:""}</div></div>
 <div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div></div></div>
-<div class="sheet-mid"><table class="items"><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}${emptyRows}</tbody></table></div>
+<div class="sheet-mid"><table class="items"><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table></div>
 <div class="sheet-bot"><div class="body">
 ${totalsHTML?`<div class="totals-wrap">${!isDelivery&&!isQuote?`<div class="totals-left"><div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div></div>`:""}<div class="totals"><div class="totals-box">${totalsHTML}</div></div></div>`:(!isDelivery&&!isQuote?`<div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div>`:"")}
 ${vatSummaryHTML}
-${isPartialPay?`<div class="pay-box"><span style="font-weight:700">${isBn?"আংশিক পরিশোধ":"Part Received"}</span><span style="font-size:17px;font-weight:900">${cur} ${siFmt2(paidAmt)}</span></div>`:isSettledPay?`<div class="pay-box"><span style="font-weight:700">${isBn?"পরিশোধিত":"Paid"}</span><span style="font-size:17px;font-weight:900">${cur} ${siFmt2(paidAmt)}</span></div>`:""}
-${!isDelivery&&!isQuote&&balance>0.01?`<div class="bal-box"><span style="font-weight:700">${isBn?"বাকি":"Balance Due"}</span><span style="font-size:17px;font-weight:900">${cur} ${siFmt2(balance)}</span></div>`:""}
 ${isDelivery?`<div class="recv-box"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
 ${custBalanceHTML}
 ${ps.printNarration&&invoice.note?`<div class="note-box">${invoice.note}</div>`:""}

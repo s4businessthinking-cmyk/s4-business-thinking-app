@@ -3,6 +3,7 @@ import { db } from "../firebase-config";
 import { offlineCacheCloudRecords, offlineList } from "../offline/offlineRepository";
 import { piEmptyCurrent, piEmptyForm } from "./purchaseShared.js";
 import { subscribeShopCollection } from "../offline/realtimeSync";
+import { loadInvoiceRows } from "../inventory/stockFromInvoices";
 import { useEffect, useRef, useState } from "react";
 
 export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments, canViewSupplierLedger, piMobile, piRootRef, piView, piWin, setInvoices, setPiFitH, setPiLoading, shopId, syncRefreshKey }) {
@@ -19,6 +20,10 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
     return () => window.removeEventListener("resize", fit);
   }, [piMobile, piView]);
   useEffect(() => { if (piView!=="form") piWin.restore(); }, [piView]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (piView !== "form") return undefined;
+    loadInvoiceRows().catch(() => {});
+  }, [piView]);
   const [piSubTab,setPiSubTab]     = useState(
     canManagePurchase ? "invoices" : (canViewSupplierLedger ? "ledger" : (canVendorPayments ? "payments" : "invoices"))
   ); // "invoices" | "ledger" | "payments"
@@ -97,9 +102,14 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
   }, [piSubTab, canManagePurchase, canViewSupplierLedger, canVendorPayments]);
 
   // ── Local-first list, then Firebase; SQLite cache stays in background ──
+  // Do not flash the spinner again when auth/sync refreshes — only when the shop changes.
+  const piListKeyRef = useRef("");
   useEffect(()=>{
     if (!shopId) return;
-    setPiLoading(true);
+    if (piListKeyRef.current !== shopId) {
+      piListKeyRef.current = shopId;
+      setPiLoading(true);
+    }
     let unsub1=()=>{};
     let unsub2=null;
     let cancelled=false;
@@ -136,13 +146,16 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
         return rows.length;
       }
 
-      if (localRows.length) setInvoices(sortPiInvoices(localRows));
+      setInvoices(sortPiInvoices(localRows));
       return localRows.length;
     };
 
     loadOfflinePiInvoices()
-      .then((count) => { if (!cancelled && count > 0) setPiLoading(false); })
-      .catch(err => console.warn("[S4 Offline] purchaseInvoices offline load failed", err));
+      .then(() => { if (!cancelled) setPiLoading(false); })
+      .catch(err => {
+        console.warn("[S4 Offline] purchaseInvoices offline load failed", err);
+        if (!cancelled) setPiLoading(false);
+      });
 
     const applyCloudRows = (rows) => {
       if (cancelled) return;

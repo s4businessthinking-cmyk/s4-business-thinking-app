@@ -161,6 +161,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
               showBar={false}
               cur={t.cur || localShop?.currency || "AED"}
               canSeeCost={canSeeProductCost}
+              shopId={shopId}
             />
           )}
           {globalSearchCanAny && tab !== "products" && !pmOverSales && (
@@ -176,6 +177,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
               isMobile
               cur={t.cur || localShop?.currency || "AED"}
               canSeeCost={canSeeProductCost}
+              shopId={shopId}
             />
           )}
           {tabContent}

@@ -72,6 +72,10 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   const [siOpenParty,setSiOpenParty] = useState(null);
   const siWin = useWindowState({ maximized:true });
   useEffect(() => { if (siView!=="form") siWin.restore(); }, [siView]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (siView !== "form") return undefined;
+    loadInvoiceRows().catch(() => {});
+  }, [siView]);
   const siMobile = usePmMobile();
   const siRootRef = useRef(null);
   const [siFitH,setSiFitH] = useState(null);

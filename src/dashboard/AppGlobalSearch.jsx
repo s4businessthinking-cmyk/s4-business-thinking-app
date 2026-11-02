@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom";
 import { offlineList } from "../offline/offlineRepository.js";
 import { specValues } from "../product-master/productSpecs";
-import { productSearchSub } from "./productSearchMeta.js";
+import { lastPurchaseFromInvoices, productSearchSub } from "./productSearchMeta.js";
 
 const nsq = (str) => String(str || "").replace(/[\.\-\/\\\s_,]+/g, "").toLowerCase();
 const match = (hay, needle) => {
@@ -69,6 +69,7 @@ export default function AppGlobalSearch({
   showBar = true,
   cur = "AED",
   canSeeCost = false,
+  shopId = "",
 }) {
   const bn = lang === "bn";
   const [q, setQ] = useState("");
@@ -76,6 +77,7 @@ export default function AppGlobalSearch({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [invoiceHits, setInvoiceHits] = useState([]);
   const [invoiceBusy, setInvoiceBusy] = useState(false);
+  const [lastPurchaseByProduct, setLastPurchaseByProduct] = useState({});
   const inputRef = useRef(null);
   const wrapRef = useRef(null);
 
@@ -94,9 +96,16 @@ export default function AppGlobalSearch({
     if (canProduct) {
       for (const p of products) {
         if (!match(productHay(p), needle)) continue;
+        const lp = lastPurchaseByProduct[p.id]
+          || lastPurchaseByProduct[`code:${String(p.code || "").trim().toLowerCase()}`];
         out.push({
           kind: "product", id: p.id, title: p.name || "—",
-          sub: productSearchSub(p, { bn: lang === "bn", cur, canSeeCost }),
+          purchaseInvoiceId: lp?.invoiceId || null,
+          sub: productSearchSub({
+            ...p,
+            lastPurchaseDate: lp?.date || p.lastPurchaseDate,
+            lastPurchaseVendorName: lp?.vendor || p.lastPurchaseVendorName,
+          }, { bn: lang === "bn", cur, canSeeCost }),
         });
         if (out.filter((h) => h.kind === "product").length >= cap) break;
       }
@@ -118,11 +127,14 @@ export default function AppGlobalSearch({
       }
     }
     return out;
-  }, [needle, products, customers, vendors, canProduct, canCustomer, canVendor, lang, cur, canSeeCost]);
+  }, [needle, products, customers, vendors, canProduct, canCustomer, canVendor, lang, cur, canSeeCost, lastPurchaseByProduct]);
 
   useEffect(() => {
-    if (needle.length < 2 || (!canSales && !canPurchase)) {
+    const needInvoices = canSales || canPurchase;
+    const needLastPurchase = canProduct;
+    if (needle.length < 2 || (!needInvoices && !needLastPurchase)) {
       setInvoiceHits([]);
+      setLastPurchaseByProduct({});
       return undefined;
     }
     let cancelled = false;
@@ -130,45 +142,58 @@ export default function AppGlobalSearch({
     const t = setTimeout(async () => {
       try {
         const hits = [];
+        let lpMap = {};
         if (canSales) {
-          const res = await offlineList("salesInvoices");
-          const rows = (res.records || []).map((r) => ({ ...r.data, id: r.data?.id || r.document_id || r.id }));
-          for (const inv of rows) {
-            if (inv.status === "cancelled" || inv.isDeleted) continue;
-            const hay = [inv.invoiceNo, inv.customerName, inv.customerMobile, inv.refNo, inv.note].join(" ");
-            if (!match(hay, needle)) continue;
-            hits.push({
-              kind: "salesInvoice", id: inv.id,
-              title: inv.invoiceNo || "—",
-              sub: `${inv.customerName || ""} · ${String(inv.invoiceDate || "").slice(0, 10)}`,
-            });
-            if (hits.filter((h) => h.kind === "salesInvoice").length >= 8) break;
-          }
+          try {
+            const res = await offlineList("salesInvoices");
+            const rows = (res.records || []).map((r) => ({ ...r.data, id: r.data?.id || r.document_id || r.id }))
+              .filter((inv) => !shopId || !inv.shopId || inv.shopId === shopId);
+            for (const inv of rows) {
+              if (inv.status === "cancelled" || inv.isDeleted) continue;
+              const hay = [inv.invoiceNo, inv.customerName, inv.customerMobile, inv.refNo, inv.note].join(" ");
+              if (!match(hay, needle)) continue;
+              hits.push({
+                kind: "salesInvoice", id: inv.id,
+                title: inv.invoiceNo || "—",
+                sub: `${inv.customerName || ""} · ${String(inv.invoiceDate || "").slice(0, 10)}`,
+              });
+              if (hits.filter((h) => h.kind === "salesInvoice").length >= 8) break;
+            }
+          } catch { /* sales list is optional next to product last-purchase */ }
         }
-        if (canPurchase) {
+        if (canPurchase || needLastPurchase) {
           const res = await offlineList("purchaseInvoices");
-          const rows = (res.records || []).map((r) => ({ ...r.data, id: r.data?.id || r.document_id || r.id }));
-          for (const inv of rows) {
-            if (inv.status === "cancelled" || inv.isDeleted) continue;
-            const hay = [inv.invoiceNo, inv.supplierInvoiceNo, inv.vendorName, inv.refNo, inv.note].join(" ");
-            if (!match(hay, needle)) continue;
-            hits.push({
-              kind: "purchaseInvoice", id: inv.id,
-              title: inv.supplierInvoiceNo || inv.invoiceNo || "—",
-              sub: `${inv.vendorName || ""} · ${String(inv.invoiceDate || "").slice(0, 10)}`,
-            });
-            if (hits.filter((h) => h.kind === "purchaseInvoice").length >= 8) break;
+          const rows = (res.records || []).map((r) => ({ ...r.data, id: r.data?.id || r.document_id || r.id }))
+            .filter((inv) => !shopId || !inv.shopId || inv.shopId === shopId);
+          if (needLastPurchase) lpMap = lastPurchaseFromInvoices(rows);
+          if (canPurchase) {
+            for (const inv of rows) {
+              if (inv.status === "cancelled" || inv.isDeleted) continue;
+              const hay = [inv.invoiceNo, inv.supplierInvoiceNo, inv.vendorName, inv.refNo, inv.note].join(" ");
+              if (!match(hay, needle)) continue;
+              hits.push({
+                kind: "purchaseInvoice", id: inv.id,
+                title: inv.supplierInvoiceNo || inv.invoiceNo || "—",
+                sub: `${inv.vendorName || ""} · ${String(inv.invoiceDate || "").slice(0, 10)}`,
+              });
+              if (hits.filter((h) => h.kind === "purchaseInvoice").length >= 8) break;
+            }
           }
         }
-        if (!cancelled) setInvoiceHits(hits);
+        if (!cancelled) {
+          setInvoiceHits(hits);
+          setLastPurchaseByProduct(lpMap);
+        }
       } catch {
-        if (!cancelled) setInvoiceHits([]);
+        if (!cancelled) {
+          setInvoiceHits([]);
+        }
       } finally {
         if (!cancelled) setInvoiceBusy(false);
       }
     }, 220);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [needle, canSales, canPurchase]);
+  }, [needle, canSales, canPurchase, canProduct, shopId]);
 
   const results = useMemo(() => {
     const merged = [...staticHits, ...invoiceHits];
@@ -183,10 +208,31 @@ export default function AppGlobalSearch({
     setQ("");
   }, []);
 
+  const pendingProductPick = useRef(null);
+
   const pick = useCallback((hit) => {
+    if (hit.kind === "product" && invoiceBusy && !hit.purchaseInvoiceId) {
+      pendingProductPick.current = hit.id;
+      return;
+    }
+    pendingProductPick.current = null;
     closeSheet();
     onNavigate?.(hit);
-  }, [onNavigate, closeSheet]);
+  }, [onNavigate, closeSheet, invoiceBusy]);
+
+  useEffect(() => {
+    const pendingId = pendingProductPick.current;
+    if (!pendingId || invoiceBusy) return;
+    const fresh = results.find((h) => h.kind === "product" && h.id === pendingId);
+    pendingProductPick.current = null;
+    if (!fresh) return;
+    closeSheet();
+    onNavigate?.(fresh);
+  }, [invoiceBusy, results, closeSheet, onNavigate]);
+
+  useEffect(() => {
+    pendingProductPick.current = null;
+  }, [needle]);
 
   const openSheet = useCallback(() => {
     setSheetOpen(true);

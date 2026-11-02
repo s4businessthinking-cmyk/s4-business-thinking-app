@@ -4,6 +4,7 @@ import { PartySelect } from "./AgainstInvoiceVoucherWindow.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { printWithSettings } from "../print/printSettings.js";
 import { loadPrintDesign, renderLayoutDocument, generateStatementHTML } from "../print/printDesign.js";
+import { invMeta, statementRefValue } from "./partyLedgerMeta.js";
 
 const n2 = (v) => parseFloat(v) || 0;
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
@@ -17,17 +18,6 @@ const monthTitle = (ym) => { const [y, m] = String(ym).split("-"); return `${MON
 const ledgerOptsKey = (mode) => `s4-party-ledger-opts-${mode}`;
 const loadLedgerOpts = (mode) => {
   try { return JSON.parse(localStorage.getItem(ledgerOptsKey(mode)) || "{}"); } catch { return {}; }
-};
-const invMeta = (inv, isCustomer) => {
-  const raw = inv?.raw || inv;
-  if (!raw) return { dn: "", vehicle: "", trn: "", note: "", refNo: "" };
-  return {
-    dn: isCustomer ? String(raw.deliveryNoteNo || inv.ref || "").trim() : String(raw.supplierInvoiceNo || inv.ref || "").trim(),
-    vehicle: String(raw.vehicleNo || "").trim(),
-    trn: String(raw.customerTrn || raw.vendorTrn || "").trim(),
-    note: String(raw.note || "").trim(),
-    refNo: String(raw.refNo || "").trim(),
-  };
 };
 const billNarration = (inv, isCustomer, merge, { includeDn, includeNote } = {}) => {
   const raw = inv?.raw || inv;
@@ -134,7 +124,9 @@ export default function PartyLedgerWindow({
   const [showVehicle, setShowVehicle] = useState(!!savedOpts.showVehicle);
   const [showTrn, setShowTrn] = useState(!!savedOpts.showTrn);
   const [showNote, setShowNote] = useState(!!savedOpts.showNote);
-  const [showVendorRef, setShowVendorRef] = useState(!!savedOpts.showVendorRef);
+  const [showVendorRef, setShowVendorRef] = useState(
+    isCustomer ? (savedOpts.showRefNo == null ? true : !!savedOpts.showRefNo) : !!savedOpts.showVendorRef
+  );
   const [mergeEntries, setMergeEntries] = useState(!!savedOpts.mergeEntries);
   const [showSettledInvoices, setShowSettledInvoices] = useState(!!savedOpts.showSettledInvoices);
   const [stmtType, setStmtType] = useState(savedOpts.stmtType === "outstanding" ? "outstanding" : "ledger");
@@ -148,7 +140,7 @@ export default function PartyLedgerWindow({
     try {
       localStorage.setItem(ledgerOptsKey(mode), JSON.stringify({
         voucherFilter, includePdc, monthly, showNarration, showBalanceInPrint, showBalance, showDrCr,
-        showDn, showVehicle, showTrn, showNote, showVendorRef, mergeEntries, showSettledInvoices, stmtType, osOpts,
+        showDn, showVehicle, showTrn, showNote, showVendorRef, showRefNo: showVendorRef, mergeEntries, showSettledInvoices, stmtType, osOpts,
       }));
     } catch { /* ignore */ }
   };
@@ -365,7 +357,7 @@ export default function PartyLedgerWindow({
         if (bucket >= 0) ageing[bucket].amount += r.act;
         return {
           ...r, key: `os-${r.inv.id}`, sno: i + 1, run, days,
-          ref: invMeta(r.inv, isCustomer).dn || r.inv.ref || "",
+          ref: statementRefValue(invMeta(r.inv, isCustomer), { includeDn: true }) || r.inv.ref || "",
           isOpening: r.inv.raw?.source === "openingBalance",
           open: () => onOpenInvoice?.(r.inv.raw),
         };
@@ -448,8 +440,13 @@ export default function PartyLedgerWindow({
         width: 95, render: (e) => (e.opening ? "" : (e.meta?.dn || e.ref || "")),
       });
     }
-    if (!isCustomer && showVendorRef) {
-      cols.push({ key: "vref", label: bn ? "আমাদের Ref" : "Our Ref", width: 88, render: (e) => (e.opening ? "" : (e.meta?.refNo || "")) });
+    if (showVendorRef) {
+      cols.push({
+        key: "vref",
+        label: isCustomer ? (bn ? "রেফ নং" : "Ref No") : (bn ? "আমাদের Ref" : "Our Ref"),
+        width: 88,
+        render: (e) => (e.opening ? "" : (e.meta?.refNo || "")),
+      });
     }
     if (isCustomer && showVehicle) {
       cols.push({ key: "vehicle", label: bn ? "গাড়ি" : "Vehicle", width: 88, render: (e) => (e.opening ? "" : (e.meta?.vehicle || "")) });
@@ -525,7 +522,7 @@ export default function PartyLedgerWindow({
       const items = stmtRows.map((e) => ({
         date: e.opening ? "" : (e.monthly ? e.type : fmtDate(e.date)),
         type: e.vType || e.type || "", no: e.no || "",
-        ref: showDn ? (e.meta?.dn || e.ref || "") : (e.ref || ""),
+        ref: statementRefValue(e.meta, { includeDn: showDn }) || (showDn ? (e.ref || "") : ""),
         particulars: String(e.particulars || ""),
         debit: dr(e) ? f2(dr(e)) : "", credit: cr(e) ? f2(cr(e)) : "",
         balance: showBalanceInPrint && showBalance ? balText(e.run) : "",
@@ -666,11 +663,10 @@ export default function PartyLedgerWindow({
                   <input type="checkbox" checked={showVehicle} onChange={(e) => setShowVehicle(e.target.checked)} /> {bn ? "গাড়ি নং" : "Vehicle No"}
                 </label>
               )}
-              {!isCustomer && (
-                <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                  <input type="checkbox" checked={showVendorRef} onChange={(e) => setShowVendorRef(e.target.checked)} /> {bn ? "আমাদের Ref" : "Our Ref No"}
-                </label>
-              )}
+              <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
+                <input type="checkbox" checked={showVendorRef} onChange={(e) => setShowVendorRef(e.target.checked)} />
+                {isCustomer ? (bn ? "রেফারেন্স নং" : "Ref No") : (bn ? "আমাদের Ref" : "Our Ref No")}
+              </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
                 <input type="checkbox" checked={showTrn} onChange={(e) => setShowTrn(e.target.checked)} /> TRN
               </label>

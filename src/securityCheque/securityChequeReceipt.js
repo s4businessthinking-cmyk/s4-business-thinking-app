@@ -55,10 +55,10 @@ table.detail th,table.detail td{border:1px solid #555;padding:4px 6px;text-align
 table.detail th{width:16%;background:#f1f5f9}
 table.detail td{width:34%}
 .chequearea{border:1.5px dashed #333;width:100%;height:55mm;display:flex;align-items:center;justify-content:center;text-align:center;margin:5px 0;font-size:11px;color:#555;overflow:hidden;padding:0}
-.chequearea img,.chequearea embed{width:100%;height:100%;object-fit:cover;display:block}
+.chequearea img,.chequearea embed{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
 .idrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:5px 0}
 .idbox{width:100%;aspect-ratio:85.6 / 54;max-height:54mm;border:1.5px dashed #333;display:flex;align-items:center;justify-content:center;text-align:center;font-size:10px;color:#555;overflow:hidden;padding:0}
-.idbox img,.idbox embed{width:100%;height:100%;object-fit:cover;display:block}
+.idbox img,.idbox embed{width:100%;height:100%;object-fit:contain;background:#fff;display:block}
 .conditions{font-size:9.5px;line-height:1.3;margin:5px 0}
 .conditions ol{margin:3px 0 3px 18px;padding:0}
 .siggrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:8px}

@@ -485,7 +485,7 @@ export function renderPiScreens({ onProductPatched, onScanBill, balance, billRet
         invoiceNo={piInvoiceNo} editInvoiceId={editInvoiceId} saving={piSaving} nameRef={piNameRef} qtyRef={piQtyRef}
         helpers={{ piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS, emptyCurrent:piEmptyCurrent }}
         purchaseOptions={purchaseOpts} baseCurrency={piBaseCur} onSaveOptions={isOwner ? savePurchaseOptions : undefined}
-        sourceNote={piSource ? `${piSource.kind==="grn" ? (bnL?"মাল গ্রহণ থেকে":"From Goods Received") : (bnL?"পারচেজ অর্ডার থেকে":"From Purchase Order")}: ${piSource.no}` : ""}
+        sourceNote={piSource ? `${piSource.kind==="grn" ? (bnL?"মাল গ্রহণ থেকে":"From Goods Received") : (bnL?"পারচেজ অর্ডার থেকে":"From Purchase Order")}: ${piSource.no}${piSource.kind==="po" ? (bnL?" — যে পণ্য আসেনি, লাইন মুছুন; সেভ করলে আলাদা অর্ডারে যাবে":" — delete lines that did not arrive; saving moves them to a new order") : ""}` : ""}
         onSelectProduct={piSelectProduct} onChangeCurrentUnit={piChangeCurrentUnit} onAddCurrent={piAddCurrentItem} onDelLine={piDelLine}
         onPickVendor={(v)=>{ piPickVendor(v); piEarlyDuplicateCheck(); }} onCheckDuplicate={piEarlyDuplicateCheck}
         onConfirm={piConfirm} onSaveDraft={piSaveDraft}

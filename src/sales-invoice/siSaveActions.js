@@ -6,6 +6,7 @@ import { siAddDays, siDeliveryLines, siResolveRate, sourceDocOf } from "./siHelp
 import { siCalcLine, siCalcTotals, siFmt2, siInvoiceExtras, siIsSettledPay, siN2 } from "./salesInvoiceShared.js";
 import { itemBaseQty, unitFactorFor } from "../inventory/unitConversion";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
+import { peekInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 
 export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user }) {
   const siBuild=(status, invoiceNoOverride, extras={})=>{
@@ -167,8 +168,13 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     });
     if (!needed.size) return true;
     let rows;
-    try { rows = await loadInvoiceRows(); } catch { return true; }
-    const stockMap = computeStockMap(products, rows.purchaseInvoices, rows.salesInvoices, shopId, rows.deliveryNotes, rows.extras);
+    try {
+      rows = peekInvoiceRowsCache({ allowStale: true }) || await loadInvoiceRows();
+    } catch { return true; }
+    const stockMap = computeStockMap(products, rows.purchaseInvoices, rows.salesInvoices, shopId, rows.deliveryNotes, {
+      ...rows.extras,
+      onlyProductIds: new Set(needed.keys()),
+    });
     // Editing an already-confirmed invoice: its own old items were already subtracted from
     // the stock map above, so add them back before comparing against the new quantities.
     const priorDoc = editInvId ? invoices.find((inv) => inv.id === editInvId) : null;
@@ -238,8 +244,6 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       actor: { uid: user?.uid, personName: profile?.personName },
     });
 
-    await persistOfflineDb();
-
     if (!editInvId) bumpShopSiSerial(payload.invoiceNo);
 
     if ((kind==="sales" || isDN) && !editInvId && sourceQuote?.id) {
@@ -255,12 +259,14 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
           convertedInvoiceNo: payload.invoiceNo,
           updatedAt: nowIso,
           updatedBy: user?.uid || "",
-        });
+        }, { deferPersist: true });
       } catch (err) {
         console.warn("[S4 SI] mark source document converted failed", err);
       }
       setSourceQuote(null);
     }
+
+    persistOfflineDb().catch((err) => console.warn("[S4 SI] persist after save failed", err));
 
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] sales invoice save sync failed", err));

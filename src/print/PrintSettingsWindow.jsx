@@ -176,13 +176,19 @@ function DocTab({ title, doc, setDoc, isTax, bn }) {
                 </button>
               ))}
             </div>
-            {isTax && (
-              <div style={{ marginTop: 10 }}>
+            <div style={{ marginTop: 10 }}>
+              {isTax && (
                 <Check checked={doc.hideVatDiscCols} onChange={(v) => set("hideVatDiscCols", v)}>
                   {bn ? "VAT ও ছাড়ের কলাম লুকান, মোট VAT ও মোট ছাড় নিচে দেখান" : "Hide VAT and Discount Columns and Print Total VAT and Total Discount in the Bottom"}
                 </Check>
-              </div>
-            )}
+              )}
+              <Check checked={doc.printDiscount !== false} onChange={(v) => set("printDiscount", v)}>
+                {bn ? "বিলে ছাড় (Discount) দেখাও" : "Print Discount in Bill"}
+              </Check>
+              <Check checked={doc.printRoundOff !== false} onChange={(v) => set("printRoundOff", v)}>
+                {bn ? "বিলে Round Off দেখাও" : "Print Round Off in Bill"}
+              </Check>
+            </div>
           </div>
         </div>
       </Group>

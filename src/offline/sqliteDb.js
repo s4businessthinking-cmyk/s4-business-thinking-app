@@ -171,11 +171,12 @@ export function queryRows(sql, params = []) {
 }
 
 export async function persistOfflineDb() {
+  const result = await persist();
   try {
     const { invalidateInvoiceRowsCache } = await import("../inventory/stockRowsCache.js");
     invalidateInvoiceRowsCache();
   } catch { /* stock cache is optional */ }
-  return persist();
+  return result;
 }
 
 function initSchema() {

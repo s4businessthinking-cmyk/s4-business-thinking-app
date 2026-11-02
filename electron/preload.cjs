@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld("S4Desktop", {
     ackClose: () => ipcRenderer.send("s4-app:close-ack"),
     cancelClose: () => ipcRenderer.send("s4-app:close-cancel"),
     closeNow: () => ipcRenderer.send("s4-app:close-now"),
+    hide: () => ipcRenderer.send("s4-app:hide"),
+    show: () => ipcRenderer.send("s4-app:show"),
   },
   printing: {
     listPrinters: () => ipcRenderer.invoke("s4-print:list"),

@@ -16,6 +16,7 @@ describe("invoice rows cache", () => {
     assert.ok(peekInvoiceRowsCache());
     invalidateInvoiceRowsCache();
     assert.equal(peekInvoiceRowsCache(), null);
+    assert.equal(peekInvoiceRowsCache({ allowStale: true }), null);
     await beginInvoiceRowsLoad(loader);
     assert.equal(loads, 2);
   });

@@ -3,6 +3,7 @@ import { ProductNameLookup, ProductCodeLookup, codeLine } from "../sales-invoice
 import { C, inp, lbl, btn, th, td, splitRack, productBarcodeUnit, Modal, GridTable, todayIso, fmtDate, fmtDateLong, textMatch, sameProductLine } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { nsq } from "../utils/productSearch";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
+import { StockBadgeLabel } from "../inventory/StockBadge.jsx";
 import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
@@ -399,11 +400,14 @@ export default function PurchaseInvoiceDesktopForm({
       <div style={{ padding: "8px 12px", background: "#e9f0fa", borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 80px 64px 100px auto", gap: 6, alignItems: "end" }}>
           <div>
-            <div style={{ ...lbl, display: "flex", justifyContent: "space-between" }}>
+            <div style={{ ...lbl, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span>Product Nam<u>e</u>{" "}
                 <button type="button" onClick={() => handlersRef.current.productSearch()} title={bn ? "প্রোডাক্ট সার্চ" : "Search Product"}
                   style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>(F10)</button>
               </span>
+              {currentProduct && stockOf != null && (
+                <StockBadgeLabel stock={stockOf} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span" style={{ marginTop: 0, fontSize: 11 }} />
+              )}
               <button type="button" onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
                 New Product [F9]
               </button>
@@ -483,7 +487,9 @@ export default function PurchaseInvoiceDesktopForm({
         <div style={{ display: "flex", gap: 22, marginTop: 6, fontSize: 12.5, fontWeight: 700, minHeight: 18 }}>
           {currentProduct ? (
             <>
-              <span>STOCK: <span style={{ color: stockOf != null && stockOf <= 0 ? C.red : C.green }}>{stockOf == null ? "…" : stockOf}</span> {currentProduct.unit || "Pcs"}</span>
+              {stockOf == null
+                ? <span>📦 {bn ? "স্টক" : "Stock"}: …</span>
+                : <StockBadgeLabel stock={stockOf} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span" style={{ fontSize: 12.5 }} />}
               <span>Lnd. Cost: <span style={{ color: "#1e3a8a" }}>{piFmt2(currentProduct.landingCost)}</span></span>
               <span>Avg. Cost: <span style={{ color: "#1e3a8a" }}>{piFmt2(currentProduct.averageCost || currentProduct.landingCost)}</span></span>
               <span>Last Cost: <span style={{ color: ACCENT }}>{lastPurchase ? `${piFmt2(lastPurchase.it.unitCost)} (${fmtDate(lastPurchase.inv.invoiceDate)})` : "—"}</span></span>

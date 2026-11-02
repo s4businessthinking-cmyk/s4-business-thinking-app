@@ -17,8 +17,9 @@ export function subscribeInvoiceRowsCache(listener) {
   return () => listeners.delete(listener);
 }
 
-export function peekInvoiceRowsCache() {
-  if (rows && Date.now() - rowsAt < TTL_MS) return rows;
+export function peekInvoiceRowsCache(opts = {}) {
+  if (!rows) return null;
+  if (opts.allowStale || Date.now() - rowsAt < TTL_MS) return rows;
   return null;
 }
 

@@ -24,6 +24,11 @@ export function useGlobalSearch({ can, globalFocusProductId, isDesktop, isOwner,
       const canFindProduct = isOwner || can("viewProducts") || can("manageSales") || can("managePurchase");
       if (!canFindProduct) return;
       if (!products.some((x) => x.id === hit.id)) return;
+      if (hit.purchaseInvoiceId && (isOwner || can("managePurchase"))) {
+        if (!goTab("purchase")) return;
+        setGlobalOpenPurchaseInvoiceId(hit.purchaseInvoiceId);
+        return;
+      }
       if (isOwner || can("viewProducts")) {
         if (!goTab("products")) return;
         // Tab-change effect clears pm form; open product after switch (like customer/vendor focus).

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { orderLines, orderProgress, billOfReceipt, docTotals } from "./purchaseDocs.js";
+import { orderLines, orderProgress, billOfReceipt, docTotals, shortageAfterBill, applyBackorderToOrder, pendingProductCount } from "./purchaseDocs.js";
 
 const po = { id: "po1", status: "open", items: [{ productId: "a", unit: "Pcs", qty: 10, unitCost: 5 }, { productId: "b", unit: "Box", qty: 2, unitCost: 100 }] };
 
@@ -25,6 +25,23 @@ test("goods received notes and direct bills count, bills made from a received no
 test("closing and cancelling", () => {
   assert.equal(orderProgress({ ...po, status: "closed" }, [], []), "closed");
   assert.equal(orderProgress({ ...po, status: "cancelled" }, [], []), "cancelled");
+});
+
+test("a full-order bill that drops missing products returns those as shortage", () => {
+  const billed = [{ productId: "a", unit: "Pcs", qty: 10 }];
+  const miss = shortageAfterBill(po, billed, [], []);
+  assert.deepEqual(miss.map((l) => [l.productId, l.shortage]), [["b", 2]]);
+  assert.equal(pendingProductCount(po, [], []), 2);
+});
+
+test("missing products move to a new order and the original counts as invoiced", () => {
+  const miss = shortageAfterBill(po, [{ productId: "a", unit: "Pcs", qty: 10 }], [], []);
+  const items = applyBackorderToOrder(po, miss);
+  const split = { ...po, items };
+  const bill = { id: "p1", purchaseOrderId: "po1", status: "confirmed", items: [{ productId: "a", unit: "Pcs", qty: 10 }] };
+  assert.equal(orderProgress(split, [bill], []), "invoiced");
+  assert.deepEqual(orderLines(split, [bill], []).map((l) => l.remaining), [0, 0]);
+  assert.equal(pendingProductCount(split, [bill], []), 0);
 });
 
 test("a received note knows its bill; totals add VAT", () => {

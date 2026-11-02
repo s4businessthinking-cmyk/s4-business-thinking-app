@@ -69,6 +69,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           onGlobalSearchNavigate={handleGlobalSearchNavigate}
           globalSearchCur={t.cur || localShop?.currency || "AED"}
           globalSearchCanSeeCost={canSeeProductCost}
+          shopId={shopId}
         />
       )}
       {tab==="dashboard"&&(isOwner||can("viewProducts"))&&(

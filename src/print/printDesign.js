@@ -17,6 +17,20 @@ export const TEMPLATES = [
   { key: "compact", en: "Compact", bn: "কমপ্যাক্ট", accent: "", sample: ["#e5e7eb", "#f9fafb", "#374151"] },
 ];
 
+export function clampFontScale(fontScale) {
+  return Math.max(70, Math.min(140, parseInt(fontScale, 10) || 100));
+}
+
+// Text-size slider must not shrink the page box (90% left a gap under signatures)
+// or overflow it (100%/95% pushed signatures onto page 2). Zoom the type, then
+// stretch the sheet so it still fills exactly one printed page.
+export function invoiceScaleCss(fontScale) {
+  const scale = clampFontScale(fontScale);
+  if (scale === 100) return "";
+  const z = scale / 100;
+  return `.invoice,.receipt{zoom:${z}}@media print{.invoice,.receipt{min-height:calc(100% / ${z})!important}}`;
+}
+
 const STYLE_DEFAULT = {
   template: "pro", accent: "", fontScale: 100, logo: "", logoSize: 56,
   logoAlign: "left", logoX: 0, logoY: 0,
@@ -427,8 +441,6 @@ thead tr{background:#111!important;color:#fff!important}.grand-row{background:${
 th{padding:5px!important}td{padding:4px 5px!important}.totals-row{padding:4px 10px!important}.grand-row{padding:6px 10px!important}
 .sigs{margin-top:10px!important}.sig-line{margin-top:26px!important}.amount-box{padding:8px!important}.amount-val{font-size:22px!important}`;
   }
-  const scale = Math.max(70, Math.min(140, parseInt(style.fontScale, 10) || 100));
-  if (scale !== 100) css += `.invoice,.receipt{zoom:${scale / 100}}`;
   if (!style.showSignatures) css += ".sigs,.recv-grid{display:none!important}";
   if (style.logo) {
     const x = Math.max(-160, Math.min(220, parseInt(style.logoX, 10) || 0));
@@ -448,8 +460,10 @@ th{padding:5px!important}td{padding:4px 5px!important}.totals-row{padding:4px 10
   }
   css += `@media print{
 @page{size:A4;margin:8mm 10mm}
-body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:economy;print-color-adjust:economy}
+html,body{height:100%!important;padding:0!important}
+body{font-size:10.5pt!important;-webkit-print-color-adjust:economy;print-color-adjust:economy}
 .receipt,.invoice{border:1px solid #000!important;border-radius:0!important;box-shadow:none!important;max-width:100%!important}
+.sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}
 .hdr{padding:3mm 4mm!important;background:#fff!important;color:#000!important;background-image:none!important}
 .hdr *,.rc-title,.rc-no,.shop-name,.shop-sub{color:#000!important}
 .shop-name{font-size:12pt!important}.shop-sub{font-size:8.5pt!important;line-height:1.25!important}
@@ -473,6 +487,7 @@ body{padding:0!important;font-size:10.5pt!important;-webkit-print-color-adjust:e
 .sig-line{margin-top:8mm!important;padding-top:2px!important;font-size:8.5pt!important}
 .footer{padding:2mm!important;font-size:8pt!important;background:#fff!important}
 }`;
+  css += invoiceScaleCss(style.fontScale);
   return css;
 }
 
@@ -492,10 +507,9 @@ export function applyDesign(html, kind, styleOverride) {
 .s4-terms-title{text-align:center;font-weight:900;margin-bottom:4px}
 .s4-term-line{display:flex;align-items:flex-start;gap:4px;margin:1px 0}
 .s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}
-.sheet-mid{flex:1 1 auto!important;min-height:50mm!important;display:flex!important;flex-direction:column!important}
+.sheet-mid{flex:1 1 auto!important;min-height:50mm!important}
 .sheet-bot{flex:0 0 auto!important;margin-top:auto!important}
-table.items{height:100%!important;margin:0!important}
-tr.blank td{height:7mm;border-bottom:1px solid #999!important}`;
+table.items{height:auto!important;margin:0!important}`;
   let out = html.replace("</style>", `${templateCss(style)}${termsCss}</style>`);
   const shopName = /(<div class="shop-name">[\s\S]*?<\/div>)/;
   if (style.logo) out = out.replace(shopName, `<div class="s4-logo-wrap"><img class="s4-logo" src="${style.logo}" alt=""></div>$1`);
@@ -572,9 +586,7 @@ function tableHtml(el, kind, rows, layout, ox, oy, bn) {
   const colgroup = cols.map((c) => `<col style="width:${c.w}mm">`).join("");
   const cell = (c, v, head) => `<td style="${border}padding:0 1mm;height:${rowH}mm;overflow:hidden;white-space:nowrap;text-overflow:clip;text-align:${c.align || (RIGHT_COLS.has(c.key) ? "right" : c.key === "sl" ? "center" : "left")};${head ? "font-weight:700;" : ""}">${esc(v)}</td>`;
   const head = showHead ? `<tr>${cols.map((c) => cell(c, c.label || colLabel(kind, c.key, bn), true)).join("")}</tr>` : "";
-  const cap = tableCapacity(el, pre);
-  const filled = rows.length >= cap ? rows : [...rows, ...Array.from({ length: cap - rows.length }, () => ({}))];
-  const body = filled.map((r) => `<tr>${cols.map((c) => cell(c, r[c.key] ?? "", false)).join("")}</tr>`).join("");
+  const body = rows.map((r) => `<tr>${cols.map((c) => cell(c, r[c.key] ?? "", false)).join("")}</tr>`).join("");
   return `<table style="position:absolute;left:${el.x + ox}mm;top:${el.y + oy}mm;width:${el.w}mm;border-collapse:collapse;table-layout:fixed;font-size:${el.size || 10}pt">${colgroup}${head}${body}</table>`;
 }
 

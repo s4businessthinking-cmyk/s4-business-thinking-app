@@ -26,7 +26,7 @@ function PhotoField({ label: lbl, value, onChange, bn, kind = "id" }) {
   const run = async (folder) => {
     setBusy(true);
     try {
-      const data = await acquireScanImage({ folder });
+      const data = await acquireScanImage({ folder, kind });
       if (data) onChange(data);
     } catch (err) { alert(err.message); } finally { setBusy(false); }
   };
@@ -36,18 +36,19 @@ function PhotoField({ label: lbl, value, onChange, bn, kind = "id" }) {
       <div onClick={() => !busy && run(false)}
         style={{
           width: "100%",
+          maxWidth: cheque ? 576 : 254,
+          margin: "0 auto",
           borderRadius: 10,
           border: value ? "1px solid #cbd5e1" : "1.5px dashed #94a3b8",
-          background: "#f8fafc", overflow: "hidden", cursor: "pointer",
+          background: "#fff", overflow: "hidden", cursor: "pointer",
           aspectRatio: cheque ? "2.4 / 1" : "85.6 / 54",
-          maxHeight: cheque ? 200 : 140,
-          display: "flex", alignItems: "center", justifyContent: "center",
+          position: "relative",
         }}>
         {value
           ? (isPdf
-            ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700, display: "block", padding: 24, textAlign: "center" }}>📄 PDF</span>
-            : <img src={value} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />)
-          : <span style={{ fontSize: 12, color: "#64748b", padding: 12, textAlign: "center" }}>{busy ? "…" : (bn ? "📷 স্ক্যান / ক্যামেরা" : "📷 Scan / camera")}</span>}
+            ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center" }}>📄 PDF</span>
+            : <img src={value} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#fff", display: "block" }} />)
+          : <span style={{ fontSize: 12, color: "#64748b", padding: 12, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>{busy ? "…" : (bn ? "📷 স্ক্যান / ক্যামেরা" : "📷 Scan / camera")}</span>}
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
         <button type="button" onClick={() => run(false)} disabled={busy} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>

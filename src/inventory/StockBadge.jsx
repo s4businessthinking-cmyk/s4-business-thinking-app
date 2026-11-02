@@ -1,6 +1,18 @@
 import { useEffect, useState } from "react";
 import { computeStockMap, loadInvoiceRows } from "./stockFromInvoices";
 import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "./stockRowsCache.js";
+import { stockBadgeParts } from "./stockBadgeParts.js";
+
+export function StockBadgeLabel({ stock, extraQty = 0, unit = "Pcs", reorderMin = 0, lang, as = "div", style }) {
+  const { color, over } = stockBadgeParts(stock, extraQty, reorderMin);
+  const Tag = as;
+  return (
+    <Tag style={{ fontSize: 11, fontWeight: 800, color, marginTop: as === "div" ? 4 : 0, ...style }}>
+      📦 {lang === "bn" ? "স্টক" : "Stock"}: {parseFloat(Number(stock).toFixed(2))} {unit || "Pcs"}
+      {over ? (lang === "bn" ? " — স্টকের চেয়ে বেশি!" : " — more than in stock!") : ""}
+    </Tag>
+  );
+}
 
 // Current stock of one product, from the same invoice-based calculation the PC forms use.
 export default function StockBadge({ product, products, shopId, refreshKey, lang, extraQty = 0 }) {
@@ -26,12 +38,13 @@ export default function StockBadge({ product, products, shopId, refreshKey, lang
   }, [productId, products, shopId, refreshKey, stockRev]);
 
   if (!productId || stock === null) return null;
-  const left = stock - (Number(extraQty) || 0);
-  const color = left < 0 ? "#ef4444" : left <= (Number(product.reorderMin) || 0) ? "#f59e0b" : "#22c55e";
   return (
-    <div style={{ fontSize: 11, fontWeight: 800, color, marginTop: 4 }}>
-      📦 {lang === "bn" ? "স্টক" : "Stock"}: {parseFloat(stock.toFixed(2))} {product.unit || "Pcs"}
-      {extraQty > 0 && left < 0 ? (lang === "bn" ? " — স্টকের চেয়ে বেশি!" : " — more than in stock!") : ""}
-    </div>
+    <StockBadgeLabel
+      stock={stock}
+      extraQty={extraQty}
+      unit={product.unit}
+      reorderMin={product.reorderMin}
+      lang={lang}
+    />
   );
 }

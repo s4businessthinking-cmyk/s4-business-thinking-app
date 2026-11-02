@@ -3,9 +3,11 @@
 // Android: shared via the system share sheet (e.g. "Save to Drive").
 // Browser: plain download.
 import { callServer } from "../backend/firestore.js";
+import { SHOP_PULL_COLLECTIONS } from "../offline/cloudPullService.js";
+import { getLocalRecords } from "../offline/sqliteDb.js";
 import { FIREBASE_EXPORT_FORMAT, planFirebaseImport } from "./firebaseImport.js";
+import { BACKUP_FORMAT, buildLocalBackupPayload, docsFromLocalRecords } from "./backupLocal.js";
 
-const BACKUP_FORMAT = "s4-shop-backup";
 const DESKTOP_AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const MOBILE_REMIND_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const lastBackupKey = (shopId) => `s4-last-backup:${shopId}`;
@@ -80,8 +82,7 @@ async function shareOnMobile(fileName, bytes) {
   return uri;
 }
 
-export async function saveShopBackup(shopId) {
-  const backup = await callServer("/v1/backup/export", { shopId });
+async function writeBackupFile(shopId, backup) {
   const bytes = await gzip(JSON.stringify(backup));
   const fileName = backupFileName(shopId, new Date());
   const platform = backupPlatform();
@@ -92,6 +93,23 @@ export async function saveShopBackup(shopId) {
   const at = new Date().toISOString();
   setLastBackupAt(shopId, at);
   return { fileName, savedTo, at, documentCount: backup.documentCount, sizeBytes: bytes.length };
+}
+
+export async function saveShopBackup(shopId) {
+  const backup = await callServer("/v1/backup/export", { shopId });
+  return writeBackupFile(shopId, backup);
+}
+
+// Close/logout backup: SQLite already on this PC — no wait for the VPS export.
+export async function saveShopBackupFromLocal(shopId) {
+  const names = ["shops", ...SHOP_PULL_COLLECTIONS];
+  const lists = await Promise.all(names.map((name) => getLocalRecords(name).catch(() => [])));
+  const collectionDocs = {};
+  names.forEach((name, i) => {
+    const docs = docsFromLocalRecords(lists[i], shopId, name);
+    if (docs.length) collectionDocs[name] = docs;
+  });
+  return writeBackupFile(shopId, buildLocalBackupPayload(shopId, collectionDocs, new Date().toISOString()));
 }
 
 // Parses a picked file; plain (un-gzipped) JSON backups are accepted too.

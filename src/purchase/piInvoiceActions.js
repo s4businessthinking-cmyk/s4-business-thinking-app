@@ -1,10 +1,11 @@
-import { STOCK_AFFECTING_INVOICE_STATUSES, applyInvoiceStockEffect, piFmt2, piN2, unlinkedStockOk } from "../shared/appShared.jsx";
+import { STOCK_AFFECTING_INVOICE_STATUSES, applyInvoiceStockEffect, deviceSerialTag, piFmt2, piN2, reserveShopSerial, unlinkedStockOk } from "../shared/appShared.jsx";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
 import { isForeign, lineToBase, rateOf } from "./purchaseOptions.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { localIsoDate } from "../utils/localIsoDate.js";
 import { logAudit } from "../utils/auditLog.js";
-import { offlineCreate, offlineGetById, offlinePatch, offlineRemove } from "../offline/offlineRepository";
+import { offlineCreate, offlineGetById, offlineList, offlinePatch, offlineRemove } from "../offline/offlineRepository";
+import { applyBackorderToOrder, backorderItemsFromShortage, docTotals, mergeOrderItems, orderProgress, shortageAfterBill } from "./purchaseDocs.js";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { piCalcLine, piCalcTotals } from "./purchaseShared.js";
 import { pricingPatchFromLanding } from "../product-master/pricingFromLanding.js";
@@ -16,7 +17,16 @@ function unmatchedPurchaseNames(items) {
   return (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
 }
 
-export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onOpenProductMaster, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user }) {
+function shopDocs(res, shopId) {
+  return (res?.records || []).map((r) => ({ ...(r.data || r), id: r.data?.id || r.document_id || r.id })).filter((row) => !shopId || row.shopId === shopId);
+}
+function recDoc(rec) {
+  if (!rec) return null;
+  const data = rec.data || rec;
+  return { ...data, id: data.id || rec.document_id };
+}
+
+export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onOpenProductMaster, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shop, shopId, t, toast, user }) {
   // ── Build payload ──
   const piBuild=(status, invoiceNoOverride)=>{
     if (!piForm.vendorName.trim()){ toast(lang==="bn"?"❌ Vendor / সাপ্লায়ারের নাম দিন — লিস্টে না থাকলে নাম লিখে দিন":"❌ Enter the vendor / supplier name — type it if it's not in the list","err"); return null; }
@@ -58,6 +68,62 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     };
     return { ...sourceFields, shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate, entryDate:piForm.entryDate||piForm.invoiceDate,
       currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
+  };
+
+  const nextPurchaseOrderNo = async () => {
+    const rows = shopDocs(await offlineList("purchaseOrders"), shopId);
+    const re = /^PO-?(\d+)(?:-[A-Z]{2})?$/i;
+    const local = rows.reduce((mx, r) => {
+      const m = String(r.orderNo || "").match(re);
+      return m ? Math.max(mx, Number(m[1])) : mx;
+    }, Number(shop?.lastPOSerial || 0));
+    const fmt = (n) => `PO-${String(n).padStart(4, "0")}`;
+    const serial = await reserveShopSerial(shopId, "lastPOSerial", local);
+    if (serial) return fmt(serial);
+    return isOwner ? fmt(local + 1) : `${fmt(local + 1)}-${deviceSerialTag()}`;
+  };
+
+  // After a PO is billed, leftover lines (supplier did not send them) become a new PO so they can be ordered elsewhere.
+  const splitUnreceivedPurchaseOrder = async (payload, persistOpts) => {
+    if (!payload?.purchaseOrderId || payload.goodsReceiptId || !["confirmed", "paid", "partial"].includes(payload.status)) return null;
+    const order = recDoc(await offlineGetById("purchaseOrders", payload.purchaseOrderId));
+    if (!order || order.status === "cancelled" || (order.shopId && order.shopId !== shopId)) return null;
+    const [grnRes, piRes] = await Promise.all([offlineList("goodsReceipts"), offlineList("purchaseInvoices")]);
+    const grns = shopDocs(grnRes, shopId);
+    const bills = shopDocs(piRes, shopId).filter((p) => p.id !== payload.id);
+    const miss = shortageAfterBill(order, payload.items, bills, grns);
+    if (!miss.length) return null;
+    const items = backorderItemsFromShortage(miss);
+    const totals = docTotals(items, true);
+    const nowIso = new Date().toISOString();
+    const note = lang === "bn"
+      ? `${order.orderNo}-এ পাওয়া যায়নি (${payload.invoiceNo}) — অন্য সাপ্লায়ারকে অর্ডার দিন`
+      : `Not received on ${order.orderNo} (${payload.invoiceNo}) — order from another supplier`;
+    let saved;
+    const existingBo = order.backorderOrderId ? recDoc(await offlineGetById("purchaseOrders", order.backorderOrderId)) : null;
+    const boLive = existingBo && existingBo.status !== "cancelled" && ["open", "partial"].includes(orderProgress(existingBo, bills, grns));
+    if (boLive) {
+      const merged = mergeOrderItems(existingBo.items || [], items);
+      const nextTot = docTotals(merged, true);
+      const patch = { items: merged, subtotal: nextTot.sub, totalTax: nextTot.tax, grandTotal: nextTot.grand, note: [existingBo.note, note].filter(Boolean).join(" · "), updatedAt: nowIso, updatedBy: user?.uid || "" };
+      const res = await offlinePatch("purchaseOrders", existingBo.id, patch, existingBo, persistOpts);
+      saved = { ...res.data, id: existingBo.id };
+    } else {
+      const orderNo = await nextPurchaseOrderNo();
+      const res = await offlineCreate("purchaseOrders", {
+        shopId, orderNo, orderDate: localIsoDate(), refNo: order.orderNo || "", vendorId: null, vendorName: "", vendorMobile: "",
+        note, items, subtotal: totals.sub, totalTax: totals.tax, grandTotal: totals.grand, expectedDate: "",
+        sourceOrderId: order.id, sourceOrderNo: order.orderNo || "", sourceInvoiceId: payload.id, sourceInvoiceNo: payload.invoiceNo || "",
+        status: "open", createdAt: nowIso, createdBy: user?.uid || "", createdByName: profile?.personName || "",
+      }, persistOpts);
+      saved = { ...res.data, id: res.documentId };
+    }
+    const patchedItems = applyBackorderToOrder(order, miss);
+    await offlinePatch("purchaseOrders", order.id, {
+      items: patchedItems, backorderOrderId: saved.id, backorderOrderNo: saved.orderNo, updatedAt: nowIso, updatedBy: user?.uid || "",
+    }, order, persistOpts);
+    logAudit({ shopId, user, profile, action: boLive ? "edit" : "create", collection: "purchaseOrders", docId: saved.id, docNo: saved.orderNo, amount: saved.grandTotal, note: `${miss.length} from ${order.orderNo}` });
+    return { orderNo: saved.orderNo, count: miss.length };
   };
 
   const savePurchaseInvoiceOffline = async (payload, successMessage) => {
@@ -115,10 +181,20 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     await refreshAverageCosts([...(payload.items || []), ...(priorInvoice?.items || [])].map((it) => it.productId),
       [...invoices.filter((inv) => inv.id !== savedId), savedDoc], deferPersist);
 
-    await persistOfflineDb();
+    let splitInfo = null;
+    try { splitInfo = await splitUnreceivedPurchaseOrder({ ...payload, id: savedId }, deferPersist); }
+    catch (err) { console.warn("[S4 PI] purchase-order split failed", err); }
+
+    persistOfflineDb().catch((err) => console.warn("[S4 PI] persist after save failed", err));
 
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
+    }
+
+    if (splitInfo) {
+      toast(lang === "bn"
+        ? `${splitInfo.count}টি পণ্য পাওয়া যায়নি — নতুন অর্ডার ${splitInfo.orderNo}-এ গেছে। অন্য সাপ্লায়ারকে অর্ডার দিন।`
+        : `${splitInfo.count} product(s) were not received — moved to new order ${splitInfo.orderNo}. Order them from another supplier.`);
     }
 
     if (!editInvoiceId) {

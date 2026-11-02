@@ -6,6 +6,7 @@ import { salesSpecs } from "../product-master/productSpecs";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 import { itemBaseQty } from "../inventory/unitConversion";
+import { StockBadgeLabel } from "../inventory/StockBadge.jsx";
 import { listShopRecords } from "../branch-transfer/branchTransferService";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
@@ -365,6 +366,10 @@ export default function SalesInvoiceDesktopForm({
   }, { qty: 0, gross: 0, disc: 0, vat: 0, total: 0 });
 
   const stockOf = currentProduct && stockMap ? stockMap.get(currentProduct.id) : null;
+  const stockExtraQty = (!isQuote && !editInvId && currentProduct)
+    ? [...lines.filter((it) => it.productId === currentProduct.id && it.id !== editingLineId), current]
+      .reduce((sum, it) => sum + itemBaseQty(it, currentProduct), 0)
+    : 0;
   const rack = splitRack(currentProduct?.rackLocation);
   const unitOptions = siUnitOptionsFor(currentProduct, current.unit);
   const field = (label, node, labelWidth = 92) => (
@@ -492,11 +497,22 @@ export default function SalesInvoiceDesktopForm({
       <div style={{ padding: "8px 12px", background: "#e9f0fa", borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 84px 64px auto", gap: 6, alignItems: "end" }}>
           <div>
-            <div style={{ ...lbl, display: "flex", justifyContent: "space-between" }}>
+            <div style={{ ...lbl, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span>Product Nam<u>e</u>{" "}
                 <button type="button" onClick={() => handlersRef.current.productSearch()} title={bn ? "প্রোডাক্ট সার্চ" : "Search Product"}
                   style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>(F10)</button>
               </span>
+              {!isQuote && currentProduct && stockOf != null && (
+                <StockBadgeLabel
+                  stock={stockOf}
+                  extraQty={stockExtraQty}
+                  unit={currentProduct.unit}
+                  reorderMin={currentProduct.reorderMin}
+                  lang={lang}
+                  as="span"
+                  style={{ marginTop: 0, fontSize: 11 }}
+                />
+              )}
               <button type="button" onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
                 New Product [F9]
               </button>
@@ -568,7 +584,9 @@ export default function SalesInvoiceDesktopForm({
         <div style={{ display: "flex", gap: 22, marginTop: 6, fontSize: 12.5, fontWeight: 700, minHeight: 18 }}>
           {currentProduct ? (
             <>
-              <span>STOCK: <span style={{ color: stockOf != null && stockOf <= 0 ? C.red : C.green }}>{stockOf == null ? "…" : stockOf}</span> {currentProduct.unit || "Pcs"}</span>
+              {stockOf == null
+                ? <span>📦 {bn ? "স্টক" : "Stock"}: …</span>
+                : <StockBadgeLabel stock={stockOf} extraQty={stockExtraQty} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span" style={{ fontSize: 12.5 }} />}
               <span>MRP: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.mrp)}</span></span>
               {canSeeCost && <span>Lnd. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.landingCost)}</span></span>}
               {canSeeCost && <span>Avg. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.averageCost || currentProduct.landingCost)}</span></span>}
