@@ -27,10 +27,14 @@ const STATIC_MIME = {
   ".woff": "font/woff", ".woff2": "font/woff2", ".webmanifest": "application/manifest+json", ".gz": "application/gzip", ".map": "application/json",
 };
 
+// Fixed port so Chromium keeps the same origin (localStorage / IndexedDB) across launches.
+// listen(0) used a random port every start → printer + print settings looked "unset" after close.
+const LOCAL_UI_PORT = 18713;
+
 // The packaged app's UI reads files over file://, and Chromium refuses to create Workers (OCR,
 // PDF parsing) or fetch WASM from that scheme — it works on the web build only because that one
 // is served over http(s). Serving the same built files from a local HTTP server removes that gap.
-function startLocalServer(rootDir) {
+function startLocalServer(rootDir, port = LOCAL_UI_PORT) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       let reqPath;
@@ -47,8 +51,20 @@ function startLocalServer(rootDir) {
       });
     });
     server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => resolve(server));
+    server.listen(port, "127.0.0.1", () => resolve(server));
   });
+}
+
+async function ensureLocalUiServer(rootDir) {
+  try {
+    return await startLocalServer(rootDir, LOCAL_UI_PORT);
+  } catch (error) {
+    // Another S4 window already holds the port — reuse the same origin so settings stay shared.
+    if (error && error.code === "EADDRINUSE") {
+      return { address: () => ({ port: LOCAL_UI_PORT }), close: () => {} };
+    }
+    throw error;
+  }
 }
 
 async function createWindow() {
@@ -120,9 +136,9 @@ async function createWindow() {
   } else {
     const distDir = path.join(__dirname, "../dist");
     try {
-      const server = await startLocalServer(distDir);
+      const server = await ensureLocalUiServer(distDir);
       win.on("closed", () => server.close());
-      win.loadURL(`http://127.0.0.1:${server.address().port}/index.html`);
+      win.loadURL(`http://127.0.0.1:${LOCAL_UI_PORT}/index.html`);
     } catch (error) {
       console.error("[S4] local server failed, falling back to file://", error);
       win.loadFile(path.join(distDir, "index.html"));
@@ -240,6 +256,19 @@ const execFileAsync = promisify(execFile);
 const PRINT_HTML_MAX_BYTES = 8 * 1024 * 1024;
 
 function setupPrintIpc() {
+  const printSettingsFile = () => path.join(app.getPath("userData"), "print-settings.json");
+  ipcMain.handle("s4-print-settings:load", async () => {
+    try {
+      const raw = JSON.parse(await fs.promises.readFile(printSettingsFile(), "utf8"));
+      return raw && typeof raw === "object" ? raw : null;
+    } catch { return null; }
+  });
+  ipcMain.handle("s4-print-settings:save", async (_event, settings) => {
+    if (!settings || typeof settings !== "object") throw new Error("invalid print settings");
+    await fs.promises.writeFile(printSettingsFile(), JSON.stringify(settings), "utf8");
+    return true;
+  });
+
   ipcMain.handle("s4-print:list", async (event) => {
     const printers = await event.sender.getPrintersAsync();
     return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name, isDefault: !!p.isDefault }));

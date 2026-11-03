@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { loadPrintSettings, savePrintSettings, PAPER_SIZES, canPickPrinter, listPrinters, printHtmlDocument } from "./printSettings.js";
+import { useEffect, useRef, useState } from "react";
+import { loadPrintSettings, savePrintSettings, hydratePrintSettingsFromDisk, PAPER_SIZES, canPickPrinter, listPrinters, printHtmlDocument } from "./printSettings.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 import { DESIGN_DOCS, TEMPLATES, SAMPLE_DATA, loadPrintDesign, savePrintDesign, savePrintDesignBestEffort, extractShopPrintDesign, hydratePrintDesignFromShop, renderLayoutDocument, imageFileToDataUrl } from "./printDesign.js";
 import { saveShopRecord } from "../offline/shopService";
@@ -345,6 +345,8 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
   const bn = lang === "bn";
   const [tab, setTab] = useState("general");
   const [draft, setDraft] = useState(loadPrintSettings);
+  const [ready, setReady] = useState(() => !window.S4Desktop?.printing?.loadSettings);
+  const dirtyRef = useRef(false);
   const [hideCode, setHideCode] = useState(!showCode);
   const [color, setColor] = useState(!!colorPrint);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -352,8 +354,17 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
   const [designerDoc, setDesignerDoc] = useState(null);
   const [saving, setSaving] = useState(false);
   useEscapeKey(onClose, { level: 3 });
+  useEffect(() => {
+    let alive = true;
+    hydratePrintSettingsFromDisk().then((s) => {
+      if (!alive) return;
+      if (!dirtyRef.current) setDraft(s);
+      setReady(true);
+    }).catch(() => { if (alive) setReady(true); });
+    return () => { alive = false; };
+  }, []);
 
-  const set = (k, v) => setDraft((d) => ({ ...d, [k]: v }));
+  const set = (k, v) => { dirtyRef.current = true; setDraft((d) => ({ ...d, [k]: v })); };
   const apply = async () => {
     if (saving) return false;
     savePrintSettings(draft);
@@ -483,15 +494,16 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
             onClose={() => setSetupOpen(false)}
             onSet={(billPrinter, barcodePrinter, chequePrinter) => {
               const next = { ...draft, billPrinter, barcodePrinter, chequePrinter };
+              dirtyRef.current = true;
               setDraft(next);
               savePrintSettings({ ...loadPrintSettings(), billPrinter, barcodePrinter, chequePrinter });
               toast?.(bn ? "✅ প্রিন্টার সেট হয়েছে" : "✅ Printers set");
             }} />
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: 10 }}>
-          <button type="button" style={winBtn(true)} disabled={saving} onClick={async () => { if (await apply()) onClose(); }}>OK</button>
+          <button type="button" style={winBtn(true)} disabled={saving || !ready} onClick={async () => { if (await apply()) onClose(); }}>OK</button>
           <button type="button" style={winBtn(false)} onClick={onClose}>{bn ? "বাতিল" : "Cancel"}</button>
-          <button type="button" style={winBtn(false)} disabled={saving} onClick={apply}>{saving ? (bn ? "সেভ হচ্ছে..." : "Saving...") : (bn ? "প্রয়োগ" : "Apply")}</button>
+          <button type="button" style={winBtn(false)} disabled={saving || !ready} onClick={apply}>{saving ? (bn ? "সেভ হচ্ছে..." : "Saving...") : (bn ? "প্রয়োগ" : "Apply")}</button>
         </div>
       </div>
     </div>

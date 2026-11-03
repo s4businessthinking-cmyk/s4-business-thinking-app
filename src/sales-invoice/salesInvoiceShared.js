@@ -363,8 +363,9 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
 
   const rows = (invoice.items||[]).map((it,i)=>{
     const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
+    // Same line as the name — a second line under every product pushes totals onto page 2.
     const codeHtml = showCode&&!invoice.hideCodeInPrint&&(it.code||it.brand)
-      ? `<br><span style="font-size:10px;color:#6b7280">${[it.code,it.brand].filter(Boolean).join("  ")}</span>` : "";
+      ? ` <span style="font-size:9px;font-weight:400;color:#444">(${[it.code,it.brand].filter(Boolean).join(" · ")})</span>` : "";
     if (isDelivery) {
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     } else if (hideVatCols) {

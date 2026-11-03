@@ -620,6 +620,18 @@ export async function getLocalRecords(collectionName) {
   }));
 }
 
+/** Distinct collection names still held in local SQLite (for full offline backup). */
+export async function listLocalCollectionNames() {
+  await bootOfflineSqlite();
+  const rows = query(
+    `SELECT DISTINCT collection_name AS name
+     FROM local_records
+     WHERE deleted = 0
+     ORDER BY collection_name`
+  );
+  return rows.map((row) => String(row.name || "")).filter(Boolean);
+}
+
 export async function enqueueSync(collectionName, documentId, operation, payload, options = {}) {
   await bootOfflineSqlite();
 

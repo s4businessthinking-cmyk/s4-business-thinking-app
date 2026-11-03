@@ -3,10 +3,10 @@
 // Android: shared via the system share sheet (e.g. "Save to Drive").
 // Browser: plain download.
 import { callServer } from "../backend/firestore.js";
-import { SHOP_PULL_COLLECTIONS } from "../offline/cloudPullService.js";
-import { getLocalRecords } from "../offline/sqliteDb.js";
+import { SHOP_PULL_COLLECTIONS, SHOP_PULL_ONLY_COLLECTIONS } from "../offline/cloudPullService.js";
+import { getLocalRecords, listLocalCollectionNames } from "../offline/sqliteDb.js";
 import { FIREBASE_EXPORT_FORMAT, planFirebaseImport } from "./firebaseImport.js";
-import { BACKUP_FORMAT, buildLocalBackupPayload, docsFromLocalRecords } from "./backupLocal.js";
+import { BACKUP_FORMAT, buildLocalBackupPayload, docsFromLocalRecords, localBackupCollectionNames } from "./backupLocal.js";
 
 const DESKTOP_AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const MOBILE_REMIND_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
@@ -100,9 +100,13 @@ export async function saveShopBackup(shopId) {
   return writeBackupFile(shopId, backup);
 }
 
-// Close/logout backup: SQLite already on this PC — no wait for the VPS export.
+// Close/logout backup: everything this PC already has in SQLite — works offline.
 export async function saveShopBackupFromLocal(shopId) {
-  const names = ["shops", ...SHOP_PULL_COLLECTIONS];
+  const discovered = await listLocalCollectionNames().catch(() => []);
+  const names = localBackupCollectionNames(
+    ["shops", ...SHOP_PULL_COLLECTIONS, ...SHOP_PULL_ONLY_COLLECTIONS],
+    discovered,
+  );
   const lists = await Promise.all(names.map((name) => getLocalRecords(name).catch(() => [])));
   const collectionDocs = {};
   names.forEach((name, i) => {

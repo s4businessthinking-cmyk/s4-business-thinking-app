@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { BACKUP_FORMAT, buildLocalBackupPayload, docsFromLocalRecords } from "./backupLocal.js";
+import { BACKUP_FORMAT, buildLocalBackupPayload, docsFromLocalRecords, localBackupCollectionNames } from "./backupLocal.js";
 
 describe("docsFromLocalRecords", () => {
   it("keeps this shop's rows and skips other shops", () => {
@@ -32,5 +32,14 @@ describe("buildLocalBackupPayload", () => {
     assert.equal(backup.version, 1);
     assert.equal(backup.documentCount, 1);
     assert.deepEqual(Object.keys(backup.collections), ["salesInvoices"]);
+  });
+});
+
+describe("localBackupCollectionNames", () => {
+  it("merges known lists with SQLite discoveries without duplicates", () => {
+    assert.deepEqual(
+      localBackupCollectionNames(["shops", "salesInvoices"], ["salesInvoices", "taxPayments", ""]),
+      ["shops", "salesInvoices", "taxPayments"],
+    );
   });
 });

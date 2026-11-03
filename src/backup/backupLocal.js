@@ -34,3 +34,18 @@ export function buildLocalBackupPayload(shopId, collectionDocs, createdAt) {
     collections,
   };
 }
+
+/** Merge known pull lists with whatever SQLite actually holds so offline close backup is complete. */
+export function localBackupCollectionNames(...lists) {
+  const out = [];
+  const seen = new Set();
+  for (const list of lists) {
+    for (const name of list || []) {
+      const key = String(name || "").trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(key);
+    }
+  }
+  return out;
+}

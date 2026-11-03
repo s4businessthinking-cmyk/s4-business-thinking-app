@@ -21,7 +21,10 @@ export function generatePurchaseInvoiceHTML(invoice, shop, lang, opts = {}) {
   const grandBg = "#111";
 
   const rows = items.map((it, i) => {
-    const codeHtml = (it.code || it.brand) ? `<br><span style="font-size:10px">${[it.code, it.brand].filter(Boolean).join("  ")}</span>` : "";
+    // Same line as the name so 8–12 products still fit on one A4 page.
+    const codeHtml = (it.code || it.brand)
+      ? ` <span style="font-size:9px;font-weight:400">(${[it.code, it.brand].filter(Boolean).join(" · ")})</span>`
+      : "";
     const discHtml = piN2(it.discountPerc) > 0 ? `${it.discountPerc}%` : piN2(it.discountAmt) > 0 ? piFmt2(it.discountAmt) : "—";
     return hasTax
       ? `<tr><td style="text-align:center">${i + 1}</td><td><strong>${it.name || ""}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${cur} ${piFmt2(it.unitCost)}</td><td style="text-align:center">${discHtml}</td><td style="text-align:center">${it.taxPerc || 0}%</td><td style="text-align:right"><strong>${cur} ${piFmt2(it.lineTotal)}</strong></td></tr>`

@@ -107,7 +107,7 @@ import AppGlobalSearch from "./dashboard/AppGlobalSearch.jsx";
 import { groupMenuItems } from "./dashboard/menuGroups.js";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "./components/WindowChrome.jsx";
 import PrintSettingsWindow from "./print/PrintSettingsWindow.jsx";
-import { loadPrintSettings, docSettingsFor, paperCss, printHtmlDocument, printWithSettings, canPickPrinter } from "./print/printSettings.js";
+import { loadPrintSettings, hydratePrintSettingsFromDisk, docSettingsFor, paperCss, printHtmlDocument, printWithSettings, canPickPrinter } from "./print/printSettings.js";
 import { applyDesign, loadPrintDesign, layoutAppliesTo, renderLayoutDocument, amountInWords, generateStatementHTML, SAMPLE_DATA, shopHeaderExtras } from "./print/printDesign.js";
 import { useChequeDueNotifications } from "./dashboard/chequeNotifications.js";
 import { useEmployeeAlerts } from "./employees/useEmployeeAlerts.js";
@@ -438,6 +438,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const setWaStyle = (v) => { setWaStyleState(v); saveWaStyle(v); };
   const [siShowCode,setSiShowCode] = useState(loadSiShowCode);
   const [siColorPrint,setSiColorPrint] = useState(loadSiColor);
+  useEffect(() => { hydratePrintSettingsFromDisk().catch(() => {}); }, []);
 
   const windowWidth = useWindowWidth();
   const isDesktop = windowWidth >= 768;

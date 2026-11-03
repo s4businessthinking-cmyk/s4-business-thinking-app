@@ -1,7 +1,8 @@
 // Offers the shop owner a data backup before logging out or closing the desktop app.
 import { BackupCancelled, saveShopBackupFromLocal } from "./backupService.js";
 
-const CLOSE_BACKUP_MS = 8000;
+// Local SQLite backup (offline). Large shops with photos may need a bit of time.
+const CLOSE_BACKUP_MS = 60000;
 
 function withTimeout(promise, ms) {
   let timer;
@@ -41,10 +42,12 @@ export async function backupBeforeExit({ shopId, lang, toast, action }) {
     if (!closing) toast?.(bn ? `✅ ব্যাকআপ সেভ হয়েছে (${result.documentCount ?? 0} রেকর্ড)` : `✅ Backup saved (${result.documentCount ?? 0} records)`);
     return true;
   } catch (error) {
-    // Window already gone from the user's view — still quit so close never hangs.
-    if (closing && String(error?.message || error) === "timeout") return true;
     if (closing) deskApp()?.show?.();
-    const reason = error instanceof BackupCancelled ? (bn ? "বাতিল করা হয়েছে" : "cancelled") : String(error?.message || error);
+    const reason = error instanceof BackupCancelled
+      ? (bn ? "বাতিল করা হয়েছে" : "cancelled")
+      : String(error?.message || error) === "timeout"
+        ? (bn ? "সময় শেষ" : "timed out")
+        : String(error?.message || error);
     return window.confirm(bn
       ? `❌ ব্যাকআপ হয়নি (${reason})।\n\nতবুও ${what} করবেন?`
       : `❌ Backup failed (${reason}).\n\nContinue ${what} anyway?`);

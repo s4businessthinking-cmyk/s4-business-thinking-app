@@ -34,7 +34,8 @@ export const DEFAULT_PRINT_SETTINGS = {
   showPreview: true,
   printVatSummary: false,
   printSalesman: true,
-  printCustomerBalance: true,
+  // Off until the user turns it on in Print Settings (must stay after close).
+  printCustomerBalance: false,
   printCreditPeriod: false,
   printUserName: true,
   printNarration: true,
@@ -46,22 +47,67 @@ export const DEFAULT_PRINT_SETTINGS = {
   tax: { ...DOC_DEFAULTS },
 };
 
+function mergePrintSettings(raw = {}) {
+  return {
+    ...DEFAULT_PRINT_SETTINGS,
+    ...raw,
+    retail: { ...DOC_DEFAULTS, ...(raw.retail || {}) },
+    tax: { ...DOC_DEFAULTS, ...(raw.tax || {}) },
+  };
+}
+
+let memorySettings = null;
+let hydratePromise = null;
+
 export function loadPrintSettings() {
+  if (memorySettings) return mergePrintSettings(memorySettings);
   try {
     const raw = JSON.parse(localStorage.getItem(KEY) || "null") || {};
-    return {
-      ...DEFAULT_PRINT_SETTINGS,
-      ...raw,
-      retail: { ...DOC_DEFAULTS, ...(raw.retail || {}) },
-      tax: { ...DOC_DEFAULTS, ...(raw.tax || {}) },
-    };
+    return mergePrintSettings(raw);
   } catch {
-    return { ...DEFAULT_PRINT_SETTINGS, retail: { ...DOC_DEFAULTS }, tax: { ...DOC_DEFAULTS } };
+    return mergePrintSettings();
   }
 }
 
 export function savePrintSettings(settings) {
+  memorySettings = settings;
   try { localStorage.setItem(KEY, JSON.stringify(settings)); } catch {}
+  // Desktop: also write to disk so printer/due options survive even if the UI origin changes.
+  try {
+    const p = window.S4Desktop?.printing?.saveSettings?.(settings);
+    if (p && typeof p.then === "function") p.catch((err) => console.warn("[S4 Print] disk settings save failed", err));
+  } catch {}
+}
+
+/** Pull disk copy over localStorage once on desktop (printers/due must survive app close). */
+export async function hydratePrintSettingsFromDisk() {
+  if (hydratePromise) return hydratePromise;
+  hydratePromise = (async () => {
+    const api = typeof window !== "undefined" ? window.S4Desktop?.printing?.loadSettings : null;
+    if (typeof api !== "function") {
+      memorySettings = loadPrintSettings();
+      return memorySettings;
+    }
+    try {
+      const disk = await api();
+      const local = (() => { try { return JSON.parse(localStorage.getItem(KEY) || "null") || {}; } catch { return {}; } })();
+      // Disk wins for printer device names; otherwise keep whichever side actually set a field.
+      const merged = mergePrintSettings({
+        ...disk,
+        ...local,
+        billPrinter: local.billPrinter || disk?.billPrinter || "",
+        barcodePrinter: local.barcodePrinter || disk?.barcodePrinter || "",
+        chequePrinter: local.chequePrinter || disk?.chequePrinter || "",
+      });
+      memorySettings = merged;
+      try { localStorage.setItem(KEY, JSON.stringify(merged)); } catch {}
+      return merged;
+    } catch {
+      memorySettings = loadPrintSettings();
+      return memorySettings;
+    }
+  })();
+  return hydratePromise;
 }
 
 export function docSettingsFor(settings, invoice) {

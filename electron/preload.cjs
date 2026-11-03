@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("S4Desktop", {
   printing: {
     listPrinters: () => ipcRenderer.invoke("s4-print:list"),
     printHtml: (html, options) => ipcRenderer.invoke("s4-print:html", html, options),
+    loadSettings: () => ipcRenderer.invoke("s4-print-settings:load"),
+    saveSettings: (settings) => ipcRenderer.invoke("s4-print-settings:save", settings),
   },
   scan: {
     acquire: () => ipcRenderer.invoke("s4-scan:acquire"),
