@@ -16,7 +16,8 @@ describe("invoice rows cache", () => {
     assert.ok(peekInvoiceRowsCache());
     invalidateInvoiceRowsCache();
     assert.equal(peekInvoiceRowsCache(), null);
-    assert.equal(peekInvoiceRowsCache({ allowStale: true }), null);
+    // Stale rows stay briefly for save-checks; age is from original load (not reset by invalidate).
+    assert.equal(peekInvoiceRowsCache({ allowStale: true }), a);
     await beginInvoiceRowsLoad(loader);
     assert.equal(loads, 2);
   });

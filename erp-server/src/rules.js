@@ -5,7 +5,7 @@
 import { deepEqual } from "./util.js";
 import { LOCKED_COLLECTIONS, dayOf, periodLockBlocks } from "./periodLock.js";
 
-export async function makeRuleContext(uid, loadDoc) {
+export async function makeRuleContext(uid, loadDoc, listDocs) {
   const cache = new Map();
   const get = async (collection, id) => {
     if (id === undefined || id === null || id === "") return null;
@@ -13,8 +13,14 @@ export async function makeRuleContext(uid, loadDoc) {
     if (!cache.has(key)) cache.set(key, await loadDoc(collection, String(id)));
     return cache.get(key);
   };
+  const list = async (collection, shopId) => {
+    if (typeof listDocs !== "function" || shopId === undefined || shopId === null || shopId === "") return [];
+    const key = `list:${collection}/${shopId}`;
+    if (!cache.has(key)) cache.set(key, (await listDocs(collection, String(shopId))) || []);
+    return cache.get(key);
+  };
   const user = uid ? await get("users", uid) : null;
-  return { uid: uid || null, user, get };
+  return { uid: uid || null, user, get, list };
 }
 
 const has = (v) => v !== undefined && v !== null;
@@ -113,8 +119,43 @@ const validVoucher = (req, noField, partyField) =>
   && typeof req.totalAmount === "number"
   && req.totalAmount > 0
   && Array.isArray(req.allocations)
-  && req.allocations.length > 0
+  // Normal vouchers need invoice allocs; return refunds link via returnId with empty allocs.
+  && (req.allocations.length > 0 || (req.isRefund === true && typeof req.returnId === "string" && !!req.returnId))
   && req.status === "active";
+
+const RETURNABLE_INV = new Set(["confirmed", "partial", "paid"]);
+
+async function validReturnDoc(c, req, invCol, retCol, exceptId = null) {
+  if (!req || req.shopId !== shopIdOf(c)) return false;
+  if (!(typeof req.returnNo === "string" && req.returnNo) || !(typeof req.invoiceId === "string" && req.invoiceId)) return false;
+  if (!["confirmed", "cancelled"].includes(req.status)) return false;
+  if (req.status === "cancelled") return true;
+  if (!(typeof req.total === "number" && req.total > 0)) return false;
+  if (!Array.isArray(req.items) || !req.items.length) return false;
+  const inv = await c.get(invCol, req.invoiceId);
+  if (!inv || inv.shopId !== req.shopId || inv.isDeleted || inv.deleted) return false;
+  if (!RETURNABLE_INV.has(inv.status)) return false;
+  const lines = Array.isArray(inv.items) ? inv.items : [];
+  const already = new Map();
+  const prior = typeof c.list === "function" ? await c.list(retCol, req.shopId) : [];
+  for (const r of prior || []) {
+    if (!r || r.status === "cancelled" || (exceptId && (r.id === exceptId))) continue;
+    if (r.invoiceId !== req.invoiceId) continue;
+    for (const it of r.items || []) {
+      const i = Number(it?.lineIndex);
+      if (!Number.isInteger(i)) continue;
+      already.set(i, (already.get(i) || 0) + num(it?.qty));
+    }
+  }
+  for (const it of req.items) {
+    const idx = Number(it?.lineIndex);
+    const qty = num(it?.qty);
+    if (!Number.isInteger(idx) || idx < 0 || idx >= lines.length || !(qty > 0)) return false;
+    const left = Math.max(0, num(lines[idx].qty) - (already.get(idx) || 0));
+    if (qty > left + 0.01) return false;
+  }
+  return true;
+}
 
 const REMINDER_DONE_FIELDS = ["status", "dueDate", "doneAt", "doneBy", "doneByName", "lastDoneAt", "snoozedUntil", "updatedAt", "updatedBy", "history"];
 const PDC_FIELDS = ["chequeDate", "chequeDateBefore", "chequePostponedAt", "chequePostponedBy"];
@@ -183,7 +224,7 @@ async function memberCanViewShopDoc(c, res, viewPerm) {
 const shopScoped = ({ view, create, update, del } = {}) => ({
   read: async (c, args) => memberCanViewShopDoc(c, args.res, view),
   create: async (c, { req }) => sameShopByRequest(c, req) && (create ? await create(c, req) : true),
-  update: async (c, { res, req }) => sameShopByResource(c, res) && req.shopId === res.shopId && (update ? await update(c, res, req) : true),
+  update: async (c, { id, res, req }) => sameShopByResource(c, res) && req.shopId === res.shopId && (update ? await update(c, res, req, id) : true),
   delete: async (c, { res }) => sameShopByResource(c, res) && (del ? await del(c, res) : isOwnerOfShop(c, res.shopId)),
 });
 const appendOnly = (view = "viewProducts") => ({
@@ -332,18 +373,23 @@ export const RULES = {
   }),
 
   // Returns and stock adjustments: created by staff with the permission; only the owner or the creator may cancel.
+  // Create/update check invoice link + per-line qty ≤ remaining (billed minus other live returns).
   salesReturns: shopScoped({
     view: withReportRead("manageReturns"),
-    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns")),
-    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
-      || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))),
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns"))
+      && (await validReturnDoc(c, req, "salesInvoices", "salesReturns")),
+    update: async (c, res, req, id) => ((await isOwnerOfShop(c, res.shopId))
+      || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))))
+      && (req.status === "cancelled" || (await validReturnDoc(c, req, "salesInvoices", "salesReturns", id))),
     del: memberDelete("deleteReturns"),
   }),
   purchaseReturns: shopScoped({
     view: withReportRead("manageReturns"),
-    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns")),
-    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
-      || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))),
+    create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "manageReturns"))
+      && (await validReturnDoc(c, req, "purchaseInvoices", "purchaseReturns")),
+    update: async (c, res, req, id) => ((await isOwnerOfShop(c, res.shopId))
+      || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "manageReturns"))))
+      && (req.status === "cancelled" || (await validReturnDoc(c, req, "purchaseInvoices", "purchaseReturns", id))),
     del: memberDelete("deleteReturns"),
   }),
   // Journal and contra vouchers are a record only; they never touch bills or stock.

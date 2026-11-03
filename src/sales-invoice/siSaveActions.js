@@ -81,7 +81,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     const trackedPaid = priorDoc && !plainCash
       ? siN2(priorDoc.amountPaid) + (typedPaid - siLoadedPaidRef.current)
       : typedPaid;
-    const receiptsOnBill = priorDoc ? (receipts||[]).filter(r=>r.status!=="cancelled")
+    const receiptsOnBill = priorDoc ? (receipts||[]).filter(r=>r.status!=="cancelled" && !r.isRefund)
       .reduce((s,r)=>s+(r.allocations||[]).filter(a=>a.invoiceId===priorDoc.id).reduce((x,a)=>x+siN2(a.amount),0),0) : 0;
     if (!isDelivery && !isQuote && !plainCash && priorDoc && receiptsOnBill > grand + 0.01) {
       toast(lang==="bn"?`❌ এই বিলে আগেই ${siFmt2(receiptsOnBill)} টাকা নেওয়া হয়েছে — সর্বমোট এর চেয়ে কম করা যাবে না`:`❌ ${siFmt2(receiptsOnBill)} has already been received on this bill — the total cannot go below it`,"err"); return null;
@@ -331,7 +331,8 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
   const siSaveDraft = () => siSaveRun("draft", t.si_saved);
   const siConfirm = (options) => {
     const extra = options && typeof options === "object" && !options.nativeEvent ? options : {};
-    return siSaveRun("confirmed", t.si_confirmed, { print:true, ...extra });
+    // Default print modal; Save & Print callers pass print:"direct".
+    return siSaveRun("confirmed", t.si_confirmed, { print: true, ...extra });
   };
   return { siConfirm, siSaveDraft };
 }

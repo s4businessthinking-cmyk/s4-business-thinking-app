@@ -33,7 +33,7 @@ const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);
 const live = (d, shopId) => isLive(d, shopId) && d.status !== "cancelled" && d.status !== "draft";
 const liveSales = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
 const livePurchases = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
-const sumAlloc = (vouchers, id) => vouchers.reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
+const sumAlloc = (vouchers, id) => vouchers.filter((v) => !v.isRefund).reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
 const sumApplied = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((t, r) => t + n(r.appliedToInvoice), 0);
 
 /**
@@ -89,6 +89,8 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
 
   const receipts = (data.receipts || []).filter((r) => live(r, shopId));
   const payments = (data.payments || []).filter((p) => live(p, shopId));
+  const liveReceiptIds = new Set(receipts.map((r) => r.id));
+  const livePaymentIds = new Set(payments.map((p) => p.id));
   const salesRet = liveReturnsOf(data.salesReturns, shopId);
   const purchRet = liveReturnsOf(data.purchaseReturns, shopId);
 
@@ -112,28 +114,47 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
   });
   receipts.forEach((r) => {
     const amt = n(r.totalAmount);
-    entry({ date: r.receiptDate || r.createdAt, no: r.receiptNo, col: "salesReceipts", id: r.id, type: "receipt", narration: [r.chequeNo && `Chq ${r.chequeNo}`, r.note].filter(Boolean).join(" · ") },
-      [[money(r.method) || named(CASH_ACCOUNT), amt, 0], [customer(r.customerId, r.customerName), 0, amt]]);
+    const c = customer(r.customerId, r.customerName);
+    const cash = money(r.method) || named(CASH_ACCOUNT);
+    if (r.isRefund) {
+      entry({ date: r.receiptDate || r.createdAt, no: r.receiptNo, col: "salesReceipts", id: r.id, type: "refundPaid", narration: [r.returnNo && `Return ${r.returnNo}`, r.note].filter(Boolean).join(" · ") },
+        [[c, amt, 0], [cash, 0, amt]]);
+    } else {
+      entry({ date: r.receiptDate || r.createdAt, no: r.receiptNo, col: "salesReceipts", id: r.id, type: "receipt", narration: [r.chequeNo && `Chq ${r.chequeNo}`, r.note].filter(Boolean).join(" · ") },
+        [[cash, amt, 0], [c, 0, amt]]);
+    }
   });
   payments.forEach((p) => {
     const total = n(p.totalAmount);
     const paid = p.chequeAmount != null ? n(p.chequeAmount) : total - n(p.discountAmount);
-    entry({ date: p.paymentDate || p.createdAt, no: p.paymentNo, col: "purchasePayments", id: p.id, type: "payment", narration: [p.chequeNo && `Chq ${p.chequeNo}`, p.note].filter(Boolean).join(" · ") },
-      [[vendor(p.vendorId, p.vendorName), total, 0], [money(p.method) || named(CASH_ACCOUNT), 0, paid], [named("Discount Received"), 0, total - paid]]);
+    const v = vendor(p.vendorId, p.vendorName);
+    const cash = money(p.method) || named(CASH_ACCOUNT);
+    if (p.isRefund) {
+      entry({ date: p.paymentDate || p.createdAt, no: p.paymentNo, col: "purchasePayments", id: p.id, type: "refundReceived", narration: [p.returnNo && `Return ${p.returnNo}`, p.note].filter(Boolean).join(" · ") },
+        [[cash, paid, 0], [v, 0, paid]]);
+    } else {
+      entry({ date: p.paymentDate || p.createdAt, no: p.paymentNo, col: "purchasePayments", id: p.id, type: "payment", narration: [p.chequeNo && `Chq ${p.chequeNo}`, p.note].filter(Boolean).join(" · ") },
+        [[v, total, 0], [cash, 0, paid], [named("Discount Received"), 0, total - paid]]);
+    }
   });
   salesRet.forEach((r) => {
     const c = customer(r.partyId, r.partyName);
     const total = n(r.total), vat = n(r.totalVat), refund = n(r.refundAmount);
     const doc = { date: r.returnDate, no: r.returnNo, col: "salesReturns", id: r.id, narration: r.invoiceNo ? `Inv ${r.invoiceNo}` : "" };
     entry({ ...doc, type: "salesReturn" }, [[named("Sales Return"), total - vat, 0], [named("VAT Output"), vat, 0], [c, 0, total]]);
-    if (refund > 0.009) entry({ ...doc, type: "refundPaid" }, [[c, refund, 0], [money(r.refundMethod) || named(CASH_ACCOUNT), 0, refund]]);
+    // Refund cash on linked live voucher; if voucher cancelled/missing, post here (same as bankRec).
+    if (refund > 0.009 && !(r.refundVoucherId && liveReceiptIds.has(r.refundVoucherId))) {
+      entry({ ...doc, type: "refundPaid" }, [[c, refund, 0], [money(r.refundMethod) || named(CASH_ACCOUNT), 0, refund]]);
+    }
   });
   purchRet.forEach((r) => {
     const v = vendor(r.partyId, r.partyName);
     const total = n(r.total), vat = n(r.totalVat), refund = n(r.refundAmount);
     const doc = { date: r.returnDate, no: r.returnNo, col: "purchaseReturns", id: r.id, narration: r.supplierInvoiceNo || r.invoiceNo ? `Inv ${r.supplierInvoiceNo || r.invoiceNo}` : "" };
     entry({ ...doc, type: "purchaseReturn" }, [[v, total, 0], [named("Purchase Return"), 0, total - vat], [named("VAT Input"), 0, vat]]);
-    if (refund > 0.009) entry({ ...doc, type: "refundReceived" }, [[money(r.refundMethod) || named(CASH_ACCOUNT), refund, 0], [v, 0, refund]]);
+    if (refund > 0.009 && !(r.refundVoucherId && livePaymentIds.has(r.refundVoucherId))) {
+      entry({ ...doc, type: "refundReceived" }, [[money(r.refundMethod) || named(CASH_ACCOUNT), refund, 0], [v, 0, refund]]);
+    }
   });
   (data.expenses || []).filter((e) => live(e, shopId)).forEach((e) => {
     const amt = n(e.amount), vat = Math.max(0, n(e.vatAmount));

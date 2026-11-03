@@ -233,11 +233,17 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
       invoices={invoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.customerId||null, partyName:inv.customerName||"", partyMobile:inv.customerMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.deliveryNoteNo||"", method:inv.paymentMethod, raw:inv }))}
       vouchers={(isOwner ? receipts : (()=>{
         const visible = new Set(invoices.map(inv=>inv.id));
+        const retById = new Map((billReturns||[]).map((x)=>[x.id, x]));
         return receipts.map(r=>{
+          // Refund vouchers have empty allocs — keep if linked return's bill is staff-visible.
+          if (r.isRefund) {
+            const linked = retById.get(r.returnId);
+            return linked && visible.has(linked.invoiceId) ? r : null;
+          }
           const allocations = (r.allocations||[]).filter(a=>visible.has(a.invoiceId));
           return allocations.length ? { ...r, allocations, totalAmount:allocations.reduce((s,a)=>s+siN2(a.amount),0) } : null;
         }).filter(Boolean);
-      })()).map(r=>({ id:r.id, no:r.receiptNo, date:String(r.receiptDate||"").slice(0,10), partyId:r.customerId||null, partyName:r.customerName||"", partyMobile:r.customerMobile||"", method:r.method, amount:r.totalAmount, status:r.status, allocations:r.allocations||[], raw:r }))
+      })()).map(r=>({ id:r.id, no:r.receiptNo, date:String(r.receiptDate||"").slice(0,10), partyId:r.customerId||null, partyName:r.customerName||"", partyMobile:r.customerMobile||"", method:r.isRefund ? (r.method ? `${r.method} · Refund` : "Refund") : r.method, amount:r.totalAmount, status:r.status, allocations:r.isRefund ? [] : (r.allocations||[]), raw:r }))
         .concat(returnsAsLedgerVouchers(isOwner ? billReturns : billReturns.filter(r=>invoices.some(inv=>inv.id===r.invoiceId)), "sales"))}
       onOpenInvoice={(inv)=>{ setSiNavReturn("ledger"); setLedgerWin(false); setSelInv(inv); setSiView("detail"); }}
       onOpenVoucher={(r)=>{ if (r?.raw?.__return) return; setSiNavReturn("ledger"); setLedgerWin(false); setReceiptWin({ viewId:r.id }); }}

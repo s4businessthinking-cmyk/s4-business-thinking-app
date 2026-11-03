@@ -2,8 +2,8 @@
 import { itemBaseQty } from "../inventory/unitConversion.js";
 import { n, dayOf } from "./reportFilters.js";
 
-// Weighted average purchase cost per base unit up to a date: opening stock at its rate plus every confirmed purchase (VAT excluded).
-export function averageCosts(products, purchases, upTo) {
+// Weighted average purchase cost per base unit up to a date: opening stock at its rate plus every confirmed purchase (VAT excluded), minus purchase returns.
+export function averageCosts(products, purchases, upTo, purchaseReturns = []) {
   const acc = new Map();
   (products || []).forEach((p) => {
     const q = n(p.openingStock);
@@ -21,6 +21,19 @@ export function averageCosts(products, purchases, upTo) {
       const a = acc.get(it.productId);
       a.qty += q;
       a.value += net > 0 ? net : 0;
+    });
+  });
+  (purchaseReturns || []).forEach((ret) => {
+    if (upTo && dayOf(ret.returnDate) > upTo) return;
+    (ret.items || []).forEach((it) => {
+      if (!it?.productId || !acc.has(it.productId)) return;
+      const q = itemBaseQty(it, productById.get(it.productId));
+      if (q <= 0) return;
+      // Return lines store gross `amount` + `vatAmt` (not lineTotal/taxAmt).
+      const net = n(it.amount) - n(it.vatAmt);
+      const a = acc.get(it.productId);
+      a.qty = Math.max(0, a.qty - q);
+      a.value = Math.max(0, a.value - (net > 0 ? net : 0));
     });
   });
   const out = new Map();

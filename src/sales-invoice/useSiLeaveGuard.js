@@ -3,6 +3,7 @@ import { STALE_DRAFT_MS, cancelStaleClear, scheduleStaleClear } from "../utils/s
 import { billLeaveGuard } from "../shared/appShared.jsx";
 import { printSalesInvoice, siEmptyForm } from "./siHelpers.js";
 import { siN2 } from "./salesInvoiceShared.js";
+import { loadPrintSettings } from "../print/printSettings.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { useEffect } from "react";
 
@@ -79,7 +80,8 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
   const siPrint = (doc) => {
     const code = doc.customerId ? (customers||[]).find(c=>c.id===doc.customerId)?.customerCode : "";
     const inv = code && !doc.customerCode ? { ...doc, customerCode:code } : doc;
-    if (!siPerm("viewCustomerBalance")) { printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint); return; }
+    const wantBal = siPerm("viewCustomerBalance") && loadPrintSettings().printCustomerBalance;
+    if (!wantBal) { printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint); return; }
     const nameKey = String(inv.customerName||"").trim().toLowerCase();
     const customerBalance = invoices
       .filter(x => x.status!=="cancelled" && x.status!=="draft" && x.docKind!=="quotation" && x.invoiceType!=="delivery"

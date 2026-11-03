@@ -45,9 +45,11 @@ test("reconcile splits cleared and uncleared items", () => {
 test("bank refunds on returns and bank lines of journal / contra vouchers are included", () => {
   const tx = collectBankTransactions({
     salesReturns: [{ id: "sr1", shopId: "A", status: "active", refundAmount: 120, refundMethod: "bank_transfer", returnDate: "2026-10-04", returnNo: "SR-1" },
-      { id: "sr2", shopId: "A", status: "active", refundAmount: 60, refundMethod: "cash", returnDate: "2026-10-04" }],
+      { id: "sr2", shopId: "A", status: "active", refundAmount: 60, refundMethod: "cash", returnDate: "2026-10-04" },
+      { id: "sr3", shopId: "A", status: "active", refundAmount: 80, refundMethod: "bank_transfer", returnDate: "2026-10-04", returnNo: "SR-3", refundVoucherId: "rcv1" }],
     purchaseReturns: [{ id: "pr1", shopId: "A", status: "cancelled", refundAmount: 90, refundMethod: "cheque", returnDate: "2026-10-04" },
       { id: "pr2", shopId: "A", status: "active", refundAmount: 40, refundMethod: "card", returnDate: "2026-10-05", returnNo: "PR-2" }],
+    receipts: [{ id: "rcv1", shopId: "A", status: "active", isRefund: true, method: "bank_transfer", totalAmount: 80, receiptNo: "RCT-R", receiptDate: "2026-10-04", customerName: "C" }],
     vouchers: [
       { id: "v1", shopId: "A", voucherType: "contra", voucherNo: "CV-1", voucherDate: "2026-10-06", lines: [{ account: "Bank - ENBD", debit: 2000, credit: 0 }, { account: "Cash in Hand", debit: 0, credit: 2000 }] },
       { id: "v2", shopId: "A", voucherType: "journal", voucherNo: "JV-1", voucherDate: "2026-10-07", lines: [{ account: "Rent", debit: 500, credit: 0 }, { account: "Bank - ENBD", debit: 0, credit: 500 }] },
@@ -56,13 +58,22 @@ test("bank refunds on returns and bank lines of journal / contra vouchers are in
     ],
   }, "A");
   const by = Object.fromEntries(tx.map((t) => [t.key, t]));
-  assert.deepEqual(Object.keys(by).sort(), ["accountVouchers:v1:0", "accountVouchers:v2:1", "purchaseReturns:pr2", "salesReturns:sr1"]);
+  assert.deepEqual(Object.keys(by).sort(), ["accountVouchers:v1:0", "accountVouchers:v2:1", "purchaseReturns:pr2", "salesReceipts:rcv1", "salesReturns:sr1"]);
   assert.equal(by["salesReturns:sr1"].dir, "out");
+  assert.equal(by["salesReceipts:rcv1"].dir, "out");
   assert.equal(by["purchaseReturns:pr2"].dir, "in");
   assert.equal(by["accountVouchers:v1:0"].dir, "in");
   assert.equal(by["accountVouchers:v1:0"].party, "Cash in Hand");
   assert.equal(by["accountVouchers:v2:1"].dir, "out");
   assert.equal(by["accountVouchers:v2:1"].amount, 500);
+
+  // Linked refund voucher cancelled → return row must still appear.
+  const tx2 = collectBankTransactions({
+    salesReturns: [{ id: "sr4", shopId: "A", status: "active", refundAmount: 55, refundMethod: "bank_transfer", returnDate: "2026-10-08", returnNo: "SR-4", refundVoucherId: "rcv-dead" }],
+    receipts: [{ id: "rcv-dead", shopId: "A", status: "cancelled", isRefund: true, method: "bank_transfer", totalAmount: 55, receiptDate: "2026-10-08" }],
+  }, "A");
+  assert.ok(tx2.some((t) => t.key === "salesReturns:sr4"));
+  assert.ok(!tx2.some((t) => t.key === "salesReceipts:rcv-dead"));
 });
 
 test("partner money through the bank is included; cash, reinvest and profit shares are not", () => {

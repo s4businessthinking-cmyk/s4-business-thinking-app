@@ -20,3 +20,11 @@ test("opening stock counts at its rate and different costs are weighted", () => 
 test("without purchases the landing cost is kept", () => {
   assert.equal(averageCosts([{ id: "p1", landingCost: "40" }], []).get("p1"), 40);
 });
+
+test("purchase returns reduce weighted average cost", () => {
+  const product = { id: "p1", landingCost: "40" };
+  const bills = [{ invoiceDate: "2026-10-14", items: [line(10, 400, 0)] }];
+  const returns = [{ returnDate: "2026-10-15", items: [{ productId: "p1", qty: 5, unit: "Pcs", unitFactor: 1, amount: 200, vatAmt: 0 }] }];
+  // (10x40 - 5x40) / 5 = 40
+  assert.equal(averageCosts([product], bills, undefined, returns).get("p1"), 40);
+});

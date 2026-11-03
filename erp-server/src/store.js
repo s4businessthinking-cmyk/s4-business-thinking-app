@@ -111,7 +111,11 @@ export function createStore({ db }) {
   const lock = createMutex();
 
   const loadDoc = async (collection, id) => (await db.getDoc(collection, id))?.data ?? null;
-  const ctxFor = (uid) => makeRuleContext(uid, loadDoc);
+  const listDocs = async (collection, shopId) => {
+    const rows = await db.listDocs(collection, shopId);
+    return (rows || []).map((row) => ({ ...(row.data || {}), id: row.id }));
+  };
+  const ctxFor = (uid) => makeRuleContext(uid, loadDoc, listDocs);
 
   async function canRead(ctx, collection, id, data, list = false) {
     return allowed(ctx, "read", collection, { id, res: data, list });

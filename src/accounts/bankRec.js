@@ -6,7 +6,7 @@ const live = (r, shopId) => r && !r.isDeleted && (!shopId || r.shopId === shopId
 const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);
 export const METHOD_LABEL = { bank: "Bank Transfer", bank_transfer: "Bank Transfer", card: "Card", cheque: "Cheque" };
 
-const sumAlloc = (vouchers, id) => vouchers.reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + num(a.amount), 0), 0);
+const sumAlloc = (vouchers, id) => vouchers.filter((v) => !v.isRefund).reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + num(a.amount), 0), 0);
 const sumApplied = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((t, r) => t + num(r.appliedToInvoice), 0);
 
 /**
@@ -37,19 +37,28 @@ export function collectBankTransactions(data, shopId) {
     push({ col: "purchaseInvoices", id: inv.id, dir: "out", method: inv.paymentMethod, amount: direct, no: inv.invoiceNo, party: inv.vendorName || "",
       date: day(inv.paymentMethod === "cheque" ? inv.chequeDate || inv.invoiceDate : inv.invoiceDate), ref: inv.chequeNo || "", chequeStatus: inv.chequeStatus, clearedAt: inv.clearedAt });
   });
-  receipts.forEach((v) => push({ col: "salesReceipts", id: v.id, dir: "in", method: v.method, amount: v.totalAmount, no: v.receiptNo, party: v.customerName || "",
+  receipts.forEach((v) => push({ col: "salesReceipts", id: v.id, dir: v.isRefund ? "out" : "in", method: v.method, amount: v.totalAmount, no: v.receiptNo, party: v.customerName || "",
     date: day(v.method === "cheque" ? v.chequeDate || v.receiptDate : v.refDate || v.receiptDate), ref: v.chequeNo || v.refNo || "", chequeStatus: v.chequeStatus, clearedAt: v.clearedAt }));
-  payments.forEach((v) => push({ col: "purchasePayments", id: v.id, dir: "out", method: v.method, amount: v.chequeAmount ?? v.totalAmount, no: v.paymentNo, party: v.vendorName || "",
+  payments.forEach((v) => push({ col: "purchasePayments", id: v.id, dir: v.isRefund ? "in" : "out", method: v.method, amount: v.chequeAmount ?? v.totalAmount, no: v.paymentNo, party: v.vendorName || "",
     date: day(v.method === "cheque" ? v.chequeDate || v.paymentDate : v.refDate || v.paymentDate), ref: v.chequeNo || v.refNo || "", chequeStatus: v.chequeStatus, clearedAt: v.clearedAt }));
   (data?.expenses || []).forEach((e) => {
     if (!live(e, shopId)) return;
     push({ col: "expenses", id: e.id, dir: "out", method: e.method, amount: e.amount, no: e.expenseNo, party: e.employeeName || e.paidTo || e.categoryName || e.category || "",
       date: day(e.method === "cheque" ? e.chequeDate || e.expenseDate : e.expenseDate), ref: e.chequeNo || e.refNo || "", chequeStatus: e.chequeStatus, clearedAt: e.clearedAt });
   });
-  salesRet.forEach((r) => push({ col: "salesReturns", id: r.id, dir: "out", method: r.refundMethod, amount: r.refundAmount, no: r.returnNo, party: r.partyName || "",
-    date: day(r.returnDate), ref: r.invoiceNo || "" }));
-  purchRet.forEach((r) => push({ col: "purchaseReturns", id: r.id, dir: "in", method: r.refundMethod, amount: r.refundAmount, no: r.returnNo, party: r.partyName || "",
-    date: day(r.returnDate), ref: r.supplierInvoiceNo || r.invoiceNo || "" }));
+  // Skip return row only while linked refund voucher is still live; cancelled link → fall back here.
+  const liveReceiptIds = new Set(receipts.map((v) => v.id));
+  const livePaymentIds = new Set(payments.map((v) => v.id));
+  salesRet.forEach((r) => {
+    if (r.refundVoucherId && liveReceiptIds.has(r.refundVoucherId)) return;
+    push({ col: "salesReturns", id: r.id, dir: "out", method: r.refundMethod, amount: r.refundAmount, no: r.returnNo, party: r.partyName || "",
+      date: day(r.returnDate), ref: r.invoiceNo || "" });
+  });
+  purchRet.forEach((r) => {
+    if (r.refundVoucherId && livePaymentIds.has(r.refundVoucherId)) return;
+    push({ col: "purchaseReturns", id: r.id, dir: "in", method: r.refundMethod, amount: r.refundAmount, no: r.returnNo, party: r.partyName || "",
+      date: day(r.returnDate), ref: r.supplierInvoiceNo || r.invoiceNo || "" });
+  });
   // Journal / contra lines on a "Bank…" account: debit puts money into the bank, credit takes it out (cash deposits, withdrawals, transfers).
   (data?.vouchers || []).forEach((v) => {
     if (!live(v, shopId)) return;

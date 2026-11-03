@@ -16,13 +16,13 @@ export function computeAccounts(data, { products = [], shopId, from, to, bn }) {
   const receipts = (data.receipts || []).filter((r) => isLive(r, shopId) && r.status !== "cancelled");
   const payments = (data.payments || []).filter((p) => isLive(p, shopId) && p.status !== "cancelled");
   const productById = new Map(products.map((p) => [p.id, p]));
-  const avg = averageCosts(products, purchases, to);
+  const salesRet = liveReturnsOf(data.extras?.salesReturns, shopId);
+  const purchRet = liveReturnsOf(data.extras?.purchaseReturns, shopId);
+  const avg = averageCosts(products, purchases, to, purchRet);
 
   const salesIn = sales.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to));
   const purchIn = purchases.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to));
 
-  const salesRet = liveReturnsOf(data.extras?.salesReturns, shopId);
-  const purchRet = liveReturnsOf(data.extras?.purchaseReturns, shopId);
   const salesRetIn = salesRet.filter((r) => inRange(dayOf(r.returnDate), from, to));
   const purchRetIn = purchRet.filter((r) => inRange(dayOf(r.returnDate), from, to));
   const salesReturnTotal = salesRetIn.reduce((t, r) => t + n(r.total), 0);
@@ -50,14 +50,15 @@ export function computeAccounts(data, { products = [], shopId, from, to, bn }) {
   const grossPurch = purchIn.reduce((t, inv) => t + n(inv.grandTotal), 0);
   const vatIn = purchIn.reduce((t, inv) => t + n(inv.totalTax), 0) - purchReturnVat;
 
-  const allocSum = (vouchers, id) => vouchers.reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
+  const allocSum = (vouchers, id) => vouchers.filter((v) => !v.isRefund).reduce((t, v) => t + (v.allocations || []).filter((a) => a.invoiceId === id).reduce((x, a) => x + n(a.amount), 0), 0);
   const appliedSum = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((t, r) => t + n(r.appliedToInvoice), 0);
   const cashOnSales = salesIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(receipts, inv.id) - appliedSum(salesRet, inv.id)), 0);
-  const receiptsIn = receipts.filter((r) => inRange(dayOf(r.receiptDate || r.createdAt), from, to)).reduce((t, r) => t + n(r.totalAmount), 0);
+  // Refund vouchers are not customer receipts — refundsPaid/Received come from returns.
+  const receiptsIn = receipts.filter((r) => !r.isRefund && inRange(dayOf(r.receiptDate || r.createdAt), from, to)).reduce((t, r) => t + n(r.totalAmount), 0);
   const cashOnPurch = purchIn.reduce((t, inv) => t + Math.max(0, n(inv.amountPaid) - allocSum(payments, inv.id) - appliedSum(purchRet, inv.id)), 0);
   const refundsPaid = salesRetIn.reduce((t, r) => t + n(r.refundAmount), 0);
   const refundsReceived = purchRetIn.reduce((t, r) => t + n(r.refundAmount), 0);
-  const paymentsIn = payments.filter((p) => inRange(dayOf(p.paymentDate || p.createdAt), from, to));
+  const paymentsIn = payments.filter((p) => !p.isRefund && inRange(dayOf(p.paymentDate || p.createdAt), from, to));
   const paymentsOut = paymentsIn.reduce((t, p) => t + n(p.chequeAmount ?? p.totalAmount), 0);
   const vendorDiscount = paymentsIn.reduce((t, p) => t + n(p.discountAmount), 0);
 

@@ -11,7 +11,7 @@ import { piCalcLine, piCalcTotals } from "./purchaseShared.js";
 import { pricingPatchFromLanding } from "../product-master/pricingFromLanding.js";
 import { unitFactorFor } from "../inventory/unitConversion";
 import { averageCosts } from "../reports/averageCost.js";
-import { livePurchasesOf } from "../reports/reportFilters.js";
+import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
 
 function unmatchedPurchaseNames(items) {
   return (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
@@ -213,12 +213,13 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     const ids = [...new Set(productIds.filter(Boolean))];
     if (!ids.length) return true;
     const live = livePurchasesOf(purchaseList, shopId).filter((inv) => inv.source !== "openingBalance");
+    const livePr = liveReturnsOf(billReturns, shopId);
     for (const pid of ids) {
       try {
         const rec = await offlineGetById("products", pid).catch(() => null);
         const prod = rec?.data || products.find((p) => p.id === pid);
         if (!prod) continue;
-        const avg = averageCosts([{ ...prod, id: pid }], live).get(pid);
+        const avg = averageCosts([{ ...prod, id: pid }], live, undefined, livePr).get(pid);
         if (!(avg > 0)) continue;
         const next = String(parseFloat(avg.toFixed(4)));
         if (Math.abs(avg - (Number(prod.averageCost) || 0)) < 0.0001) continue;

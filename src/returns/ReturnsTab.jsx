@@ -8,6 +8,13 @@ import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
+import { averageCosts } from "../reports/averageCost.js";
+import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
+import { persistOfflineDb } from "../offline/sqliteDb.js";
+import { RETURN_KINDS, RETURNABLE_STATUSES, billHaystack, grnLabel, poGrnFieldsFromInvoice, returnedQtyByLine, validateReturnItems } from "./returnsDomain.js";
+import { cancelReturnRefundVoucher, createReturnRefundVoucher } from "./returnsRefundVoucher.js";
+
+export { RETURN_KINDS, returnedQtyByLine, returnsAsLedgerVouchers } from "./returnsDomain.js";
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const r2 = (v) => Math.round((n2(v) + Number.EPSILON) * 100) / 100;
@@ -17,26 +24,6 @@ const localDay = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-export const RETURN_KINDS = {
-  sales: {
-    col: "salesReturns", invCol: "salesInvoices", prefix: "SR", serial: "lastSRSerial",
-    partyId: "customerId", partyName: "customerName", partyMobile: "customerMobile", priceKey: "unitPrice", vatKey: "vatAmt",
-    accent: "#16a34a", printTitle: "CREDIT NOTE",
-    title: { bn: "↩️ সেলস রিটার্ন (ক্রেডিট নোট)", en: "↩️ Sales Return (Credit Note)" },
-    party: { bn: "কাস্টমার", en: "Customer" },
-    refund: { bn: "কাস্টমারকে টাকা ফেরত", en: "Refund to customer" },
-  },
-  purchase: {
-    col: "purchaseReturns", invCol: "purchaseInvoices", prefix: "PR", serial: "lastPRSerial",
-    partyId: "vendorId", partyName: "vendorName", partyMobile: "vendorMobile", priceKey: "unitCost", vatKey: "taxAmt",
-    accent: "#ea580c", printTitle: "DEBIT NOTE",
-    title: { bn: "↪️ পারচেজ রিটার্ন (ডেবিট নোট)", en: "↪️ Purchase Return (Debit Note)" },
-    party: { bn: "সাপ্লায়ার", en: "Supplier" },
-    refund: { bn: "সাপ্লায়ার থেকে টাকা ফেরত", en: "Refund from supplier" },
-  },
-};
-
-const RETURNABLE_STATUSES = ["confirmed", "partial", "paid"];
 const REFUND_METHODS = [
   { key: "cash", bn: "নগদ", en: "Cash" },
   { key: "bank_transfer", bn: "ব্যাংক ট্রান্সফার", en: "Bank Transfer" },
@@ -60,31 +47,11 @@ function lineValue(inv, idx, qty, vatKey) {
   return { amount: r2(amount), vat: r2(vat), rate: r2((n2(it.lineTotal) / soldQty) * ratio) };
 }
 
-export function returnedQtyByLine(returns, invoiceId, exceptId = null) {
-  const map = new Map();
-  (returns || []).forEach((r) => {
-    if (r.invoiceId !== invoiceId || r.status === "cancelled" || r.id === exceptId) return;
-    (r.items || []).forEach((it) => map.set(it.lineIndex, (map.get(it.lineIndex) || 0) + n2(it.qty)));
-  });
-  return map;
-}
-
-// Credit/debit notes shown in the party ledger next to receipts/payments.
-export function returnsAsLedgerVouchers(returns, kind) {
-  const k = RETURN_KINDS[kind];
-  return (returns || [])
-    .filter((r) => r.status !== "cancelled" && n2(r.appliedToInvoice) > 0.009)
-    .map((r) => ({
-      id: `ret-${r.id}`, no: r.returnNo, date: String(r.returnDate || "").slice(0, 10),
-      partyId: r.partyId || null, partyName: r.partyName || "", partyMobile: r.partyMobile || "",
-      method: kind === "sales" ? "Credit Note" : "Debit Note", typeLabel: kind === "sales" ? "Credit Note" : "Debit Note",
-      amount: n2(r.appliedToInvoice), status: r.status,
-      allocations: [{ invoiceId: r.invoiceId, invoiceNo: r.invoiceNo, amount: n2(r.appliedToInvoice) }],
-      raw: { ...r, __return: true }, ref: k.prefix,
-    }));
-}
-
-export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false, cur = "AED", isDesktop, toast, shopName = "", makeNo, leaveGuard = null }) {
+export default function ReturnsTab({
+  kind = "sales", lang = "en", th, shopId, user, profile, isOwner, canManage, canDelete = false, canPrint = false,
+  cur = "AED", isDesktop, toast, shopName = "", shop = null, products = [], makeNo, leaveGuard = null,
+  openInvoiceId = null, onOpenInvoiceHandled = null,
+}) {
   const K = RETURN_KINDS[kind];
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -99,15 +66,19 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
 
   const [date, setDate] = useState(localDay());
   const [invQ, setInvQ] = useState("");
+  const [itemQ, setItemQ] = useState("");
   const [inv, setInv] = useState(null);
   const [qtys, setQtys] = useState({});
+  const [serials, setSerials] = useState({});
   const [reason, setReason] = useState("");
   const [refundMethod, setRefundMethod] = useState("cash");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [editOf, setEditOf] = useState(null);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile, view);
+  const openHandledRef = useRef(null);
 
   useEffect(() => {
     if (!shopId) return undefined;
@@ -115,6 +86,35 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
     const u2 = subscribeShopCollection({ collectionName: K.invCol, shopId, onRows: (list) => setInvoices(list || []) });
     return () => { u1?.(); u2?.(); };
   }, [shopId, K.col, K.invCol]);
+
+  useEffect(() => {
+    if (!openInvoiceId) {
+      openHandledRef.current = null;
+      return;
+    }
+    if (openHandledRef.current === openInvoiceId) return;
+    if (!invoices.length) return;
+    openHandledRef.current = openInvoiceId;
+    const found = invoices.find((i) => i.id === openInvoiceId);
+    if (!found || found.isDeleted || found.deleted || !RETURNABLE_STATUSES.includes(found.status) || isBranchTransferBill(found)) {
+      onOpenInvoiceHandled?.();
+      toast?.(L("❌ এই বিল থেকে রিটার্ন করা যাচ্ছে না", "❌ This bill can't be returned"), "err");
+      return;
+    }
+    setDate(localDay());
+    setInvQ("");
+    setItemQ("");
+    setQtys({});
+    setSerials({});
+    setReason("");
+    setRefundMethod("cash");
+    setEditOf(null);
+    setInv(found);
+    setSel(null);
+    setView("form");
+    onOpenInvoiceHandled?.();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- open once per openInvoiceId
+  }, [openInvoiceId, invoices]);
 
   const formDirty = () => view === "form" && !!inv && Object.values(qtys).some((q) => n2(q) > 0);
   const leaveOk = () => !formDirty() || window.confirm(L("এই রিটার্ন সেভ হয়নি। তবুও চলে যাবেন?", "This return is not saved. Leave anyway?"));
@@ -149,12 +149,12 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
     return invoices
       .filter((i) => !i.isDeleted && !i.deleted && i.docKind !== "quotation" && !isBranchTransferBill(i) && RETURNABLE_STATUSES.includes(i.status) && (i.items || []).length)
       .filter((i) => !ownOnly || i.createdBy === user?.uid)
-      .filter((i) => !q || [i.invoiceNo, i.supplierInvoiceNo, i[K.partyName], i[K.partyMobile]].join(" ").toLowerCase().includes(q))
+      .filter((i) => !q || billHaystack(i, K.partyName, K.partyMobile).includes(q))
       .sort((a, b) => String(b.invoiceDate || b.createdAt || "").localeCompare(String(a.invoiceDate || a.createdAt || "")))
-      .slice(0, 30);
+      .slice(0, 40);
   }, [invoices, invQ, K.partyName, K.partyMobile, ownOnly, user?.uid]);
 
-  const returnedMap = useMemo(() => (inv ? returnedQtyByLine(returns, inv.id) : new Map()), [returns, inv]);
+  const returnedMap = useMemo(() => (inv ? returnedQtyByLine(returns, inv.id, editOf?.id || null) : new Map()), [returns, inv, editOf?.id]);
   const lines = useMemo(() => {
     if (!inv) return [];
     return (inv.items || []).map((it, idx) => {
@@ -166,14 +166,171 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
       return { it, idx, sold, already, returnable, qty, ...val };
     });
   }, [inv, qtys, returnedMap, K.vatKey]);
+  const visibleLines = useMemo(() => {
+    const q = itemQ.trim().toLowerCase();
+    if (!q) return lines;
+    return lines.filter((l) => `${l.it.name || ""} ${l.it.code || ""} ${l.it.brand || ""}`.toLowerCase().includes(q));
+  }, [lines, itemQ]);
   const total = r2(lines.reduce((t, l) => t + l.amount, 0));
   const totalVat = r2(lines.reduce((t, l) => t + l.vat, 0));
-  const due = inv ? Math.max(0, r2(n2(inv.grandTotal) - n2(inv.amountPaid))) : 0;
+  // While editing, bill.amountPaid still includes this return's applied — add it back for the preview split.
+  const due = inv
+    ? Math.max(0, r2(n2(inv.grandTotal) - n2(inv.amountPaid) + (editOf && editOf.status !== "cancelled" ? n2(editOf.appliedToInvoice) : 0)))
+    : 0;
   const applied = r2(Math.min(total, due));
   const refund = r2(total - applied);
 
-  const resetForm = () => { setDate(localDay()); setInvQ(""); setInv(null); setQtys({}); setReason(""); setRefundMethod("cash"); };
+  const resetForm = () => {
+    setDate(localDay()); setInvQ(""); setItemQ(""); setInv(null); setQtys({}); setSerials({});
+    setReason(""); setRefundMethod("cash"); setEditOf(null);
+  };
   const openNew = () => { resetForm(); setView("form"); };
+
+  const loadReturnIntoForm = (r, bill) => {
+    setDate(String(r.returnDate || localDay()).slice(0, 10));
+    setInvQ("");
+    setItemQ("");
+    setInv(bill);
+    const q = {};
+    const s = {};
+    (r.items || []).forEach((it) => {
+      q[it.lineIndex] = String(it.qty);
+      if (it.serialNo) s[it.lineIndex] = String(it.serialNo);
+    });
+    setQtys(q);
+    setSerials(s);
+    setReason(r.reason || "");
+    setRefundMethod(r.refundMethod || "cash");
+    setEditOf(r);
+    setSel(null);
+    setView("form");
+  };
+
+  const refreshPurchaseAvgCosts = async (productIds, returnList) => {
+    if (kind !== "purchase" || !shopId) return;
+    const ids = [...new Set((productIds || []).filter(Boolean))];
+    if (!ids.length) return;
+    const live = livePurchasesOf(invoices, shopId).filter((inv) => inv.source !== "openingBalance");
+    const livePr = liveReturnsOf(returnList, shopId);
+    for (const pid of ids) {
+      try {
+        const rec = await offlineGetById("products", pid).catch(() => null);
+        const prod = rec?.data || (products || []).find((p) => p.id === pid);
+        if (!prod) continue;
+        const avg = averageCosts([{ ...prod, id: pid }], live, undefined, livePr).get(pid);
+        if (!(avg > 0)) continue;
+        const next = String(parseFloat(avg.toFixed(4)));
+        if (Math.abs(avg - (Number(prod.averageCost) || 0)) < 0.0001) continue;
+        await offlinePatch("products", pid, { averageCost: next, updatedAt: new Date().toISOString() }, prod, { deferPersist: true });
+      } catch (err) {
+        console.warn("[S4 Return] average cost update failed", pid, err);
+      }
+    }
+    persistOfflineDb().catch(() => {});
+  };
+
+  const reverseReturnEffects = async (r, nowIso) => {
+    if (n2(r.appliedToInvoice) > 0) {
+      const stored = await offlineGetById(K.invCol, r.invoiceId).catch(() => null);
+      const fresh = stored?.data ? { ...stored.data, id: r.invoiceId } : invoices.find((i) => i.id === r.invoiceId);
+      if (fresh && fresh.status !== "cancelled") {
+        const newPaid = Math.max(0, r2(n2(fresh.amountPaid) - n2(r.appliedToInvoice)));
+        const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
+        const status = balance < 0.01 ? "paid" : newPaid > 0.009 ? "partial" : "confirmed";
+        await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
+      }
+    }
+    await cancelReturnRefundVoucher(r, user);
+  };
+
+  const applyReturnEffects = async (ret, bill, appliedAmt, refundAmt, method, returnDate, nowIso, progress = null) => {
+    let nextBill = bill;
+    let nextRet = {
+      ...ret,
+      appliedToInvoice: appliedAmt,
+      refundAmount: refundAmt,
+      refundMethod: refundAmt > 0.009 ? method : "",
+      refundVoucherId: null,
+      refundVoucherNo: "",
+      refundVoucherCol: "",
+    };
+    if (appliedAmt > 0) {
+      const newPaid = r2(n2(nextBill.amountPaid) + appliedAmt);
+      const balance = Math.max(0, r2(n2(nextBill.grandTotal) - newPaid));
+      const status = balance < 0.01 ? "paid" : "partial";
+      await offlinePatch(K.invCol, nextBill.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, nextBill);
+      nextBill = { ...nextBill, amountPaid: newPaid, balanceDue: balance, status };
+      if (progress) progress.ret = nextRet;
+    }
+    if (refundAmt > 0.009) {
+      const voucher = await createReturnRefundVoucher({
+        kind, shopId, user, profile, isOwner, ret: nextRet, invoice: nextBill,
+        refundAmount: refundAmt, refundMethod: method, returnDate,
+      });
+      if (voucher) {
+        const link = { refundVoucherId: voucher.id, refundVoucherNo: voucher.no, refundVoucherCol: voucher.col };
+        try {
+          await offlinePatch(K.col, nextRet.id, link, nextRet);
+          nextRet = { ...nextRet, ...link };
+          if (progress) progress.ret = nextRet;
+        } catch (err) {
+          await cancelReturnRefundVoucher({ ...nextRet, ...link }, user);
+          throw err;
+        }
+      }
+    }
+    return { bill: nextBill, ret: nextRet };
+  };
+
+  const restoreReturnAfterFailedEdit = async (snap, partialNew, nowIso) => {
+    if (partialNew) {
+      try { await reverseReturnEffects(partialNew, nowIso); } catch (err) {
+        console.warn("[S4 Return] undo partial edit effects failed", err);
+      }
+    }
+    const cur = await offlineGetById(K.col, snap.id).catch(() => null);
+    const base = cur?.data ? { ...cur.data, id: snap.id } : snap;
+    const restorePatch = {
+      returnDate: snap.returnDate,
+      items: snap.items,
+      subtotal: snap.subtotal,
+      totalVat: snap.totalVat,
+      total: snap.total,
+      appliedToInvoice: snap.appliedToInvoice,
+      refundAmount: snap.refundAmount,
+      refundMethod: snap.refundMethod || "",
+      reason: snap.reason || "",
+      status: "confirmed",
+      cancelledAt: null,
+      cancelledBy: null,
+      replacedByEdit: null,
+      refundVoucherId: null,
+      refundVoucherNo: "",
+      refundVoucherCol: "",
+      purchaseOrderId: snap.purchaseOrderId || null,
+      purchaseOrderNo: snap.purchaseOrderNo || "",
+      goodsReceiptId: snap.goodsReceiptId || null,
+      goodsReceiptNo: snap.goodsReceiptNo || "",
+      goodsReceiptIds: snap.goodsReceiptIds || null,
+      goodsReceiptNos: snap.goodsReceiptNos || null,
+      updatedAt: nowIso,
+      updatedBy: user?.uid || "",
+    };
+    await offlinePatch(K.col, snap.id, restorePatch, base);
+    const stored = await offlineGetById(K.invCol, snap.invoiceId).catch(() => null);
+    const bill = stored?.data ? { ...stored.data, id: snap.invoiceId } : invoices.find((i) => i.id === snap.invoiceId);
+    if (!bill) return { ...snap, ...restorePatch, id: snap.id };
+    const applied = await applyReturnEffects(
+      { ...snap, ...restorePatch, id: snap.id },
+      bill,
+      n2(snap.appliedToInvoice),
+      n2(snap.refundAmount),
+      snap.refundMethod || "cash",
+      snap.returnDate,
+      nowIso,
+    );
+    return applied.ret;
+  };
 
   const save = async () => {
     if (saving) return;
@@ -186,42 +343,107 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
     const over = lines.find((l) => n2(qtys[l.idx]) > l.returnable + 1e-9);
     if (over) return toast?.(L(`❌ "${over.it.name}": সর্বোচ্চ ${over.returnable} ফেরত দেওয়া যায়`, `❌ "${over.it.name}": at most ${over.returnable} can be returned`), "err");
     setSaving(true);
+    const editing = editOf && editOf.status !== "cancelled" ? editOf : null;
+    let reversedForEdit = false;
+    let createdId = null;
+    const progress = { ret: null };
     try {
       const stored = await offlineGetById(K.invCol, inv.id).catch(() => null);
       const fresh = stored?.data ? { ...stored.data, id: inv.id } : inv;
-      if (!RETURNABLE_STATUSES.includes(fresh.status)) throw new Error(L("এই বিল এখন আর ফেরতযোগ্য নয় (বাতিল/ড্রাফট)", "This bill can no longer be returned (cancelled/draft)"));
-      const freshDue = Math.max(0, r2(n2(fresh.grandTotal) - n2(fresh.amountPaid)));
+      const draftItems = picked.map((l) => ({
+        lineIndex: l.idx, productId: l.it.productId || null, name: l.it.name || "", code: l.it.code || "", brand: l.it.brand || "",
+        qty: l.qty, unit: l.it.unit || "Pcs", unitFactor: n2(l.it.unitFactor) || 1, rate: l.rate, amount: l.amount, vatAmt: l.vat,
+        ...(l.it.batchNo ? { batchNo: l.it.batchNo } : {}),
+        ...((serials[l.idx] || l.it.serialNo) ? { serialNo: String(serials[l.idx] || l.it.serialNo).trim() } : {}),
+      }));
+      const priorForCap = editing ? returns.filter((x) => x.id !== editing.id) : returns;
+      const bad = validateReturnItems(fresh, draftItems, priorForCap, editing?.id || null);
+      if (bad === "INVOICE_NOT_RETURNABLE" || bad === "INVOICE_MISSING") throw new Error(L("এই বিল এখন আর ফেরতযোগ্য নয় (বাতিল/ড্রাফট)", "This bill can no longer be returned (cancelled/draft)"));
+      if (bad) throw new Error(L("রিটার্নের পরিমাণ সঠিক নয়", "Return quantities are not valid"));
+
+      // Edit = reverse bill/voucher effects, then patch the SAME return in place (never cancel-then-create).
+      if (editing) {
+        await reverseReturnEffects(editing, new Date().toISOString());
+        reversedForEdit = true;
+      }
+
+      const stored2 = await offlineGetById(K.invCol, inv.id).catch(() => null);
+      const bill = stored2?.data ? { ...stored2.data, id: inv.id } : fresh;
+      const freshDue = Math.max(0, r2(n2(bill.grandTotal) - n2(bill.amountPaid)));
       const appliedNow = r2(Math.min(total, freshDue));
       const refundNow = r2(total - appliedNow);
-      const returnNo = await makeNo(K.serial, K.prefix, returns.map((r) => r.returnNo));
       const nowIso = new Date().toISOString();
-      const payload = {
+      const returnNo = editing
+        ? editing.returnNo
+        : await makeNo(K.serial, K.prefix, returns.map((r) => r.returnNo));
+      const core = {
         shopId, returnNo, returnDate: date, kind,
-        invoiceId: fresh.id, invoiceNo: fresh.invoiceNo || "", supplierInvoiceNo: fresh.supplierInvoiceNo || "", invoiceDate: fresh.invoiceDate || "",
-        partyId: fresh[K.partyId] || null, partyName: fresh[K.partyName] || "", partyMobile: fresh[K.partyMobile] || "",
-        items: picked.map((l) => ({
-          lineIndex: l.idx, productId: l.it.productId || null, name: l.it.name || "", code: l.it.code || "", brand: l.it.brand || "",
-          qty: l.qty, unit: l.it.unit || "Pcs", unitFactor: n2(l.it.unitFactor) || 1, rate: l.rate, amount: l.amount, vatAmt: l.vat,
-          ...(l.it.batchNo ? { batchNo: l.it.batchNo } : {}),
-        })),
+        invoiceId: bill.id, invoiceNo: bill.invoiceNo || "", supplierInvoiceNo: bill.supplierInvoiceNo || "", invoiceDate: bill.invoiceDate || "",
+        partyId: bill[K.partyId] || null, partyName: bill[K.partyName] || "", partyMobile: bill[K.partyMobile] || "",
+        ...poGrnFieldsFromInvoice(bill),
+        items: draftItems,
         subtotal: r2(total - totalVat), totalVat, total,
         appliedToInvoice: appliedNow, refundAmount: refundNow, refundMethod: refundNow > 0 ? refundMethod : "",
         reason: reason.trim(), status: "confirmed",
-        createdAt: nowIso, createdBy: user?.uid || "", createdByName: profile?.personName || "",
+        refundVoucherId: null, refundVoucherNo: "", refundVoucherCol: "",
+        updatedAt: nowIso, updatedBy: user?.uid || "",
       };
-      const res = await offlineCreate(K.col, payload);
-      const created = { ...res.data, id: res.documentId };
-      if (appliedNow > 0) {
-        const newPaid = r2(n2(fresh.amountPaid) + appliedNow);
-        const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
-        await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status: balance < 0.01 ? "paid" : "partial", updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
+
+      let saved;
+      if (editing) {
+        const patch = {
+          ...core,
+          editedAt: nowIso,
+          editedBy: user?.uid || "",
+          cancelledAt: undefined,
+          cancelledBy: undefined,
+          replacedByEdit: undefined,
+        };
+        await offlinePatch(K.col, editing.id, patch, editing);
+        saved = { ...editing, ...patch, id: editing.id };
+      } else {
+        const payload = {
+          ...core,
+          createdAt: nowIso, createdBy: user?.uid || "", createdByName: profile?.personName || "",
+        };
+        const res = await offlineCreate(K.col, payload);
+        saved = { ...res.data, id: res.documentId };
+        createdId = saved.id;
       }
-      logAudit({ shopId, user, profile, action: "create", collection: K.col, docId: created.id, docNo: returnNo, amount: total, note: `${payload.partyName} · ${payload.invoiceNo}` });
-      setReturns((list) => [created, ...list.filter((r) => r.id !== created.id)]);
+
+      const applied = await applyReturnEffects(saved, bill, appliedNow, refundNow, refundMethod, date, nowIso, progress);
+      saved = applied.ret;
+      reversedForEdit = false;
+      createdId = null; // effects committed — do not roll back on later UI errors
+
+      logAudit({ shopId, user, profile, action: editing ? "edit" : "create", collection: K.col, docId: saved.id, docNo: returnNo, amount: total, note: `${core.partyName} · ${core.invoiceNo}` });
+      const list = editing
+        ? returns.map((r) => (r.id === saved.id ? saved : r))
+        : [saved, ...returns.filter((r) => r.id !== saved.id)];
+      setReturns(list);
+      await refreshPurchaseAvgCosts(core.items.map((it) => it.productId), list);
       toast?.(L(`✅ ${returnNo} সেভ হয়েছে`, `✅ ${returnNo} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
-      setSel(created); setView("detail");
+      setEditOf(null);
+      setSel(saved); setView("detail");
     } catch (e) {
+      if (reversedForEdit && editing) {
+        try {
+          const restored = await restoreReturnAfterFailedEdit(editing, progress.ret, new Date().toISOString());
+          setReturns((list) => list.map((r) => (r.id === restored.id ? restored : r)));
+        } catch (restoreErr) {
+          console.warn("[S4 Return] edit rollback failed", restoreErr);
+        }
+      } else if (createdId) {
+        // New return created but bill/voucher apply failed — undo effects and drop the orphan doc.
+        try {
+          const nowIso = new Date().toISOString();
+          if (progress.ret) await reverseReturnEffects(progress.ret, nowIso);
+          await offlineRemove(K.col, createdId);
+        } catch (restoreErr) {
+          console.warn("[S4 Return] create rollback failed", restoreErr);
+        }
+      }
       toast?.(`❌ ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
@@ -230,35 +452,40 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
 
   const canCancel = (r) => r.status !== "cancelled" && (isOwner || (canManage && r.createdBy === user?.uid));
 
-  const cancelReturn = async (r) => {
-    if (!canCancel(r)) return;
-    if (!window.confirm(L(`${r.returnNo} বাতিল করবেন? স্টক আর বিলের বাকি আগের মতো হয়ে যাবে।`, `Cancel ${r.returnNo}? Stock and the bill balance go back to before.`))) return;
+  const cancelReturn = async (r, { silent = false } = {}) => {
+    if (!canCancel(r)) return false;
+    if (!silent && !window.confirm(L(`${r.returnNo} বাতিল করবেন? স্টক আর বিলের বাকি আগের মতো হয়ে যাবে।`, `Cancel ${r.returnNo}? Stock and the bill balance go back to before.`))) return false;
     setSaving(true);
     try {
       const nowIso = new Date().toISOString();
-      if (n2(r.appliedToInvoice) > 0) {
-        const stored = await offlineGetById(K.invCol, r.invoiceId).catch(() => null);
-        const fresh = stored?.data ? { ...stored.data, id: r.invoiceId } : invoices.find((i) => i.id === r.invoiceId);
-        if (fresh && fresh.status !== "cancelled") {
-          const newPaid = Math.max(0, r2(n2(fresh.amountPaid) - n2(r.appliedToInvoice)));
-          const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
-          const status = balance < 0.01 ? "paid" : newPaid > 0.009 ? "partial" : "confirmed";
-          await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
-        }
-      }
+      await reverseReturnEffects(r, nowIso);
       const patch = { status: "cancelled", cancelledAt: nowIso, cancelledBy: user?.uid || "", updatedAt: nowIso, updatedBy: user?.uid || "" };
       await offlinePatch(K.col, r.id, patch, r);
       const updated = { ...r, ...patch };
-      setReturns((list) => list.map((x) => (x.id === r.id ? updated : x)));
+      const nextReturns = returns.map((x) => (x.id === r.id ? updated : x));
+      setReturns(nextReturns);
       setSel((s) => (s?.id === r.id ? updated : s));
+      await refreshPurchaseAvgCosts((r.items || []).map((it) => it.productId), nextReturns);
       logAudit({ shopId, user, profile, action: "cancel", collection: K.col, docId: r.id, docNo: r.returnNo, amount: r.total, note: `${r.partyName} · ${r.invoiceNo}` });
-      toast?.(L("🚫 রিটার্ন বাতিল হয়েছে", "🚫 Return cancelled"), "err");
+      if (!silent) toast?.(L("🚫 রিটার্ন বাতিল হয়েছে", "🚫 Return cancelled"), "err");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
+      return true;
     } catch (e) {
       toast?.(`❌ ${e?.message || e}`, "err");
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  const startEdit = async (r) => {
+    if (!canCancel(r)) return;
+    const bill = invoices.find((i) => i.id === r.invoiceId)
+      || (await offlineGetById(K.invCol, r.invoiceId).catch(() => null))?.data;
+    const fresh = bill ? { ...bill, id: r.invoiceId } : null;
+    if (!fresh) return toast?.(L("❌ মূল বিল পাওয়া যায়নি", "❌ Source bill not found"), "err");
+    if (!window.confirm(L(`${r.returnNo} এডিট করবেন? একই রিটার্ন আপডেট হবে — বাতিল হয়ে নতুন নম্বর তৈরি হবে না।`, `Edit ${r.returnNo}? The same return is updated — it is not cancelled into a new number.`))) return;
+    loadReturnIntoForm(r, fresh);
   };
 
   const deleteReturn = async (r) => {
@@ -276,15 +503,50 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
     }
   };
 
-  const print = (r) => {
-    const cols = [{ label: "#" }, { label: "Item" }, { label: "Qty", align: "right" }, { label: "Rate", align: "right" }, { label: `Amount (${cur})`, align: "right" }];
-    const rows = (r.items || []).map((it, i) => [String(i + 1), [it.name, it.code].filter(Boolean).join(" · "), `${it.qty} ${it.unit || ""}`, f2(it.rate), f2(it.amount)]);
-    const subtitle = [r.returnNo, r.returnDate, r.partyName, `Against ${r.invoiceNo}${r.supplierInvoiceNo ? ` (${r.supplierInvoiceNo})` : ""}`, r.status === "cancelled" ? "CANCELLED" : ""].filter(Boolean).join(" · ");
-    printWithSettings(generateStatementHTML({ shopName, title: K.printTitle, subtitle, cols, rows, foot: ["", "", "", "TOTAL", f2(r.total)] }), { lang });
-  };
-
   const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
   const methodName = (key) => (REFUND_METHODS.find((m) => m.key === key) || {})[bn ? "bn" : "en"] || key || "";
+
+  const print = (r) => {
+    const cols = [
+      { label: "#" }, { label: "Item" }, { label: "Qty", align: "right" },
+      { label: "Rate", align: "right" }, { label: `Amount (${cur})`, align: "right" },
+    ];
+    const rows = (r.items || []).map((it, i) => [
+      String(i + 1), [it.name, it.code, it.serialNo && `S/N ${it.serialNo}`].filter(Boolean).join(" · "),
+      `${it.qty} ${it.unit || ""}`, f2(it.rate), f2(it.amount),
+    ]);
+    const shopLabel = [
+      shopName || shop?.companyName || "",
+      shop?.trnNumber ? `TRN: ${shop.trnNumber}` : "",
+      shop?.mobile || "",
+    ].filter(Boolean).join(" · ");
+    const partyLine = [
+      `${K.party.en}: ${r.partyName || "—"}`,
+      r.partyMobile || "",
+      `Against invoice: ${r.invoiceNo || "—"}${r.supplierInvoiceNo ? ` (${r.supplierInvoiceNo})` : ""}`,
+      r.invoiceDate ? `Bill date: ${String(r.invoiceDate).slice(0, 10)}` : "",
+      r.purchaseOrderNo ? `PO: ${r.purchaseOrderNo}` : "",
+      grnLabel(r) ? `GRN: ${grnLabel(r)}` : "",
+    ].filter(Boolean).join(" · ");
+    const subtitle = [r.returnNo, r.returnDate, r.status === "cancelled" ? "CANCELLED" : ""].filter(Boolean).join(" · ");
+    const summaryLines = [
+      n2(r.totalVat) > 0.009 ? `VAT: ${cur} ${f2(r.totalVat)}` : "",
+      n2(r.appliedToInvoice) > 0.009 ? `Applied to bill: ${cur} ${f2(r.appliedToInvoice)}` : "",
+      n2(r.refundAmount) > 0.009 ? `Refund (${methodName(r.refundMethod)})${r.refundVoucherNo ? ` · ${r.refundVoucherNo}` : ""}: ${cur} ${f2(r.refundAmount)}` : "",
+      r.reason ? `Reason: ${r.reason}` : "",
+      `Return total: ${cur} ${f2(r.total)}`,
+    ].filter(Boolean);
+    printWithSettings(generateStatementHTML({
+      shopName: shopLabel,
+      title: K.printTitle,
+      subtitle,
+      partyLine,
+      cols,
+      rows,
+      foot: ["", "", "", "TOTAL", f2(r.total)],
+      summaryLines,
+    }), { lang });
+  };
   const backToList = () => { if (leaveOk()) { setSel(null); setView("list"); } };
   const statusBadge = (r) => (
     <span className="si-badge" style={{ color: r.status === "cancelled" ? "#6b7280" : K.accent }}>
@@ -336,7 +598,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                       <button type="button" className="pm-btn-secondary" onClick={() => { setInv(null); setQtys({}); }} title={L("অন্য বিল", "Another bill")}>✕</button>
                     </div>
                   ) : (
-                    <input className="pm-input" value={invQ} onChange={(e) => setInvQ(e.target.value)} autoFocus={!mobile} placeholder={L(`বিল নং বা ${K.party.bn}ের নাম/মোবাইল লিখুন…`, `Type bill no or ${K.party.en.toLowerCase()} name/mobile…`)} />
+                    <input className="pm-input" value={invQ} onChange={(e) => setInvQ(e.target.value)} autoFocus={!mobile} placeholder={L(`বিল নং, ${K.party.bn}, পণ্যের নাম/কোড…`, `Bill no, ${K.party.en.toLowerCase()}, product name/code…`)} />
                   )}
                 </div>
               </div>
@@ -355,7 +617,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
           {!inv && (
             <div className="si-box" style={{ flex: mobile ? undefined : 1, minHeight: 160 }}>
               {mobile ? invMatches.map((i) => (
-                <button key={i.id} type="button" className="si-mrow" onClick={() => { setInv(i); setQtys({}); }}>
+                <button key={i.id} type="button" className="si-mrow" onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
                   <div className="si-mrow-top"><span>{i.invoiceNo}{i.supplierInvoiceNo ? ` (${i.supplierInvoiceNo})` : ""}</span><span>{cur} {f2(i.grandTotal)}</span></div>
                   <div className="si-mrow-sub"><span>{i[K.partyName] || "—"}</span><span>{fmtDay(i.invoiceDate)}</span></div>
                 </button>
@@ -373,7 +635,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                     {invMatches.map((i) => {
                       const iDue = Math.max(0, r2(n2(i.grandTotal) - n2(i.amountPaid)));
                       return (
-                        <tr key={i.id} className="pm-clickable" onClick={() => { setInv(i); setQtys({}); }}>
+                        <tr key={i.id} className="pm-clickable" onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
                           <td>{fmtDay(i.invoiceDate)}</td>
                           <td className="si-strong">{i.invoiceNo}{i.supplierInvoiceNo ? ` (${i.supplierInvoiceNo})` : ""}</td>
                           <td>{i[K.partyName] || "—"}</td>
@@ -394,9 +656,12 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
             <>
               <fieldset className="pm-panel" style={{ margin: 0 }}>
                 <legend className="pm-panel-legend">{L("কোন পণ্য কতটা ফেরত", "Items to return")}</legend>
+                <div className="si-field" style={{ marginBottom: 8 }}>
+                  <input className="pm-input" value={itemQ} onChange={(e) => setItemQ(e.target.value)} placeholder={L("এই বিলে পণ্য খুঁজুন (নাম/কোড)…", "Filter items on this bill (name/code)…")} />
+                </div>
                 {mobile ? (
                   <div className="si-box">
-                    {lines.map((l) => (
+                    {visibleLines.map((l) => (
                       <div key={l.idx} className="si-mrow" style={{ cursor: "default", background: l.qty > 0 ? "#f0fdf4" : undefined }}>
                         <div className="si-mrow-top"><span>{l.it.name}</span><span style={{ color: K.accent }}>{l.qty > 0 ? f2(l.amount) : "—"}</span></div>
                         <div className="si-mrow-sub">
@@ -407,8 +672,14 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                           <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" disabled={l.returnable <= 0} value={qtys[l.idx] ?? ""}
                             placeholder="0" onChange={(e) => setQtys((q) => ({ ...q, [l.idx]: e.target.value }))} style={{ textAlign: "right" }} />
                         </div>
+                        {l.qty > 0 && (
+                          <input className="pm-input" style={{ marginTop: 4 }} value={serials[l.idx] ?? l.it.serialNo ?? ""}
+                            placeholder={L("সিরিয়াল / IMEI (ঐচ্ছিক)", "Serial / IMEI (optional)")}
+                            onChange={(e) => setSerials((s) => ({ ...s, [l.idx]: e.target.value }))} />
+                        )}
                       </div>
                     ))}
+                    {!visibleLines.length && <div className="si-empty">{L("এই সার্চে কোনো পণ্য নেই", "No items match this filter")}</div>}
                   </div>
                 ) : (
                   <div className="si-box">
@@ -420,11 +691,12 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                         <th style={{ width: 80 }} className="si-num">{L("আগে ফেরত", "Returned")}</th>
                         <th style={{ width: 84 }} className="si-num">{L("ফেরতযোগ্য", "Can return")}</th>
                         <th style={{ width: 90 }} className="si-num">{L("ফেরত", "Return qty")}</th>
+                        <th style={{ width: 110 }}>{L("সিরিয়াল/IMEI", "Serial/IMEI")}</th>
                         <th style={{ width: 84 }} className="si-num">{L("দাম", "Rate")}</th>
                         <th style={{ width: 96 }} className="si-num">{L("টাকা", "Amount")}</th>
                       </tr></thead>
                       <tbody>
-                        {lines.map((l, i) => (
+                        {visibleLines.map((l, i) => (
                           <tr key={l.idx} className={l.qty > 0 ? "is-editing" : undefined}>
                             <td className="si-center">{i + 1}</td>
                             <td title={l.it.name}><b>{l.it.name}</b>{l.it.code ? <span className="si-muted"> · {l.it.code}</span> : null}</td>
@@ -435,12 +707,17 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                               <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" disabled={l.returnable <= 0} value={qtys[l.idx] ?? ""}
                                 placeholder="0" onChange={(e) => setQtys((q) => ({ ...q, [l.idx]: e.target.value }))} style={{ textAlign: "right" }} />
                             </td>
+                            <td style={{ padding: "1px 2px" }}>
+                              <input className="pm-input" disabled={!(l.qty > 0)} value={serials[l.idx] ?? l.it.serialNo ?? ""}
+                                placeholder="—" onChange={(e) => setSerials((s) => ({ ...s, [l.idx]: e.target.value }))} />
+                            </td>
                             <td className="si-num">{f2(l.rate)}</td>
                             <td className="si-num si-strong" style={{ color: K.accent }}>{l.qty > 0 ? f2(l.amount) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    {!visibleLines.length && <div className="si-empty">{L("এই সার্চে কোনো পণ্য নেই", "No items match this filter")}</div>}
                   </div>
                 )}
                 <div className="si-line-tools">
@@ -481,7 +758,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
           <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
           <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !inv || total <= 0 || dateBad} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("রিটার্ন সেভ", "Save Return")}`}
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editOf ? L("এডিট সেভ", "Save Edit") : L("রিটার্ন সেভ", "Save Return")}`}
           </button>
         </div>
       </>
@@ -501,7 +778,10 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                 {vRow(L("তারিখ", "Date"), fmtDay(r.returnDate))}
                 {vRow(K.party[bn ? "bn" : "en"], r.partyName || "—", { strong: true })}
                 {vRow(L("বিল", "Bill"), `${r.invoiceNo}${r.supplierInvoiceNo ? ` (${r.supplierInvoiceNo})` : ""}${r.invoiceDate ? ` · ${fmtDay(r.invoiceDate)}` : ""}`)}
+                {r.purchaseOrderNo && vRow("PO", r.purchaseOrderNo)}
+                {grnLabel(r) && vRow("GRN", grnLabel(r))}
                 {r.reason && vRow(L("কারণ", "Reason"), r.reason)}
+                {r.refundVoucherNo && vRow(L("রিফান্ড ভাউচার", "Refund voucher"), r.refundVoucherNo)}
                 {vRow(L("লিখেছেন", "By"), r.createdByName || "—")}
                 {r.status === "cancelled" && vRow(L("বাতিল", "Cancelled"), fmtDay(r.cancelledAt), { color: "#b91c1c" })}
               </div>
@@ -520,14 +800,15 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
             {mobile ? (r.items || []).map((it, i) => (
               <div key={i} className="si-mrow" style={{ cursor: "default" }}>
                 <div className="si-mrow-top"><span>{i + 1}. {it.name}</span><span style={{ color: K.accent }}>{f2(it.amount)}</span></div>
-                <div className="si-mrow-sub"><span>{it.code || ""}</span><span>{it.qty} {it.unit || ""} × {f2(it.rate)}</span></div>
+                <div className="si-mrow-sub"><span>{[it.code, it.serialNo && `S/N ${it.serialNo}`].filter(Boolean).join(" · ") || "—"}</span><span>{it.qty} {it.unit || ""} × {f2(it.rate)}</span></div>
               </div>
             )) : (
               <table className="pm-table">
                 <thead><tr>
                   <th style={{ width: 28 }} className="si-center">#</th>
                   <th>{L("পণ্য", "Item")}</th>
-                  <th style={{ width: 110 }}>{L("কোড", "Code")}</th>
+                  <th style={{ width: 90 }}>{L("কোড", "Code")}</th>
+                  <th style={{ width: 110 }}>{L("সিরিয়াল/IMEI", "Serial/IMEI")}</th>
                   <th style={{ width: 90 }} className="si-num">{L("পরিমাণ", "Qty")}</th>
                   <th style={{ width: 90 }} className="si-num">{L("দাম", "Rate")}</th>
                   <th style={{ width: 80 }} className="si-num">VAT</th>
@@ -539,6 +820,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
                       <td className="si-center">{i + 1}</td>
                       <td className="si-strong" title={it.name}>{it.name}</td>
                       <td>{it.code || ""}</td>
+                      <td>{it.serialNo || "—"}</td>
                       <td className="si-num">{it.qty} {it.unit || ""}</td>
                       <td className="si-num">{f2(it.rate)}</td>
                       <td className="si-num">{f2(it.vatAmt)}</td>
@@ -553,6 +835,7 @@ export default function ReturnsTab({ kind = "sales", lang = "en", th, shopId, us
         <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
           <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
           {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+          {canCancel(r) && <button type="button" className="pm-btn" disabled={saving} onClick={() => startEdit(r)}>✏️ {L("এডিট", "Edit")}</button>}
           <span className="si-toolbar-gap" />
           {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelReturn(r)}>⛔ {L("রিটার্ন বাতিল", "Cancel Return")}</button>}
           {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteReturn(r)}>🗑️ {L("মুছুন", "Delete")}</button>}

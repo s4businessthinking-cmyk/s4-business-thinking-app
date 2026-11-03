@@ -483,13 +483,28 @@ test("rules: vendors, returns, stock adjustments, audit log and master lists fol
   assert.equal((await commit(sales.idToken, [upd("vendors", "rv1", { phone: "1" })])).status, 200);
   assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "vendors", id: "rv1" }])).status, 403, "only the owner deletes vendors");
 
-  const sr = { shopId: "shop1", returnNo: "SR-0001", invoiceId: "rsi2", total: 10, status: "confirmed", createdBy: sales.uid };
+  assert.equal((await commit(owner.idToken, [
+    set("salesInvoices", "rsi2", { shopId: "shop1", invoiceNo: "SI-R", status: "confirmed", grandTotal: 10, amountPaid: 0, items: [{ name: "Bolt", qty: 2, lineTotal: 10 }] }),
+    set("purchaseInvoices", "rpi2", { shopId: "shop1", invoiceNo: "PI-R", status: "confirmed", grandTotal: 10, amountPaid: 0, items: [{ name: "Bolt", qty: 2, lineTotal: 10 }] }),
+  ])).status, 200);
+  const sr = { shopId: "shop1", returnNo: "SR-0001", invoiceId: "rsi2", total: 10, status: "confirmed", createdBy: sales.uid, items: [{ lineIndex: 0, qty: 1, name: "Bolt" }] };
   assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr1", sr)])).status, 403, "returns need manageReturns");
   assert.equal((await perms({ manageReturns: true })).status, 200);
   assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr1", { ...sr, createdBy: owner.uid })])).status, 403, "createdBy must be the caller");
   assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr1", sr)])).status, 200);
-  assert.equal((await commit(sales.idToken, [set("purchaseReturns", "rpr1", { ...sr, returnNo: "PR-0001" })])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("salesReceipts", "rr-ref", {
+    shopId: "shop1", receiptNo: "RCT-REF", customerName: "Ali", method: "cash", totalAmount: 5,
+    allocations: [], status: "active", isRefund: true, returnId: "rsr1", createdBy: sales.uid,
+  })])).status, 200, "refund voucher empty alloc + returnId allowed");
+  assert.equal((await commit(sales.idToken, [set("salesReceipts", "rr-empty", {
+    shopId: "shop1", receiptNo: "RCT-EMPTY", customerName: "Ali", method: "cash", totalAmount: 5,
+    allocations: [], status: "active", createdBy: sales.uid,
+  })])).status, 403, "empty alloc without isRefund blocked");
+  assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr-over", { ...sr, returnNo: "SR-OVER", items: [{ lineIndex: 0, qty: 99, name: "Bolt" }] })])).status, 403, "over-qty blocked");
+  assert.equal((await commit(sales.idToken, [set("salesReturns", "rsr-cum", { ...sr, returnNo: "SR-CUM", items: [{ lineIndex: 0, qty: 2, name: "Bolt" }] })])).status, 403, "cumulative over-return blocked");
+  assert.equal((await commit(sales.idToken, [set("purchaseReturns", "rpr1", { ...sr, returnNo: "PR-0001", invoiceId: "rpi2" })])).status, 200);
   assert.equal((await commit(owner.idToken, [set("salesReturns", "rsr2", { ...sr, returnNo: "SR-0002", createdBy: owner.uid })])).status, 200);
+  assert.equal((await commit(sales.idToken, [upd("salesReturns", "rsr1", { ...sr, items: [{ lineIndex: 0, qty: 2, name: "Bolt" }], total: 10 })])).status, 403, "edit cannot take qty already used by another live return");
   assert.equal((await commit(sales.idToken, [upd("salesReturns", "rsr2", { status: "cancelled" })])).status, 403, "staff cancel only their own returns");
   assert.equal((await commit(sales.idToken, [upd("salesReturns", "rsr1", { status: "cancelled" })])).status, 200);
   assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "salesReturns", id: "rsr1" }])).status, 403);

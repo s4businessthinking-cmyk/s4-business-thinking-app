@@ -442,27 +442,41 @@ th{padding:5px!important}td{padding:4px 5px!important}.totals-row{padding:4px 10
 .sigs{margin-top:10px!important}.sig-line{margin-top:26px!important}.amount-box{padding:8px!important}.amount-val{font-size:22px!important}`;
   }
   if (!style.showSignatures) css += ".sigs,.recv-grid{display:none!important}";
+  let logoPrintClearCss = "";
   if (style.logo) {
     const x = Math.max(-160, Math.min(220, parseInt(style.logoX, 10) || 0));
     const y = Math.max(-80, Math.min(140, parseInt(style.logoY, 10) || 0));
     const size = Math.max(20, Math.min(280, parseInt(style.logoSize, 10) || 56));
+    const logoMaxW = Math.round(size * 2.8);
     const place = style.logoAlign === "center"
       ? `left:calc(50% + ${x}px);top:${8 + y}px;transform:translateX(-50%)`
       : style.logoAlign === "right"
         ? `right:${8 - x}px;top:${8 + y}px;left:auto`
         : `left:${8 + x}px;top:${8 + y}px`;
-    css += `.hdr{position:relative!important}
+    // Absolute logo must not cover shop name: reserve width/height for all alignments
+    // (wide logos can be up to logoMaxW; vouchers use .hdr-left instead of .shop-block).
+    css += `.hdr{position:relative!important;overflow:visible!important;min-height:${size + 16}px!important}
 .s4-logo-wrap{position:absolute;${place};z-index:2;width:auto;margin:0;line-height:0;pointer-events:none}
-.s4-logo{display:block;height:${size}px;width:auto;max-width:${Math.round(size * 2.8)}px;object-fit:contain;margin:0}`;
-    if (style.logoAlign !== "center" && style.logoAlign !== "right") {
-      css += `.shop-block{padding-left:${size + 14 + Math.max(0, x)}px}`;
+.s4-logo{display:block;height:${size}px;width:auto;max-width:${logoMaxW}px;object-fit:contain;margin:0}`;
+    if (style.logoAlign === "center") {
+      css += `.hdr{padding-top:${size + 12 + Math.max(0, y)}px!important}
+.shop-block,.hdr-left{padding-top:0!important}`;
+      logoPrintClearCss = `.hdr{padding:${size + 12 + Math.max(0, y)}px 4mm 3mm 4mm!important;overflow:visible!important;min-height:${size + 16}px!important}`;
+    } else if (style.logoAlign === "right") {
+      css += `.shop-block,.hdr-left{padding-right:${logoMaxW + 14 + Math.max(0, -x)}px!important}`;
+      logoPrintClearCss = `.hdr{overflow:visible!important;min-height:${size + 16}px!important}
+.shop-block,.hdr-left{padding-right:${logoMaxW + 14 + Math.max(0, -x)}px!important}`;
+    } else {
+      css += `.shop-block,.hdr-left{padding-left:${logoMaxW + 14 + Math.max(0, x)}px!important}`;
+      logoPrintClearCss = `.hdr{overflow:visible!important;min-height:${size + 16}px!important}
+.shop-block,.hdr-left{padding-left:${logoMaxW + 14 + Math.max(0, x)}px!important}`;
     }
   }
   css += `@media print{
 @page{size:A4;margin:8mm 10mm}
 html,body{height:100%!important;padding:0!important}
 body{font-size:10.5pt!important;-webkit-print-color-adjust:economy;print-color-adjust:economy}
-.receipt,.invoice{border:1px solid #000!important;border-radius:0!important;box-shadow:none!important;max-width:100%!important}
+.receipt,.invoice{border:1px solid #000!important;border-radius:0!important;box-shadow:none!important;max-width:100%!important;overflow:visible!important}
 .sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}
 .hdr{padding:3mm 4mm!important;background:#fff!important;color:#000!important;background-image:none!important}
 .hdr *,.rc-title,.rc-no,.shop-name,.shop-sub{color:#000!important}
@@ -486,6 +500,7 @@ body{font-size:10.5pt!important;-webkit-print-color-adjust:economy;print-color-a
 .sigs{margin-top:2mm!important;padding-top:1mm!important;gap:8mm!important}
 .sig-line{margin-top:8mm!important;padding-top:2px!important;font-size:8.5pt!important}
 .footer{padding:2mm!important;font-size:8pt!important;background:#fff!important}
+${logoPrintClearCss}
 }`;
   css += invoiceScaleCss(style.fontScale);
   return css;
@@ -503,18 +518,22 @@ export function shopHeaderExtras(shop) {
 // Applies the chosen template, logo, header note and footer text to a built-in document.
 export function applyDesign(html, kind, styleOverride) {
   const style = styleOverride || loadPrintDesign().style[kind] || STYLE_DEFAULT;
-  const termsCss = `.footer.s4-terms{text-align:left!important;white-space:normal!important;line-height:1.35!important;height:auto!important;min-height:0!important;flex:none!important;padding:6px 12px!important}
-.s4-terms-title{text-align:center;font-weight:900;margin-bottom:4px}
-.s4-term-line{display:flex;align-items:flex-start;gap:4px;margin:1px 0}
-.s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}
-.sheet-mid{flex:1 1 auto!important;min-height:50mm!important}
+  // Sheet flex helpers stay for all docs; terms CSS/text only for invoices.
+  const sheetCss = `.sheet-mid{flex:1 1 auto!important;min-height:50mm!important}
 .sheet-bot{flex:0 0 auto!important;margin-top:auto!important}
 table.items{height:auto!important;margin:0!important}`;
-  let out = html.replace("</style>", `${templateCss(style)}${termsCss}</style>`);
+  const termsCss = kind === "invoice" ? `.footer.s4-terms{text-align:left!important;white-space:normal!important;line-height:1.35!important;height:auto!important;min-height:0!important;flex:none!important;padding:6px 12px!important}
+.s4-terms-title{text-align:center;font-weight:900;margin-bottom:4px}
+.s4-term-line{display:flex;align-items:flex-start;gap:4px;margin:1px 0}
+.s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}` : "";
+  let out = html.replace("</style>", `${templateCss(style)}${sheetCss}${termsCss}</style>`);
   const shopName = /(<div class="shop-name">[\s\S]*?<\/div>)/;
   if (style.logo) out = out.replace(shopName, `<div class="s4-logo-wrap"><img class="s4-logo" src="${style.logo}" alt=""></div>$1`);
   if (style.headerNote) out = out.replace(shopName, `$1<div class="shop-sub" style="white-space:pre-line">${esc(style.headerNote)}</div>`);
-  if (style.footerText) out = out.replace(/<div class="footer">[\s\S]*?<\/div>/, `<div class="footer s4-terms">${termsHtml(style.footerText)}</div>`);
+  // Invoice T&C only — statement (PO/returns/ledgers/reports) and voucher keep their own footer.
+  if (style.footerText && kind === "invoice") {
+    out = out.replace(/<div class="footer">[\s\S]*?<\/div>/, `<div class="footer s4-terms">${termsHtml(style.footerText)}</div>`);
+  }
   return out;
 }
 
@@ -529,7 +548,7 @@ export function generateStatementHTML({ shopName = "", title = "", subtitle = ""
 @page{size:${paper};margin:8mm}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI','Nirmala UI',Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:16px}
-.invoice{max-width:900px;margin:0 auto;border:2px solid #374151;border-radius:4px;overflow:hidden}
+.invoice{max-width:900px;margin:0 auto;border:2px solid #374151;border-radius:4px;overflow:visible}
 .hdr{background:#f8f9fa;color:#111;padding:16px 20px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #dee2e6}
 .shop-name{font-size:19px;font-weight:900}.shop-sub{font-size:11px;opacity:0.75;margin-top:3px}
 .inv-title{font-size:18px;font-weight:900;text-align:right;letter-spacing:1px}.inv-no{font-size:12px;text-align:right;margin-top:3px}
