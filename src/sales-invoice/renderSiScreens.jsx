@@ -16,7 +16,7 @@ import { itemBaseQty } from "../inventory/unitConversion";
 import { printMoneyReceipt, qtIsExpired } from "./siHelpers.js";
 import { salesSpecs } from "../product-master/productSpecs";
 
-export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
+export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, canViewAllInvoices = false, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
   // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
   // is rendered on every screen, not only on the list.
   const siPrintPrompt = canPrintInv&&siPrintModal&&(
@@ -40,6 +40,9 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         </div>
       </div>
   );
+  // Prefer the method already on the form. Cash used to always autoFocus — Enter then
+  // saved credit bills as Paid, so owner saw Paid/Confirmed depending on whether Enter was hit.
+  const preferPrintCredit = siForm?.paymentMethod === "credit";
   const siPrintPayPrompt = canPrintInv&&siPrintPayAsk&&(
       <div className="pm-backdrop" style={{ zIndex:10000, alignItems:"center" }}>
         <style>{PM_CSS}</style>
@@ -52,8 +55,8 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             <div style={{ fontWeight:700, marginBottom:10 }}>{bnL?"এই বিল ক্যাশ না ক্রেডিট?":"Is this bill Cash or Credit?"}</div>
             <div className="pm-window-foot" style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
               <button type="button" className="pm-btn-secondary" onClick={()=>setSiPrintPayAsk(false)}>{bnL?"বাতিল":"Cancel"}</button>
-              <button type="button" className="pm-btn" style={{ background:"#b45309", color:"#fff" }} onClick={()=>siPrintAs("credit")}>📅 {bnL?"ক্রেডিট":"Credit"}</button>
-              <button type="button" className="pm-btn pm-btn--primary" autoFocus onClick={()=>siPrintAs("cash")}>💵 {bnL?"ক্যাশ":"Cash"}</button>
+              <button type="button" className={preferPrintCredit ? "pm-btn pm-btn--primary" : "pm-btn"} style={preferPrintCredit ? undefined : { background:"#b45309", color:"#fff" }} autoFocus={preferPrintCredit} onClick={()=>siPrintAs("credit")}>📅 {bnL?"ক্রেডিট":"Credit"}</button>
+              <button type="button" className={preferPrintCredit ? "pm-btn" : "pm-btn pm-btn--primary"} style={preferPrintCredit ? { background:"#b45309", color:"#fff" } : undefined} autoFocus={!preferPrintCredit} onClick={()=>siPrintAs("cash")}>💵 {bnL?"ক্যাশ":"Cash"}</button>
             </div>
           </div>
         </div>
@@ -101,7 +104,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
           <strong style={{ color:siAccent }}>{siDocTitle}</strong>
           <span>
             {invoices.length} {bnL?"টি":"total"}
-            {!isOwner ? ` · ${bnL?"শুধু আমার":"Mine only"}` : ""}
+            {!canViewAllInvoices ? ` · ${bnL?"শুধু আমার":"Mine only"}` : ""}
           </span>
         </div>
 
@@ -338,6 +341,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                 {inv.jobOrderNo&&vRow(bnL?"জব কার্ড":"Job Card", inv.jobOrderNo, { color:"#c2410c" })}
                 {!isSO&&inv.deliveryNoteId&&vRow(bnL?"ডেলিভারি নোট":"Delivery Note", inv.deliveryNoteNo, { color:"#7e22ce" })}
                 {!isSO&&!inv.deliveryNoteId&&(inv.deliveryNoteNo||inv.vehicleNo)&&vRow(t.si_deliverySection, [inv.deliveryNoteNo, inv.vehicleNo].filter(Boolean).join(" · "))}
+                {inv.refNo&&vRow(bnL?"রেফারেন্স নং":"Reference Number", inv.refNo)}
                 {(isQuote||isDN)&&inv.convertedInvoiceNo&&vRow(isSO&&inv.status==="delivered"?(bnL?"ডেলিভারি নোট":"Delivery Note"):(bnL?"ইনভয়েস":"Invoice"), inv.convertedInvoiceNo, { strong:true, color:"#15803d" })}
                 {!isQuote&&inv.quotationNo&&vRow(bnL?"কোটেশন":"Quotation", inv.quotationNo, { color:"#b45309" })}
                 {inv.salesmanName&&vRow(bnL?"সেলসম্যান":"Salesman", inv.salesmanName)}
@@ -759,7 +763,16 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         </>)}
 
         {!isSO&&fPanel(`🚚 ${t.si_deliverySection}`, <>
-          {fRow(t.si_deliveryNote, <input className="pm-input" placeholder="DN-0001" value={siForm.deliveryNoteNo} onChange={e=>siUpd("deliveryNoteNo",e.target.value)} />)}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:siMobile?8:4, alignItems:"start" }}>
+            <div className="si-field" style={{ minWidth:0 }}>
+              <label className="pm-label">{t.si_deliveryNote}</label>
+              <input className="pm-input" placeholder="DN-0001" value={siForm.deliveryNoteNo} onChange={e=>siUpd("deliveryNoteNo",e.target.value)} />
+            </div>
+            <div className="si-field" style={{ minWidth:0 }}>
+              <label className="pm-label">{bnL?"রেফারেন্স নং":"Reference Number"}</label>
+              <input className="pm-input" placeholder="LPO / Ref" value={siForm.refNo||""} onChange={e=>siUpd("refNo",e.target.value)} />
+            </div>
+          </div>
           {fRow(t.si_vehicleNo, <input className="pm-input" placeholder="ABC-1234" value={siForm.vehicleNo} onChange={e=>siUpd("vehicleNo",e.target.value)} />)}
         </>)}
 

@@ -58,6 +58,9 @@ export const PERMISSIONS_LIST = [
   { key: "viewProducts",     bn: "পণ্য তালিকা দেখা",           en: "View Product List" },
   { key: "manageProducts",   bn: "পণ্য যোগ / এডিট / Import",   en: "Add / Edit / Import Products" },
   { key: "manageSales",      bn: "বিক্রয় ইনভয়েস ম্যানেজ করা", en: "Manage Sales Invoices" },
+  { key: "viewAllSalesInvoices", bn: "সব সেলস ইনভয়েস দেখা (মালিকের মতো)", en: "View all sales invoices (like owner)" },
+  { key: "editDraftSales",   bn: "সেলস ড্রাফট ইনভয়েস এডিট", en: "Edit draft sales invoices" },
+  { key: "editConfirmedSales", bn: "সেলস কনফার্মড ইনভয়েস এডিট", en: "Edit confirmed sales invoices" },
   { key: "manageCustomers",  bn: "কাস্টমার যোগ / বেছে নেওয়া", en: "Add / Pick Customers" },
 
   // Owner-controlled purchase/supplier/payment access for staff.
@@ -67,6 +70,9 @@ export const PERMISSIONS_LIST = [
   { key: "viewSupplierLedger", bn: "সাপ্লায়ার লেজার দেখা",    en: "View Supplier Ledger" },
   { key: "vendorPayments",   bn: "সাপ্লায়ার পেমেন্ট করা",     en: "Make Supplier Payments" },
   { key: "managePurchase",   bn: "ক্রয় ইনভয়েস ম্যানেজ করা",  en: "Manage Purchase Invoices" },
+  { key: "viewAllPurchaseInvoices", bn: "সব পারচেজ ইনভয়েস দেখা (মালিকের মতো)", en: "View all purchase invoices (like owner)" },
+  { key: "editDraftPurchase", bn: "পারচেজ ড্রাফট ইনভয়েস এডিট", en: "Edit draft purchase invoices" },
+  { key: "editConfirmedPurchase", bn: "পারচেজ কনফার্মড ইনভয়েস এডিট", en: "Edit confirmed purchase invoices" },
   { key: "managePdc",        bn: "PDC (পোস্ট ডেটেড চেক) দেখা ও পোস্ট করা", en: "Post Dated Cheques (PDC)" },
   { key: "manageExpenses",   bn: "দোকানের খরচ লেখা",           en: "Record Shop Expenses" },
   { key: "sendBranchTransfer", bn: "Branch-এ পণ্য পাঠানো",      en: "Send Branch Products" },
@@ -76,7 +82,7 @@ export const PERMISSIONS_LIST = [
   { key: "giveDiscount",     bn: "বিক্রয়ে ডিসকাউন্ট দেওয়া",     en: "Give Discount on Sales" },
   { key: "cancelInvoices",   bn: "ইনভয়েস / রিসিট বাতিল ও ডিলিট", en: "Cancel / Delete Invoices & Receipts" },
   { key: "manageReturns",    bn: "সেলস / পারচেজ রিটার্ন করা",   en: "Sales / Purchase Returns" },
-  { key: "stockAdjust",      bn: "স্টক সমন্বয় (কম/বেশি) করা",   en: "Stock Adjustment" },
+  { key: "stockAdjust",      bn: "স্টক সমন্বয় / পণ্য বদল / খোলা-কিট", en: "Stock Adjust / Product Exchange / Loosen-Bundle" },
   { key: "accountVouchers",  bn: "জার্নাল / কন্ট্রা ভাউচার",      en: "Journal / Contra Vouchers" },
   { key: "manageEmployees",  bn: "কর্মচারী ও হাজিরা",              en: "Employees & Attendance" },
   { key: "bankReconcile",    bn: "ব্যাংক হিসাব মেলানো",            en: "Bank Reconciliation" },

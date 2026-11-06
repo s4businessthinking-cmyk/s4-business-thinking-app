@@ -77,7 +77,8 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     const cashPartial = isCash && (extras.cashPartial != null ? !!extras.cashPartial : !!siForm.cashPartial);
     const plainCash   = siIsSettledPay(paymentMethod, cashPartial);
     // Receipts may have been posted since the form was opened: apply only the user's change on top of the latest paid amount.
-    const typedPaid   = siN2(siForm.amountPaid);
+    // forceAmountPaid: print-as-credit after cash — setSiForm clear is async; extras must win same tick.
+    const typedPaid   = extras.forceAmountPaid != null ? siN2(extras.forceAmountPaid) : siN2(siForm.amountPaid);
     const trackedPaid = priorDoc && !plainCash
       ? siN2(priorDoc.amountPaid) + (typedPaid - siLoadedPaidRef.current)
       : typedPaid;
@@ -167,9 +168,14 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       if (qty > 0) needed.set(it.productId, (needed.get(it.productId) || 0) + qty);
     });
     if (!needed.size) return true;
+    // Advisory only — never wait on a cold full-table reload; that made Confirm feel stuck.
     let rows;
     try {
-      rows = peekInvoiceRowsCache({ allowStale: true }) || await loadInvoiceRows();
+      rows = peekInvoiceRowsCache({ allowStale: true });
+      if (!rows) {
+        loadInvoiceRows().catch(() => {});
+        return true;
+      }
     } catch { return true; }
     const stockMap = computeStockMap(products, rows.purchaseInvoices, rows.salesInvoices, shopId, rows.deliveryNotes, {
       ...rows.extras,
@@ -317,9 +323,12 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       const p = siBuild(status, siInvoiceNo, options);
       if (!p) return;
       if (!siCustomerTermsOk(p)) return;
-      if (!(await siStockOk(p))) return;
       if (status!=="draft" && !isQuote && !unlinkedStockOk(p.items, lang)) return;
-      if (!editInvId) p.invoiceNo = await reserveSiInvoiceNo();
+      if (!(await siStockOk(p))) return;
+      // Use the number already on the form. Awaiting Firebase reserveShopSerial used to block
+      // every new Confirm for up to several seconds; bumpShopSiSerial still advances the shop
+      // counter after a successful local save.
+      if (!editInvId) p.invoiceNo = siInvoiceNo;
       await saveSalesInvoiceOffline(p, editInvId ? t.si_updated : successMsg, options);
     } catch(e) {
       toast(e.message,"err");

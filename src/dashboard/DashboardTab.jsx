@@ -92,6 +92,8 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
     { key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null },
     { key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null },
     { key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null },
+    { key:"productExchange", icon:"🔄", label:lang==="bn"?"পণ্য বদল":"Product Exchange", badge:null },
+    { key:"warrantyClaim", icon:"🔋", label:lang==="bn"?"গ্যারান্টি ক্লেইম":"Warranty Claim", badge:null },
     { key:"accounts", icon:"📊", label:lang==="bn"?"হিসাব নিকাশ":"Accounts",  badge:null },
     { key:"tax",      icon:"🏛️", label:lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT", badge:null },
     { key:"partners", icon:"🤝", label:lang==="bn"?"পার্টনার":"Partners",      badge:null },
@@ -111,7 +113,8 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
     ...(staffQuickNavKeys.includes("vouchers") ? [{ key:"vouchers", icon:"🧾", label:lang==="bn"?"ভাউচার":"Vouchers", badge:null }] : []),
     ...(staffQuickNavKeys.includes("salesReturn") ? [{ key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null }] : []),
     ...(staffQuickNavKeys.includes("purchaseReturn") ? [{ key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("stockAdjust") ? [{ key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("stockAdjust") ? [{ key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null }, { key:"productExchange", icon:"🔄", label:lang==="bn"?"পণ্য বদল":"Product Exchange", badge:null }, { key:"warrantyClaim", icon:"🔋", label:lang==="bn"?"গ্যারান্টি":"Warranty", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("salesReturn") && !staffQuickNavKeys.includes("stockAdjust") ? [{ key:"warrantyClaim", icon:"🔋", label:lang==="bn"?"গ্যারান্টি":"Warranty", badge:null }] : []),
     ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
     { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];

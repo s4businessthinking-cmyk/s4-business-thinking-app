@@ -86,6 +86,14 @@ export const DEFAULT_PERMISSIONS = {
   manageProducts: false,
   manageSales: true,
   manageCustomers: true,
+  // Separate from manageSales/managePurchase — owner grants each tick in User Groups.
+  viewAllSalesInvoices: false,
+  viewAllPurchaseInvoices: false,
+  editDraftSales: true,
+  editConfirmedSales: true,
+  // Same as sales: managePurchase holders keep edit until owner unchecks these ticks.
+  editDraftPurchase: true,
+  editConfirmedPurchase: true,
 
   viewVendors: false,
   viewSupplierLedger: false,
@@ -237,7 +245,9 @@ export async function reserveShopSerial(shopId, field, localMax, count = 1) {
     t.update(ref, { [field]: next + count - 1 });
     return next;
   });
-  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("serial reservation timed out")), 6000));
+  // Keep the save button snappy: fall back to a local number quickly; bumpShop*Serial still
+  // advances the shop counter in the background after a successful save.
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("serial reservation timed out")), 1200));
   try {
     return await Promise.race([tx, timeout]);
   } catch (err) {

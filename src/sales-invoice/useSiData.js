@@ -5,7 +5,8 @@ import { offlineCacheCloudRecords, offlineList } from "../offline/offlineReposit
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { useEffect, useRef, useState } from "react";
 
-export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, isOwner, kind, setDnMigrateTick, setInvoices, setSiLoading, shopId, syncRefreshKey, user }) {
+export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, isOwner, kind, setDnMigrateTick, setInvoices, setSiLoading, shopId, syncRefreshKey, user, viewAllInvoices = false }) {
+  const seeAll = isOwner || viewAllInvoices;
   const [selInv,setSelInv]         = useState(null);
   const [editInvId,setEditInvId]   = useState(null);
   const [siPrintModal,setSiPrintModal] = useState(null); // invoice to print after confirm
@@ -26,7 +27,7 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
   const siSaveLockRef = useRef(false);
   const [siSearch,setSiSearch]     = useState("");
   const [siStatusF,setSiStatusF]   = useState("ALL");
-  const [siViewAll,setSiViewAll]   = useState(isOwner);
+  const [siViewAll,setSiViewAll]   = useState(seeAll);
 
   // Customer receipt vouchers (Receipts against Bill) — only the sales kind collects money.
   const [receipts,setReceipts]         = useState([]);
@@ -97,7 +98,7 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
     );
 
     const filterSiRows = (rows=[]) => rows.filter(inv =>
-      inv.shopId === shopId && (isOwner || inv.createdBy === user.uid)
+      inv.shopId === shopId && (seeAll || inv.createdBy === user.uid)
     );
 
     const loadOfflineSiInvoices = async ({ cloudRows = null } = {}) => {
@@ -113,7 +114,7 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
         records
           .filter(r => Number(r?.dirty || 0) === 1)
           .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
-          .filter(inv => inv.shopId === shopId && (isOwner || inv.createdBy === user.uid))
+          .filter(inv => inv.shopId === shopId && (seeAll || inv.createdBy === user.uid))
           .forEach(inv => merged.set(String(inv.id), inv));
         const rows = sortSiInvoices(filterSiRows([...merged.values()]));
         setInvoices(rows);
@@ -143,14 +144,14 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
     };
 
     if (authSyncReady) {
-      const baseQ = isOwner
+      const baseQ = seeAll
         ? query(collection(db,COL),where("shopId","==",shopId),orderBy("createdAt","desc"))
         : query(collection(db,COL),where("shopId","==",shopId),where("createdBy","==",user.uid),orderBy("createdAt","desc"));
 
       u1=onSnapshot(baseQ,snap=>{
         applyCloudRows(snap.docs.map(normalizeSiInvoice));
       },()=>{
-        const fbQ=isOwner
+        const fbQ=seeAll
           ? query(collection(db,COL),where("shopId","==",shopId))
           : query(collection(db,COL),where("shopId","==",shopId),where("createdBy","==",user.uid));
         u2=onSnapshot(fbQ,snap=>{
@@ -162,7 +163,7 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
       });
     }
     return ()=>{ cancelled=true; u1(); u2&&u2(); };
-  },[shopId,isOwner,user.uid,syncRefreshKey,authSyncReady,COL,dnMigrateTick]);
+  },[shopId,seeAll,user.uid,syncRefreshKey,authSyncReady,COL,dnMigrateTick]);
 
   useEffect(()=>{
     if (kind!=="sales" || !invoices.some(inv=>inv.invoiceType==="delivery")) return;

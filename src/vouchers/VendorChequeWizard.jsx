@@ -37,6 +37,7 @@ export function trimAllocationsTo(allocations, target) {
 export default function VendorChequeWizard({
   lang = "en", cur = "AED", vendors = [], banks = [], getOpenInvoices, amountWords = () => "",
   initialVendorId = null, saving = false, onSave, onPrintCheque, onPrintVoucher, onHandover, onClose,
+  onPrepareVendor = null,
 }) {
   const bn = lang === "bn";
   const mobile = useIsMobile();
@@ -62,7 +63,24 @@ export default function VendorChequeWizard({
 
   useEscapeKey(() => { if (!saving) onClose?.(); }, { level: 5 });
 
-  const openInvoices = useMemo(() => (vendor ? getOpenInvoices(vendor) || [] : []), [vendor, getOpenInvoices]);
+  const [prepKey, setPrepKey] = useState(0);
+  // Fold leftover purchase-return refund credit into this vendor's open bills before totals show.
+  useEffect(() => {
+    if (!vendor || !onPrepareVendor) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        await onPrepareVendor(vendor);
+        if (alive) setPrepKey((k) => k + 1);
+      } catch (err) {
+        if (alive) console.warn("[S4 Cheque] return-credit settle failed", err);
+      }
+    })();
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendor?.id, vendor?.name]);
+
+  const openInvoices = useMemo(() => (vendor ? getOpenInvoices(vendor) || [] : []), [vendor, getOpenInvoices, prepKey]);
   const shown = useMemo(() => {
     if (basis === "month") return openInvoices.filter((i) => day(i.invoiceDate).startsWith(month));
     if (basis === "range") return openInvoices.filter((i) => (!from || day(i.invoiceDate) >= from) && (!to || day(i.invoiceDate) <= to));

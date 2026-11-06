@@ -9,7 +9,7 @@ import { rescaleForUnit } from "../inventory/unitConversion";
 import { useEffect, useState } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
-export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors }) {
+export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false, canEditDraftPurchase = false, canEditConfirmedPurchase = false, editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors }) {
   // ── Open new form ──
   // justSavedNo: right after a save `invoices` does not hold the new bill yet, so the preview counts it too
   // (otherwise the fresh form showed the number just used). Called from onClick too, so ignore non-strings.
@@ -220,7 +220,16 @@ export function usePiInvoiceForm({ canManagePurchase, editInvoiceId, invoices, i
     level: piView==="form" ? 2 : 1,
   });
 
-  const piCanEditInv = (inv) => ["draft","confirmed","partial","paid"].includes(inv?.status) && !isOpeningBill(inv) && !isBranchTransferBill(inv) && (isOwner || (canManagePurchase && inv.createdBy===user?.uid));
+  const piCanEditInv = (inv) => {
+    if (!inv || isOpeningBill(inv) || isBranchTransferBill(inv)) return false;
+    const st = inv.status;
+    if (!["draft", "confirmed", "partial", "paid"].includes(st)) return false;
+    if (isOwner) return true;
+    if (!canManagePurchase) return false;
+    if (!(inv.createdBy === user?.uid || canViewAllPurchase)) return false;
+    if (st === "draft") return canEditDraftPurchase;
+    return canEditConfirmedPurchase;
+  };
   const piOpenFromDesktop = (inv) => {
     if (!piLeaveUnsavedOk()) return;
     // Every saved bill (paid, cancelled, opening balance, branch transfer too) opens on the desktop form read-only,

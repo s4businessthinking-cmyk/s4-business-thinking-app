@@ -50,7 +50,11 @@ export async function isOwnerOfShop(c, shopId) {
 const hasShopPermission = (c, shopId, perm) => isShopMember(c, shopId) && c.user.permissions?.[perm] === true;
 
 // The app treats these as granted when a profile has no explicit value (DEFAULT_PERMISSIONS).
-const DEFAULT_ON_PERMISSIONS = ["sendOrder", "viewProducts", "manageSales", "manageCustomers"];
+const DEFAULT_ON_PERMISSIONS = [
+  "sendOrder", "viewProducts", "manageSales", "manageCustomers",
+  // Legacy profiles omit these keys; treat as on so existing staff keep draft/confirmed edit.
+  "editDraftSales", "editConfirmedSales", "editDraftPurchase", "editConfirmedPurchase",
+];
 const memberMay = async (c, shopId, perm) => {
   if (await isOwnerOfShop(c, shopId)) return true;
   if (!isShopMember(c, shopId)) return false;
@@ -181,18 +185,39 @@ const memberPaymentUpdate = (c, res, req) =>
   && ["confirmed", "partial", "paid"].includes(req.status)
   && (!has(req.grandTotal) || num(req.amountPaid) <= num(req.grandTotal) + 0.01);
 
+async function salesInvoiceStatusEditAllowed(c, shopId, status) {
+  if (status === "draft") return memberMay(c, shopId, "editDraftSales");
+  if (["confirmed", "paid", "partial"].includes(status)) return memberMay(c, shopId, "editConfirmedSales");
+  return false;
+}
+
+async function purchaseInvoiceStatusEditAllowed(c, shopId, status) {
+  if (status === "draft") return memberMay(c, shopId, "editDraftPurchase");
+  if (["confirmed", "partial", "paid"].includes(status)) return memberMay(c, shopId, "editConfirmedPurchase");
+  return false;
+}
+
 async function salesCreatorUpdate(c, res, req) {
-  if (!(isShopMember(c, res.shopId) && res.createdBy === c.uid && req.createdBy === res.createdBy && req.shopId === res.shopId)) return false;
+  const own = isShopMember(c, res.shopId) && res.createdBy === c.uid && req.createdBy === res.createdBy && req.shopId === res.shopId;
+  const viewAll = isShopMember(c, res.shopId) && req.shopId === res.shopId && req.createdBy === res.createdBy
+    && (await memberMay(c, res.shopId, "viewAllSalesInvoices"));
+  if (!own && !viewAll) return false;
   if (!(await memberMay(c, res.shopId, "manageSales"))) return false;
   if (res.status === "cancelled") return false;
   if (req.status === "cancelled") return memberMay(c, res.shopId, "cancelInvoices");
+  if (!(await salesInvoiceStatusEditAllowed(c, res.shopId, res.status))) return false;
   return num(req.amountPaid) <= num(req.grandTotal) + 0.01;
 }
 
 async function purchaseCreatorUpdate(c, res, req) {
-  if (!(isShopMember(c, res.shopId) && res.createdBy === c.uid && req.createdBy === res.createdBy && req.shopId === res.shopId)) return false;
+  const own = isShopMember(c, res.shopId) && res.createdBy === c.uid && req.createdBy === res.createdBy && req.shopId === res.shopId;
+  const viewAll = isShopMember(c, res.shopId) && req.shopId === res.shopId && req.createdBy === res.createdBy
+    && (await memberMay(c, res.shopId, "viewAllPurchaseInvoices"));
+  if (!own && !viewAll) return false;
   if (!(await memberMay(c, res.shopId, "managePurchase"))) return false;
-  return ["draft", "confirmed"].includes(res.status) && ["draft", "confirmed"].includes(req.status);
+  if (!(await purchaseInvoiceStatusEditAllowed(c, res.shopId, res.status))) return false;
+  return ["draft", "confirmed", "partial", "paid"].includes(res.status)
+    && ["draft", "confirmed", "partial", "paid"].includes(req.status);
 }
 
 const deny = async () => false;
@@ -293,7 +318,7 @@ export const RULES = {
     update: async (c, { id, res, req }) => isAuthenticated(c) && (
       res.ownerUid === c.uid
       || res.ownerId === c.uid
-      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastSOSerial", "lastGRSerial", "lastJOSerial", "lastPLSerial", "lastPBSerial", "lastVendorCode", "lastCustomerCode"]))
+      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastSOSerial", "lastGRSerial", "lastJOSerial", "lastPLSerial", "lastPBSerial", "lastPXSerial", "lastWCSerial", "lastVendorCode", "lastCustomerCode"]))
     ),
     delete: async (c, { res }) => isAuthenticated(c) && (res.ownerUid === c.uid || res.ownerId === c.uid),
   },
@@ -405,6 +430,18 @@ export const RULES = {
     create: async (c, req) => req.createdBy === c.uid && (await memberMay(c, req.shopId, "stockAdjust")),
     update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "stockAdjust"))),
+    del: memberDelete("deleteStock"),
+  }),
+  // Battery / product guarantee: customer → company → replacement (stock only at replaced/delivered).
+  warrantyClaims: shopScoped({
+    view: ["stockAdjust", "manageReturns"],
+    create: async (c, req) => req.createdBy === c.uid && (
+      (await memberMay(c, req.shopId, "stockAdjust")) || (await memberMay(c, req.shopId, "manageReturns"))
+    ),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
+      || (req.shopId === res.shopId && req.createdBy === res.createdBy && (
+        (await memberMay(c, res.shopId, "stockAdjust")) || (await memberMay(c, res.shopId, "manageReturns"))
+      )),
     del: memberDelete("deleteStock"),
   }),
   auditLogs: {

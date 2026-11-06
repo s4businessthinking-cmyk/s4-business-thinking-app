@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 export const MENU_GROUPS = [
   { key: "home", bn: "", en: "", tabs: ["dashboard", "owner", "shop"] },
   { key: "masters", icon: "🗂️", bn: "মাস্টার (Masters)", en: "Masters", tabs: ["products", "vendors", "customers", "employees"] },
-  { key: "transaction", icon: "🧾", bn: "লেনদেন (Transaction)", en: "Transaction", tabs: ["purchaseOrder", "salesOrder", "delivery", "goodsReceipt", "branchTransfer", "stockAdjust", "loosen", "bundle", "purchase", "sales", "purchaseReturn", "salesReturn", "employeeExpense", "attendance", "quotation", "jobCard"] },
+  { key: "transaction", icon: "🧾", bn: "লেনদেন (Transaction)", en: "Transaction", tabs: ["purchaseOrder", "salesOrder", "delivery", "goodsReceipt", "branchTransfer", "stockAdjust", "productExchange", "warrantyClaim", "loosen", "bundle", "purchase", "sales", "purchaseReturn", "salesReturn", "employeeExpense", "attendance", "quotation", "jobCard"] },
   { key: "accounts", icon: "💰", bn: "হিসাব (Accounts)", en: "Accounts", tabs: ["globalLedger", "vouchers", "expenses", "cheque", "pdc", "securityCheque", "bankRec", "partners"] },
   { key: "reports", icon: "📊", bn: "রিপোর্ট (Reports)", en: "Reports", tabs: ["accounts", "tax", "auditLog"] },
   { key: "utilities", icon: "🛠️", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["labels", "reminders", "calculator", "settings"] },

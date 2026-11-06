@@ -21,9 +21,42 @@ import { isForeign } from "./purchaseOptions.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { printPaymentVoucher, siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
 import { printPurchaseInvoice } from "./purchasePrint.js";
+import { settleLeftoverVendorReturnCredits } from "../returns/returnsCreditSettle.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 
-export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shop, shopId, t, th, toast, totals, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
+export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
+  const applyVendorReturnCreditSettle = async (p) => {
+    const plan = await settleLeftoverVendorReturnCredits({
+      returns: billReturns,
+      invoices: piMoneyInvoices,
+      vendorId: p.id || null,
+      vendorName: p.name || "",
+      user,
+    });
+    if (plan.invoicePatches?.length && setInvoices) {
+      const byId = new Map(plan.invoicePatches.map((x) => [x.id, x]));
+      setInvoices((prev) => prev.map((inv) => {
+        const hit = byId.get(inv.id);
+        return hit ? { ...inv, amountPaid: hit.amountPaid, balanceDue: hit.balanceDue, status: hit.status } : inv;
+      }));
+    }
+    if (plan.returnPatches?.length && setBillReturns) {
+      const byId = new Map(plan.returnPatches.map((x) => [x.id, x]));
+      setBillReturns((prev) => prev.map((r) => {
+        const hit = byId.get(r.id);
+        if (!hit) return r;
+        return {
+          ...r,
+          appliedToInvoice: hit.appliedToInvoice,
+          appliedAllocations: hit.appliedAllocations,
+          refundAmount: hit.refundAmount,
+          ...(hit.clearRefundVoucher ? { refundMethod: "", refundVoucherId: null, refundVoucherNo: "", refundVoucherCol: "" } : {}),
+        };
+      }));
+    }
+    return plan;
+  };
+
   if (piView==="list" || (piView==="form" && piWin.min && wideDesktop)) {
     const groups = groupInvoicesByParty(piFiltered, { idField:"vendorId", nameField:"vendorName" });
     const openGroup = piGroupMode==="folders" && piOpenParty ? (groups.find(g=>g.key===piOpenParty) || null) : null;
@@ -133,6 +166,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                 prefill={pmtEditSnapshot || (prefParty ? { ...prefParty, invoiceId:pmtPrefillInvoiceId } : null)}
                 initialViewId={pmtView==="detail" ? (selVoucher?.id||null) : null}
                 saving={pmtSaving}
+                onPrepareParty={(p)=>applyVendorReturnCreditSettle(p)}
                 onSave={async (d)=>{
                   const created = await piSavePaymentVoucher({ vendorId:d.partyId, vendorName:d.partyName, vendorMobile:d.partyMobile, method:d.method, paymentDate:d.date, note:d.note, chequeNo:d.chequeNo, chequeBank:d.chequeBank, chequeDate:d.chequeDate, chequeReceivedBy:d.chequeReceivedBy, vendorReceiptNo:d.vendorReceiptNo, chequeMonth:d.chequeMonth, refNo:d.refNo, refBank:d.refBank, refDate:d.refDate, discountAmount:d.discountAmount, allocations:d.allocations }, { stayOpen:true });
                   return created ? toVoucherView(withSupRefs(created),"payment") : null;
@@ -157,6 +191,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
               amountWords={(n)=>`${amountToWordsAED(n)} Only`}
               initialVendorId={chqWizard.vendorId}
               saving={pmtSaving}
+              onPrepareVendor={(p)=>applyVendorReturnCreditSettle(p)}
               onSave={(payload)=>piSavePaymentVoucher(payload, { stayOpen:true })}
               onPrintCheque={onOpenChequePrinter ? (v)=>{ setChqWizard(null); openVoucherInChequePrinter(v); } : undefined}
               onPrintVoucher={(v)=>printChequePaymentVoucher(v)}

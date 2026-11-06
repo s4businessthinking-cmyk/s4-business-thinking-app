@@ -63,6 +63,23 @@ function addAdjustments(adjustments, shopId, into, productById, onlyIds = null) 
   });
 }
 
+/** Warranty: only "replaced" (company gave new unit, still at shop) adds saleable stock. */
+function addWarrantyClaims(claims, shopId, into, productById, onlyIds = null) {
+  (claims || []).forEach((c) => {
+    if (!c || c.isDeleted || c.deleted || c.status !== "replaced") return;
+    if (shopId && c.shopId && c.shopId !== shopId) return;
+    const productId = c.replacedProductId || c.productId;
+    if (!productId) return;
+    if (onlyIds && !onlyIds.has(productId)) return;
+    const qty = itemBaseQty(
+      { productId, qty: c.qty, unitFactor: c.unitFactor || 1 },
+      productById.get(productId),
+    );
+    if (qty <= 0) return;
+    into.set(productId, (into.get(productId) || 0) + qty);
+  });
+}
+
 // Stock = opening stock + purchased + goods received − sold − delivered + sales returns − purchase returns ± adjustments, in base units.
 export function computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes = [], extras = {}) {
   const onlyIds = extras.onlyProductIds instanceof Set && extras.onlyProductIds.size
@@ -79,6 +96,7 @@ export function computeStockMap(products, purchaseInvoices, salesInvoices, shopI
   addInvoices(extras.salesReturns || [], shopId, movement, 1, productById, RETURN_STOCK_STATUSES, null, null, onlyIds);
   addInvoices(extras.purchaseReturns || [], shopId, movement, -1, productById, RETURN_STOCK_STATUSES, null, null, onlyIds);
   addAdjustments(extras.stockAdjustments, shopId, movement, productById, onlyIds);
+  addWarrantyClaims(extras.warrantyClaims, shopId, movement, productById, onlyIds);
   const stock = new Map();
   productById.forEach((p, id) => {
     stock.set(id, parseFloat(((Number(p.openingStock) || 0) + (movement.get(id) || 0)).toFixed(4)));
@@ -88,12 +106,15 @@ export function computeStockMap(products, purchaseInvoices, salesInvoices, shopI
 
 export async function loadInvoiceRows() {
   return beginInvoiceRowsLoad(async () => {
-    const [pur, sal, dn, sr, pr, adj, grn] = await Promise.all([
+    const [pur, sal, dn, sr, pr, adj, grn, wc] = await Promise.all([
       offlineList("purchaseInvoices"), offlineList("salesInvoices"), offlineList("deliveryNotes"),
       offlineList("salesReturns").catch(() => []), offlineList("purchaseReturns").catch(() => []), offlineList("stockAdjustments").catch(() => []),
-      offlineList("goodsReceipts").catch(() => []),
+      offlineList("goodsReceipts").catch(() => []), offlineList("warrantyClaims").catch(() => []),
     ]);
-    const extras = { salesReturns: rowsOf(sr), purchaseReturns: rowsOf(pr), stockAdjustments: rowsOf(adj), goodsReceipts: rowsOf(grn) };
+    const extras = {
+      salesReturns: rowsOf(sr), purchaseReturns: rowsOf(pr), stockAdjustments: rowsOf(adj),
+      goodsReceipts: rowsOf(grn), warrantyClaims: rowsOf(wc),
+    };
     return { purchaseInvoices: rowsOf(pur), salesInvoices: rowsOf(sal), deliveryNotes: rowsOf(dn), extras, ...extras };
   });
 }

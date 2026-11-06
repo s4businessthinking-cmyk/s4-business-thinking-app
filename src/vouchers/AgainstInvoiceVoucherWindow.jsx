@@ -122,7 +122,7 @@ export default function AgainstInvoiceVoucherWindow({
   lang = "en", mode = "payment", cur = "AED", voucherNo = "", title = null,
   parties = [], salesmen = [], banks = [], getOpenInvoices, vouchers = [], prefill = null,
   saving = false, onSave, onCancelVoucher, onDeleteVoucher, onSetChequeStatus, onPrint, onClose, initialViewId = null,
-  onPrintCheque, onPrintChequeVoucher, onHandover,
+  onPrintCheque, onPrintChequeVoucher, onHandover, onPrepareParty = null,
 }) {
   const bn = lang === "bn";
   const isReceipt = mode === "receipt";
@@ -202,7 +202,24 @@ export default function AgainstInvoiceVoucherWindow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const openInvoices = useMemo(() => (party ? getOpenInvoices(party) || [] : []), [party, getOpenInvoices]);
+  const [prepKey, setPrepKey] = useState(0);
+  // Purchase: fold leftover return refund credit into open bills before last-balance / pay amounts show.
+  useEffect(() => {
+    if (!party || !onPrepareParty || isReceipt) return undefined;
+    let alive = true;
+    (async () => {
+      try {
+        await onPrepareParty(party);
+        if (alive) setPrepKey((k) => k + 1);
+      } catch (err) {
+        if (alive) console.warn("[S4 Payment] return-credit settle failed", err);
+      }
+    })();
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [party?.id, party?.name, isReceipt]);
+
+  const openInvoices = useMemo(() => (party ? getOpenInvoices(party) || [] : []), [party, getOpenInvoices, prepKey]);
   const pendingTotal = openInvoices.reduce((a, i) => a + n2(i.balanceDue), 0);
   const choosable = openInvoices.filter((i) => !rows.some((r) => r.invoiceId === i.id));
   const selInv = openInvoices.find((i) => i.id === selInvId) || null;

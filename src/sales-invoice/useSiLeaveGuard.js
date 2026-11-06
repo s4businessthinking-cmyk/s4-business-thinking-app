@@ -90,8 +90,21 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
     printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint, { customerBalance });
   };
 
-  // A bill with money received against it changes only through the owner; staff cancel the receipt first.
-  const siCanEditDoc = (inv) => !isOpeningBill(inv) && (isQuote?["draft","open"]:isDN?["draft","confirmed"]:["draft","confirmed","paid","partial"]).includes(inv?.status)
+  // Draft vs confirmed are separate group ticks. A bill with receipts stays owner-only until receipts are cancelled.
+  const siStatusEditable = (inv) => {
+    const st = inv?.status;
+    if (isQuote) return ["draft", "open"].includes(st) && (isOwner || siPerm("editDraftSales"));
+    if (isDN) {
+      if (st === "draft") return isOwner || siPerm("editDraftSales");
+      if (st === "confirmed") return isOwner || siPerm("editConfirmedSales");
+      return false;
+    }
+    if (st === "draft") return isOwner || siPerm("editDraftSales");
+    if (["confirmed", "paid", "partial"].includes(st)) return isOwner || siPerm("editConfirmedSales");
+    return false;
+  };
+  const siCanEditDoc = (inv) => !isOpeningBill(inv) && siStatusEditable(inv)
+    && (isOwner || inv?.createdBy === user?.uid || siPerm("viewAllSalesInvoices"))
     && (isOwner || !receipts.some(r => r.status!=="cancelled" && (r.allocations||[]).some(a => a.invoiceId===inv.id)));
   const siCanDeleteDoc = (inv) => !!inv && (isOwner
     ? ["draft","cancelled"].includes(inv.status)

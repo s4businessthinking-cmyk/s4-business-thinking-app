@@ -28,8 +28,18 @@ const MATRIX_ROW_DEFS = [
   { key: "orders", group: "transactions", bn: "অর্ডার", en: "Orders", view: "sendOrder", add: "sendOrder", edit: "setStatus", del: "deleteOrder", print: "printOrders",
     extras: [{ key: "setPrices", bn: "দাম", en: "Prices" }, { key: "markDelivery", bn: "ডেলিভারি", en: "Delivery" }] },
   { key: "sales", group: "transactions", bn: "বিক্রয় (ইনভয়েস, কোটেশন, অর্ডার)", en: "Sales (invoice, quote, order)", view: "manageSales", add: "manageSales", edit: "manageSales", del: "cancelInvoices", print: "printSales",
-    extras: [{ key: "giveDiscount", bn: "ডিসকাউন্ট", en: "Discount" }] },
-  { key: "purchase", group: "transactions", bn: "ক্রয় (ইনভয়েস, PO, রিসিভ)", en: "Purchase (invoice, PO, receive)", view: "managePurchase", add: "managePurchase", edit: "managePurchase", del: "deletePurchase", print: "printPurchase" },
+    extras: [
+      { key: "viewAllSalesInvoices", bn: "সব সেলস ইনভয়েস দেখা", en: "View all sales invoices" },
+      { key: "editDraftSales", bn: "ড্রাফট এডিট", en: "Edit draft" },
+      { key: "editConfirmedSales", bn: "কনফার্মড এডিট", en: "Edit confirmed" },
+      { key: "giveDiscount", bn: "ডিসকাউন্ট", en: "Discount" },
+    ] },
+  { key: "purchase", group: "transactions", bn: "ক্রয় (ইনভয়েস, PO, রিসিভ)", en: "Purchase (invoice, PO, receive)", view: "managePurchase", add: "managePurchase", edit: "managePurchase", del: "deletePurchase", print: "printPurchase",
+    extras: [
+      { key: "viewAllPurchaseInvoices", bn: "সব পারচেজ ইনভয়েস দেখা", en: "View all purchase invoices" },
+      { key: "editDraftPurchase", bn: "ড্রাফট এডিট", en: "Edit draft" },
+      { key: "editConfirmedPurchase", bn: "কনফার্মড এডিট", en: "Edit confirmed" },
+    ] },
   { key: "returns", group: "transactions", bn: "সেলস / পারচেজ রিটার্ন", en: "Sales / purchase returns", view: "manageReturns", add: "manageReturns", edit: "manageReturns", del: "deleteReturns", print: "printReturns" },
   { key: "stock", group: "transactions", bn: "স্টক সমন্বয় ও গণনা", en: "Stock adjust & count", view: "stockAdjust", add: "stockAdjust", edit: "stockAdjust", del: "deleteStock", print: "printStock" },
   { key: "branch", group: "transactions", bn: "Branch ট্রান্সফার", en: "Branch transfer", view: "sendBranchTransfer", add: "sendBranchTransfer", edit: "sendBranchTransfer", del: "deleteBranch", print: "printBranch",
@@ -100,11 +110,11 @@ function on(...keys) {
 
 export const GROUP_PRESETS = [
   { id: "preset_salesman", bn: "সেলসম্যান", en: "Salesman",
-    permissions: on("sendOrder", "viewProducts", "manageSales", "printSales", "manageCustomers", "printCustomers") },
+    permissions: on("sendOrder", "viewProducts", "manageSales", "printSales", "manageCustomers", "printCustomers", "editDraftSales", "editConfirmedSales") },
   { id: "preset_cashier", bn: "ক্যাশিয়ার", en: "Cashier",
-    permissions: on("viewProducts", "manageSales", "printSales", "manageCustomers", "printCustomers", "viewCustomerBalance", "giveDiscount", "manageReturns", "manageExpenses") },
+    permissions: on("viewProducts", "manageSales", "printSales", "manageCustomers", "printCustomers", "viewCustomerBalance", "giveDiscount", "manageReturns", "manageExpenses", "editDraftSales", "editConfirmedSales") },
   { id: "preset_store", bn: "স্টোর কিপার", en: "Store keeper",
-    permissions: on("viewProducts", "manageProducts", "managePurchase", "printPurchase", "viewVendors", "stockAdjust", "sendBranchTransfer", "receiveBranchTransfer") },
+    permissions: on("viewProducts", "manageProducts", "managePurchase", "printPurchase", "viewVendors", "stockAdjust", "sendBranchTransfer", "receiveBranchTransfer", "viewAllPurchaseInvoices", "editDraftPurchase", "editConfirmedPurchase") },
   { id: "preset_accountant", bn: "হিসাবরক্ষক", en: "Accountant",
     permissions: on("viewProducts", "viewVendors", "viewSupplierLedger", "vendorPayments", "managePdc", "manageExpenses", "printCheques", "viewCustomerBalance", "accountVouchers", "bankReconcile", "manageCustomers", "manageSecurityCheques") },
   { id: "preset_manager", bn: "ম্যানেজার", en: "Manager",
@@ -117,7 +127,14 @@ export function userGroupsOf(shop) {
 }
 
 export function groupPermissions(group, defaults = {}) {
-  return { ...defaults, ...allOff(), ...(group?.permissions || {}) };
+  const saved = group?.permissions || {};
+  const out = { ...defaults, ...allOff(), ...saved };
+  // Groups saved before these ticks existed: keep prior manage* edit behavior until owner sets them.
+  if (!Object.prototype.hasOwnProperty.call(saved, "editDraftSales") && out.manageSales) out.editDraftSales = true;
+  if (!Object.prototype.hasOwnProperty.call(saved, "editConfirmedSales") && out.manageSales) out.editConfirmedSales = true;
+  if (!Object.prototype.hasOwnProperty.call(saved, "editDraftPurchase") && out.managePurchase) out.editDraftPurchase = true;
+  if (!Object.prototype.hasOwnProperty.call(saved, "editConfirmedPurchase") && out.managePurchase) out.editConfirmedPurchase = true;
+  return out;
 }
 
 export function samePermissions(a = {}, b = {}) {

@@ -177,19 +177,29 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     });
 
     if (!editInvoiceId) bumpShopPiSerial(payload.invoiceNo);
-    if (STOCK_AFFECTING_INVOICE_STATUSES.includes(payload.status)) await piUpdateProductCosts(payload, deferPersist);
-    await refreshAverageCosts([...(payload.items || []), ...(priorInvoice?.items || [])].map((it) => it.productId),
-      [...invoices.filter((inv) => inv.id !== savedId), savedDoc], deferPersist);
 
     let splitInfo = null;
     try { splitInfo = await splitUnreceivedPurchaseOrder({ ...payload, id: savedId }, deferPersist); }
     catch (err) { console.warn("[S4 PI] purchase-order split failed", err); }
 
+    // Persist + sync immediately so Confirm unlocks; product cost/avg used to await every
+    // line's SQLite read and made purchase save feel multi-second even offline.
     persistOfflineDb().catch((err) => console.warn("[S4 PI] persist after save failed", err));
-
     if (navigator.onLine) {
       window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase invoice save sync failed", err));
     }
+
+    const costIds = [...(payload.items || []), ...(priorInvoice?.items || [])].map((it) => it.productId);
+    const costList = [...invoices.filter((inv) => inv.id !== savedId), savedDoc];
+    Promise.resolve().then(async () => {
+      try {
+        if (STOCK_AFFECTING_INVOICE_STATUSES.includes(payload.status)) await piUpdateProductCosts(payload, deferPersist);
+        await refreshAverageCosts(costIds, costList, deferPersist);
+        await persistOfflineDb();
+      } catch (err) {
+        console.warn("[S4 PI] post-save cost update failed", err);
+      }
+    });
 
     if (splitInfo) {
       toast(lang === "bn"
@@ -397,7 +407,8 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       }
       if (!piVendorTermsOk(payload, status)) return;
       if (!piSupplierInvoiceDuplicateOk(payload)) return;
-      if (!editInvoiceId) payload.invoiceNo = await reservePiInvoiceNo();
+      // Same as sales: keep the preview number — do not block Confirm on Firebase serial reserve.
+      if (!editInvoiceId) payload.invoiceNo = piInvoiceNo;
       await savePurchaseInvoiceOffline(payload, editInvoiceId ? t.pi_updated : successMsg);
       if (!editInvoiceId) setPiSource(null);
     } catch(e) {

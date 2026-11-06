@@ -6,10 +6,11 @@ import { alertText as employeeAlertText } from "../employees/employeeAlerts.js";
 import { partnerAlertText } from "../partners/partners.js";
 import { securityChequeAlertText } from "../securityCheque/securityCheque.js";
 import { reminderAlertText } from "../reminders/reminders.js";
+import { warrantyAlertText } from "../returns/warrantyClaim.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
-export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList = [], team, th, toast, user }) {
+export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId = null, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList = [], team, th, toast, user, warrantyAlertList = [] }) {
   const unread = isOwner || isOrderManager
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
@@ -46,8 +47,20 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
       const txt = reminderAlertText(a, lang==="bn");
       return { key:a.key, icon:txt.icon, tone:a.tone, title:txt.title, sub:txt.sub, onClick:()=>{
         setSettingsPage(null);
-        if (a.linkType && a.linkId && ["sales","quotation","delivery","salesOrder"].includes(a.linkType)) { setTab(a.linkType); setGlobalOpenSalesInvoiceId(a.linkId); }
+        if (a.linkType === "warrantyClaim") {
+          setTab("warrantyClaim");
+          if (a.linkId) setGlobalOpenWarrantyClaimId?.(a.linkId);
+        }
+        else if (a.linkType && a.linkId && ["sales","quotation","delivery","salesOrder"].includes(a.linkType)) { setTab(a.linkType); setGlobalOpenSalesInvoiceId(a.linkId); }
         else setTab("reminders");
+      } };
+    }),
+    ...warrantyAlertList.map(a => {
+      const txt = warrantyAlertText(a, lang==="bn");
+      return { key:a.key, icon:txt.icon, tone:"danger", title:txt.title, sub:txt.sub, onClick:()=>{
+        setSettingsPage(null);
+        setTab("warrantyClaim");
+        if (a.id) setGlobalOpenWarrantyClaimId?.(a.id);
       } };
     }),
     ...securityChequeAlertList.map(a => {
@@ -261,13 +274,15 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     salesReturn: lang==="bn"?"↩️ সেলস রিটার্ন":"↩️ Sales Return",
     purchaseReturn: lang==="bn"?"↪️ পারচেজ রিটার্ন":"↪️ Purchase Return",
     stockAdjust: lang==="bn"?"⚖️ স্টক সমন্বয়":"⚖️ Stock Adjustment",
+    productExchange: lang==="bn"?"🔄 পণ্য বদল (Exchange)":"🔄 Product Exchange",
+    warrantyClaim: lang==="bn"?"🔋 গ্যারান্টি / চেঞ্জ ক্লেইম":"🔋 Warranty / Change Claim",
     loosen: lang==="bn"?"📦 পণ্য খোলা (Loosening)":"📦 Product Loosening",
     bundle: lang==="bn"?"🧰 পণ্য জোড়া / কিট":"🧰 Product Bundling",
     auditLog: lang==="bn"?"🕵️ অডিট লগ":"🕵️ Audit Log",
   };
 
   const visibleTabs = useMemo(() => (isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["warrantyClaim",returnTabLabels.warrantyClaim],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
@@ -286,7 +301,8 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
         ...(can("manageJobs")?[["jobCard",newTabLabels.jobCard]]:[]),
         ...(canStaffVouchers?[["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"]]:[]),
         ...(can("manageReturns")?[["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn]]:[]),
-        ...(can("stockAdjust")?[["stockAdjust",returnTabLabels.stockAdjust],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle]]:[]),
+        ...(can("stockAdjust")||can("manageReturns")?[["warrantyClaim",returnTabLabels.warrantyClaim]]:[]),
+        ...(can("stockAdjust")?[["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle]]:[]),
         ...(can("viewAccounts")?[["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"]]:[]),
         ...(can("viewGlobalLedger")?[["globalLedger",newTabLabels.globalLedger]]:[]),
         ...(can("viewPartners")||can("managePartners")?[["partners",newTabLabels.partners]]:[]),

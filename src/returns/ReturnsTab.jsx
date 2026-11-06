@@ -11,7 +11,7 @@ import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js
 import { averageCosts } from "../reports/averageCost.js";
 import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
-import { RETURN_KINDS, RETURNABLE_STATUSES, billHaystack, grnLabel, poGrnFieldsFromInvoice, returnedQtyByLine, validateReturnItems } from "./returnsDomain.js";
+import { RETURN_KINDS, RETURNABLE_STATUSES, billHaystack, grnLabel, planPartyReturnSettlement, poGrnFieldsFromInvoice, returnedQtyByLine, validateReturnItems } from "./returnsDomain.js";
 import { cancelReturnRefundVoucher, createReturnRefundVoucher } from "./returnsRefundVoucher.js";
 
 export { RETURN_KINDS, returnedQtyByLine, returnsAsLedgerVouchers } from "./returnsDomain.js";
@@ -173,12 +173,44 @@ export default function ReturnsTab({
   }, [lines, itemQ]);
   const total = r2(lines.reduce((t, l) => t + l.amount, 0));
   const totalVat = r2(lines.reduce((t, l) => t + l.vat, 0));
-  // While editing, bill.amountPaid still includes this return's applied — add it back for the preview split.
-  const due = inv
-    ? Math.max(0, r2(n2(inv.grandTotal) - n2(inv.amountPaid) + (editOf && editOf.status !== "cancelled" ? n2(editOf.appliedToInvoice) : 0)))
-    : 0;
-  const applied = r2(Math.min(total, due));
-  const refund = r2(total - applied);
+  // Settle against source bill + other open bills of the same party (so cheque/last balance shrinks).
+  const settlementPreview = useMemo(() => {
+    if (!inv) return { appliedToInvoice: 0, refundAmount: 0, appliedAllocations: [] };
+    let bills = invoices || [];
+    if (editOf && editOf.status !== "cancelled") {
+      const allocs = (editOf.appliedAllocations || []).length
+        ? editOf.appliedAllocations
+        : (n2(editOf.appliedToInvoice) > 0.009 ? [{ invoiceId: editOf.invoiceId, amount: editOf.appliedToInvoice }] : []);
+      const back = new Map(allocs.map((a) => [a.invoiceId, n2(a.amount)]));
+      bills = bills.map((i) => {
+        const add = back.get(i.id) || 0;
+        if (!add) return i;
+        const amountPaid = Math.max(0, r2(n2(i.amountPaid) - add));
+        return { ...i, amountPaid, balanceDue: Math.max(0, r2(n2(i.grandTotal) - amountPaid)) };
+      });
+    }
+    const source = bills.find((i) => i.id === inv.id) || inv;
+    return planPartyReturnSettlement({
+      sourceInvoice: source,
+      returnTotal: total,
+      invoices: bills,
+      partyIdKey: K.partyId,
+      partyNameKey: K.partyName,
+    });
+  }, [inv, invoices, total, editOf, K.partyId, K.partyName]);
+  const due = (() => {
+    if (!inv) return 0;
+    let addBack = 0;
+    if (editOf && editOf.status !== "cancelled") {
+      const allocs = (editOf.appliedAllocations || []).length
+        ? editOf.appliedAllocations
+        : (n2(editOf.appliedToInvoice) > 0.009 ? [{ invoiceId: editOf.invoiceId, amount: editOf.appliedToInvoice }] : []);
+      addBack = n2(allocs.find((a) => a.invoiceId === inv.id)?.amount || 0);
+    }
+    return Math.max(0, r2(n2(inv.grandTotal) - n2(inv.amountPaid) + addBack));
+  })();
+  const applied = settlementPreview.appliedToInvoice;
+  const refund = settlementPreview.refundAmount;
 
   const resetForm = () => {
     setDate(localDay()); setInvQ(""); setItemQ(""); setInv(null); setQtys({}); setSerials({});
@@ -229,37 +261,55 @@ export default function ReturnsTab({
     persistOfflineDb().catch(() => {});
   };
 
+  const applicationLinesOf = (r) => {
+    if (Array.isArray(r?.appliedAllocations) && r.appliedAllocations.length) return r.appliedAllocations;
+    if (n2(r?.appliedToInvoice) > 0.009) return [{ invoiceId: r.invoiceId, amount: n2(r.appliedToInvoice) }];
+    return [];
+  };
+
   const reverseReturnEffects = async (r, nowIso) => {
-    if (n2(r.appliedToInvoice) > 0) {
-      const stored = await offlineGetById(K.invCol, r.invoiceId).catch(() => null);
-      const fresh = stored?.data ? { ...stored.data, id: r.invoiceId } : invoices.find((i) => i.id === r.invoiceId);
-      if (fresh && fresh.status !== "cancelled") {
-        const newPaid = Math.max(0, r2(n2(fresh.amountPaid) - n2(r.appliedToInvoice)));
-        const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
-        const status = balance < 0.01 ? "paid" : newPaid > 0.009 ? "partial" : "confirmed";
-        await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
-      }
+    for (const a of applicationLinesOf(r)) {
+      const id = a.invoiceId;
+      const amt = n2(a.amount);
+      if (!id || !(amt > 0.009)) continue;
+      const stored = await offlineGetById(K.invCol, id).catch(() => null);
+      const fresh = stored?.data ? { ...stored.data, id } : invoices.find((i) => i.id === id);
+      if (!fresh || fresh.status === "cancelled") continue;
+      const newPaid = Math.max(0, r2(n2(fresh.amountPaid) - amt));
+      const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
+      const status = balance < 0.01 ? "paid" : newPaid > 0.009 ? "partial" : "confirmed";
+      await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
     }
     await cancelReturnRefundVoucher(r, user);
   };
 
-  const applyReturnEffects = async (ret, bill, appliedAmt, refundAmt, method, returnDate, nowIso, progress = null) => {
+  const applyReturnEffects = async (ret, bill, appliedAmt, refundAmt, method, returnDate, nowIso, progress = null, allocations = null) => {
+    const lines = (allocations && allocations.length)
+      ? allocations
+      : (appliedAmt > 0.009 ? [{ invoiceId: bill.id, invoiceNo: bill.invoiceNo || "", amount: appliedAmt }] : []);
     let nextBill = bill;
     let nextRet = {
       ...ret,
       appliedToInvoice: appliedAmt,
+      appliedAllocations: lines,
       refundAmount: refundAmt,
       refundMethod: refundAmt > 0.009 ? method : "",
       refundVoucherId: null,
       refundVoucherNo: "",
       refundVoucherCol: "",
     };
-    if (appliedAmt > 0) {
-      const newPaid = r2(n2(nextBill.amountPaid) + appliedAmt);
-      const balance = Math.max(0, r2(n2(nextBill.grandTotal) - newPaid));
+    for (const a of lines) {
+      const id = a.invoiceId;
+      const amt = n2(a.amount);
+      if (!id || !(amt > 0.009)) continue;
+      const stored = await offlineGetById(K.invCol, id).catch(() => null);
+      const fresh = stored?.data ? { ...stored.data, id } : (id === bill.id ? nextBill : invoices.find((i) => i.id === id));
+      if (!fresh || fresh.status === "cancelled") continue;
+      const newPaid = r2(n2(fresh.amountPaid) + amt);
+      const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
       const status = balance < 0.01 ? "paid" : "partial";
-      await offlinePatch(K.invCol, nextBill.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, nextBill);
-      nextBill = { ...nextBill, amountPaid: newPaid, balanceDue: balance, status };
+      await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
+      if (id === bill.id) nextBill = { ...fresh, amountPaid: newPaid, balanceDue: balance, status };
       if (progress) progress.ret = nextRet;
     }
     if (refundAmt > 0.009) {
@@ -297,6 +347,7 @@ export default function ReturnsTab({
       totalVat: snap.totalVat,
       total: snap.total,
       appliedToInvoice: snap.appliedToInvoice,
+      appliedAllocations: snap.appliedAllocations || applicationLinesOf(snap),
       refundAmount: snap.refundAmount,
       refundMethod: snap.refundMethod || "",
       reason: snap.reason || "",
@@ -328,6 +379,8 @@ export default function ReturnsTab({
       snap.refundMethod || "cash",
       snap.returnDate,
       nowIso,
+      null,
+      restorePatch.appliedAllocations,
     );
     return applied.ret;
   };
@@ -369,9 +422,26 @@ export default function ReturnsTab({
 
       const stored2 = await offlineGetById(K.invCol, inv.id).catch(() => null);
       const bill = stored2?.data ? { ...stored2.data, id: inv.id } : fresh;
-      const freshDue = Math.max(0, r2(n2(bill.grandTotal) - n2(bill.amountPaid)));
-      const appliedNow = r2(Math.min(total, freshDue));
-      const refundNow = r2(total - appliedNow);
+      // Reload party bills from SQLite so settlement sees post-reverse dues (and other open bills).
+      const partyId = bill[K.partyId] || null;
+      const partyName = bill[K.partyName] || "";
+      const partyBills = (invoices || []).filter((i) => i && i.id && (partyId ? i[K.partyId] === partyId : !!partyName && i[K.partyName] === partyName));
+      const freshParty = [];
+      for (const p of partyBills) {
+        const s = await offlineGetById(K.invCol, p.id).catch(() => null);
+        freshParty.push(s?.data ? { ...s.data, id: p.id } : p);
+      }
+      if (!freshParty.some((p) => p.id === bill.id)) freshParty.push(bill);
+      const settlement = planPartyReturnSettlement({
+        sourceInvoice: bill,
+        returnTotal: total,
+        invoices: freshParty,
+        partyIdKey: K.partyId,
+        partyNameKey: K.partyName,
+      });
+      const appliedNow = settlement.appliedToInvoice;
+      const refundNow = settlement.refundAmount;
+      const allocNow = settlement.appliedAllocations;
       const nowIso = new Date().toISOString();
       const returnNo = editing
         ? editing.returnNo
@@ -383,7 +453,8 @@ export default function ReturnsTab({
         ...poGrnFieldsFromInvoice(bill),
         items: draftItems,
         subtotal: r2(total - totalVat), totalVat, total,
-        appliedToInvoice: appliedNow, refundAmount: refundNow, refundMethod: refundNow > 0 ? refundMethod : "",
+        appliedToInvoice: appliedNow, appliedAllocations: allocNow,
+        refundAmount: refundNow, refundMethod: refundNow > 0 ? refundMethod : "",
         reason: reason.trim(), status: "confirmed",
         refundVoucherId: null, refundVoucherNo: "", refundVoucherCol: "",
         updatedAt: nowIso, updatedBy: user?.uid || "",
@@ -411,7 +482,7 @@ export default function ReturnsTab({
         createdId = saved.id;
       }
 
-      const applied = await applyReturnEffects(saved, bill, appliedNow, refundNow, refundMethod, date, nowIso, progress);
+      const applied = await applyReturnEffects(saved, bill, appliedNow, refundNow, refundMethod, date, nowIso, progress, allocNow);
       saved = applied.ret;
       reversedForEdit = false;
       createdId = null; // effects committed — do not roll back on later UI errors
@@ -746,6 +817,11 @@ export default function ReturnsTab({
                   <div className="si-panel-body">
                     {totalVat > 0 && totalRow("VAT", `${cur} ${f2(totalVat)}`)}
                     {totalRow(L("বিলের বাকি থেকে কাটা যাবে", "Taken off the bill balance"), `${cur} ${f2(applied)}`)}
+                    {(settlementPreview.appliedAllocations || []).length > 1 && (
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                        {L(`একই ${K.party.bn}-এর অন্য বাকি বিলও কাটা হবে — পরের চেক/বাকিতে কম দেখাবে`, `Also nets other open bills of this ${K.party.en.toLowerCase()} — next cheque / balance will be lower`)}
+                      </div>
+                    )}
                     {refund > 0.009 && totalRow(K.refund[bn ? "bn" : "en"], `${cur} ${f2(refund)}`, { color: "#b91c1c" })}
                     {totalRow(L("ফেরতের মোট", "Return total"), `${cur} ${f2(total)}`, { grand: true, color: K.accent })}
                   </div>

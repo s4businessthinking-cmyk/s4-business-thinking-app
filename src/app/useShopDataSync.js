@@ -15,6 +15,7 @@ import { useEmployeeAlerts } from "../employees/useEmployeeAlerts.js";
 import { usePartnerAlerts } from "../partners/usePartnerAlerts.js";
 import { useSecurityChequeAlerts } from "../securityCheque/useSecurityChequeAlerts.js";
 import { useReminderAlerts } from "../reminders/useReminderAlerts.js";
+import { useWarrantyAlerts } from "../returns/useWarrantyAlerts.js";
 import { useShopFinance } from "../dashboard/shopFinance.js";
 import { backupBeforeExit } from "../backup/backupOnExit.js";
 
@@ -121,6 +122,13 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
   });
   const reminderAlertList = useReminderAlerts({
     shopId, uid: user?.uid, isOwner, lang, toast, onOpen: () => { setSettingsPage(null); setTab("reminders"); },
+  });
+  const warrantyAlertList = useWarrantyAlerts({
+    shopId,
+    enabled: isOwner || can("stockAdjust") || can("manageReturns"),
+    lang,
+    toast,
+    onOpen: () => { setSettingsPage(null); setTab("warrantyClaim"); },
   });
   const [calcMode, setCalcMode] = useState(null);
   useEffect(() => {
@@ -643,5 +651,5 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       (err) => console.warn("[Product Master] maintenance lock listener failed", err)
     );
   }, [shopId, productMaintenanceId, productReplacementActive, authSyncReady]);
-  return { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef };
+  return { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef, warrantyAlertList };
 }

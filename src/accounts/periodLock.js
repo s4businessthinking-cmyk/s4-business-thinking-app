@@ -14,6 +14,7 @@ export const LOCKED_COLLECTIONS = {
   salesReturns: ["returnDate"],
   purchaseReturns: ["returnDate"],
   stockAdjustments: ["adjustDate"],
+  warrantyClaims: ["claimDate", "sentDate", "replacedDate", "deliveredDate"],
   accountVouchers: ["voucherDate"],
   goodsReceipts: ["receiveDate"],
   partnerEntries: ["date"],

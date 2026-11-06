@@ -44,6 +44,7 @@ export const SHOP_PULL_COLLECTIONS = [
   "salesReturns",
   "purchaseReturns",
   "stockAdjustments",
+  "warrantyClaims",
   "accountVouchers",
   "purchaseOrders",
   "salesOrders",

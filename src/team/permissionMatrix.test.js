@@ -50,6 +50,19 @@ test("group permissions and custom state", () => {
   assert.deepEqual(userGroupsOf({ userGroups: [g, { id: "", name: "x" }, null] }), [g]);
 });
 
+test("legacy groups without edit ticks keep manage* edit behavior", () => {
+  const oldSales = groupPermissions({ id: "g", name: "S", permissions: { manageSales: true, printSales: true } });
+  assert.equal(oldSales.editDraftSales, true);
+  assert.equal(oldSales.editConfirmedSales, true);
+  assert.equal(oldSales.viewAllSalesInvoices, false);
+  const oldBuy = groupPermissions({ id: "g2", name: "B", permissions: { managePurchase: true } });
+  assert.equal(oldBuy.editDraftPurchase, true);
+  assert.equal(oldBuy.editConfirmedPurchase, true);
+  const explicitOff = groupPermissions({ id: "g3", name: "X", permissions: { manageSales: true, editDraftSales: false, editConfirmedSales: false } });
+  assert.equal(explicitOff.editDraftSales, false);
+  assert.equal(explicitOff.editConfirmedSales, false);
+});
+
 test("unused presets match both English and Bangla saved names", () => {
   const leftover = unusedGroupPresets([{ id: "g1", name: "Salesman", permissions: {} }]);
   assert.equal(leftover.some((p) => p.id === "preset_salesman"), false);
