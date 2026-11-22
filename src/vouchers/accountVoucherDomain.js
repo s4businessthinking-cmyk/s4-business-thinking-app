@@ -1,8 +1,8 @@
 export const CASH_ACCOUNT = "Cash in Hand";
 
 export const ACCOUNT_VOUCHER_TYPES = {
-  journal: { prefix: "JV", serial: "lastJVSerial", icon: "📒", printTitle: "JOURNAL VOUCHER", title: { bn: "জার্নাল ভাউচার", en: "Journal Voucher" } },
-  contra: { prefix: "CV", serial: "lastCVSerial", icon: "🔁", printTitle: "CONTRA VOUCHER", title: { bn: "কন্ট্রা ভাউচার", en: "Contra Voucher" } },
+  journal: { prefix: "JV", serial: "lastJVSerial", icon: "", printTitle: "JOURNAL VOUCHER", title: { bn: "জার্নাল ভাউচার", en: "Journal Voucher" } },
+  contra: { prefix: "CV", serial: "lastCVSerial", icon: "", printTitle: "CONTRA VOUCHER", title: { bn: "কন্ট্রা ভাউচার", en: "Contra Voucher" } },
 };
 
 const num = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;

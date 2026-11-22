@@ -361,22 +361,23 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const accentBorder = line;
   const grandBg      = "#fff";
 
-  const rows = (invoice.items||[]).map((it,i)=>{
+  const itemList = invoice.items || [];
+  const renderItemRow = (it, i) => {
     const { disc:d, vat:v, total:tot } = siCalcLine(it, effectiveTax);
-    // Same line as the name — a second line under every product pushes totals onto page 2.
     const codeHtml = showCode&&!invoice.hideCodeInPrint&&(it.code||it.brand)
       ? ` <span style="font-size:9px;font-weight:400;color:#444">(${[it.code,it.brand].filter(Boolean).join(" · ")})</span>` : "";
     if (isDelivery) {
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
-    } else if (hideVatCols) {
+    }
+    if (hideVatCols) {
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
-    } else if (isTax) {
+    }
+    if (isTax) {
       const base = siN2(it.unitPrice)*siN2(it.qty) - d;
       return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right">${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${siFmt2(v)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
-    } else {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     }
-  }).join("");
+    return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
+  };
 
   const tableHeaders = isDelivery || hideVatCols
     ? `<th style="width:36px">#</th><th>${isBn?"পণ্যের বিবরণ":"Item Description"}</th><th style="text-align:center;width:95px">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right;width:110px">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:right;width:120px">${isBn?"মোট":"Amount"}</th>`
@@ -388,11 +389,17 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     ? `${totalsLine(isBn?"পরিশোধিত":"Paid", moneyTxt(paidAmt))}${totalsLine(isBn?"বাকি":"Balance Due", moneyTxt(Math.max(0, balance)))}`
     : "";
   const discTotalHTML = printDiscount ? totalsLine(isBn?"ছাড়":"Discount", moneyTxt(lineDisc, "-")) : "";
+  // Amount options without Grand Total / paid / balance — used on continued pages.
+  const amountOptionsHTML = isDelivery
+    ? extraRowsHTML
+    : isTax
+      ? `${totalsLine(isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)", moneyTxt(sub))}${discTotalHTML}${totalsLine(`VAT (${isBn?"মোট":"Total"})`, moneyTxt(vat, "+"))}${extraRowsHTML}`
+      : `${totalsLine(isBn?"সাব-টোটাল":"Subtotal", moneyTxt(sub))}${discTotalHTML}${extraRowsHTML}`;
   const totalsHTML = isDelivery
     ? `${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${siFmt2(grand)}</span></div>`
     : isTax
-      ? `${totalsLine(isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)", moneyTxt(sub))}${discTotalHTML}${totalsLine(`VAT (${isBn?"মোট":"Total"})`, moneyTxt(vat, "+"))}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`
-      : `${totalsLine(isBn?"সাব-টোটাল":"Subtotal", moneyTxt(sub))}${discTotalHTML}${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`;
+      ? `${amountOptionsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`
+      : `${amountOptionsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`;
 
   const custHTML = `<div class="info-box"><div class="info-label">${isBn?"বিল টু":"Bill To"}</div><div class="info-value">${invoice.customerName||"—"}</div>${infoLine(isBn?"কোড":"Code", invoice.customerCode)}${infoLine(isBn?"মোবাইল":"Mobile", invoice.customerMobile)}${infoLine(isBn?"ঠিকানা":"Address", invoice.customerAddress)}${isTax?infoLine("TRN", invoice.customerTrn):""}</div>`;
 
@@ -403,8 +410,45 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     : `<div class="info-box"><div class="info-label">${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${payLabel||"—"}</div>${metaHTML}</div>`;
 
   const thermal = ds.paper==="80mm" || ds.paper==="58mm";
-  const pageH = !thermal && ds.fullPage !== false ? paperHeightMm(ds.paper) : null;
-  const sheetH = pageH ? `${pageH - 16}mm` : "auto";
+  // A4: more rows on continued pages (compact footer); fewer on last page (full totals+terms+sigs).
+  const FULL_MAX = 14;
+  const CONT_MAX = 22;
+  const pages = thermal ? [itemList] : paginateInvoiceItems(itemList, FULL_MAX, CONT_MAX);
+  const multi = !thermal && pages.length > 1;
+
+  const thankFooter = isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ।":"Thank you for your order."):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ।`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you.`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন।":"Please sign this challan upon delivery."):(isBn?"ব্যবসার জন্য ধন্যবাদ।":"Thank you for your business.");
+
+  const hdrHTML = (pageNo, pageCount) => `<div class="sheet-top"><div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate}${timeText?`  ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no">${userNameHTML}</div>`:""}${pageCount>1?`<div class="inv-no">${isBn?"পৃষ্ঠা":"Page"} ${pageNo}/${pageCount}</div>`:""}</div></div>
+<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div></div></div>`;
+
+  const continuedBot = (pageNo, pageCount) => `<div class="sheet-bot"><div class="body">
+${amountOptionsHTML?`<div class="totals-wrap"><div class="totals-left"><div class="words-box"><b>${isBn?"চলমান":"Continued"}:</b> ${isBn?`পৃষ্ঠা ${pageNo}/${pageCount} — মোট পরের পেজে`:`Page ${pageNo}/${pageCount} — totals on next page`}</div></div><div class="totals"><div class="totals-box">${amountOptionsHTML}<div class="totals-row"><span class="tl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="tv">${isBn?"পরের পেজ":"Next page"}</span></div></div></div></div>`:""}
+<div class="cont-note">${isBn?"চলবে…":"Continued…"}</div>
+</div></div>`;
+
+  const finalBot = () => `<div class="sheet-bot"><div class="body">
+${totalsHTML?`<div class="totals-wrap">${!isDelivery&&!isQuote?`<div class="totals-left"><div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div></div>`:""}<div class="totals"><div class="totals-box">${totalsHTML}</div></div></div>`:(!isDelivery&&!isQuote?`<div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div>`:"")}
+${vatSummaryHTML}
+${isDelivery?`<div class="recv-box"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">${isBn?"মোট পণ্য":"Total Items"}: ${itemList.reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${itemList.length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
+${custBalanceHTML}
+${ps.printNarration&&invoice.note?`<div class="note-box">${invoice.note}</div>`:""}
+<div class="footer">${thankFooter}</div>
+${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
+</div></div>`;
+
+  let rowOffset = 0;
+  const sheets = pages.map((chunk, idx) => {
+    const isLast = idx === pages.length - 1;
+    const rowsHtml = chunk.map((it, j) => renderItemRow(it, rowOffset + j)).join("");
+    rowOffset += chunk.length;
+    const pageClass = multi ? "invoice paged" : "invoice";
+    return `<div class="${pageClass}">
+${hdrHTML(idx + 1, pages.length)}
+<div class="sheet-mid"><table class="items"><thead><tr>${tableHeaders}</tr></thead><tbody>${rowsHtml}</tbody></table></div>
+${isLast ? finalBot() : continuedBot(idx + 1, pages.length)}
+</div>`;
+  }).join("");
+
   const rawDoc = `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${title} - ${invoice.invoiceNo}</title>
@@ -412,33 +456,34 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
 @page{size:${paperCss(ds.paper)};margin:${thermal?"3mm":"8mm"}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Times New Roman','Nirmala UI',serif;font-size:12px;color:#111;background:#fff;padding:16px}
-.invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column;${pageH?`min-height:${sheetH};`:""}}
+.invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column}
+.invoice.paged{min-height:0}
 .sheet-top{flex:0 0 auto}
-.sheet-mid{flex:1 1 auto;display:flex;flex-direction:column;min-height:${pageH?"70mm":"0"}}
-.sheet-bot{flex:0 0 auto;margin-top:auto}
-.hdr{background:${headerGrad};color:${headerText};padding:10px 12px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid ${accentBorder}}
+.sheet-mid{flex:0 1 auto;display:flex;flex-direction:column;min-height:0}
+.sheet-bot{flex:0 0 auto;margin-top:0}
+.hdr{background:${headerGrad};color:${headerText};padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid ${accentBorder}}
 .shop-name{font-size:18px;font-weight:900;letter-spacing:0.3px}
 .shop-sub{font-size:11px;margin-top:2px;color:#111}
 .inv-title{font-size:15px;font-weight:900;text-align:right;letter-spacing:1px;border:1px solid #111;padding:3px 8px;display:inline-block}
 .inv-no{font-size:12px;text-align:right;margin-top:3px}
-.body{padding:8px 12px}
+.body{padding:6px 12px}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin:0;border:1px solid #111;align-items:stretch}
-.info-box{background:#fff;padding:7px 10px;border:none;border-right:1px solid #111;min-height:38mm}
+.info-box{background:#fff;padding:6px 10px;border:none;border-right:1px solid #111;min-height:${multi?"24mm":"32mm"}}
 .info-box:last-child{border-right:none}
 .info-label{font-size:10px;text-transform:uppercase;letter-spacing:0.4px;color:#111;font-weight:700;margin-bottom:2px}
 .info-value{font-size:13px;font-weight:700;color:#111}
 .info-sub{font-size:11px;color:#111;margin-top:2px}
 table.items{width:100%;border-collapse:collapse;margin:0;font-size:11px;height:auto}
-table.items th,table.items td{border:1px solid #111;padding:5px 6px;vertical-align:top}
+table.items th,table.items td{border:1px solid #111;padding:3px 5px;vertical-align:top}
 thead tr{background:${theadBg};color:${theadText}}
 th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.3px;font-weight:700}
 tbody tr:nth-child(even){background:#fff}
-.totals-wrap{display:flex;align-items:stretch;gap:10px;margin:8px 0}
+.totals-wrap{display:flex;align-items:stretch;gap:10px;margin:6px 0}
 .totals-left{flex:1;min-width:0;display:flex}
 .totals-left .words-box{flex:1;margin:0;display:flex;align-items:center}
 .totals{flex:0 0 280px;margin:0}
 .totals-box{width:100%;border:1px solid #111}
-.totals-row{display:flex;justify-content:space-between;padding:5px 10px;border-bottom:1px solid #111;background:#fff}
+.totals-row{display:flex;justify-content:space-between;padding:4px 10px;border-bottom:1px solid #111;background:#fff}
 .tl{color:#111;font-size:11px}
 .tv{font-weight:700;font-size:11px;color:#111}
 .grand-row{display:flex;justify-content:space-between;padding:7px 10px;background:${grandBg};border-top:2px solid #111}
@@ -447,11 +492,12 @@ tbody tr:nth-child(even){background:#fff}
 .pay-box,.bal-box,.note-box{background:#fff;border:1px solid #111;padding:6px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
 .note-box{display:block;font-size:11px;color:#111}
 .words-box{background:#fff;border:1px solid #111;padding:6px 10px;margin-bottom:8px;font-size:11px;font-weight:600}
+.cont-note{text-align:center;padding:4px 12px;border-top:1px dashed #111;font-size:11px;font-weight:700}
 ${isDelivery?`.recv-box{background:#fff;border:1px solid #111;padding:10px;margin-bottom:8px}.recv-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center}.recv-item{border-top:1px solid #111;margin-top:28px;padding-top:4px;font-size:11px}`:""}
 .sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:6px;padding:4px 8px 10px}
 .sig-line{border-top:1px solid #111;margin-top:22px;padding-top:4px;font-size:11px;text-align:center}
 .footer{text-align:left;padding:6px 12px;background:#fff;border-top:1px solid #111;font-size:11px;color:#111;font-weight:600}
-@media print{html,body{height:100%!important;padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;border-radius:0!important;box-shadow:none!important;${pageH?`min-height:100%!important;`:""}display:flex!important;flex-direction:column!important}.sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}}
+@media print{html,body{height:auto!important;padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;border-radius:0!important;box-shadow:none!important;min-height:0!important;display:flex!important;flex-direction:column!important}.sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}}
 ${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px;min-height:0!important;display:block}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr}.totals-wrap{flex-direction:column}.totals{flex:1 1 auto;width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
 ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
 </style></head><body>
@@ -459,26 +505,30 @@ ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
   <button onclick="window.print()" style="padding:10px 28px;background:#111;color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">${isBn?"প্রিন্ট / PDF":"Print / PDF"}</button>
   <button onclick="window.close()" style="padding:10px 20px;background:#e5e7eb;color:#374151;border:none;font-size:14px;font-weight:700;cursor:pointer">${isBn?"বন্ধ করুন":"Close"}</button>
 </div>
-<div class="invoice">
-<div class="sheet-top"><div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate}${timeText?`  ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no">${userNameHTML}</div>`:""}</div></div>
-<div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div></div></div>
-<div class="sheet-mid"><table class="items"><thead><tr>${tableHeaders}</tr></thead><tbody>${rows}</tbody></table></div>
-<div class="sheet-bot"><div class="body">
-${totalsHTML?`<div class="totals-wrap">${!isDelivery&&!isQuote?`<div class="totals-left"><div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div></div>`:""}<div class="totals"><div class="totals-box">${totalsHTML}</div></div></div>`:(!isDelivery&&!isQuote?`<div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div>`:"")}
-${vatSummaryHTML}
-${isDelivery?`<div class="recv-box"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">${isBn?"মোট পণ্য":"Total Items"}: ${(invoice.items||[]).reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${(invoice.items||[]).length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
-${custBalanceHTML}
-${ps.printNarration&&invoice.note?`<div class="note-box">${invoice.note}</div>`:""}
-<div class="footer">${isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ।":"Thank you for your order."):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ।`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you.`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন।":"Please sign this challan upon delivery."):(isBn?"ব্যবসার জন্য ধন্যবাদ।":"Thank you for your business.")}</div>
-${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
-</div></div></div></body></html>`;
+${sheets}
+</body></html>`;
   const doc = applyDesign(rawDoc, "invoice", opts.style || design.style.invoice);
   const copies = Math.max(1, Math.min(10, parseInt(ds.copies, 10) || 1));
   if (copies === 1) return doc;
-  const start = doc.indexOf('<div class="invoice">');
+  const start = doc.indexOf('<div class="invoice');
   const end = doc.lastIndexOf("</body>");
   const block = doc.slice(start, end);
   const repeated = Array.from({ length:copies }, (_, i) =>
-    i ? block.replace('<div class="invoice">', '<div class="invoice" style="page-break-before:always;break-before:page;margin-top:20px">') : block).join("");
+    i ? `<div style="page-break-before:always;break-before:page;margin-top:20px">${block}</div>` : block).join("");
   return doc.slice(0, start) + repeated + doc.slice(end);
+}
+
+/** Split invoice lines across A4 pages. Full footer fits ~fullMax; continued pages hold contMax. */
+export function paginateInvoiceItems(items, fullMax = 14, contMax = 22) {
+  const list = Array.isArray(items) ? items : [];
+  if (list.length <= fullMax) return [list];
+  const pages = [];
+  let rest = list.slice();
+  while (rest.length > contMax) {
+    pages.push(rest.splice(0, contMax));
+  }
+  // Between fullMax+1 and contMax: keep one page (tighter CSS fits the full footer).
+  if (!pages.length) return [rest];
+  pages.push(rest);
+  return pages;
 }

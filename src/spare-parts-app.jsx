@@ -492,8 +492,8 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
     if (!fresh.length) return;
     const first = fresh[0];
     toast(lang==="bn"
-      ? `🚚 নতুন Branch Transfer এসেছে: ${first.transferNo||""}${first.branchName?` → ${first.branchName}`:""}${fresh.length>1?` (+${fresh.length-1})`:""} — রিসিভ করুন`
-      : `🚚 New branch transfer: ${first.transferNo||""}${first.branchName?` → ${first.branchName}`:""}${fresh.length>1?` (+${fresh.length-1})`:""} — please receive`);
+      ? `নতুন Branch Transfer এসেছে: ${first.transferNo||""}${first.branchName?` → ${first.branchName}`:""}${fresh.length>1?` (+${fresh.length-1})`:""} — রিসিভ করুন`
+      : `New branch transfer: ${first.transferNo||""}${first.branchName?` → ${first.branchName}`:""}${fresh.length>1?` (+${fresh.length-1})`:""} — please receive`);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [btInbox]);
 
@@ -510,7 +510,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
       );
       setLocalShop(prev => mergeShopRecord(prev, updated));
       if (!enabled && (tab === "owner" || tab === "shop")) setTab("dashboard");
-      toast(enabled ? (lang==="bn"?"✅ Order option চালু হয়েছে":"✅ Order option enabled") : (lang==="bn"?"Order option বন্ধ হয়েছে":"Order option disabled"));
+      toast(enabled ? (lang==="bn"?"Order option চালু হয়েছে":"Order option enabled") : (lang==="bn"?"Order option বন্ধ হয়েছে":"Order option disabled"));
     } catch (error) {
       hErr(error);
     } finally {
@@ -534,7 +534,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
     onOpen: () => { setSettingsPage(null); setTab("tax"); },
   });
 
-  // "Jump here filtered to this party" from Vendor/Customer Master — one-shot, same convention as
+  // "Jump here filtered to this party"from Vendor/Customer Master — one-shot, same convention as
   // globalFocusVendorId/globalFocusCustomerId (consumed once, then cleared by the receiving tab).
   const [securityChequeFocusParty, setSecurityChequeFocusParty] = useState(null);
   const [globalOpenWarrantyClaimId, setGlobalOpenWarrantyClaimId] = useState(null);
@@ -774,7 +774,7 @@ export default function App() {
     <div style={{ ...s.notif, background:notif.type==="err"?"#450a0a":"#052e16", borderColor:notif.type==="err"?"#ef4444":"#22c55e", color:notif.type==="err"?"#ef4444":"#22c55e" }}>{notif.msg}</div>
   );
 
-  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} /><div style={{ ...s.empty, paddingTop:80 }}>⏳</div></div>;
+  if (!authReady) return <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} /><div style={{ ...s.empty, paddingTop:80 }}></div></div>;
 
   if (!user) {
     let screen;
@@ -874,11 +874,10 @@ export default function App() {
     return (
       <div style={s.root}><Header t={t} lang={lang} setLang={setLang} s={s} theme={theme} setTheme={setTheme} />
         <div style={s.welcomeWrap}>
-          <div style={{ fontSize:48, marginBottom:12 }}>⚠️</div>
           <div style={{ ...s.authTitle, color:"#ef4444" }}>{lang==="bn"?"প্রোফাইল পাওয়া যায়নি":"Profile not found"}</div>
           <div style={{ ...s.authSub, marginBottom:8 }}>{lang==="bn"?"লগআউট করে আবার লগইন করুন":"Please logout and login again"}</div>
           {profileError&&<div style={{ fontSize:11, color:th.txtMuted, marginBottom:20 }}>{profileError}</div>}
-          <button style={s.sendBtn} onClick={handleLogout}>{lang==="bn"?"🚪 লগআউট":"🚪 Logout"}</button>
+          <button style={s.sendBtn} onClick={handleLogout}>{lang==="bn"?"লগআউট":"Logout"}</button>
         </div>
       </div>
     );

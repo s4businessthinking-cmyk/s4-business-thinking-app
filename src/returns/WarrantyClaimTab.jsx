@@ -106,10 +106,10 @@ export default function WarrantyClaimTab({
 
   const saveNew = async () => {
     if (saving) return;
-    if (!product?.productId) return toast?.(L("❌ পণ্য বেছে নিন", "❌ Pick the product"), "err");
-    if (!vendor?.id && !String(vendorQ || "").trim()) return toast?.(L("❌ কোম্পানি / সাপ্লায়ার বেছে নিন", "❌ Pick the company / supplier"), "err");
+    if (!product?.productId) return toast?.(L("পণ্য বেছে নিন", "Pick the product"), "err");
+    if (!vendor?.id && !String(vendorQ || "").trim()) return toast?.(L("কোম্পানি / সাপ্লায়ার বেছে নিন", "Pick the company / supplier"), "err");
     const q = n2(qty);
-    if (!(q > 0)) return toast?.(L("❌ পরিমাণ লিখুন", "❌ Enter quantity"), "err");
+    if (!(q > 0)) return toast?.(L("পরিমাণ লিখুন", "Enter quantity"), "err");
     const days = Math.max(1, Math.min(365, Number(reminderDays) || 15));
     setSaving(true);
     try {
@@ -132,11 +132,11 @@ export default function WarrantyClaimTab({
       const created = { ...res.data, id: res.documentId };
       logAudit({ shopId, user, profile, action: "create", collection: "warrantyClaims", docId: created.id, docNo: claimNo, note: claimSummary(created) });
       setRows((list) => [created, ...list.filter((r) => r.id !== created.id)]);
-      toast?.(L(`✅ ${claimNo} খোলা হয়েছে — এখন কোম্পানিতে পাঠান`, `✅ ${claimNo} opened — now send to company`));
+      toast?.(L(` ${claimNo} খোলা হয়েছে — এখন কোম্পানিতে পাঠান`, ` ${claimNo} opened — now send to company`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setSel(created); setView("detail");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -197,9 +197,9 @@ export default function WarrantyClaimTab({
         reminderId = res.documentId;
         await patchClaim(updated, { reminderId }, `Reminder linked ${reminderId}`);
       }
-      toast?.(L(`📤 পাঠানো হয়েছে · রিমাইন্ডার ${due.split("-").reverse().join("/")}`, `📤 Sent · reminder ${due}`), "err");
+      toast?.(L(`পাঠানো হয়েছে · রিমাইন্ডার ${due.split("-").reverse().join("/")}`, `Sent · reminder ${due}`), "err");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -222,9 +222,9 @@ export default function WarrantyClaimTab({
       }, "Company replaced · stock +");
       await closeReminder(updated);
       invalidateInvoiceRowsCache();
-      toast?.(L(`✅ নতুন পণ্য স্টকে যোগ · এখন কাস্টমারকে দিতে পারেন`, `✅ New unit in stock · you can give it to the customer`));
+      toast?.(L(`নতুন পণ্য স্টকে যোগ · এখন কাস্টমারকে দিতে পারেন`, `New unit in stock · you can give it to the customer`));
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -244,9 +244,9 @@ export default function WarrantyClaimTab({
         deliveredDate: ymd(new Date()),
       }, "Delivered to customer · stock −");
       invalidateInvoiceRowsCache();
-      toast?.(L("✅ কাস্টমারকে দেওয়া হয়েছে", "✅ Delivered to customer"));
+      toast?.(L("কাস্টমারকে দেওয়া হয়েছে", "Delivered to customer"));
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -264,9 +264,9 @@ export default function WarrantyClaimTab({
       }, "Cancelled");
       await closeReminder(updated);
       if (r.status === "replaced") invalidateInvoiceRowsCache();
-      toast?.(L("🚫 বাতিল", "🚫 Cancelled"), "err");
+      toast?.(L("বাতিল", "Cancelled"), "err");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -280,17 +280,17 @@ export default function WarrantyClaimTab({
       await offlineRemove("warrantyClaims", r.id);
       setRows((list) => list.filter((x) => x.id !== r.id));
       logAudit({ shopId, user, profile, action: "delete", collection: "warrantyClaims", docId: r.id, docNo: r.claimNo });
-      toast?.(L("🗑️ মুছে ফেলা হয়েছে", "🗑️ Deleted"), "err");
+      toast?.(L("মুছে ফেলা হয়েছে", "Deleted"), "err");
       setSel(null); setView("list");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
   const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
   const badge = (r) => {
     const st = WARRANTY_STATUSES[r.status] || WARRANTY_STATUSES.received;
-    return <span className="si-badge" style={{ color: st.tone }}>{st[bn ? "bn" : "en"]}</span>;
+    return <span className="si-badge"style={{ color: st.tone }}>{st[bn ? "bn" : "en"]}</span>;
   };
 
   const sorted = useMemo(() => [...rows].sort((a, b) => String(b.claimDate || b.createdAt || "").localeCompare(String(a.claimDate || a.createdAt || ""))), [rows]);
@@ -324,7 +324,7 @@ export default function WarrantyClaimTab({
   };
 
   const shell = (titleLeft, titleRight, children) => (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title"><strong style={{ color: ACCENT }}>{titleLeft}</strong><span>{titleRight}</span></div>
@@ -333,30 +333,30 @@ export default function WarrantyClaimTab({
   );
 
   if (view === "form") {
-    return shell(L("নতুন গ্যারান্টি ক্লেইম", "New Warranty Claim"), L("🔋 ব্যাটারি / পণ্য গ্যারান্টি", "🔋 Battery / Product Guarantee"), (
+    return shell(L("নতুন গ্যারান্টি ক্লেইম", "New Warranty Claim"), L("ব্যাটারি / পণ্য গ্যারান্টি", "Battery / Product Guarantee"), (
       <>
         <div className="si-body">
-          <div className="si-hint" style={{ padding: "4px 6px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 8 }}>
+          <div className="si-hint"style={{ padding: "4px 6px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 8 }}>
             <b>{L("স্টক নিয়ম (জরুরি)", "Stock rule (important)")}:</b>{" "}
             {L("কাস্টমার থেকে নিলে বা কোম্পানিতে পাঠালে স্টক বাড়বে না। কোম্পানি নতুন দিলে +স্টক, কাস্টমারকে দিলে −স্টক। সাধারণ Product Exchange ব্যবহার করবেন না — ডাবল স্টক হবে।",
               "Receiving from customer or sending to company does NOT raise stock. Company replacement = +stock; give to customer = −stock. Do not use Product Exchange here — that double-counts.")}
           </div>
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "1fr 1fr 1fr", paddingTop: 3, gap: 8 }}>
               <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span>
-                <input type="date" className="pm-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+                <input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
               <div className="si-field"><span className="pm-label">{L("কারণ", "Reason")} *</span>
-                <select className="pm-input" value={reason} onChange={(e) => setReason(e.target.value)}>
+                <select className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)}>
                   {WARRANTY_REASONS.map((r) => <option key={r.key} value={r.key}>{r[bn ? "bn" : "en"]}</option>)}
                 </select>
               </div>
               <div className="si-field"><span className="pm-label">{L("চেঞ্জ না এলে কত দিনে রিমাইন্ডার", "Remind after (days)")} *</span>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                  <input type="number" min="1" max="365" className="pm-input" style={{ width: 72 }} value={reminderDays}
+                  <input type="number"min="1"max="365"className="pm-input"style={{ width: 72 }} value={reminderDays}
                     onChange={(e) => setReminderDays(e.target.value)} />
                   {REMINDER_DAY_PRESETS.map((d) => (
-                    <button key={d} type="button" className="pm-btn-secondary" style={{ minHeight: 28, padding: "0 8px", fontWeight: reminderDays == d ? 900 : 600 }}
+                    <button key={d} type="button"className="pm-btn-secondary"style={{ minHeight: 28, padding: "0 8px", fontWeight: reminderDays == d ? 900 : 600 }}
                       onClick={() => setReminderDays(d)}>{d}d</button>
                   ))}
                 </div>
@@ -364,7 +364,7 @@ export default function WarrantyClaimTab({
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">− {L("পণ্য (কাস্টমার ফেরত এনেছে)", "Product (customer returned)")}</legend>
             <div className="si-panel-body">
               {!product && <ProductPicker products={products} stockOf={stockOf} onPick={(p) => setProduct({ productId: p.id, name: p.name || "", code: p.code || "", unit: p.unit || "Pcs" })}
@@ -374,27 +374,27 @@ export default function WarrantyClaimTab({
                   <div><b>{product.name}</b>{product.code ? <span className="si-muted"> · {product.code}</span> : null}
                     <div className="si-muted">{L("দোকান স্টক", "Shop stock")}: {stockOf(product.productId) == null ? "…" : fq(stockOf(product.productId))}</div>
                   </div>
-                  <input type="number" min="0" step="any" className="pm-input" style={{ textAlign: "right" }} value={qty} onChange={(e) => setQty(e.target.value)} />
-                  <input className="pm-input" placeholder={L("সিরিয়াল / ব্যাচ", "Serial / batch")} value={serialNo} onChange={(e) => setSerialNo(e.target.value)} />
-                  <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => setProduct(null)}>✕</button>
+                  <input type="number"min="0"step="any"className="pm-input"style={{ textAlign: "right" }} value={qty} onChange={(e) => setQty(e.target.value)} />
+                  <input className="pm-input"placeholder={L("সিরিয়াল / ব্যাচ", "Serial / batch")} value={serialNo} onChange={(e) => setSerialNo(e.target.value)} />
+                  <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => setProduct(null)}>✕</button>
                 </div>
               )}
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("কাস্টমার (ঐচ্ছিক)", "Customer (optional)")}</legend>
             <div className="si-panel-body">
               {customer ? (
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                   <b>{customer.customerName}</b>
-                  <button type="button" className="pm-btn-secondary" onClick={() => { setCustomer(null); setCustomerQ(""); }}>{L("বদলান", "Change")}</button>
+                  <button type="button"className="pm-btn-secondary"onClick={() => { setCustomer(null); setCustomerQ(""); }}>{L("বদলান", "Change")}</button>
                 </div>
               ) : (
                 <>
-                  <input className="pm-input" value={customerQ} onChange={(e) => setCustomerQ(e.target.value)} placeholder={L("নাম বা মোবাইল…", "Name or mobile…")} />
+                  <input className="pm-input"value={customerQ} onChange={(e) => setCustomerQ(e.target.value)} placeholder={L("নাম বা মোবাইল…", "Name or mobile…")} />
                   {custHits.map((c) => (
-                    <button key={c.id} type="button" className="si-mrow" style={{ width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid #e2e8f0", background: "#fff", cursor: "pointer" }}
+                    <button key={c.id} type="button"className="si-mrow"style={{ width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid #e2e8f0", background: "#fff", cursor: "pointer" }}
                       onClick={() => { setCustomer(c); setCustomerQ(""); }}>{c.customerName} <span className="si-muted">{c.mobileNumber || ""}</span></button>
                   ))}
                 </>
@@ -402,19 +402,19 @@ export default function WarrantyClaimTab({
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("কোম্পানি / সাপ্লায়ার *", "Company / Supplier *")}</legend>
             <div className="si-panel-body">
               {vendor ? (
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
                   <b>{vendor.vendorName}</b>
-                  <button type="button" className="pm-btn-secondary" onClick={() => { setVendor(null); setVendorQ(""); }}>{L("বদলান", "Change")}</button>
+                  <button type="button"className="pm-btn-secondary"onClick={() => { setVendor(null); setVendorQ(""); }}>{L("বদলান", "Change")}</button>
                 </div>
               ) : (
                 <>
-                  <input className="pm-input" value={vendorQ} onChange={(e) => setVendorQ(e.target.value)} placeholder={L("কোম্পানির নাম…", "Company name…")} />
+                  <input className="pm-input"value={vendorQ} onChange={(e) => setVendorQ(e.target.value)} placeholder={L("কোম্পানির নাম…", "Company name…")} />
                   {vendHits.map((v) => (
-                    <button key={v.id} type="button" className="si-mrow" style={{ width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid #e2e8f0", background: "#fff", cursor: "pointer" }}
+                    <button key={v.id} type="button"className="si-mrow"style={{ width: "100%", textAlign: "left", border: 0, borderBottom: "1px solid #e2e8f0", background: "#fff", cursor: "pointer" }}
                       onClick={() => { setVendor(v); setVendorQ(""); }}>{v.vendorName}</button>
                   ))}
                 </>
@@ -422,18 +422,18 @@ export default function WarrantyClaimTab({
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("নোট", "Note")}</legend>
             <div className="si-panel-body">
-              <input className="pm-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={L("ঐচ্ছিক", "Optional")} />
+              <input className="pm-input"value={note} onChange={(e) => setNote(e.target.value)} placeholder={L("ঐচ্ছিক", "Optional")} />
             </div>
           </fieldset>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !product} onClick={saveNew}>
-            {saving ? "…" : `💾 ${L("ক্লেইম খুলুন", "Open claim")}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !product} onClick={saveNew}>
+            {saving ? "…" : ` ${L("ক্লেইম খুলুন", "Open claim")}`}
           </button>
         </div>
       </>
@@ -445,18 +445,18 @@ export default function WarrantyClaimTab({
     const st = WARRANTY_STATUSES[r.status] || WARRANTY_STATUSES.received;
     const today = ymd(new Date());
     const isOverdue = r.status === "sent" && r.reminderDueDate && String(r.reminderDueDate).slice(0, 10) <= today;
-    return shell(<>{r.claimNo} {badge(r)}</>, L("🔋 গ্যারান্টি ক্লেইম", "🔋 Warranty Claim"), (
+    return shell(<>{r.claimNo} {badge(r)}</>, L("গ্যারান্টি ক্লেইম", "Warranty Claim"), (
       <>
         <div className="si-body">
           {isOverdue && (
             <div style={{ padding: 12, marginBottom: 8, borderRadius: 10, background: "#fef2f2", border: "2px solid #dc2626", color: "#991b1b", fontWeight: 800 }}>
-              🚨 {L("কোম্পানি এখনো চেঞ্জ দেয়নি — এখনই ফলো-আপ করুন!", "Company has not replaced yet — follow up NOW!")}
+               {L("কোম্পানি এখনো চেঞ্জ দেয়নি — এখনই ফলো-আপ করুন!", "Company has not replaced yet — follow up NOW!")}
               <div style={{ fontWeight: 600, marginTop: 4 }}>{L("রিমাইন্ডার তারিখ", "Reminder date")}: {fmtDay(r.reminderDueDate)}</div>
             </div>
           )}
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
-            <legend className="pm-panel-legend" style={{ background: st.tone }}>{st[bn ? "bn" : "en"]}</legend>
-            <div className="si-panel-body" style={{ paddingTop: 4, display: "grid", gap: 4 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
+            <legend className="pm-panel-legend"style={{ background: st.tone }}>{st[bn ? "bn" : "en"]}</legend>
+            <div className="si-panel-body"style={{ paddingTop: 4, display: "grid", gap: 4 }}>
               <div><b style={{ color: ACCENT }}>{r.claimNo}</b> · {fmtDay(r.claimDate)} · {warrantyReasonLabel(r.reason, bn)}</div>
               <div style={{ fontSize: 16, fontWeight: 800 }}>{r.productName}{r.productCode ? ` · ${r.productCode}` : ""} × {fq(r.qty)} {r.unit || ""}</div>
               {r.serialNo && <div className="si-muted">{L("সিরিয়াল", "Serial")}: {r.serialNo}</div>}
@@ -464,55 +464,55 @@ export default function WarrantyClaimTab({
               <div>{L("কোম্পানি", "Company")}: <b>{r.vendorName || "—"}</b></div>
               <div>{L("রিমাইন্ডার", "Reminder")}: <b>{r.reminderDays || "—"} {L("দিন", "days")}</b>
                 {r.reminderDueDate ? ` · ${L("শেষ তারিখ", "due")} ${fmtDay(r.reminderDueDate)}` : ` · ${L("কোম্পানিতে পাঠালে শুরু", "starts when sent")}`}</div>
-              {r.note && <div className="si-note">📝 {r.note}</div>}
-              <div className="si-muted" style={{ marginTop: 6 }}>
+              {r.note && <div className="si-note"> {r.note}</div>}
+              <div className="si-muted"style={{ marginTop: 6 }}>
                 {L("স্টক: পাঠানো = ০ · কোম্পানি দিলে = + · কাস্টমারকে দিলে = −", "Stock: sent = 0 · company replaced = + · delivered = −")}
               </div>
             </div>
           </fieldset>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`} style={{ flexWrap: "wrap" }}>
-          <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`} style={{ flexWrap: "wrap" }}>
+          <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}></button>}
           <span className="si-toolbar-gap" />
           {canManage && canAdvance(r.status, "send") && (
-            <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={() => sendToCompany(r)}>
-              📤 {L("কোম্পানিতে পাঠালাম", "Sent to company")}
+            <button type="button"className="pm-btn pm-btn--primary"disabled={saving} onClick={() => sendToCompany(r)}>
+               {L("কোম্পানিতে পাঠালাম", "Sent to company")}
             </button>
           )}
           {canManage && canAdvance(r.status, "replace") && (
-            <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={() => markReplaced(r)}
+            <button type="button"className="pm-btn pm-btn--primary"disabled={saving} onClick={() => markReplaced(r)}
               style={{ background: "#15803d" }}>
-              ✅ {L("কোম্পানি নতুন দিয়েছে (+স্টক)", "Company replaced (+stock)")}
+               {L("কোম্পানি নতুন দিয়েছে (+স্টক)", "Company replaced (+stock)")}
             </button>
           )}
           {canManage && canAdvance(r.status, "deliver") && (
-            <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={() => markDelivered(r)}
+            <button type="button"className="pm-btn pm-btn--primary"disabled={saving} onClick={() => markDelivered(r)}
               style={{ background: "#0f766e" }}>
-              👤 {L("কাস্টমারকে দিয়েছি (−স্টক)", "Given to customer (−stock)")}
+               {L("কাস্টমারকে দিয়েছি (−স্টক)", "Given to customer (−stock)")}
             </button>
           )}
           {canManage && canAdvance(r.status, "cancel") && (
-            <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelClaim(r)}>⛔ {L("বাতিল", "Cancel")}</button>
+            <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => cancelClaim(r)}> {L("বাতিল", "Cancel")}</button>
           )}
           {canDelete && r.status === "cancelled" && (
-            <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteClaim(r)}>🗑️</button>
+            <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => deleteClaim(r)}></button>
           )}
         </div>
       </>
     ));
   }
 
-  return shell(L("🔋 গ্যারান্টি / চেঞ্জ ক্লেইম", "🔋 Warranty / Change Claims"), `${liveOpen} ${L("খোলা", "open")}${overdue ? ` · 🚨 ${overdue}` : ""}`, (
+  return shell(L("গ্যারান্টি / চেঞ্জ ক্লেইম", "Warranty / Change Claims"), `${liveOpen} ${L("খোলা", "open")}${overdue ? ` ·  ${overdue}` : ""}`, (
     <>
       <div className="si-toolbar">
-        {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন ক্লেইম", "New Claim")}</button>}
+        {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন ক্লেইম", "New Claim")}</button>}
         <span className="si-toolbar-gap" />
-        <div className="si-search" style={{ minWidth: mobile ? "100%" : 240 }}>
-          <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, পণ্য, কাস্টমার, কোম্পানি…", "No, product, customer, company…")} />
-          {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+        <div className="si-search"style={{ minWidth: mobile ? "100%" : 240 }}>
+          <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, পণ্য, কাস্টমার, কোম্পানি…", "No, product, customer, company…")} />
+          {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
         </div>
-        <select className="pm-input" style={{ width: mobile ? "100%" : 160 }} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
+        <select className="pm-input"style={{ width: mobile ? "100%" : 160 }} value={statusF} onChange={(e) => setStatusF(e.target.value)}>
           <option value="open">{L("চলমান", "In progress")}</option>
           <option value="sent">{L("কোম্পানিতে বাকি", "Waiting on company")}</option>
           <option value="done">{L("শেষ / বাতিল", "Done / cancelled")}</option>
@@ -521,13 +521,13 @@ export default function WarrantyClaimTab({
       </div>
       {overdue > 0 && (
         <div style={{ margin: "0 8px 8px", padding: 10, borderRadius: 10, background: "#fef2f2", border: "2px solid #dc2626", fontWeight: 800, color: "#991b1b" }}>
-          🚨 {L(`${overdue}টি ক্লেইমে কোম্পানি এখনো চেঞ্জ দেয়নি — বেল/নোটিফ দেখুন`, `${overdue} claim(s) still waiting on company change — check bell/notify`)}
+           {L(`${overdue}টি ক্লেইমে কোম্পানি এখনো চেঞ্জ দেয়নি — বেল/নোটিফ দেখুন`, `${overdue} claim(s) still waiting on company change — check bell/notify`)}
         </div>
       )}
       <div className="si-main is-all">
         <div className="si-box">
           {filtered.length > 0 && (mobile ? filtered.map((r) => (
-            <button key={r.id} type="button" className="si-mrow" onClick={() => { setSel(r); setView("detail"); }}
+            <button key={r.id} type="button"className="si-mrow"onClick={() => { setSel(r); setView("detail"); }}
               style={r.status === "cancelled" ? { opacity: 0.55 } : r.status === "sent" && r.reminderDueDate && String(r.reminderDueDate) <= ymd(new Date()) ? { borderLeft: "4px solid #dc2626" } : undefined}>
               <div className="si-mrow-top"><span style={{ color: ACCENT }}>{r.claimNo}</span>{badge(r)}</div>
               <div className="si-mrow-sub"><span>{fmtDay(r.claimDate)} · {warrantyReasonLabel(r.reason, bn)}</span><span>{r.vendorName || ""}</span></div>
@@ -547,15 +547,15 @@ export default function WarrantyClaimTab({
                 {filtered.map((r) => {
                   const late = r.status === "sent" && r.reminderDueDate && String(r.reminderDueDate).slice(0, 10) <= ymd(new Date());
                   return (
-                    <tr key={r.id} className="pm-clickable" onClick={() => { setSel(r); setView("detail"); }}
+                    <tr key={r.id} className="pm-clickable"onClick={() => { setSel(r); setView("detail"); }}
                       style={r.status === "cancelled" ? { color: "#6b7280" } : late ? { background: "#fef2f2" } : undefined}>
                       <td>{fmtDay(r.claimDate)}</td>
-                      <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.claimNo}</td>
+                      <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.claimNo}</td>
                       <td>{warrantyReasonLabel(r.reason, bn)}</td>
                       <td title={claimSummary(r)}>{claimSummary(r)}</td>
                       <td style={late ? { color: "#b91c1c", fontWeight: 800 } : undefined}>
                         {r.reminderDueDate ? fmtDay(r.reminderDueDate) : `${r.reminderDays || "—"}d`}
-                        {late ? " 🚨" : ""}
+                        {late ? " " : ""}
                       </td>
                       <td className="si-center">{badge(r)}</td>
                     </tr>

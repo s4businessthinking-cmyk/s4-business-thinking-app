@@ -117,20 +117,20 @@ export function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImporte
         {(status==="idle"||status==="parsing")&&(
           <div>
             <div style={{ border:`2px dashed ${th.borderMid}`, borderRadius:12, padding:32, textAlign:"center", marginBottom:16 }}>
-              <div style={{ fontSize:36, marginBottom:8 }}>📂</div>
+              <div style={{ fontSize:36, marginBottom:8 }}></div>
               <div style={{ fontSize:14, color:th.txtMuted, marginBottom:16 }}>
                 {isBn?"XLS / XLSX ফাইল এখানে টেনে আনুন বা ক্লিক করুন":"Drag & drop XLS/XLSX file or click to browse"}
               </div>
               <label style={{ display:"inline-block", padding:"10px 24px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#22c55e,#16a34a)", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
                 {status==="parsing"?(isBn?"পড়া হচ্ছে...":"Reading..."):(isBn?"ফাইল বেছে নিন":"Choose File")}
-                <input type="file" accept=".xls,.xlsx" style={{ display:"none" }} disabled={status==="parsing"}
+                <input type="file"accept=".xls,.xlsx"style={{ display:"none" }} disabled={status==="parsing"}
                   onChange={e=>e.target.files[0]&&parseFile(e.target.files[0])} />
               </label>
             </div>
             <div style={{ fontSize:12, color:"#f59e0b", background:"rgba(245,158,11,0.08)", borderRadius:8, padding:"8px 12px" }}>
-              ⚠️ {isBn?"Import করলে নতুন রেকর্ড যোগ হবে। একই নামের পুরনো রেকর্ড মুছবে না।":"Import adds new records. Existing records with same name are not deleted."}
+               {isBn?"Import করলে নতুন রেকর্ড যোগ হবে। একই নামের পুরনো রেকর্ড মুছবে না।":"Import adds new records. Existing records with same name are not deleted."}
             </div>
-            {error&&<div style={{ marginTop:10, color:"#ef4444", fontSize:13 }}>❌ {error}</div>}
+            {error&&<div style={{ marginTop:10, color:"#ef4444", fontSize:13 }}> {error}</div>}
           </div>
         )}
 
@@ -138,7 +138,7 @@ export function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImporte
         {status==="preview"&&(
           <div>
             <div style={{ fontSize:14, fontWeight:700, color:"#22c55e", marginBottom:12 }}>
-              ✅ {rows.length} {isBn?t.cm_importCount:t.cm_importCount}
+               {rows.length} {isBn?t.cm_importCount:t.cm_importCount}
             </div>
             <div style={{ overflowX:"auto", marginBottom:16, borderRadius:8, border:`1px solid ${th.border}` }}>
               <table style={{ width:"100%", borderCollapse:"collapse", fontSize:11 }}>
@@ -164,17 +164,17 @@ export function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImporte
             </div>
             {rows.length>5&&<div style={{ fontSize:11, color:th.txtMuted, marginBottom:12 }}>...{isBn?"আরও":"and"} {rows.length-5} {isBn?"টি রেকর্ড":"more records"}</div>}
             <div style={{ display:"flex", gap:10 }}>
-              {btn("linear-gradient(135deg,#22c55e,#16a34a)","#fff",doImport, isBn?`✅ ${rows.length} টি ইমপোর্ট করুন`:`✅ Import ${rows.length} records`)}
+              {btn("linear-gradient(135deg,#22c55e,#16a34a)","#fff",doImport, isBn?` ${rows.length} টি ইমপোর্ট করুন`:`Import ${rows.length} records`)}
               {btn("transparent","#a1a1aa",()=>{ setRows([]); setStatus("idle"); }, isBn?"বাতিল":"Cancel")}
             </div>
-            {error&&<div style={{ marginTop:10, color:"#ef4444", fontSize:13 }}>❌ {error}</div>}
+            {error&&<div style={{ marginTop:10, color:"#ef4444", fontSize:13 }}> {error}</div>}
           </div>
         )}
 
         {/* Progress */}
         {status==="importing"&&(
           <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:32, marginBottom:12 }}>⏳</div>
+            <div style={{ fontSize:32, marginBottom:12 }}></div>
             <div style={{ fontSize:16, fontWeight:700, color:th.txtPrimary, marginBottom:8 }}>
               {isBn?"ইমপোর্ট হচ্ছে...":"Importing..."}
             </div>
@@ -188,7 +188,7 @@ export function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImporte
         {/* Done */}
         {status==="done"&&(
           <div style={{ textAlign:"center", padding:"20px 0" }}>
-            <div style={{ fontSize:48, marginBottom:12 }}>🎉</div>
+            <div style={{ fontSize:48, marginBottom:12 }}></div>
             <div style={{ fontSize:18, fontWeight:800, color:"#22c55e", marginBottom:6 }}>
               {isBn?t.cm_importDone:t.cm_importDone}
             </div>
@@ -196,7 +196,7 @@ export function ExcelImportModal({ t, lang, th, shopId, user, onClose, onImporte
               {imported} {isBn?"টি রেকর্ড ইমপোর্ট হয়েছে":"records imported"}
               {skipped>0&&` · ${skipped} ${isBn?"টি skip":"skipped"}`}
             </div>
-            {btn("linear-gradient(135deg,#22c55e,#16a34a)","#fff",onClose,isBn?"✅ বন্ধ করুন":"✅ Close")}
+            {btn("linear-gradient(135deg,#22c55e,#16a34a)","#fff",onClose,isBn?"বন্ধ করুন":"Close")}
           </div>
         )}
       </div>

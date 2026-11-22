@@ -12,7 +12,7 @@ export function useProductForm({ isOwner, lang, setSelOrder, setSettingsPage, sh
   const generateNewCode = async () => {
     try {
       if (!navigator.onLine || !db) {
-        toast(lang==="bn"?"❌ Invite Code বানাতে ইন্টারনেট লাগবে":"❌ Internet is required to create an invite code","err");
+        toast(lang==="bn"?"Invite Code বানাতে ইন্টারনেট লাগবে":"Internet is required to create an invite code","err");
         return;
       }
       const code = generateInviteCode();
@@ -20,7 +20,7 @@ export function useProductForm({ isOwner, lang, setSelOrder, setSettingsPage, sh
         shopId, used:false, createdAt:serverTimestamp(),
       });
       addLocalInviteCode(shopId, code);
-      toast(lang==="bn"?"✅ নতুন Invite Code তৈরি হয়েছে!":"✅ New invite code created!");
+      toast(lang==="bn"?"নতুন Invite Code তৈরি হয়েছে!":"New invite code created!");
     } catch(e) { hErr(e); }
   };
 

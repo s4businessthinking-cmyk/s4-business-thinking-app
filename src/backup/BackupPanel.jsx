@@ -28,12 +28,12 @@ function FirebaseImportChoices({ bn, th, muted, pending, setPending }) {
   const showVendors = m.vendorDocs > 0;
   return (
     <div style={{ ...muted, color: th.txtPrimary, marginTop: 8, padding: 10, borderRadius: 8, background: "rgba(59,130,246,0.08)" }}>
-      <strong>☁️ {bn ? "পুরোনো সফটওয়্যারের ডেটা — কোনগুলো আনবেন বাছুন" : "Old software data — choose what to bring in"}</strong>
+      <strong> {bn ? "পুরোনো সফটওয়্যারের ডেটা — কোনগুলো আনবেন বাছুন" : "Old software data — choose what to bring in"}</strong>
       {Object.entries(plan.byCollection).map(([name, docs]) => {
         const already = plan.currentCounts[name] || 0;
         return (
           <label key={name} style={{ display: "flex", gap: 8, alignItems: "center", padding: "3px 0", cursor: "pointer" }}>
-            <input type="checkbox" checked={sel.has(name)} onChange={() => toggle(name)} />
+            <input type="checkbox"checked={sel.has(name)} onChange={() => toggle(name)} />
             <span>{(COLLECTION_LABELS[name]?.[bn ? 0 : 1]) || name}: <strong>{docs.length}</strong>
               {already > 0 && <span style={{ color: th.txtMuted }}> · {bn ? `এখন আছে ${already}টি` : `${already} already in the app`}</span>}
             </span>
@@ -44,15 +44,15 @@ function FirebaseImportChoices({ bn, th, muted, pending, setPending }) {
 
       {(showItems || showVendors) && (
         <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${th.border}` }}>
-          <strong>🔗 {bn ? "আপনার এখনকার প্রোডাক্ট/ভেন্ডরের সাথে মিল" : "Matched to your current products/vendors"}</strong>
+          <strong> {bn ? "আপনার এখনকার প্রোডাক্ট/ভেন্ডরের সাথে মিল" : "Matched to your current products/vendors"}</strong>
           {showItems && (
             <div style={{ color: pct(m.itemsMatched, m.items) >= 90 ? "#16a34a" : "#f59e0b" }}>
-              📦 {bn ? `ইনভয়েসের লাইন: ${m.items}টির মধ্যে ${m.itemsMatched}টি প্রোডাক্টের সাথে মিলেছে (${pct(m.itemsMatched, m.items)}%)` : `Invoice lines: ${m.itemsMatched} of ${m.items} matched a product (${pct(m.itemsMatched, m.items)}%)`}
+               {bn ? `ইনভয়েসের লাইন: ${m.items}টির মধ্যে ${m.itemsMatched}টি প্রোডাক্টের সাথে মিলেছে (${pct(m.itemsMatched, m.items)}%)` : `Invoice lines: ${m.itemsMatched} of ${m.items} matched a product (${pct(m.itemsMatched, m.items)}%)`}
             </div>
           )}
           {showVendors && (
             <div style={{ color: pct(m.vendorMatched, m.vendorDocs) >= 90 ? "#16a34a" : "#f59e0b" }}>
-              🏪 {bn ? `ভেন্ডর: ${m.vendorDocs}টির মধ্যে ${m.vendorMatched}টি মিলেছে` : `Vendors: ${m.vendorMatched} of ${m.vendorDocs} matched`}
+               {bn ? `ভেন্ডর: ${m.vendorDocs}টির মধ্যে ${m.vendorMatched}টি মিলেছে` : `Vendors: ${m.vendorMatched} of ${m.vendorDocs} matched`}
             </div>
           )}
           {showItems && m.itemsMatched < m.items && st.unmatchedItems.length > 0 && (
@@ -69,7 +69,7 @@ function FirebaseImportChoices({ bn, th, muted, pending, setPending }) {
           )}
           {sel.has("purchaseInvoices") && st.productsWithOpeningStock > 0 && (
             <div style={{ color: "#ef4444", marginTop: 6, fontWeight: 700 }}>
-              ⚠️ {bn
+               {bn
                 ? `মিলে যাওয়া ${st.productsWithOpeningStock}টি প্রোডাক্টে আগে থেকেই ওপেনিং স্টক আছে। পুরোনো পারচেজ যোগ হলে এদের স্টক বেড়ে যাবে — ওপেনিং স্টক যদি আজকের আসল স্টক হয়, তাহলে স্টক দুবার গোনা হবে।`
                 : `${st.productsWithOpeningStock} matched products already have an opening stock. Old purchases will add to it — if the opening stock is today's real stock, it will be counted twice.`}
             </div>
@@ -100,13 +100,13 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
     try {
       const result = await saveShopBackup(shopId);
       setLastAt(result.at);
-      toast(bn ? `✅ ব্যাকআপ তৈরি হয়েছে (${result.documentCount} রেকর্ড, ${fmtSize(result.sizeBytes)})` : `✅ Backup created (${result.documentCount} records, ${fmtSize(result.sizeBytes)})`);
+      toast(bn ? `ব্যাকআপ তৈরি হয়েছে (${result.documentCount} রেকর্ড, ${fmtSize(result.sizeBytes)})` : `Backup created (${result.documentCount} records, ${fmtSize(result.sizeBytes)})`);
     } catch (error) {
       if (error instanceof BackupCancelled) {
         toast(bn ? "ব্যাকআপ সেভ করা বাতিল হয়েছে" : "Backup sharing cancelled");
       } else {
         console.warn("[S4 Backup] backup failed", error);
-        toast(bn ? `❌ ব্যাকআপ হয়নি: ${error?.message || error}` : `❌ Backup failed: ${error?.message || error}`);
+        toast(bn ? `ব্যাকআপ হয়নি: ${error?.message || error}` : `Backup failed: ${error?.message || error}`);
       }
     } finally {
       setBusy(false);
@@ -126,7 +126,7 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
     try {
       parsed = await readBackupFile(file);
     } catch {
-      toast(bn ? "❌ এটা সঠিক S4 ব্যাকআপ ফাইল নয়" : "❌ Not a valid S4 backup file");
+      toast(bn ? "এটা সঠিক S4 ব্যাকআপ ফাইল নয়" : "Not a valid S4 backup file");
       return;
     }
     if (parsed.firebaseExport) {
@@ -134,7 +134,7 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
       try {
         const plan = await prepareFirebaseImport(parsed.firebaseExport, { shopId, userId });
         if (!Object.keys(plan.byCollection).length) {
-          toast(bn ? `ℹ️ নতুন কিছু আনার নেই — সব ${plan.alreadyThere}টি রেকর্ড আগে থেকেই আছে` : `ℹ️ Nothing new — all ${plan.alreadyThere} records are already here`);
+          toast(bn ? `নতুন কিছু আনার নেই — সব ${plan.alreadyThere}টি রেকর্ড আগে থেকেই আছে` : `Nothing new — all ${plan.alreadyThere} records are already here`);
           return;
         }
         setPending({
@@ -142,14 +142,14 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
           selected: DEFAULT_SELECTED.filter((n) => plan.byCollection[n]),
         });
       } catch (error) {
-        toast(bn ? `❌ পুরোনো ডেটা পড়া যায়নি: ${error?.message || error}` : `❌ Could not read the old data: ${error?.message || error}`);
+        toast(bn ? `পুরোনো ডেটা পড়া যায়নি: ${error?.message || error}` : `Could not read the old data: ${error?.message || error}`);
       } finally {
         setBusy(false);
       }
       return;
     }
     if (parsed.shopId !== shopId) {
-      toast(bn ? "❌ এই ব্যাকআপ ফাইল অন্য দোকানের" : "❌ This backup belongs to a different shop");
+      toast(bn ? "এই ব্যাকআপ ফাইল অন্য দোকানের" : "This backup belongs to a different shop");
       return;
     }
     setPending({ ...parsed, fileName: file.name });
@@ -168,11 +168,11 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
     setBusy(true);
     try {
       const result = await restoreShopBackup(payload);
-      toast(bn ? `✅ রিস্টোর হয়েছে: ${result.restored} রেকর্ড ফিরিয়ে আনা হয়েছে। অ্যাপ রিলোড হচ্ছে...` : `✅ Restored ${result.restored} records. Reloading...`);
+      toast(bn ? `রিস্টোর হয়েছে: ${result.restored} রেকর্ড ফিরিয়ে আনা হয়েছে। অ্যাপ রিলোড হচ্ছে...` : `Restored ${result.restored} records. Reloading...`);
       setTimeout(() => window.location.reload(), 1500);
     } catch (error) {
       console.warn("[S4 Backup] restore failed", error);
-      toast(bn ? `❌ রিস্টোর হয়নি: ${error?.message || error}` : `❌ Restore failed: ${error?.message || error}`);
+      toast(bn ? `রিস্টোর হয়নি: ${error?.message || error}` : `Restore failed: ${error?.message || error}`);
       setBusy(false);
     }
   };
@@ -182,7 +182,7 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
   return (
     <>
       <div style={s.card}>
-        <div style={s.settingsLbl}>{bn ? "💾 ব্যাকআপ" : "💾 Backup"}</div>
+        <div style={s.settingsLbl}>{bn ? "ব্যাকআপ" : "Backup"}</div>
         <div style={{ ...muted, marginBottom: 12 }}>
           {bn ? "আপনার দোকানের সব ডেটা (প্রোডাক্ট, ইনভয়েস, কাস্টমার, হিসাব) একটি ফাইলে সেভ হবে।" : "All your shop data (products, invoices, customers, accounts) is saved into one file."}
           <br />
@@ -200,18 +200,18 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
         )}
         {platform === "mobile" && (
           <div style={{ ...muted, marginBottom: 12 }}>
-            {bn ? "ব্যাকআপ চাপলে শেয়ার মেনু আসবে, সেখান থেকে \"Drive\" বেছে নিন। সপ্তাহে অন্তত একবার করুন।" : "Tap Backup, then choose \"Drive\" in the share menu. Do it at least once a week."}
+            {bn ? "ব্যাকআপ চাপলে শেয়ার মেনু আসবে, সেখান থেকে \"Drive\"বেছে নিন। সপ্তাহে অন্তত একবার করুন।" : "Tap Backup, then choose \"Drive\"in the share menu. Do it at least once a week."}
           </div>
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <button type="button" onClick={runBackup} disabled={busy || !isOnline} style={{ ...s.sendBtn, opacity: busy || !isOnline ? 0.6 : 1 }}>
-            {busy ? "..." : platform === "mobile" ? (bn ? "💾 ব্যাকআপ নিন → Google Drive" : "💾 Back up → Google Drive") : bn ? "💾 এখনই ব্যাকআপ নিন" : "💾 Back up now"}
+          <button type="button"onClick={runBackup} disabled={busy || !isOnline} style={{ ...s.sendBtn, opacity: busy || !isOnline ? 0.6 : 1 }}>
+            {busy ? "..." : platform === "mobile" ? (bn ? "ব্যাকআপ নিন → Google Drive" : "Back up → Google Drive") : bn ? "এখনই ব্যাকআপ নিন" : "Back up now"}
           </button>
           {platform === "desktop" && (
             <>
-              <button type="button" onClick={chooseFolder} style={s.stBtn}>{bn ? "📁 ফোল্ডার পরিবর্তন করুন" : "📁 Change folder"}</button>
-              <button type="button" onClick={() => window.S4Desktop.backup.openFolder()} style={s.stBtn}>{bn ? "📂 ফোল্ডার খুলুন" : "📂 Open folder"}</button>
+              <button type="button"onClick={chooseFolder} style={s.stBtn}>{bn ? "ফোল্ডার পরিবর্তন করুন" : "Change folder"}</button>
+              <button type="button"onClick={() => window.S4Desktop.backup.openFolder()} style={s.stBtn}>{bn ? "ফোল্ডার খুলুন" : "Open folder"}</button>
             </>
           )}
         </div>
@@ -219,17 +219,17 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
       </div>
 
       <div style={s.card}>
-        <div style={s.settingsLbl}>{bn ? "♻️ রিস্টোর (ব্যাকআপ থেকে ফেরত আনা)" : "♻️ Restore from backup"}</div>
+        <div style={s.settingsLbl}>{bn ? "রিস্টোর (ব্যাকআপ থেকে ফেরত আনা)" : "Restore from backup"}</div>
         <div style={{ ...muted, marginBottom: 12 }}>
           {bn
             ? "ব্যাকআপ ফাইলের সময়ে যা ছিল সেই ডেটা ফেরত আসবে। ব্যাকআপের পরে নতুন যোগ করা রেকর্ড মুছবে না।"
             : "Brings data back to how it was when the backup was made. Records added after the backup are kept."}
         </div>
-        <input ref={fileInput} type="file" accept=".s4backup,application/octet-stream,application/gzip,application/json" style={{ display: "none" }} onChange={onPickFile} />
+        <input ref={fileInput} type="file"accept=".s4backup,application/octet-stream,application/gzip,application/json"style={{ display: "none" }} onChange={onPickFile} />
 
         {!pending && (
-          <button type="button" onClick={() => fileInput.current?.click()} disabled={busy || !isOnline} style={{ ...s.stBtn, width: "100%", opacity: busy || !isOnline ? 0.6 : 1 }}>
-            {bn ? "📄 ব্যাকআপ ফাইল বেছে নিন" : "📄 Choose backup file"}
+          <button type="button"onClick={() => fileInput.current?.click()} disabled={busy || !isOnline} style={{ ...s.stBtn, width: "100%", opacity: busy || !isOnline ? 0.6 : 1 }}>
+            {bn ? "ব্যাকআপ ফাইল বেছে নিন" : "Choose backup file"}
           </button>
         )}
 
@@ -244,14 +244,14 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
             {pending.fromFirebase && <FirebaseImportChoices bn={bn} th={th} muted={muted} pending={pending} setPending={setPending} />}
             <div style={{ fontSize: 12, color: "#f59e0b", margin: "10px 0" }}>
               {pending.fromFirebase
-                ? (bn ? "⚠️ উপরের রেকর্ডগুলো আপনার দোকানে যোগ হবে। এখনকার কোনো ডেটা বদলাবে বা মুছবে না। নিশ্চিত?" : "⚠️ The records above are added to your shop. Nothing current is changed or deleted. Continue?")
-                : (bn ? "⚠️ বর্তমান ডেটা ব্যাকআপের ডেটা দিয়ে বদলে যাবে। নিশ্চিত?" : "⚠️ Current records will be replaced with the backup's version. Continue?")}
+                ? (bn ? "উপরের রেকর্ডগুলো আপনার দোকানে যোগ হবে। এখনকার কোনো ডেটা বদলাবে বা মুছবে না। নিশ্চিত?" : "The records above are added to your shop. Nothing current is changed or deleted. Continue?")
+                : (bn ? "বর্তমান ডেটা ব্যাকআপের ডেটা দিয়ে বদলে যাবে। নিশ্চিত?" : "Current records will be replaced with the backup's version. Continue?")}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button type="button" onClick={confirmRestore} disabled={busy} style={{ ...s.sendBtn, flex: 1, background: "linear-gradient(135deg,#dc2626,#b91c1c)", opacity: busy ? 0.6 : 1 }}>
+              <button type="button"onClick={confirmRestore} disabled={busy} style={{ ...s.sendBtn, flex: 1, background: "linear-gradient(135deg,#dc2626,#b91c1c)", opacity: busy ? 0.6 : 1 }}>
                 {busy ? "..." : pending.fromFirebase ? (bn ? "হ্যাঁ, ডেটা যোগ করুন" : "Yes, add the data") : bn ? "হ্যাঁ, রিস্টোর করুন" : "Yes, restore"}
               </button>
-              <button type="button" onClick={() => setPending(null)} disabled={busy} style={{ ...s.stBtn, flex: 1 }}>
+              <button type="button"onClick={() => setPending(null)} disabled={busy} style={{ ...s.stBtn, flex: 1 }}>
                 {bn ? "বাতিল" : "Cancel"}
               </button>
             </div>

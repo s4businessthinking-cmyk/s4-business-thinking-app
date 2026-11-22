@@ -7,7 +7,7 @@ import { offlinePatch } from "../../offline/offlineRepository";
 
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
 const n2 = (v) => parseFloat(v) || 0;
-const STATUS = { exact: ["✅", "#15803d"], suggest: ["⚠️", "#b45309"], none: ["❌", "#b91c1c"] };
+const STATUS = { exact: ["", "#15803d"], suggest: ["", "#b45309"], none: ["", "#b91c1c"] };
 
 // Scan a supplier bill (PDF, photo or screenshot), check what was read, then fill the purchase form with it.
 // Nothing is saved here: onApply fills the form and the user saves the bill as usual.
@@ -112,11 +112,11 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
   const stepText = { pdf: bn ? "PDF পড়া হচ্ছে…" : "Reading the PDF…", ocr: bn ? "ছবি থেকে লেখা পড়া হচ্ছে (প্রথমবার একটু সময় লাগে)…" : "Reading text from the picture (the first time takes a little longer)…" };
 
   return (
-    <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 10060, background: "rgba(10,25,55,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 10 }}>
+    <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 10060, background: "rgba(10,25,55,0.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 10 }}>
       <div style={{ width: "100%", maxWidth: 1250, maxHeight: "96vh", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", overflow: "hidden" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "6px 12px", fontWeight: 800 }}>
-          <span>📄 {bn ? "বিল স্ক্যান করে Purchase" : "Scan a bill into Purchase"}</span>
-          <button type="button" onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
+          <span> {bn ? "বিল স্ক্যান করে Purchase" : "Scan a bill into Purchase"}</span>
+          <button type="button"onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
         </div>
 
         {phase !== "review" && (
@@ -125,17 +125,17 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
               {bn ? "সাপ্লায়ারের বিল দিন — PDF, ছবি, ফোনের ক্যামেরা বা পিসির স্ক্যানার। সফটওয়্যার পড়ে আইটেম মিলিয়ে দেখাবে; আপনি দেখে Purchase ফর্মে বসাবেন, তারপর Save করবেন।"
                 : "Give the supplier's bill as a PDF, photo, phone camera or PC scanner. The software reads it and matches the items; you check them, fill the purchase form, then save it yourself."}
             </div>
-            <input ref={fileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; start(f); }} />
-            <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; start(f); }} />
+            <input ref={fileRef} type="file"accept="application/pdf,image/*"style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; start(f); }} />
+            <input ref={cameraRef} type="file"accept="image/*"capture="environment"style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; start(f); }} />
             {phase === "pick"
               ? (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-                  <button type="button" onClick={() => fileRef.current?.click()} style={btn("#1d4ed8", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}>📂 {bn ? "PDF / ছবি" : "PDF / picture"}</button>
-                  {canCamera && <button type="button" onClick={() => cameraRef.current?.click()} style={btn("#0f766e", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}>📷 {bn ? "ক্যামেরা" : "Camera"}</button>}
-                  {canScanner && <button type="button" onClick={startScanner} style={btn("#15803d", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}>🖨️ {bn ? "স্ক্যানার" : "Scanner"}</button>}
+                  <button type="button"onClick={() => fileRef.current?.click()} style={btn("#1d4ed8", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}> {bn ? "PDF / ছবি" : "PDF / picture"}</button>
+                  {canCamera && <button type="button"onClick={() => cameraRef.current?.click()} style={btn("#0f766e", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}> {bn ? "ক্যামেরা" : "Camera"}</button>}
+                  {canScanner && <button type="button"onClick={startScanner} style={btn("#15803d", "#fff", { height: 40, padding: "0 18px", fontSize: 14 })}> {bn ? "স্ক্যানার" : "Scanner"}</button>}
                 </div>
               )
-              : <div style={{ fontWeight: 700, color: "#1e3a8a" }}>⏳ {stepText[step] || (bn ? "পড়া হচ্ছে…" : "Reading…")}</div>}
+              : <div style={{ fontWeight: 700, color: "#1e3a8a" }}> {stepText[step] || (bn ? "পড়া হচ্ছে…" : "Reading…")}</div>}
             {error && <div style={{ color: C.red, fontWeight: 700 }}>{error}</div>}
             <div style={{ fontSize: 11.5, color: "#4b5f86", maxWidth: 620 }}>
               {bn ? "সাপ্লায়ারের সফটওয়্যারের PDF সবচেয়ে নির্ভুল। ছবি হলে সোজা করে, আলোতে, পুরো বিল ফ্রেমে রেখে তুলুন। হাতে লেখা বিল ভালো পড়া যায় না।"
@@ -164,13 +164,13 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
                   )}
                 </div>
                 <div><div style={lbl}>Supplier Inv. No</div><input style={inp({ borderColor: head.invoiceNo ? C.border : C.red })} value={head.invoiceNo} onChange={(e) => setHead((h) => ({ ...h, invoiceNo: e.target.value }))} /></div>
-                <div><div style={lbl}>{bn ? "বিলের তারিখ" : "Bill date"}</div><input type="date" style={inp()} value={head.date} onChange={(e) => setHead((h) => ({ ...h, date: e.target.value }))} /></div>
-                <button type="button" onClick={() => { setPhase("pick"); setLines([]); setError(""); }} style={btn()}>↺ {bn ? "অন্য ফাইল" : "Other file"}</button>
+                <div><div style={lbl}>{bn ? "বিলের তারিখ" : "Bill date"}</div><input type="date"lang="en-GB" style={inp()} value={head.date} onChange={(e) => setHead((h) => ({ ...h, date: e.target.value }))} /></div>
+                <button type="button"onClick={() => { setPhase("pick"); setLines([]); setError(""); }} style={btn()}>↺ {bn ? "অন্য ফাইল" : "Other file"}</button>
               </div>
               {error && <div style={{ color: C.red, fontWeight: 700, fontSize: 12.5 }}>{error}</div>}
               <div style={{ fontSize: 11.5, color: "#4b5f86" }}>
                 {source === "ocr" ? (bn ? "ছবি থেকে পড়া — প্রতিটা সংখ্যা মিলিয়ে নিন।" : "Read from a picture — check every number.") : (bn ? "PDF থেকে পড়া।" : "Read from the PDF.")}
-                {" "}✅ {bn ? "মিলেছে" : "matched"} · ⚠️ {bn ? "মিল সন্দেহের, দেখে নিন" : "likely match, check it"} · ❌ {bn ? "product নেই — বাছাই করুন বা নতুন বানান" : "no product — pick one or create it"}
+                {" "} {bn ? "মিলেছে" : "matched"} ·  {bn ? "মিল সন্দেহের, দেখে নিন" : "likely match, check it"} ·  {bn ? "product নেই — বাছাই করুন বা নতুন বানান" : "no product — pick one or create it"}
               </div>
               <div style={{ border: `1px solid ${C.border}`, background: "#fff", overflow: "auto", flex: 1, minHeight: 160 }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -184,30 +184,30 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
                       const cand = l.candidates.filter((c) => c.product.id !== l.productId);
                       return (
                         <tr key={l.key} style={{ opacity: l.use ? 1 : 0.45, background: l.status === "none" ? "#fef2f2" : l.status === "suggest" ? "#fffbeb" : "#fff" }}>
-                          <td style={{ ...td, textAlign: "center", width: 24 }}><input type="checkbox" checked={l.use} onChange={(e) => upd(l.key, { use: e.target.checked })} /></td>
+                          <td style={{ ...td, textAlign: "center", width: 24 }}><input type="checkbox"checked={l.use} onChange={(e) => upd(l.key, { use: e.target.checked })} /></td>
                           <td style={{ ...td, textAlign: "center", width: 26, color }} title={l.how}>{icon}</td>
                           <td style={{ ...td, textAlign: "left", whiteSpace: "normal", minWidth: 180 }}>
                             <div style={{ fontWeight: 700 }}>{l.line.name}</div>
                             <div style={{ fontSize: 11, color: "#64748b" }}>{[l.line.brand, l.line.code, l.line.unit].filter(Boolean).join(" · ")}</div>
-                            {l.line.loose && <div style={{ fontSize: 11, color: C.red, fontWeight: 700 }}>⚠️ {bn ? "দাম পড়া যায়নি — qty / rate দেখে দিন" : "Price not readable — check qty / rate"}</div>}
+                            {l.line.loose && <div style={{ fontSize: 11, color: C.red, fontWeight: 700 }}> {bn ? "দাম পড়া যায়নি — qty / rate দেখে দিন" : "Price not readable — check qty / rate"}</div>}
                           </td>
                           <td style={{ ...td, textAlign: "left", minWidth: 260, whiteSpace: "normal" }}>
                             <select style={inp({ height: 24, fontSize: 12 })} value={l.productId} onChange={(e) => pickProduct(l, e.target.value)}>
                               <option value="">{bn ? "— product নেই —" : "— no product —"}</option>
                               {l.productId && productById.get(l.productId) && <option value={l.productId}>{productById.get(l.productId).name}{productById.get(l.productId).code ? ` · ${productById.get(l.productId).code}` : ""}</option>}
                               {cand.map((c) => <option key={c.product.id} value={c.product.id}>≈ {c.product.name}{c.product.code ? ` · ${c.product.code}` : ""}</option>)}
-                              {hits.filter((p) => p.id !== l.productId && !cand.some((c) => c.product.id === p.id)).map((p) => <option key={p.id} value={p.id}>🔍 {p.name}{p.code ? ` · ${p.code}` : ""}</option>)}
+                              {hits.filter((p) => p.id !== l.productId && !cand.some((c) => c.product.id === p.id)).map((p) => <option key={p.id} value={p.id}> {p.name}{p.code ? ` · ${p.code}` : ""}</option>)}
                             </select>
                             <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
-                              <input style={inp({ height: 22, fontSize: 11.5 })} placeholder={bn ? "🔍 নাম / কোড খুঁজুন" : "🔍 search name / code"} value={search[l.key] || ""} onChange={(e) => setSearch((s) => ({ ...s, [l.key]: e.target.value }))} />
+                              <input style={inp({ height: 22, fontSize: 11.5 })} placeholder={bn ? "নাম / কোড খুঁজুন" : "search name / code"} value={search[l.key] || ""} onChange={(e) => setSearch((s) => ({ ...s, [l.key]: e.target.value }))} />
                               {onOpenProductMaster && !l.productId && (
-                                <button type="button" onClick={() => onOpenProductMaster(l.line.name)} style={btn("#ecfdf5", "#15803d", { height: 22, fontSize: 11, padding: "0 6px" })}>＋ {bn ? "নতুন" : "New"}</button>
+                                <button type="button"onClick={() => onOpenProductMaster(l.line.name)} style={btn("#ecfdf5", "#15803d", { height: 22, fontSize: 11, padding: "0 6px" })}>＋ {bn ? "নতুন" : "New"}</button>
                               )}
                             </div>
                           </td>
                           {["qty", "rate", "discount", "vatPerc"].map((k) => (
                             <td key={k} style={{ ...td, width: k === "vatPerc" ? 56 : 80 }}>
-                              <input style={inp({ height: 24, fontSize: 12, textAlign: "right" })} inputMode="decimal" value={l[k]} onChange={(e) => upd(l.key, { [k]: e.target.value })} />
+                              <input style={inp({ height: 24, fontSize: 12, textAlign: "right" })} inputMode="decimal"value={l[k]} onChange={(e) => upd(l.key, { [k]: e.target.value })} />
                             </td>
                           ))}
                           <td style={{ ...td, fontWeight: 700, width: 90 }}>{f2(lineTotal(l))}</td>
@@ -218,18 +218,18 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
                 </table>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-                <button type="button" onClick={() => setLines((prev) => [...prev, { key: Date.now(), use: true, line: { name: "", code: "", unit: "", raw: "" }, productId: "", status: "none", how: "", candidates: [], qty: "1", rate: "", discount: "", vatPerc: "5", learn: false }])} style={btn()}>＋ {bn ? "লাইন যোগ" : "Add line"}</button>
+                <button type="button"onClick={() => setLines((prev) => [...prev, { key: Date.now(), use: true, line: { name: "", code: "", unit: "", raw: "" }, productId: "", status: "none", how: "", candidates: [], qty: "1", rate: "", discount: "", vatPerc: "5", learn: false }])} style={btn()}>＋ {bn ? "লাইন যোগ" : "Add line"}</button>
                 <span style={{ marginLeft: "auto", fontSize: 13 }}>
                   {bn ? "হিসাব" : "Calculated"}: <b>{f2(total)}</b>
-                  {head.grandTotal != null && <> · {bn ? "বিলে" : "On bill"}: <b>{f2(head.grandTotal)}</b> {totalDiff < 0.06 ? <span style={{ color: C.green, fontWeight: 800 }}>✅ {bn ? "মিলেছে" : "matches"}</span> : <span style={{ color: C.red, fontWeight: 800 }}>⚠️ {bn ? "পার্থক্য" : "difference"} {f2(total - head.grandTotal)}</span>}</>}
+                  {head.grandTotal != null && <> · {bn ? "বিলে" : "On bill"}: <b>{f2(head.grandTotal)}</b> {totalDiff < 0.06 ? <span style={{ color: C.green, fontWeight: 800 }}> {bn ? "মিলেছে" : "matches"}</span> : <span style={{ color: C.red, fontWeight: 800 }}> {bn ? "পার্থক্য" : "difference"} {f2(total - head.grandTotal)}</span>}</>}
                 </span>
-                <button type="button" onClick={onClose} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
-                <button type="button" onClick={apply} disabled={!used.length} style={btn("#15803d", "#fff", { padding: "0 18px" })}>✔ {bn ? "Purchase ফর্মে বসাও" : "Fill the purchase form"}</button>
+                <button type="button"onClick={onClose} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
+                <button type="button"onClick={apply} disabled={!used.length} style={btn("#15803d", "#fff", { padding: "0 18px" })}> {bn ? "Purchase ফর্মে বসাও" : "Fill the purchase form"}</button>
               </div>
             </div>
             {preview && (
               <div style={{ border: `1px solid ${C.border}`, background: "#fff", overflow: "auto", minHeight: 0 }}>
-                <img src={preview} alt="" style={{ width: "100%", display: "block" }} />
+                <img src={preview} alt=""style={{ width: "100%", display: "block" }} />
               </div>
             )}
           </div>

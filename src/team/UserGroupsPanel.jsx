@@ -48,7 +48,7 @@ function GroupMembersBlock({ lang, th, s, draft, dirty, staff, members, onApplyG
               borderRadius: 999, border: `1px solid ${th.border}`, color: th.txtPrimary,
             }}>
               {memberLabel(m)}
-              <button type="button" disabled={busy} onClick={() => apply(m, null)}
+              <button type="button"disabled={busy} onClick={() => apply(m, null)}
                 style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontWeight: 800, padding: 0, fontFamily: "inherit" }}>×</button>
             </span>
           ))}
@@ -60,7 +60,7 @@ function GroupMembersBlock({ lang, th, s, draft, dirty, staff, members, onApplyG
             <option value="">{L("কর্মী গ্রুপে দিন…", "Add staff to this group…")}</option>
             {free.map((m) => <option key={m.uid || m.id} value={m.uid || m.id}>{memberLabel(m)}</option>)}
           </select>
-          <button type="button" style={{ ...s.addCoBtn, padding: "6px 10px" }} disabled={busy || !addId} onClick={() => {
+          <button type="button"style={{ ...s.addCoBtn, padding: "6px 10px" }} disabled={busy || !addId} onClick={() => {
             if (dirty) return toast?.(L("আগে গ্রুপ সেভ করুন, তারপর কর্মী যোগ করুন", "Save the group first, then add staff"), "err");
             const m = free.find((x) => (x.uid || x.id) === addId);
             if (m) apply(m, { id: draft.id, name: draft.name, permissions: draft.permissions });
@@ -185,17 +185,17 @@ export default function UserGroupsPanel({ lang = "bn", th, s, groups = [], team 
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
           {groups.map((g) => (
-            <button key={g.id} type="button" style={chip(draft?.id === g.id)} onClick={() => selectGroup(g.id)}>
-              👥 {g.name} <span style={{ color: "#71717a", fontWeight: 600 }}>· {membersOf(g.id).length}</span>
+            <button key={g.id} type="button"style={chip(draft?.id === g.id)} onClick={() => selectGroup(g.id)}>
+               {g.name} <span style={{ color: "#71717a", fontWeight: 600 }}>· {membersOf(g.id).length}</span>
             </button>
           ))}
-          <button type="button" style={{ ...chip(draft?.isNew), borderStyle: "dashed" }} onClick={() => startNew()}>＋ {L("নতুন গ্রুপ", "New group")}</button>
+          <button type="button"style={{ ...chip(draft?.isNew), borderStyle: "dashed" }} onClick={() => startNew()}>＋ {L("নতুন গ্রুপ", "New group")}</button>
         </div>
         {unusedPresets.length > 0 && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}>
             <span style={{ fontSize: 11, color: "#71717a" }}>{L("তৈরি টেমপ্লেট:", "Templates:")}</span>
             {unusedPresets.map((p) => (
-              <button key={p.id} type="button" style={{ ...chip(false), padding: "4px 10px", fontSize: 11 }} onClick={() => startNew(p)}>＋ {p[lang] || p.en}</button>
+              <button key={p.id} type="button"style={{ ...chip(false), padding: "4px 10px", fontSize: 11 }} onClick={() => startNew(p)}>＋ {p[lang] || p.en}</button>
             ))}
           </div>
         )}
@@ -214,9 +214,9 @@ export default function UserGroupsPanel({ lang = "bn", th, s, groups = [], team 
             onToggle={(key, val) => setDraft((d) => ({ ...d, permissions: { ...d.permissions, [key]: val } }))}
             onSetFlags={(perms) => setDraft((d) => ({ ...d, permissions: perms }))} />
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            <button type="button" style={{ ...s.sendBtn, flex: 1 }} disabled={busy} onClick={save}>{busy ? "..." : `💾 ${L("গ্রুপ সেভ", "Save group")}`}</button>
-            <button type="button" style={{ ...s.addCoBtn, borderColor: "#450a0a", color: "#ef4444" }} disabled={busy} onClick={remove}>
-              {draft.isNew ? L("বাতিল", "Cancel") : `🗑️ ${L("মুছুন", "Delete")}`}
+            <button type="button"style={{ ...s.sendBtn, flex: 1 }} disabled={busy} onClick={save}>{busy ? "..." : ` ${L("গ্রুপ সেভ", "Save group")}`}</button>
+            <button type="button"style={{ ...s.addCoBtn, borderColor: "#450a0a", color: "#ef4444" }} disabled={busy} onClick={remove}>
+              {draft.isNew ? L("বাতিল", "Cancel") : ` ${L("মুছুন", "Delete")}`}
             </button>
           </div>
         </div>

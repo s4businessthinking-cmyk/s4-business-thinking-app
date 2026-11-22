@@ -1,0 +1,46 @@
+---
+description: AI co-engineering Plan To Production + locked roadmap + no emoji
+alwaysApply: true
+---
+
+# S4 co-engineering (always on)
+
+Before coding, read:
+
+1. `CLAUDE.md` (mandatory for Claude Code and all agents)
+2. `AGENTS.md`
+3. `docs/AI_COENGINEERING_PLAN_TO_PRODUCTION.md`
+4. Workspace `S4-TRADEASY-LOCKED-ROADMAP.md` and `S4-LOCKED-WORK-PLAN.md` when adding finance/stock/report features
+
+## Process order
+
+1. Requirement / plan
+2. Data model
+3. Project structure
+4. Coding standards / reference patterns
+5. Reuse kits / services / components
+6. Implement (production only)
+7. Review / refactor
+8. QA
+9. Fix bugs / mismatches
+10. Deploy only if user explicitly asks
+
+## Product rules
+
+- Do not 1:1 copy Tradeasy menus; build locked modern hubs (Books, Stock Hub, Analytics, etc.)
+- Do not ask the user to restate these instructions
+- No fake APIs, placeholders, or stub UI
+- Preserve offline sync, permissions, and existing invoice/stock behavior
+
+## Professional output (anti-AI-tell)
+
+- Code and UI must look like careful human senior-engineer work
+- **No emoji** in UI, menus, toasts, prints, commits messages for this app, or new strings
+- Do not reintroduce emoji removed from the codebase
+- Avoid generic AI layout clichés when not already in the design system
+- Small, purposeful diffs; match neighboring file style
+
+## Scope
+
+- Default work is `src/` React app
+- `erp/` Django lock (`ARCHITECTURE_LOCK.md`) only when editing `erp/`

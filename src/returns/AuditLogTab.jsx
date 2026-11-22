@@ -90,10 +90,10 @@ export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDe
   return (
     <div style={{ maxWidth: isDesktop ? 1100 : 660, margin: "0 auto", padding: isDesktop ? "24px 28px 60px" : "18px 14px 60px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 16, fontWeight: 900, color: "#7c3aed" }}>🕵️ {L("অডিট লগ", "Audit Log")}</div>
+        <div style={{ fontSize: 16, fontWeight: 900, color: "#7c3aed" }}> {L("অডিট লগ", "Audit Log")}</div>
         {canPrint && (
-          <button type="button" onClick={printList} disabled={!shown.length} style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${th.border}`, background: th.bgInp, color: th.txtPrimary, fontWeight: 800, cursor: shown.length ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
-            🖨️ {L("প্রিন্ট", "Print")}
+          <button type="button"onClick={printList} disabled={!shown.length} style={{ padding: "7px 12px", borderRadius: 8, border: `1px solid ${th.border}`, background: th.bgInp, color: th.txtPrimary, fontWeight: 800, cursor: shown.length ? "pointer" : "not-allowed", fontFamily: "inherit" }}>
+             {L("প্রিন্ট", "Print")}
           </button>
         )}
       </div>
@@ -128,8 +128,8 @@ export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDe
             {people.map(([uid, name]) => <option key={uid} value={uid}>{name}</option>)}
           </select>
         </div>
-        <div><div style={lbl}>{L("থেকে", "From")}</div><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inp} /></div>
-        <div><div style={lbl}>{L("পর্যন্ত", "To")}</div><input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inp} /></div>
+        <div><div style={lbl}>{L("থেকে", "From")}</div><input type="date"value={from} onChange={(e) => setFrom(e.target.value)} style={inp} /></div>
+        <div><div style={lbl}>{L("পর্যন্ত", "To")}</div><input type="date"value={to} onChange={(e) => setTo(e.target.value)} style={inp} /></div>
       </div>
 
       {isDesktop ? (
@@ -168,7 +168,7 @@ export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDe
                 <div style={{ fontWeight: 900, color: th.txtPrimary }}>{collLabel(r.collection)} {r.docNo ? `· ${r.docNo}` : ""}</div>
                 {pill(r.action)}
               </div>
-              <div style={{ fontSize: 12, color: th.txtMuted, marginTop: 4 }}>👤 {r.byName || "—"} · 🕒 {fmtWhen(r.createdAt)}{r.amount != null ? ` · ${money(r.amount)}` : ""}</div>
+              <div style={{ fontSize: 12, color: th.txtMuted, marginTop: 4 }}> {r.byName || "—"} ·  {fmtWhen(r.createdAt)}{r.amount != null ? ` · ${money(r.amount)}` : ""}</div>
               {r.note && <div style={{ fontSize: 12.5, color: th.txtSecondary, marginTop: 4, overflowWrap: "anywhere" }}>{r.note}</div>}
             </div>
           ))}
@@ -177,7 +177,7 @@ export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDe
       )}
       {filtered.length > limit && (
         <div style={{ textAlign: "center", marginTop: 10 }}>
-          <button type="button" onClick={() => setLimit((n) => n + 200)} style={{ padding: "9px 16px", borderRadius: 10, border: `1px solid ${th.border}`, background: th.bgInp, color: th.txtPrimary, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+          <button type="button"onClick={() => setLimit((n) => n + 200)} style={{ padding: "9px 16px", borderRadius: 10, border: `1px solid ${th.border}`, background: th.bgInp, color: th.txtPrimary, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
             {L(`আরও দেখাও (${filtered.length - limit})`, `Show more (${filtered.length - limit})`)}
           </button>
         </div>

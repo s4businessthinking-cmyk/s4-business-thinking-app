@@ -8,7 +8,7 @@ export function StockBadgeLabel({ stock, extraQty = 0, unit = "Pcs", reorderMin 
   const Tag = as;
   return (
     <Tag style={{ fontSize: 11, fontWeight: 800, color, marginTop: as === "div" ? 4 : 0, ...style }}>
-      📦 {lang === "bn" ? "স্টক" : "Stock"}: {parseFloat(Number(stock).toFixed(2))} {unit || "Pcs"}
+       {lang === "bn" ? "স্টক" : "Stock"}: {parseFloat(Number(stock).toFixed(2))} {unit || "Pcs"}
       {over ? (lang === "bn" ? " — স্টকের চেয়ে বেশি!" : " — more than in stock!") : ""}
     </Tag>
   );

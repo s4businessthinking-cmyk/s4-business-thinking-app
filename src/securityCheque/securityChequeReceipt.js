@@ -7,7 +7,7 @@ import { printWithSettings } from "../print/printSettings.js";
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 const money = (v, cur) => `${esc(cur)} ${(Math.round((parseFloat(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const box = (on) => (on ? "☑" : "☐"); // ☑ / ☐
+const box = (on) => (on ? "" : "☐"); //  / ☐
 
 const CONDITIONS = {
   bn: [
@@ -34,7 +34,7 @@ export function buildSecurityChequeReceiptHTML(record, shop, lang = "en", cur = 
   // A captured photo or PDF fills the box (scaled to fit, never stretching it); otherwise show the placeholder text.
   const photoBox = (src, placeholder) => {
     if (!src) return placeholder;
-    return String(src).startsWith("data:application/pdf") ? `<embed src="${esc(src)}" type="application/pdf" />` : `<img src="${esc(src)}" alt="" />`;
+    return String(src).startsWith("data:application/pdf") ? `<embed src="${esc(src)}"type="application/pdf" />` : `<img src="${esc(src)}"alt="" />`;
   };
 
   return `<!doctype html><html lang="${bn ? "bn" : "en"}"><head><meta charset="utf-8"><title>${esc(title)}</title>
@@ -83,11 +83,11 @@ ${row2(bn ? "দায়িত্বে থাকা কর্মী" : "Respon
 ${row2(bn ? "রসিদ নম্বর" : "Receipt number", record.receiptNo, bn ? "রসিদের তারিখ" : "Receipt date", fmtDay(record.receiptDate))}
 </table>
 <div style="font-weight:800;font-size:10.5px;margin-top:4px">${bn ? "চেকের কপি — বড় সংযুক্তি এলাকা" : "CHEQUE COPY — LARGE ATTACHMENT AREA"}</div>
-<div class="chequearea${docs.chequePhoto ? " filled" : ""}">${photoBox(docs.chequePhoto, bn ? "চেকের কপি এখানে রাখুন" : "PLACE / PASTE CHEQUE COPY HERE")}</div>
+<div class="chequearea${docs.chequePhoto ? "filled" : ""}">${photoBox(docs.chequePhoto, bn ? "চেকের কপি এখানে রাখুন" : "PLACE / PASTE CHEQUE COPY HERE")}</div>
 <div style="font-weight:800;font-size:10.5px;margin-top:4px">${bn ? "প্রতিনিধির আইডি কার্ড — সামনে ও পেছনে" : "REPRESENTATIVE ID CARD — FRONT AND BACK"}</div>
 <div class="idrow">
-<div class="idbox${docs.idFront ? " filled" : ""}">${photoBox(docs.idFront, bn ? "আইডি কার্ড সামনে" : "ID CARD FRONT")}</div>
-<div class="idbox${docs.idBack ? " filled" : ""}">${photoBox(docs.idBack, bn ? "আইডি কার্ড পেছনে" : "ID CARD BACK")}</div>
+<div class="idbox${docs.idFront ? "filled" : ""}">${photoBox(docs.idFront, bn ? "আইডি কার্ড সামনে" : "ID CARD FRONT")}</div>
+<div class="idbox${docs.idBack ? "filled" : ""}">${photoBox(docs.idBack, bn ? "আইডি কার্ড পেছনে" : "ID CARD BACK")}</div>
 </div>
 <div class="conditions"><b>${bn ? "শর্ত / স্বীকৃতি" : "CONDITIONS / ACKNOWLEDGEMENT"}</b><ol>${conditions.map((c, i) => `<li>${esc(c)}</li>`).join("")}</ol></div>
 <div class="siggrid">

@@ -5,7 +5,7 @@ export const RETURN_KINDS = {
     col: "salesReturns", invCol: "salesInvoices", prefix: "SR", serial: "lastSRSerial",
     partyId: "customerId", partyName: "customerName", partyMobile: "customerMobile", priceKey: "unitPrice", vatKey: "vatAmt",
     accent: "#16a34a", printTitle: "CREDIT NOTE",
-    title: { bn: "↩️ সেলস রিটার্ন (ক্রেডিট নোট)", en: "↩️ Sales Return (Credit Note)" },
+    title: { bn: "সেলস রিটার্ন (ক্রেডিট নোট)", en: "Sales Return (Credit Note)" },
     party: { bn: "কাস্টমার", en: "Customer" },
     refund: { bn: "কাস্টমারকে টাকা ফেরত", en: "Refund to customer" },
   },
@@ -13,7 +13,7 @@ export const RETURN_KINDS = {
     col: "purchaseReturns", invCol: "purchaseInvoices", prefix: "PR", serial: "lastPRSerial",
     partyId: "vendorId", partyName: "vendorName", partyMobile: "vendorMobile", priceKey: "unitCost", vatKey: "taxAmt",
     accent: "#ea580c", printTitle: "DEBIT NOTE",
-    title: { bn: "↪️ পারচেজ রিটার্ন (ডেবিট নোট)", en: "↪️ Purchase Return (Debit Note)" },
+    title: { bn: "পারচেজ রিটার্ন (ডেবিট নোট)", en: "Purchase Return (Debit Note)" },
     party: { bn: "সাপ্লায়ার", en: "Supplier" },
     refund: { bn: "সাপ্লায়ার থেকে টাকা ফেরত", en: "Refund from supplier" },
   },
@@ -45,7 +45,7 @@ export function returnsAsLedgerVouchers(returns, kind) {
         method: typeLabel, typeLabel,
         amount: applied,
         status: r.status,
-        // Settle only appliedToInvoice — never refund/total (else party-ledger "direct" paid shrinks).
+        // Settle only appliedToInvoice — never refund/total (else party-ledger "direct"paid shrinks).
         allocations: [{ invoiceId: r.invoiceId, invoiceNo: r.invoiceNo, amount: applied }],
         raw: { ...r, __return: true }, ref: k.prefix,
       };

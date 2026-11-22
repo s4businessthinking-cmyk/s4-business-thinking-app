@@ -78,84 +78,84 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
 
   const btWaiting = btInbox.length;
   const ownerNavItems = [
-    ...(orderModuleEnabled ? [{ key:"owner", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders", badge:unread }] : []),
-    { key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products",         badge:products.length },
-    { key:"purchase", icon:"🧾", label:lang==="bn"?"ক্রয়":"Purchase",         badge:null },
-    { key:"sales",    icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
-    { key:"vendors",  icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors",        badge:vendors.length },
-    { key:"customers",icon:"👥", label:lang==="bn"?"কাস্টমার":"Customers",    badge:customers.length },
-    { key:"cheque",   icon:"🖨️", label:lang==="bn"?"চেক":"Cheque",            badge:null },
-    { key:"pdc",      icon:"📃", label:lang==="bn"?"PDC চেক":"PDC",           badge:null },
-    { key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses",          badge:null },
-    { key:"globalLedger", icon:"📒", label:lang==="bn"?"গ্লোবাল লেজার":"Global Ledger", badge:null },
-    { key:"vouchers", icon:"🧾", label:lang==="bn"?"ভাউচার":"Vouchers",       badge:null },
-    { key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null },
-    { key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null },
-    { key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null },
-    { key:"productExchange", icon:"🔄", label:lang==="bn"?"পণ্য বদল":"Product Exchange", badge:null },
-    { key:"warrantyClaim", icon:"🔋", label:lang==="bn"?"গ্যারান্টি ক্লেইম":"Warranty Claim", badge:null },
-    { key:"accounts", icon:"📊", label:lang==="bn"?"হিসাব নিকাশ":"Accounts",  badge:null },
-    { key:"tax",      icon:"🏛️", label:lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT", badge:null },
-    { key:"partners", icon:"🤝", label:lang==="bn"?"পার্টনার":"Partners",      badge:null },
-    { key:"auditLog", icon:"🕵️", label:lang==="bn"?"অডিট লগ":"Audit Log",   badge:null },
-    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
-    { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
+    ...(orderModuleEnabled ? [{ key:"owner", icon:"", label:lang==="bn"?"অর্ডার":"Orders", badge:unread }] : []),
+    { key:"products", icon:"", label:lang==="bn"?"পণ্য":"Products",         badge:products.length },
+    { key:"purchase", icon:"", label:lang==="bn"?"ক্রয়":"Purchase",         badge:null },
+    { key:"sales",    icon:"", label:lang==="bn"?"বিক্রয়":"Sales",          badge:null },
+    { key:"vendors",  icon:"", label:lang==="bn"?"ভেন্ডর":"Vendors",        badge:vendors.length },
+    { key:"customers",icon:"", label:lang==="bn"?"কাস্টমার":"Customers",    badge:customers.length },
+    { key:"cheque",   icon:"", label:lang==="bn"?"চেক":"Cheque",            badge:null },
+    { key:"pdc",      icon:"", label:lang==="bn"?"PDC চেক":"PDC",           badge:null },
+    { key:"expenses", icon:"", label:lang==="bn"?"খরচ":"Expenses",          badge:null },
+    { key:"globalLedger", icon:"", label:lang==="bn"?"গ্লোবাল লেজার":"Global Ledger", badge:null },
+    { key:"vouchers", icon:"", label:lang==="bn"?"ভাউচার":"Vouchers",       badge:null },
+    { key:"salesReturn", icon:"", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null },
+    { key:"purchaseReturn", icon:"", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null },
+    { key:"stockAdjust", icon:"", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null },
+    { key:"productExchange", icon:"", label:lang==="bn"?"পণ্য বদল":"Product Exchange", badge:null },
+    { key:"warrantyClaim", icon:"", label:lang==="bn"?"গ্যারান্টি ক্লেইম":"Warranty Claim", badge:null },
+    { key:"accounts", icon:"", label:lang==="bn"?"হিসাব নিকাশ":"Accounts",  badge:null },
+    { key:"tax",      icon:"", label:lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT", badge:null },
+    { key:"partners", icon:"", label:lang==="bn"?"পার্টনার":"Partners",      badge:null },
+    { key:"auditLog", icon:"", label:lang==="bn"?"অডিট লগ":"Audit Log",   badge:null },
+    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
+    { key:"settings", icon:"", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
 
   const salesNavItems = [
-    ...(orderModuleEnabled ? [{ key:"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"New Order", badge:unread }] : []),
-    ...(staffQuickNavKeys.includes("products") ? [{ key:"products", icon:"📦", label:lang==="bn"?"পণ্য":"Products", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"🧾", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
-    { key:"purchase", icon:"📦", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
-    ...(staffQuickNavKeys.includes("cheque") ? [{ key:"cheque", icon:"🖨️", label:lang==="bn"?"চেক":"Cheque", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("pdc") ? [{ key:"pdc", icon:"📃", label:lang==="bn"?"PDC চেক":"PDC", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("expenses") ? [{ key:"expenses", icon:"💸", label:lang==="bn"?"খরচ":"Expenses", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("vouchers") ? [{ key:"vouchers", icon:"🧾", label:lang==="bn"?"ভাউচার":"Vouchers", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("salesReturn") ? [{ key:"salesReturn", icon:"↩️", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("purchaseReturn") ? [{ key:"purchaseReturn", icon:"↪️", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("stockAdjust") ? [{ key:"stockAdjust", icon:"⚖️", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null }, { key:"productExchange", icon:"🔄", label:lang==="bn"?"পণ্য বদল":"Product Exchange", badge:null }, { key:"warrantyClaim", icon:"🔋", label:lang==="bn"?"গ্যারান্টি":"Warranty", badge:null }] : []),
-    ...(staffQuickNavKeys.includes("salesReturn") && !staffQuickNavKeys.includes("stockAdjust") ? [{ key:"warrantyClaim", icon:"🔋", label:lang==="bn"?"গ্যারান্টি":"Warranty", badge:null }] : []),
-    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"🚚", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
-    { key:"settings", icon:"⚙️", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
+    ...(orderModuleEnabled ? [{ key:"shop", icon:"", label:lang==="bn"?"অর্ডার":"New Order", badge:unread }] : []),
+    ...(staffQuickNavKeys.includes("products") ? [{ key:"products", icon:"", label:lang==="bn"?"পণ্য":"Products", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("sales") ? [{ key:"sales", icon:"", label:lang==="bn"?"বিক্রয়":"Sales", badge:null }] : []),
+    { key:"purchase", icon:"", label:lang==="bn"?"ক্রয় তথ্য":"Purchase",   badge:null },
+    ...(staffQuickNavKeys.includes("cheque") ? [{ key:"cheque", icon:"", label:lang==="bn"?"চেক":"Cheque", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("pdc") ? [{ key:"pdc", icon:"", label:lang==="bn"?"PDC চেক":"PDC", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("expenses") ? [{ key:"expenses", icon:"", label:lang==="bn"?"খরচ":"Expenses", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("vouchers") ? [{ key:"vouchers", icon:"", label:lang==="bn"?"ভাউচার":"Vouchers", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("salesReturn") ? [{ key:"salesReturn", icon:"", label:lang==="bn"?"সেলস রিটার্ন":"Sales Return", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("purchaseReturn") ? [{ key:"purchaseReturn", icon:"", label:lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("stockAdjust") ? [{ key:"stockAdjust", icon:"", label:lang==="bn"?"স্টক সমন্বয়":"Stock Adjust", badge:null }, { key:"productExchange", icon:"", label:lang==="bn"?"পণ্য বদল":"Product Exchange", badge:null }, { key:"warrantyClaim", icon:"", label:lang==="bn"?"গ্যারান্টি":"Warranty", badge:null }] : []),
+    ...(staffQuickNavKeys.includes("salesReturn") && !staffQuickNavKeys.includes("stockAdjust") ? [{ key:"warrantyClaim", icon:"", label:lang==="bn"?"গ্যারান্টি":"Warranty", badge:null }] : []),
+    ...(canUseBranchTransfer ? [{ key:"branchTransfer", icon:"", label:lang==="bn"?"Branch Transfer":"Branch Transfer", badge:btWaiting||null }] : []),
+    { key:"settings", icon:"", label:lang==="bn"?"সেটিংস":"Settings",       badge:null },
   ];
 
   const navItems = isOwner ? ownerNavItems : salesNavItems;
 
   const statusCards = [
-    { label:t.dashPending,    value:pending,    icon:"⏳", color:"#f59e0b", glow:"rgba(245,158,11,0.26)" },
-    { label:t.dashInProgress, value:inProgress, icon:"🔄", color:"#0ea5e9", glow:"rgba(14,165,233,0.26)" },
-    { label:t.dashDelivered,  value:delivered,  icon:"✅", color:"#22c55e", glow:"rgba(34,197,94,0.24)" },
-    { label:t.dashCancelled,  value:cancelled,  icon:"✖", color:"#ef4444", glow:"rgba(239,68,68,0.24)" },
+    { label:t.dashPending,    value:pending,    icon:"", color:"#f59e0b", glow:"rgba(245,158,11,0.26)" },
+    { label:t.dashInProgress, value:inProgress, icon:"", color:"#0ea5e9", glow:"rgba(14,165,233,0.26)" },
+    { label:t.dashDelivered,  value:delivered,  icon:"", color:"#22c55e", glow:"rgba(34,197,94,0.24)" },
+    { label:t.dashCancelled,  value:cancelled,  icon:"", color:"#ef4444", glow:"rgba(239,68,68,0.24)" },
   ];
 
   const bn = lang==="bn";
   const cur = t.cur || "AED";
   const money = (v) => (Math.round((parseFloat(v)||0)*100)/100).toLocaleString("en-US", { minimumFractionDigits:2, maximumFractionDigits:2 });
   const salesCards = [
-    { key:"st", tab:"sales",    icon:"🧾", color:"#22c55e", label:bn?"আজকের বিক্রি":"Today's sales",
+    { key:"st", tab:"sales",    icon:"", color:"#22c55e", label:bn?"আজকের বিক্রি":"Today's sales",
       value:money(finance.salesToday), sub:bn?`${finance.salesTodayCount}টি ইনভয়েস`:`${finance.salesTodayCount} invoices` },
-    { key:"sm", tab:"sales",    icon:"📈", color:"#3b82f6", label:bn?"এই মাসের বিক্রি":"This month's sales",
+    { key:"sm", tab:"sales",    icon:"", color:"#3b82f6", label:bn?"এই মাসের বিক্রি":"This month's sales",
       value:money(finance.salesMonth), sub:bn?`${finance.salesMonthCount}টি ইনভয়েস`:`${finance.salesMonthCount} invoices` },
-    { key:"ct", tab:"sales",    icon:"💵", color:"#10b981", label:bn?"আজ টাকা আদায়":"Collected today",
+    { key:"ct", tab:"sales",    icon:"", color:"#10b981", label:bn?"আজ টাকা আদায়":"Collected today",
       value:money(finance.collectedToday), sub:bn?"নগদ + রিসিট":"Cash + receipts" },
-    { key:"pt", tab:"purchase", icon:"🛒", color:"#8b5cf6", label:bn?"আজকের ক্রয়":"Today's purchase",
+    { key:"pt", tab:"purchase", icon:"", color:"#8b5cf6", label:bn?"আজকের ক্রয়":"Today's purchase",
       value:money(finance.purchaseToday), sub:bn?`${finance.purchaseTodayCount}টি ইনভয়েস`:`${finance.purchaseTodayCount} invoices` },
-    { key:"pm", tab:"purchase", icon:"📦", color:"#a855f7", label:bn?"এই মাসের ক্রয়":"This month's purchase",
+    { key:"pm", tab:"purchase", icon:"", color:"#a855f7", label:bn?"এই মাসের ক্রয়":"This month's purchase",
       value:money(finance.purchaseMonth), sub:bn?`${finance.purchaseMonthCount}টি ইনভয়েস`:`${finance.purchaseMonthCount} invoices` },
   ];
   const creditCards = [
-    { key:"rc", tab:"sales",    icon:"🙋", color:"#f59e0b", label:bn?"কাস্টমারের কাছে পাওনা":"Customers owe you",
+    { key:"rc", tab:"sales",    icon:"", color:"#f59e0b", label:bn?"কাস্টমারের কাছে পাওনা":"Customers owe you",
       value:money(finance.receivable.amount), sub:bn?`${finance.receivable.parties} জন কাস্টমার`:`${finance.receivable.parties} customers` },
-    { key:"py", tab:"purchase", icon:"🏭", color:"#ef4444", label:bn?"সাপ্লায়ারকে দেনা":"You owe suppliers",
+    { key:"py", tab:"purchase", icon:"", color:"#ef4444", label:bn?"সাপ্লায়ারকে দেনা":"You owe suppliers",
       value:money(finance.payable.amount), sub:bn?`${finance.payable.parties} জন সাপ্লায়ার`:`${finance.payable.parties} suppliers` },
-    { key:"cr", tab:"pdc",      icon:"📥", color:"#06b6d4", label:bn?"হাতে থাকা চেক (পাওয়া)":"Cheques received (pending)",
+    { key:"cr", tab:"pdc",      icon:"", color:"#06b6d4", label:bn?"হাতে থাকা চেক (পাওয়া)":"Cheques received (pending)",
       value:money(finance.chequesReceived.amount),
       sub:finance.chequesReceived.dueNow>0
         ? (bn?`${finance.chequesReceived.count}টি · ${finance.chequesReceived.dueNow}টি জমার সময় হয়েছে`:`${finance.chequesReceived.count} · ${finance.chequesReceived.dueNow} due now`)
         : (bn?`${finance.chequesReceived.count}টি চেক`:`${finance.chequesReceived.count} cheques`),
       extra:{ label:bn?"এই মাসে":"This month", value:money(finance.chequesReceived.monthAmount), count:finance.chequesReceived.monthCount },
       alert:finance.chequesReceived.dueNow>0 },
-    { key:"ci", tab:"pdc",      icon:"📤", color:"#ec4899", label:bn?"দেওয়া চেক (বাকি)":"Cheques issued (pending)",
+    { key:"ci", tab:"pdc",      icon:"", color:"#ec4899", label:bn?"দেওয়া চেক (বাকি)":"Cheques issued (pending)",
       value:money(finance.chequesIssued.amount),
       sub:finance.chequesIssued.dueNow>0
         ? (bn?`${finance.chequesIssued.count}টি · ${finance.chequesIssued.dueNow}টি পাস হওয়ার সময়`:`${finance.chequesIssued.count} · ${finance.chequesIssued.dueNow} due now`)
@@ -201,7 +201,7 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
       <div style={{ fontSize:10, fontWeight:700, color:item.alert?"#f59e0b":th.txtMuted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>{item.sub}</div>
       {item.extra&&(
         <div style={{ width:"100%", boxSizing:"border-box", marginTop:2, padding:"4px 7px", borderRadius:8, background:`${item.color}1f`, border:`1px solid ${item.color}44`, display:"flex", flexWrap:"wrap", justifyContent:"space-between", alignItems:"baseline", columnGap:6, rowGap:1, whiteSpace:"nowrap" }}>
-          <span style={{ fontSize:10, fontWeight:800, color:th.txtSecondary }}>📅 {item.extra.label} ({item.extra.count})</span>
+          <span style={{ fontSize:10, fontWeight:800, color:th.txtSecondary }}> {item.extra.label} ({item.extra.count})</span>
           <span style={{ fontSize:12, fontWeight:900, color:th.txtPrimary }}>{item.extra.value}</span>
         </div>
       )}
@@ -299,28 +299,28 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
 
       {isOwner && moneyLocked && (
         <button onClick={onUnlockMoney} style={{ ...glassCard, width:"100%", borderRadius:14, padding:"16px 14px", marginTop:6, marginBottom:6, display:"flex", alignItems:"center", gap:12, cursor:"pointer", fontFamily:"inherit", textAlign:"left", color:th.txtPrimary, borderBottom:"3px solid #2563eb" }}>
-          <span style={{ fontSize:28 }}>🔒</span>
+          <span style={{ fontSize:28 }}></span>
           <span style={{ flex:1, minWidth:0 }}>
             <span style={{ display:"block", fontSize:14, fontWeight:900 }}>{bn?"টাকার হিসাব লুকানো আছে":"Money figures are hidden"}</span>
             <span style={{ display:"block", fontSize:11, color:th.txtMuted, marginTop:2 }}>
               {bn?"বিক্রি, ক্রয়, পাওনা, দেনা ও চেকের হিসাব দেখতে পিন দিন":"Enter your PIN to see sales, purchase, receivables, payables and cheques"}
-              {(finance.dueCheques?.length||0)>0 ? (bn?` · ⏰ ${finance.dueCheques.length}টি চেকের তারিখ এসেছে`:` · ⏰ ${finance.dueCheques.length} cheques due`) : ""}
+              {(finance.dueCheques?.length||0)>0 ? (bn?` ·  ${finance.dueCheques.length}টি চেকের তারিখ এসেছে`:` ·  ${finance.dueCheques.length} cheques due`) : ""}
             </span>
           </span>
-          <span style={{ padding:"8px 14px", borderRadius:10, background:"linear-gradient(135deg,#2563eb,#1d4ed8)", color:"#fff", fontSize:13, fontWeight:800, whiteSpace:"nowrap" }}>🔓 {bn?"দেখুন":"Show"}</span>
+          <span style={{ padding:"8px 14px", borderRadius:10, background:"linear-gradient(135deg,#2563eb,#1d4ed8)", color:"#fff", fontSize:13, fontWeight:800, whiteSpace:"nowrap" }}> {bn?"দেখুন":"Show"}</span>
         </button>
       )}
 
       {isOwner && !moneyLocked && (
         <>
           <div style={{ ...sectionTitle, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-            <span>{bn?"💰 বিক্রির হিসাব":"💰 Sales"}</span>
-            {onLockMoney&&<button onClick={onLockMoney} title={bn?"আবার লুকান":"Hide again"} style={{ padding:"4px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtSecondary, fontSize:11, fontWeight:800, cursor:"pointer", fontFamily:"inherit" }}>🔒 {bn?"লক":"Lock"}</button>}
+            <span>{bn?"বিক্রির হিসাব":"Sales"}</span>
+            {onLockMoney&&<button onClick={onLockMoney} title={bn?"আবার লুকান":"Hide again"} style={{ padding:"4px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtSecondary, fontSize:11, fontWeight:800, cursor:"pointer", fontFamily:"inherit" }}> {bn?"লক":"Lock"}</button>}
           </div>
           <div style={moneyRow}>
             {salesCards.map(moneyCard)}
           </div>
-          <div style={sectionTitle}><span>{bn?"📒 বাকির হিসাব":"📒 Credit"}</span></div>
+          <div style={sectionTitle}><span>{bn?"বাকির হিসাব":"Credit"}</span></div>
           <div style={moneyRow}>
             {creditCards.map(moneyCard)}
           </div>
@@ -328,9 +328,9 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
       )}
 
       {canUseBranchTransfer && btWaiting>0 && (
-        <button type="button" onClick={()=>setTab("branchTransfer")}
+        <button type="button"onClick={()=>setTab("branchTransfer")}
           style={{ ...glassCard, width:"100%", display:"flex", alignItems:"center", gap:12, padding:"12px 14px", marginBottom:14, borderRadius:14, border:"1px solid #f59e0b", borderLeft:"5px solid #f59e0b", cursor:"pointer", textAlign:"left", fontFamily:"inherit", color:th.txtPrimary }}>
-          <span style={{ fontSize:26 }}>🚚</span>
+          <span style={{ fontSize:26 }}></span>
           <span style={{ flex:1, minWidth:0 }}>
             <span style={{ display:"block", fontSize:14, fontWeight:800 }}>
               {bn ? `${btWaiting}টা Branch Transfer রিসিভের অপেক্ষায়` : `${btWaiting} branch transfer${btWaiting>1?"s":""} waiting to be received`}
@@ -356,15 +356,15 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
       {!isDesktop && (
         <div style={{ position:"fixed", left:12, right:12, bottom:10, zIndex:20, borderRadius:24, padding:"10px 12px", background:isLightDash?"rgba(255,255,255,0.92)":"rgba(15,23,42,0.86)", border:isLightDash?"1px solid rgba(59,130,246,0.18)":"1px solid rgba(148,163,184,0.25)", boxShadow:isLightDash?"0 20px 40px rgba(30,64,175,0.14)":"0 20px 40px rgba(2,6,23,0.48)", backdropFilter:"blur(16px)", display:"grid", gridTemplateColumns:"repeat(5,1fr)", gap:6 }}>
           {[
-            { key:"dashboard", icon:"🏠", label:lang==="bn"?"হোম":"Home" },
-            { key:isOwner?"owner":"shop", icon:"📋", label:lang==="bn"?"অর্ডার":"Orders" },
+            { key:"dashboard", icon:"", label:lang==="bn"?"হোম":"Home" },
+            { key:isOwner?"owner":"shop", icon:"", label:lang==="bn"?"অর্ডার":"Orders" },
             {
               key: isOwner ? "purchase" : "shop",
               icon:"＋",
               label: isOwner ? (lang==="bn"?"নতুন":"New") : (lang==="bn"?"অর্ডার":"Order"),
               main:true,
             },
-            ...(isOwner ? [{ key:"vendors", icon:"🏭", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
+            ...(isOwner ? [{ key:"vendors", icon:"", label:lang==="bn"?"ভেন্ডর":"Vendors" }] : []),
             { key:"more", icon:"☰", label:lang==="bn"?"আরও":"More" },
           ].map(item=>(
             <button key={item.key} onClick={()=>item.key==="more" ? (onOpenMenu ? onOpenMenu() : setTab("settings")) : setTab(item.key)}

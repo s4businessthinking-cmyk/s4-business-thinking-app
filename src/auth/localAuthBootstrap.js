@@ -288,7 +288,7 @@ function readLegacyCachedShop(shopId) {
 }
 
 // Callers at start-up can overlap (session restore, login, a second effect run in development); they share one
-// run, otherwise both see zero users and the second "admin" insert fails with UNIQUE constraint failed.
+// run, otherwise both see zero users and the second "admin"insert fails with UNIQUE constraint failed.
 let bootstrapInFlight = null;
 export function ensureLocalAuthBootstrap() {
   if (!bootstrapInFlight) bootstrapInFlight = runLocalAuthBootstrap().finally(() => { bootstrapInFlight = null; });
@@ -489,7 +489,7 @@ async function getUserProfileWithRetry(uid, retries = 7) {
   if (lastError?.code === "permission-denied") {
     // Every retry failed identically — this is not a transient race, so
     // find out what the token Firestore actually used looked like
-    // instead of surfacing a generic "server issue" to the user.
+    // instead of surfacing a generic "server issue"to the user.
     const diagnostic = await computeAuthDiagnostics({ auth, expectedUid: uid }).catch(
       (diagError) => ({
         ok: false,
@@ -870,7 +870,7 @@ async function markInviteCodeUsed(inviteInfo, usedBy, usedByName) {
 const USERNAME_TAKEN = {
   ok: false,
   code: "auth/username-taken",
-  message: "❌ এই ইউজারনেম আগেই নেওয়া হয়েছে, অন্য একটি দিন / Username already taken, choose another",
+  message: "এই ইউজারনেম আগেই নেওয়া হয়েছে, অন্য একটি দিন / Username already taken, choose another",
 };
 
 async function isUsernameTaken(username) {
@@ -1167,8 +1167,8 @@ export function friendlyLocalAuthError(result, lang = "bn") {
       ? "ইউজারনেম/ইমেইল ও পাসওয়ার্ড দিন"
       : "Username/email and password required",
     DEVICE_CLOCK_SKEW: isBn
-      ? "আপনার ডিভাইসের তারিখ/সময় ভুল আছে, তাই Login যাচাই করা যাচ্ছে না। Settings > Date & time-এ গিয়ে 'Automatic date & time' চালু করুন, তারপর আবার Login করুন।"
-      : "Your device's date & time is wrong, so login can't be verified. Turn on 'Automatic date & time' in your phone's Settings, then log in again.",
+      ? "আপনার ডিভাইসের তারিখ/সময় ভুল আছে, তাই Login যাচাই করা যাচ্ছে না। Settings > Date & time-এ গিয়ে 'Automatic date & time'চালু করুন, তারপর আবার Login করুন।"
+      : "Your device's date & time is wrong, so login can't be verified. Turn on 'Automatic date & time'in your phone's Settings, then log in again.",
   };
 
   if (reason === "FIREBASE_ERROR") {

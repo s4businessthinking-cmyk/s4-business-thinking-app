@@ -1,26 +1,25 @@
-﻿---
+---
 description: S4 production-ready coding rules
 alwaysApply: true
 ---
 
-You are working on S4 business projects.
+You are working on S4 business projects (`s4-business-thinking-app`).
 
 Core rules:
-1. Do not edit any file before explaining the plan.
+1. Follow `AGENTS.md` and `docs/AI_COENGINEERING_PLAN_TO_PRODUCTION.md` without the user repeating them.
 2. Do not delete or rewrite unrelated working features.
 3. Do not create demo, fake, placeholder, or sample-only code.
 4. Always produce production-ready code with validation, error handling, and safe structure.
-5. Before major edits, create or request a backup plan.
-6. For code changes, prefer full replace-ready files, not tiny partial snippets.
-7. Keep existing architecture, database schema, routes, UI flow, and business rules safe unless the user explicitly asks to change them.
-8. After every code change, provide exact terminal commands to run and test.
-9. For offline-first software, never break local data storage, sync safety, conflict protection, or existing offline behavior.
-10. If unsure about the project structure, inspect files first and do not guess.
+5. Keep existing architecture, routes, UI flow, offline storage, sync, and business rules safe unless the user explicitly asks to change them.
+6. Prefer reusable services/components and the existing module layout.
+7. **No emoji** in product UI or source strings. Do not add new ones.
+8. Output must look professional (senior engineer), not like generated demo UI.
+9. No push / release / deploy unless the user explicitly asks.
+10. If unsure about structure, inspect files first; do not guess.
 
 Workflow:
-1. Analyze first.
-2. Explain affected files.
-3. Wait before editing.
-4. Edit only required files.
-5. Run/test.
-6. Explain exactly what changed.
+1. Analyze / plan (co-engineering step 1).
+2. Touch only required files.
+3. Implement against real data paths.
+4. QA and report how to verify.
+5. Stop when the asked deliverable is done; do not expand scope.

@@ -36,10 +36,10 @@ export async function backupBeforeExit({ shopId, lang, toast, action }) {
   if (choice === "cancel") return false;
   if (choice === "no") return true;
   if (closing) deskApp()?.hide?.();
-  else toast?.(bn ? "💾 ব্যাকআপ নেওয়া হচ্ছে…" : "💾 Backing up…");
+  else toast?.(bn ? "ব্যাকআপ নেওয়া হচ্ছে…" : "Backing up…");
   try {
     const result = await withTimeout(saveShopBackupFromLocal(shopId), closing ? CLOSE_BACKUP_MS : 30000);
-    if (!closing) toast?.(bn ? `✅ ব্যাকআপ সেভ হয়েছে (${result.documentCount ?? 0} রেকর্ড)` : `✅ Backup saved (${result.documentCount ?? 0} records)`);
+    if (!closing) toast?.(bn ? `ব্যাকআপ সেভ হয়েছে (${result.documentCount ?? 0} রেকর্ড)` : `Backup saved (${result.documentCount ?? 0} records)`);
     return true;
   } catch (error) {
     if (closing) deskApp()?.show?.();
@@ -49,7 +49,7 @@ export async function backupBeforeExit({ shopId, lang, toast, action }) {
         ? (bn ? "সময় শেষ" : "timed out")
         : String(error?.message || error);
     return window.confirm(bn
-      ? `❌ ব্যাকআপ হয়নি (${reason})।\n\nতবুও ${what} করবেন?`
-      : `❌ Backup failed (${reason}).\n\nContinue ${what} anyway?`);
+      ? `ব্যাকআপ হয়নি (${reason})।\n\nতবুও ${what} করবেন?`
+      : `Backup failed (${reason}).\n\nContinue ${what} anyway?`);
   }
 }

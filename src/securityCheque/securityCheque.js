@@ -27,7 +27,7 @@ export const ID_TYPES = ["Emirates ID", "Passport", "Other ID"];
 
 export const SECURITY_CHEQUE_DEFAULTS = { reminderMonths: 3 };
 
-/** Every field shown on the New/Edit form; `req` marks what validate() requires. */
+/** Every field shown on the New/Edit form; `req`marks what validate() requires. */
 export const SECURITY_CHEQUE_FIELDS = [
   { k: "partyType", bn: "পার্টির ধরন *", en: "Party type *", req: true },
   { k: "direction", bn: "চেকের দিক *", en: "Direction *", req: true },
@@ -87,7 +87,7 @@ export function outstandingBalanceFor(invoices, idField, partyId) {
     .reduce((t, inv) => t + Math.max(0, num(inv.balanceDue)), 0));
 }
 
-/** Required-field check for the New/Edit form; returns the first missing field's label, or "" if OK. */
+/** Required-field check for the New/Edit form; returns the first missing field's label, or ""if OK. */
 export function validateSecurityCheque(form, bn) {
   for (const f of SECURITY_CHEQUE_FIELDS) {
     if (!f.req) continue;
@@ -100,7 +100,7 @@ export function validateSecurityCheque(form, bn) {
 const live = (r, shopId) => r && !r.isDeleted && (!shopId || r.shopId === shopId);
 export const liveSecurityCheques = (records, shopId) => (records || []).filter((r) => live(r, shopId));
 
-/** True once `reminderMonths` have passed since the last recorded transaction, for a still-held cheque. */
+/** True once `reminderMonths`have passed since the last recorded transaction, for a still-held cheque. */
 export function isStale(record, today) {
   if (!record?.lastTxn || record.status !== "held") return false;
   const months = Number(record.reminderMonths) || SECURITY_CHEQUE_DEFAULTS.reminderMonths;
@@ -141,23 +141,23 @@ export function securityChequeAlertText(a, bn, cur = "AED") {
   switch (a.kind) {
     case "stale":
       return {
-        icon: "🔔",
+        icon: "",
         title: bn ? `${a.party} — ${a.months} মাস কোনো লেনদেন নেই` : `${a.party} — no transaction for ${a.months} months`,
         sub: bn ? "সিকিউরিটি চেক ফেরত দেওয়া বা অ্যাকাউন্ট বন্ধ করার কথা ভাবুন" : "Consider returning the security cheque or closing the account",
       };
     case "closure":
       return {
-        icon: "⚠️",
+        icon: "",
         title: bn ? `${a.party} — বন্ধের অনুরোধ, চেক এখনো জমা` : `${a.party} — closure requested, cheque still held`,
         sub: bn ? "মালিকের অনুমোদন ও চেক ফেরতের অপেক্ষায়" : "Awaiting owner approval and cheque return",
       };
     case "docs":
       return {
-        icon: "📎",
+        icon: "",
         title: bn ? `${a.party} — ডকুমেন্ট অসম্পূর্ণ` : `${a.party} — documents incomplete`,
         sub: bn ? "চেক কপি, আইডি কপি ও সই করা রসিদ যাচাই করুন" : "Check cheque copy, ID copy and signed receipt",
       };
     default:
-      return { icon: "🔒", title: a.party || "", sub: a.amount ? money(a.amount, cur) : "" };
+      return { icon: "", title: a.party || "", sub: a.amount ? money(a.amount, cur) : "" };
   }
 }

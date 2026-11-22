@@ -14,7 +14,7 @@ export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
   return (
     <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🔥</div>
+        <div style={_s.authIcon}></div>
         <div style={{ ..._s.authTitle, color:"#f97316" }}>Firebase Setup Required</div>
         <div style={_s.authSub}>SETUP.md ফাইল দেখে Firebase config যোগ করুন।</div>
       </div>
@@ -71,18 +71,18 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
         <div style={_s.authTitle}>{t.welcomeBack}</div>
         <div style={_s.authSub}>{t.welcomeBackSub}</div>
         <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type="text" placeholder={t.usernameOrEmailLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="text"placeholder={t.usernameOrEmailLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"autoCapitalize="none" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
           <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
-            <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
+            <input type="checkbox"checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
             <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
           </label>
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
+          <button type="submit"style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
         </form>
         <div style={{ ..._s.authSub, marginTop:14, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginOfflineHint}</div>
         <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginStaffHint}</div>
         <div style={{ ..._s.authFooter, marginTop:16 }}>{t.noAccount}{" "}
-          <button type="button" style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
+          <button type="button"style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
         </div>
       </div>
     </div>
@@ -125,17 +125,17 @@ export function ChangePasswordScreen({ t, lang, setLang, profile, toast, s:sp, t
     <div style={_s.root}>
       <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🔐</div>
+        <div style={_s.authIcon}></div>
         <div style={_s.authTitle}>{t.changePwTitle}</div>
         <div style={_s.authSub}>{t.changePwSub}</div>
         <form onSubmit={submit} style={_s.authCard}>
           <input style={{ ..._s.inp, marginBottom:10 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
           <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
-            <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
+            <input type="checkbox"checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
             <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
           </label>
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.changePwBtn}</button>
+          <button type="submit"style={_s.sendBtn} disabled={busy}>{busy?"...":t.changePwBtn}</button>
         </form>
         <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onLogout}>{t.logout}</button>
       </div>
@@ -177,7 +177,7 @@ export function ShopSetupWizard({ t, lang, setLang, localShop, shopId, profile, 
         },
         { ownerUid: user?.uid, profile, user }
       );
-      toast(lang==="bn"?"✅ দোকান সেটআপ সম্পন্ন!":"✅ Shop setup complete!");
+      toast(lang==="bn"?"দোকান সেটআপ সম্পন্ন!":"Shop setup complete!");
       onShopSaved(updated);
     } catch (err) {
       toast(err?.message || String(err), "err");
@@ -192,7 +192,7 @@ export function ShopSetupWizard({ t, lang, setLang, localShop, shopId, profile, 
     <div style={_s.root}>
       <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🏢</div>
+        <div style={_s.authIcon}></div>
         <div style={_s.authTitle}>{t.shopSetupTitle}</div>
         <div style={_s.authSub}>{t.shopSetupSub}</div>
         <form onSubmit={submit} style={_s.authCard}>
@@ -201,9 +201,9 @@ export function ShopSetupWizard({ t, lang, setLang, localShop, shopId, profile, 
             {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
           </select>
           <input style={sinp} placeholder={t.areaLbl} value={form.area} onChange={e=>setForm(p=>({...p,area:e.target.value}))} />
-          <input style={sinp} type="tel" placeholder={t.mobileLbl} value={form.mobile} onChange={e=>setForm(p=>({...p,mobile:e.target.value}))} />
-          <input style={sinp} type="email" placeholder={lang==="bn"?"ইমেইল (ঐচ্ছিক)":"Email (optional)"} value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} />
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.shopSetupBtn}</button>
+          <input style={sinp} type="tel"placeholder={t.mobileLbl} value={form.mobile} onChange={e=>setForm(p=>({...p,mobile:e.target.value}))} />
+          <input style={sinp} type="email"placeholder={lang==="bn"?"ইমেইল (ঐচ্ছিক)":"Email (optional)"} value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))} />
+          <button type="submit"style={_s.sendBtn} disabled={busy}>{busy?"...":t.shopSetupBtn}</button>
         </form>
       </div>
     </div>
@@ -225,12 +225,12 @@ export function ResetScreen({ t, lang, setLang, onBack, toast, s:sp, theme, setT
   return (
     <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
-        <div style={_s.authIcon}>🔑</div>
+        <div style={_s.authIcon}></div>
         <div style={_s.authTitle}>{t.resetTitle}</div>
         <div style={_s.authSub}>{t.resetMsg}</div>
         <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} />
-          <button type="submit" style={_s.sendBtn} disabled={busy}>{busy?"...":t.resetBtn}</button>
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email"placeholder={t.emailLbl} value={email} onChange={e=>setEmail(e.target.value)} />
+          <button type="submit"style={_s.sendBtn} disabled={busy}>{busy?"...":t.resetBtn}</button>
         </form>
         <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
       </div>
@@ -249,12 +249,12 @@ export function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:
         <div style={_s.authSub}>{t.chooseRoleSub}</div>
         <div style={{ ..._s.roleGrid, marginTop:24 }}>
           <button style={_s.roleCard} onClick={() => onPick("owner")}>
-            <div style={_s.roleEmoji}>🏢</div>
+            <div style={_s.roleEmoji}></div>
             <div style={_s.roleName}>{t.roleOwnerCard}</div>
             <div style={_s.roleDesc}>{t.roleOwnerDesc}</div>
           </button>
           <button style={_s.roleCard} onClick={() => onPick("salesman")}>
-            <div style={_s.roleEmoji}>👨‍💼</div>
+            <div style={_s.roleEmoji}></div>
             <div style={_s.roleName}>{t.roleSalesCard}</div>
             <div style={_s.roleDesc}>{t.roleSalesDesc}</div>
           </button>
@@ -304,7 +304,7 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
       setCodeSentTo(cleanEmail);
       setEmailCode("");
       setResendIn(60);
-      toast(bnL?`📧 ${cleanEmail} এ ৬ সংখ্যার কোড পাঠানো হয়েছে`:`📧 A 6-digit code was sent to ${cleanEmail}`);
+      toast(bnL?` ${cleanEmail} এ ৬ সংখ্যার কোড পাঠানো হয়েছে`:`A 6-digit code was sent to ${cleanEmail}`);
       return false;
     } catch(err) {
       if (err?.code==="auth/not-found") return true;
@@ -363,9 +363,9 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
 
       if (!result.ok) {
         if (result.code === "invite/already-used") {
-          toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
+          toast(lang==="bn"?"এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"This invite code has already been used. Please get a new one from the owner.","err");
         } else if (result.code === "invite/not-found") {
-          toast(lang==="bn"?"❌ Invite Code সঠিক নয়":"❌ Invalid invite code","err");
+          toast(lang==="bn"?"Invite Code সঠিক নয়":"Invalid invite code","err");
         } else {
           toast(result.message || friendlyLocalAuthError(result, lang), "err");
         }
@@ -382,19 +382,19 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
       onSignupSuccess(result);
     } catch(err) {
       if (err.code === "invite/already-used") {
-        toast(lang==="bn"?"❌ এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"❌ This invite code has already been used. Please get a new one from the owner.","err");
+        toast(lang==="bn"?"এই Invite Code আগেই ব্যবহার হয়ে গেছে। মালিকের কাছ থেকে নতুন code নিন।":"This invite code has already been used. Please get a new one from the owner.","err");
       } else if (err.code === "invite/not-found") {
-        toast(lang==="bn"?"❌ Invite Code সঠিক নয়":"❌ Invalid invite code","err");
+        toast(lang==="bn"?"Invite Code সঠিক নয়":"Invalid invite code","err");
       } else if (err.code === "OFFLINE_REQUIRED") {
         toast(friendlyLocalAuthError({ reason: "OFFLINE_REQUIRED" }, lang), "err");
       } else if (err.code === "auth/email-already-in-use") {
         toast(friendlyAuthError(err, lang), "err");
       } else if (err.code === "auth/invalid-email-code") {
         setEmailCode("");
-        toast(bnL?"❌ কোড ভুল — ইমেইলের কোডটা আবার দেখে দিন":"❌ Wrong code — check the email again","err");
+        toast(bnL?"কোড ভুল — ইমেইলের কোডটা আবার দেখে দিন":"Wrong code — check the email again","err");
       } else if (err.code === "auth/email-code-expired") {
         setCodeSentTo("");
-        toast(bnL?"কোডের মেয়াদ শেষ — আবার \"অ্যাকাউন্ট তৈরি\" চাপুন, নতুন কোড যাবে":"The code expired — press Create account again for a new code","err");
+        toast(bnL?"কোডের মেয়াদ শেষ — আবার \"অ্যাকাউন্ট তৈরি\"চাপুন, নতুন কোড যাবে":"The code expired — press Create account again for a new code","err");
       } else {
         toast(err?.message || friendlyAuthError(err,lang),"err");
       }
@@ -405,7 +405,7 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
   return (
     <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
-        <div style={_s.authIcon}>{isOwner?"🏢":"👨‍💼"}</div>
+        <div style={_s.authIcon}>{isOwner?"":""}</div>
         <div style={_s.authTitle}>{isOwner?t.roleOwnerCard:t.roleSalesCard}</div>
         <form onSubmit={submit} style={_s.authCard}>
           {isOwner && <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.companyName} value={companyName} onChange={e=>setCompanyName(e.target.value)} />}
@@ -417,38 +417,38 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
                 value={inviteCode}
                 onChange={e=>setInviteCode(e.target.value.toUpperCase())}
               />
-              <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}>💡 {t.inviteCodeLbl}</div>
+              <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}> {t.inviteCodeLbl}</div>
             </>
           )}
           <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="text" placeholder={t.usernameLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="text"placeholder={t.usernameLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"autoCapitalize="none" />
           <select style={{ ..._s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
             {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
           </select>
           <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email" placeholder={bnL?"ইমেইল (যাচাই কোড যাবে)":"Email (a code will be sent)"} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" autoCapitalize="none" />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="tel"placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
+          <input style={{ ..._s.inp, marginBottom:10 }} type="email"placeholder={bnL?"ইমেইল (যাচাই কোড যাবে)":"Email (a code will be sent)"} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"autoCapitalize="none" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
           <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
-            <input type="checkbox" checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
+            <input type="checkbox"checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
             <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
           </label>
           {codeStep&&(
             <div style={{ border:"1px solid #bfdbfe", background:"#eff6ff", borderRadius:10, padding:"10px 12px", marginBottom:12 }}>
               <div style={{ fontSize:12, color:"#1e3a8a", fontWeight:700, marginBottom:6 }}>
-                📧 {bnL?`${codeSentTo} এ পাঠানো ৬ সংখ্যার কোড দিন (১০ মিনিট চলবে, Spam ফোল্ডারও দেখুন)`:`Enter the 6-digit code sent to ${codeSentTo} (valid 10 min, check spam too)`}
+                 {bnL?`${codeSentTo} এ পাঠানো ৬ সংখ্যার কোড দিন (১০ মিনিট চলবে, Spam ফোল্ডারও দেখুন)`:`Enter the 6-digit code sent to ${codeSentTo} (valid 10 min, check spam too)`}
               </div>
               <input style={{ ..._s.inp, marginBottom:6, textAlign:"center", fontSize:22, letterSpacing:8, fontWeight:800 }}
-                type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="000000"
+                type="text"inputMode="numeric"autoComplete="one-time-code"placeholder="000000"
                 value={emailCode} onChange={e=>setEmailCode(e.target.value.replace(/\D/g,"").slice(0,6))} />
-              <button type="button" style={{ ..._s.linkBtn, margin:0, opacity:resendIn>0?0.5:1 }} disabled={busy||resendIn>0} onClick={resend}>
+              <button type="button"style={{ ..._s.linkBtn, margin:0, opacity:resendIn>0?0.5:1 }} disabled={busy||resendIn>0} onClick={resend}>
                 {resendIn>0?(bnL?`আবার কোড পাঠান (${resendIn}s)`:`Resend code (${resendIn}s)`):(bnL?"আবার কোড পাঠান":"Resend code")}
               </button>
             </div>
           )}
-          <button type="submit" style={_s.sendBtn} disabled={busy}>
-            {busy?t.creatingAccount:codeStep?t.createAccount:(bnL?"📧 ইমেইল যাচাই করে এগিয়ে যান":"📧 Verify email & continue")}
+          <button type="submit"style={_s.sendBtn} disabled={busy}>
+            {busy?t.creatingAccount:codeStep?t.createAccount:(bnL?"ইমেইল যাচাই করে এগিয়ে যান":"Verify email & continue")}
           </button>
         </form>
         <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
@@ -479,7 +479,7 @@ export function VerifyGate({ t, lang, setLang, user, toast, onLogout, s:sp, them
   return (
     <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
       <div style={_s.authWrap}>
-        <div style={_s.authIcon}>📧</div>
+        <div style={_s.authIcon}></div>
         <div style={_s.authTitle}>{t.verifyTitle}</div>
         <div style={_s.authSub}>{t.verifyMsg}</div>
         <div style={{ ..._s.card, marginTop:16, textAlign:"center" }}>

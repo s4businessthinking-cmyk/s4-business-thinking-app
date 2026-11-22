@@ -28,6 +28,6 @@ export function applyPurchaseScan(res, { pickVendor, setField, setLines, toast, 
   setField("scanFilled", true);
   setLines((prev) => [...prev.filter((x) => String(x.name || "").trim()), ...scanLinesToPi(res)]);
   toast?.(lang === "bn"
-    ? `✅ ${res.lines.length}টি লাইন বসানো হয়েছে — মিলিয়ে নিয়ে Save করুন`
-    : `✅ ${res.lines.length} line(s) filled — check them, then Save`);
+    ? ` ${res.lines.length}টি লাইন বসানো হয়েছে — মিলিয়ে নিয়ে Save করুন`
+    : ` ${res.lines.length} line(s) filled — check them, then Save`);
 }

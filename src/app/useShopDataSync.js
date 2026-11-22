@@ -72,7 +72,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
   // below — this just covers a brand-new install (empty local catalog) or a
   // very stale local cache, and re-runs once when a genuine Firebase Auth
   // session becomes available (it can't do anything useful before that).
-  // Manual "Cloud Download" in Settings > Sync (runCloudDownload) remains the
+  // Manual "Cloud Download"in Settings > Sync (runCloudDownload) remains the
   // user-triggered fallback for a full re-pull at any time.
   useEffect(() => {
     if (!shopId || !authSyncReady) return;
@@ -153,8 +153,8 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
     if (!shopId || !isOwner || !authSyncReady) return;
     return startAutoBackup(shopId, {
       onReminder: () => toast(lang==="bn"
-        ? "💾 অনেকদিন ব্যাকআপ নেওয়া হয়নি — সেটিংস › ব্যাকআপ ও রিস্টোর থেকে Google Drive-এ ব্যাকআপ নিন"
-        : "💾 No recent backup — go to Settings › Backup & restore to save one to Google Drive"),
+        ? "অনেকদিন ব্যাকআপ নেওয়া হয়নি — সেটিংস › ব্যাকআপ ও রিস্টোর থেকে Google Drive-এ ব্যাকআপ নিন"
+        : "No recent backup — go to Settings › Backup & restore to save one to Google Drive"),
     });
   }, [shopId, isOwner, authSyncReady]);
 

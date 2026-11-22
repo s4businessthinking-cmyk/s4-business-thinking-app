@@ -47,7 +47,7 @@ export default function PartyFolderList({
   const bn = lang === "bn";
   const groups = useMemo(() => groupInvoicesByParty(invoices, { idField, nameField }), [invoices, idField, nameField]);
   const open = openKey ? groups.find((g) => g.key === openKey) : null;
-  const cashName = bn ? "💵 ক্যাশ (নাম ছাড়া)" : "💵 Cash (no name)";
+  const cashName = bn ? "ক্যাশ (নাম ছাড়া)" : "Cash (no name)";
 
   if (open) {
     const days = [];
@@ -64,7 +64,7 @@ export default function PartyFolderList({
         </button>
         <div style={{ background: th.bgCard, border: `1px solid ${th.border}`, borderLeft: `4px solid ${accent}`, borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
           <div style={{ fontSize: 16, fontWeight: 900, color: th.txtPrimary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {open.isCash ? cashName : `📁 ${open.name}`}
+            {open.isCash ? cashName : ` ${open.name}`}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 4, fontSize: 12, fontWeight: 700, color: th.txtMuted }}>
             <span>{bn ? `${open.invoices.length}টি ইনভয়েস` : `${open.invoices.length} invoices`}</span>
@@ -75,7 +75,7 @@ export default function PartyFolderList({
         {days.map((day) => (
           <div key={day.date || "none"}>
             <div style={{ fontSize: 11, fontWeight: 900, color: accent, textTransform: "uppercase", letterSpacing: 0.5, margin: "10px 2px 6px" }}>
-              📅 {formatDay(day.date, lang)} · {day.list.length}
+               {formatDay(day.date, lang)} · {day.list.length}
             </div>
             {day.list.map(renderCard)}
           </div>
@@ -89,10 +89,10 @@ export default function PartyFolderList({
       {groups.map((g) => (
         <button key={g.key} onClick={() => onOpenKey(g.key)}
           style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", boxSizing: "border-box", padding: "11px 12px", borderRadius: 12, border: `1px solid ${th.border}`, background: th.bgCard, cursor: "pointer", fontFamily: "inherit", textAlign: "left", color: th.txtPrimary }}>
-          <span style={{ fontSize: 26, flexShrink: 0 }}>{g.isCash ? "💵" : "📁"}</span>
+          <span style={{ fontSize: 26, flexShrink: 0 }}>{g.isCash ? "" : ""}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {g.isCash ? cashName.replace(/^💵 /, "") : g.name}
+              {g.isCash ? cashName.replace(/^ /, "") : g.name}
             </div>
             <div style={{ fontSize: 11, fontWeight: 700, color: th.txtMuted, marginTop: 2 }}>
               {bn ? `${g.invoices.length}টি ইনভয়েস` : `${g.invoices.length} invoices`}
@@ -113,8 +113,8 @@ export default function PartyFolderList({
 export function FolderToggle({ value, onChange, lang, th, accent = "#f97316" }) {
   const bn = lang === "bn";
   const opts = [
-    { key: "folders", label: bn ? "📁 নাম অনুযায়ী" : "📁 By name" },
-    { key: "all", label: bn ? "📋 সব ইনভয়েস" : "📋 All invoices" },
+    { key: "folders", label: bn ? "নাম অনুযায়ী" : "By name" },
+    { key: "all", label: bn ? "সব ইনভয়েস" : "All invoices" },
   ];
   return (
     <div style={{ display: "flex", gap: 0, marginBottom: 10, background: th.bgInp, borderRadius: 10, padding: 3 }}>

@@ -138,7 +138,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       return;
     }
     const r = resolved(current);
-    if (!r || r.qty <= 0) { toast?.(L("❌ কতটা লিখুন", "❌ Enter how many"), "err"); return; }
+    if (!r || r.qty <= 0) { toast?.(L("কতটা লিখুন", "Enter how many"), "err"); return; }
     setLines((ls) => [...ls, current]);
     setCurrent(null);
   };
@@ -158,13 +158,13 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
 
   const save = async () => {
     if (saving) return;
-    if (!date) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
+    if (!date) return toast?.(L("তারিখ দিন", "Pick a date"), "err");
     const counting = lines.filter((l) => l.mode === "count" && String(l.counted).trim() !== "");
-    if (counting.length && !stockMap) return toast?.(L("⏳ স্টক এখনো লোড হচ্ছে, একটু পরে সেভ করুন", "⏳ Stock is still loading, save again in a moment"), "err");
+    if (counting.length && !stockMap) return toast?.(L("স্টক এখনো লোড হচ্ছে, একটু পরে সেভ করুন", "Stock is still loading, save again in a moment"), "err");
     const negative = lines.find((l) => (l.mode === "count" ? n2(l.counted) < 0 : n2(l.qty) < 0));
-    if (negative) return toast?.(L(`❌ "${negative.name}": সংখ্যা মাইনাস হতে পারে না`, `❌ "${negative.name}": quantity can't be negative`), "err");
+    if (negative) return toast?.(L(` "${negative.name}": সংখ্যা মাইনাস হতে পারে না`, ` "${negative.name}": quantity can't be negative`), "err");
     const built = lines.map((l) => ({ l, r: resolved(l) })).filter(({ r }) => r && r.qty > 0);
-    if (!built.length) return toast?.(L("❌ অন্তত একটা পণ্যের কম/বেশি লিখুন", "❌ Enter a change for at least one product"), "err");
+    if (!built.length) return toast?.(L("অন্তত একটা পণ্যের কম/বেশি লিখুন", "Enter a change for at least one product"), "err");
     setSaving(true);
     try {
       const adjustNo = await makeNo("lastSASerial", "SA", rows.map((r) => r.adjustNo));
@@ -181,11 +181,11 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       const created = { ...res.data, id: res.documentId };
       logAudit({ shopId, user, profile, action: "create", collection: "stockAdjustments", docId: created.id, docNo: adjustNo, note: `${payload.items.length} item(s) · ${reasonLabel(reason)}` });
       setRows((list) => [created, ...list.filter((r) => r.id !== created.id)]);
-      toast?.(L(`✅ ${adjustNo} সেভ হয়েছে`, `✅ ${adjustNo} saved`));
+      toast?.(L(` ${adjustNo} সেভ হয়েছে`, ` ${adjustNo} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setSel(created); setView("detail");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -197,19 +197,19 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     setCountDate(draft?.date || localDay());
     setCountQ(""); setOnlyDiff(false);
     if (draft?.counted && Object.keys(draft.counted).length) {
-      toast?.(L(`📋 আগের অসমাপ্ত গণনা খোলা হলো (${Object.keys(draft.counted).length}টি পণ্য)`, `📋 Resumed the unfinished count (${Object.keys(draft.counted).length} items)`));
+      toast?.(L(`আগের অসমাপ্ত গণনা খোলা হলো (${Object.keys(draft.counted).length}টি পণ্য)`, `Resumed the unfinished count (${Object.keys(draft.counted).length} items)`));
     }
     setView("count");
   };
 
   const saveCount = async () => {
     if (saving) return;
-    if (!countDate) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
-    if (!stockMap) return toast?.(L("⏳ স্টক এখনো লোড হচ্ছে, একটু পরে সেভ করুন", "⏳ Stock is still loading, save again in a moment"), "err");
+    if (!countDate) return toast?.(L("তারিখ দিন", "Pick a date"), "err");
+    if (!stockMap) return toast?.(L("স্টক এখনো লোড হচ্ছে, একটু পরে সেভ করুন", "Stock is still loading, save again in a moment"), "err");
     const sum = countSummary(products, counted, stockOf);
     const negative = Object.entries(counted).find(([, v]) => String(v ?? "").trim() !== "" && n2(v) < 0);
-    if (negative) return toast?.(L("❌ গোনা সংখ্যা মাইনাস হতে পারে না", "❌ Counted quantity can't be negative"), "err");
-    if (!sum.entered) return toast?.(L("❌ অন্তত একটা পণ্যের গোনা সংখ্যা লিখুন", "❌ Enter the count for at least one product"), "err");
+    if (negative) return toast?.(L("গোনা সংখ্যা মাইনাস হতে পারে না", "Counted quantity can't be negative"), "err");
+    if (!sum.entered) return toast?.(L("অন্তত একটা পণ্যের গোনা সংখ্যা লিখুন", "Enter the count for at least one product"), "err");
     if (!sum.diffs.length) {
       if (!window.confirm(L(`${sum.entered}টি পণ্য গোনা হয়েছে, সব সিস্টেমের সাথে মিলে গেছে — কোনো সমন্বয় লাগবে না। গণনাটা শেষ করে মুছে দেব?`, `${sum.entered} items counted and all match the system — no adjustment needed. Finish and clear this count?`))) return;
       setCounted({}); try { localStorage.removeItem(countDraftKey(shopId)); } catch { /* ignore */ }
@@ -239,11 +239,11 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       logAudit({ shopId, user, profile, action: "create", collection: "stockAdjustments", docId: created.id, docNo: adjustNo, note: `Physical count · ${payload.items.length} difference(s)` });
       setRows((list) => [created, ...list.filter((r) => r.id !== created.id)]);
       setCounted({}); try { localStorage.removeItem(countDraftKey(shopId)); } catch { /* ignore */ }
-      toast?.(L(`✅ ${adjustNo} সেভ হয়েছে — স্টক গোনা সংখ্যার সাথে মিলিয়ে দেওয়া হলো`, `✅ ${adjustNo} saved — stock now matches the count`));
+      toast?.(L(` ${adjustNo} সেভ হয়েছে — স্টক গোনা সংখ্যার সাথে মিলিয়ে দেওয়া হলো`, ` ${adjustNo} saved — stock now matches the count`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setSel(created); setView("detail");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -275,10 +275,10 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       setRows((list) => list.map((x) => (x.id === r.id ? updated : x)));
       setSel((s) => (s?.id === r.id ? updated : s));
       logAudit({ shopId, user, profile, action: "cancel", collection: "stockAdjustments", docId: r.id, docNo: r.adjustNo });
-      toast?.(L("🚫 বাতিল হয়েছে", "🚫 Cancelled"), "err");
+      toast?.(L("বাতিল হয়েছে", "Cancelled"), "err");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -289,11 +289,11 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       await offlineRemove("stockAdjustments", r.id);
       setRows((list) => list.filter((x) => x.id !== r.id));
       logAudit({ shopId, user, profile, action: "delete", collection: "stockAdjustments", docId: r.id, docNo: r.adjustNo });
-      toast?.(L("🗑️ মুছে ফেলা হয়েছে", "🗑️ Deleted"), "err");
+      toast?.(L("মুছে ফেলা হয়েছে", "Deleted"), "err");
       setSel(null); setView("list");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -321,20 +321,20 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     }
   };
   const badge = (r) => (
-    <span className="si-badge" style={{ color: r.status === "cancelled" ? "#6b7280" : ACCENT }}>
+    <span className="si-badge"style={{ color: r.status === "cancelled" ? "#6b7280" : ACCENT }}>
       {r.status === "cancelled" ? L("বাতিল", "Cancelled") : L("সম্পন্ন", "Done")}
     </span>
   );
   const vRow = (label, value, opts = {}) => (
     <div className="pm-form-row">
       <span className="pm-label">{label}</span>
-      <div className={`si-val${opts.strong ? " is-strong" : ""}`} style={opts.color ? { color: opts.color } : undefined}>{value}</div>
+      <div className={`si-val${opts.strong ? "is-strong" : ""}`} style={opts.color ? { color: opts.color } : undefined}>{value}</div>
     </div>
   );
   const changeText = (r) => (!r ? "—" : r.qty === 0 ? L("পরিবর্তন নেই", "No change") : `${r.direction === "out" ? "−" : "+"}${fq(r.qty)}`);
   const changeColor = (r) => (!r || r.qty === 0 ? "#64748b" : r.direction === "out" ? "#b91c1c" : "#15803d");
   const shell = (titleLeft, titleRight, children) => (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title">
@@ -364,19 +364,19 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     const itemSummary = (r) => `${(r.items || []).slice(0, 3).map((it) => `${it.name} ${it.direction === "out" ? "−" : "+"}${fq(it.qty)}`).join(" · ")}${(r.items || []).length > 3 ? ` +${r.items.length - 3}` : ""}`;
     return (
       <>
-        {shell(L("⚖️ স্টক সমন্বয়", "⚖️ Stock Adjustment"), `${liveShown.length} ${L("টি", "entries")}`, (
+        {shell(L("স্টক সমন্বয়", "Stock Adjustment"), `${liveShown.length} ${L("টি", "entries")}`, (
           <>
             <div className="si-toolbar">
-              {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন সমন্বয়", "New Adjustment")}</button>}
-              {canManage && <button type="button" className="pm-btn-secondary" onClick={openCount}>📋 {L("ফিজিক্যাল স্টক গণনা", "Physical stock count")}{readCountDraft(shopId) ? " •" : ""}</button>}
+              {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন সমন্বয়", "New Adjustment")}</button>}
+              {canManage && <button type="button"className="pm-btn-secondary"onClick={openCount}> {L("ফিজিক্যাল স্টক গণনা", "Physical stock count")}{readCountDraft(shopId) ? " •" : ""}</button>}
               <span className="si-toolbar-gap" />
               <div className="si-pills">
                 {quick.map(([key, label, f, t]) => (
-                  <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
+                  <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
                 ))}
               </div>
-              <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-              <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+              <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+              <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
             <div className="si-kpis">
               <div className="si-kpi"><span>{L("সমন্বয়", "Adjustments")}</span><b>{liveShown.length}</b></div>
@@ -386,15 +386,15 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
             </div>
             <div className="si-filters">
               <div className="si-search">
-                <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, কারণ, নোট বা পণ্য…", "Number, reason, note or item…")} />
-                {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+                <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, কারণ, নোট বা পণ্য…", "Number, reason, note or item…")} />
+                {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
               </div>
-              <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
+              <label className="pm-check"><input type="checkbox"checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
             </div>
             <div className="si-main is-all">
               <div className="si-box">
                 {mobile ? filtered.map((r) => (
-                  <button key={r.id} type="button" className="si-mrow" onClick={() => openDetail(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
+                  <button key={r.id} type="button"className="si-mrow"onClick={() => openDetail(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
                     <div className="si-mrow-top"><span style={{ color: ACCENT }}>{r.adjustNo}</span>{badge(r)}</div>
                     <div className="si-mrow-sub"><span>{fmtDay(r.adjustDate)} · {reasonLabel(r.reason)}</span><span>{(r.items || []).length} {L("টি পণ্য", "items")}</span></div>
                     <div className="si-mrow-sub"><span>{itemSummary(r)}</span></div>
@@ -413,9 +413,9 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                     </tr></thead>
                     <tbody>
                       {filtered.map((r) => (
-                        <tr key={r.id} className="pm-clickable" onClick={() => openDetail(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+                        <tr key={r.id} className="pm-clickable"onClick={() => openDetail(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
                           <td>{fmtDay(r.adjustDate)}</td>
-                          <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.adjustNo}</td>
+                          <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.adjustNo}</td>
                           <td>{reasonLabel(r.reason)}</td>
                           <td title={itemSummary(r)}>{itemSummary(r)}</td>
                           <td className="si-center">{(r.items || []).length}</td>
@@ -452,14 +452,14 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     const counting = lines.some((l) => l.mode === "count");
     const wdModeButtons = (l, onUpdate) => (
       <div style={{ display: "flex", gap: 4 }}>
-        <button type="button" style={btn(l.mode === "count" ? "#dbe6f5" : "#fff", C.label, { height: 22, padding: "0 8px", fontSize: 11 })} onClick={() => onUpdate({ mode: "count" })}>{L("গুনে পাওয়া", "Counted")}</button>
-        <button type="button" style={btn(l.mode === "change" && l.direction === "out" ? "#fee2e2" : "#fff", l.mode === "change" && l.direction === "out" ? C.red : C.label, { height: 22, padding: "0 8px", fontSize: 11 })} onClick={() => onUpdate({ mode: "change", direction: "out" })}>− {L("কমান", "Reduce")}</button>
-        <button type="button" style={btn(l.mode === "change" && l.direction === "in" ? "#dcfce7" : "#fff", l.mode === "change" && l.direction === "in" ? C.green : C.label, { height: 22, padding: "0 8px", fontSize: 11 })} onClick={() => onUpdate({ mode: "change", direction: "in" })}>+ {L("বাড়ান", "Add")}</button>
+        <button type="button"style={btn(l.mode === "count" ? "#dbe6f5" : "#fff", C.label, { height: 22, padding: "0 8px", fontSize: 11 })} onClick={() => onUpdate({ mode: "count" })}>{L("গুনে পাওয়া", "Counted")}</button>
+        <button type="button"style={btn(l.mode === "change" && l.direction === "out" ? "#fee2e2" : "#fff", l.mode === "change" && l.direction === "out" ? C.red : C.label, { height: 22, padding: "0 8px", fontSize: 11 })} onClick={() => onUpdate({ mode: "change", direction: "out" })}>− {L("কমান", "Reduce")}</button>
+        <button type="button"style={btn(l.mode === "change" && l.direction === "in" ? "#dcfce7" : "#fff", l.mode === "change" && l.direction === "in" ? C.green : C.label, { height: 22, padding: "0 8px", fontSize: 11 })} onClick={() => onUpdate({ mode: "change", direction: "in" })}>+ {L("বাড়ান", "Add")}</button>
       </div>
     );
     const wdQtyInput = (l, onUpdate, onEnter) => (l.mode === "count"
-      ? <input style={inp({ textAlign: "right", height: 20 })} inputMode="decimal" value={l.counted} onChange={(e) => onUpdate({ counted: e.target.value })} onKeyDown={onEnter} placeholder={L("আসলে কত আছে", "Actually there")} />
-      : <input style={inp({ textAlign: "right", height: 20 })} inputMode="decimal" value={l.qty} onChange={(e) => onUpdate({ qty: e.target.value })} onKeyDown={onEnter} placeholder={L("কতটা", "How many")} />);
+      ? <input style={inp({ textAlign: "right", height: 20 })} inputMode="decimal"value={l.counted} onChange={(e) => onUpdate({ counted: e.target.value })} onKeyDown={onEnter} placeholder={L("আসলে কত আছে", "Actually there")} />
+      : <input style={inp({ textAlign: "right", height: 20 })} inputMode="decimal"value={l.qty} onChange={(e) => onUpdate({ qty: e.target.value })} onKeyDown={onEnter} placeholder={L("কতটা", "How many")} />);
     const enterAddCurrentWd = (e) => { if (e.key === "Enter") { e.preventDefault(); addCurrentItem(); } };
     return (
       <div style={{ position: "fixed", inset: win.max ? 0 : "28px 40px", zIndex: 1500, background: "#c7d8ee", padding: win.max ? 6 : "0 6px 6px", boxSizing: "border-box", overflowX: "auto", overflowY: "hidden", display: "flex", flexDirection: "column", border: win.max ? "none" : "1px solid #2854ad", boxShadow: win.max ? "none" : "0 18px 50px rgba(2,6,23,0.45)" }}>
@@ -469,7 +469,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: C.panel, border: `1px solid ${C.border}`, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "120px 220px 1fr", gap: 8 }}>
-            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date" style={inp()} value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date"style={inp()} value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><div style={lbl}>{L("কারণ", "Reason")}</div>
               <select style={inp()} value={reason} onChange={(e) => setReason(e.target.value)}>{ADJUST_REASONS.map((r) => <option key={r.key} value={r.key}>{bn ? r.bn : r.en}</option>)}</select>
             </div>
@@ -483,7 +483,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
             {prodMatches.length > 0 && (
               <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 50, maxHeight: 200, overflowY: "auto", background: "#fff", border: `1px solid ${C.border}` }}>
                 {prodMatches.map((p) => (
-                  <button key={p.id} type="button" style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "4px 8px", border: 0, borderBottom: "1px solid #eef3fb", background: "#fff", cursor: "pointer", font: "inherit", textAlign: "left" }} onClick={() => selectCurrentProduct(p)}>
+                  <button key={p.id} type="button"style={{ display: "flex", justifyContent: "space-between", width: "100%", padding: "4px 8px", border: 0, borderBottom: "1px solid #eef3fb", background: "#fff", cursor: "pointer", font: "inherit", textAlign: "left" }} onClick={() => selectCurrentProduct(p)}>
                     <span><b>{p.name}</b>{p.code ? <span style={{ color: "#64748b" }}> · {p.code}</span> : null}</span>
                     <span style={{ color: ACCENT, fontWeight: 700 }}>{stockOf(p.id) == null ? "…" : fq(stockOf(p.id))} {p.unit || ""}</span>
                   </button>
@@ -503,8 +503,8 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                 <div style={{ textAlign: "right", fontWeight: 700, color: changeColor(resolved(current)) }}>{changeText(resolved(current))}</div>
               </div>
               <div style={{ display: "flex", gap: 4 }}>
-                <button type="button" style={btn("#15803d", "#fff")} onClick={addCurrentItem}>{L("পণ্য যোগ করুন", "Add Item")}</button>
-                <button type="button" style={btn()} onClick={() => setCurrent(null)}>{L("বাদ", "Cancel")}</button>
+                <button type="button"style={btn("#15803d", "#fff")} onClick={addCurrentItem}>{L("পণ্য যোগ করুন", "Add Item")}</button>
+                <button type="button"style={btn()} onClick={() => setCurrent(null)}>{L("বাদ", "Cancel")}</button>
               </div>
             </div>
           )}
@@ -529,7 +529,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                       <td style={td}>{wdQtyInput(l, (patch) => updLine(l.productId, patch))}</td>
                       <td style={{ ...td, color: changeColor(r), fontWeight: 700 }}>{changeText(r)}</td>
                       <td style={{ ...td, color: after != null && after < 0 ? C.red : undefined, fontWeight: after != null && after < 0 ? 700 : 400 }}>{after != null && r?.qty > 0 ? fq(after) : "—"}</td>
-                      <td style={td}><button type="button" style={btn("#fee2e2", C.red, { height: 20, padding: "0 6px" })} onClick={() => removeLine(l.productId)}>✕</button></td>
+                      <td style={td}><button type="button"style={btn("#fee2e2", C.red, { height: 20, padding: "0 6px" })} onClick={() => removeLine(l.productId)}>✕</button></td>
                     </tr>
                   );
                 })}
@@ -539,10 +539,10 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button type="button" style={btn()} onClick={backToList}>{L("তালিকা", "List")}</button>
+            <button type="button"style={btn()} onClick={backToList}>{L("তালিকা", "List")}</button>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              {counting && !stockMap && <span style={{ color: C.label }}>⏳ {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
-              <button type="button" disabled={saving || !lines.length || (counting && !stockMap)} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সমন্বয় সেভ", "Save Adjustment")}`}</button>
+              {counting && !stockMap && <span style={{ color: C.label }}> {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
+              <button type="button"disabled={saving || !lines.length || (counting && !stockMap)} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সমন্বয় সেভ", "Save Adjustment")}`}</button>
             </div>
           </div>
         </div>
@@ -553,42 +553,42 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
   if (view === "form" && !wideDesktop) {
     const counting = lines.some((l) => l.mode === "count");
     const modeButtons = (l, onUpdate) => (
-      <div className="si-pills" style={{ flexWrap: "nowrap" }}>
-        <button type="button" className={`pm-btn-secondary${l.mode === "count" ? " is-active" : ""}`} onClick={() => onUpdate({ mode: "count" })}>{L("গুনে পাওয়া", "Counted")}</button>
-        <button type="button" className={`pm-btn-secondary${l.mode === "change" && l.direction === "out" ? " is-active" : ""}`} onClick={() => onUpdate({ mode: "change", direction: "out" })}>− {L("কমান", "Reduce")}</button>
-        <button type="button" className={`pm-btn-secondary${l.mode === "change" && l.direction === "in" ? " is-active" : ""}`} onClick={() => onUpdate({ mode: "change", direction: "in" })}>+ {L("বাড়ান", "Add")}</button>
+      <div className="si-pills"style={{ flexWrap: "nowrap" }}>
+        <button type="button"className={`pm-btn-secondary${l.mode === "count" ? "is-active" : ""}`} onClick={() => onUpdate({ mode: "count" })}>{L("গুনে পাওয়া", "Counted")}</button>
+        <button type="button"className={`pm-btn-secondary${l.mode === "change" && l.direction === "out" ? "is-active" : ""}`} onClick={() => onUpdate({ mode: "change", direction: "out" })}>− {L("কমান", "Reduce")}</button>
+        <button type="button"className={`pm-btn-secondary${l.mode === "change" && l.direction === "in" ? "is-active" : ""}`} onClick={() => onUpdate({ mode: "change", direction: "in" })}>+ {L("বাড়ান", "Add")}</button>
       </div>
     );
     const qtyInput = (l, onUpdate, onEnter) => (l.mode === "count"
-      ? <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" value={l.counted} onChange={(e) => onUpdate({ counted: e.target.value })} onKeyDown={onEnter} placeholder={L("আসলে কত আছে", "Actually there")} style={{ textAlign: "right" }} />
-      : <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" value={l.qty} onChange={(e) => onUpdate({ qty: e.target.value })} onKeyDown={onEnter} placeholder={L("কতটা", "How many")} style={{ textAlign: "right" }} />);
+      ? <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"value={l.counted} onChange={(e) => onUpdate({ counted: e.target.value })} onKeyDown={onEnter} placeholder={L("আসলে কত আছে", "Actually there")} style={{ textAlign: "right" }} />
+      : <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"value={l.qty} onChange={(e) => onUpdate({ qty: e.target.value })} onKeyDown={onEnter} placeholder={L("কতটা", "How many")} style={{ textAlign: "right" }} />);
     const enterAddCurrent = (e) => { if (e.key === "Enter") { e.preventDefault(); addCurrentItem(); } };
 
-    return shell(L("নতুন স্টক সমন্বয়", "New Stock Adjustment"), L("⚖️ স্টক সমন্বয়", "⚖️ Stock Adjustment"), (
+    return shell(L("নতুন স্টক সমন্বয়", "New Stock Adjustment"), L("স্টক সমন্বয়", "Stock Adjustment"), (
       <>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "140px 220px minmax(0,1fr)", paddingTop: 3 }}>
-              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date" className="pm-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
               <div className="si-field"><span className="pm-label">{L("কারণ", "Reason")}</span>
-                <select className="pm-input" value={reason} onChange={(e) => setReason(e.target.value)}>{ADJUST_REASONS.map((r) => <option key={r.key} value={r.key}>{bn ? r.bn : r.en}</option>)}</select>
+                <select className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)}>{ADJUST_REASONS.map((r) => <option key={r.key} value={r.key}>{bn ? r.bn : r.en}</option>)}</select>
               </div>
-              <div className="si-field"><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input"value={note} onChange={(e) => setNote(e.target.value)} /></div>
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("পণ্য যোগ করুন", "Add product")}</legend>
             <div className="si-panel-body">
-              <div className="si-search" style={{ position: "relative" }}>
-                <input className="pm-input" value={prodQ} onChange={(e) => setProdQ(e.target.value)} onKeyDown={onProdKey} autoFocus={!mobile}
+              <div className="si-search"style={{ position: "relative" }}>
+                <input className="pm-input"value={prodQ} onChange={(e) => setProdQ(e.target.value)} onKeyDown={onProdKey} autoFocus={!mobile}
                   placeholder={L("নাম, কোড বা বারকোড লিখুন / স্ক্যান করুন…", "Type or scan name, code or barcode…")} />
               </div>
               {prodMatches.length > 0 && (
-                <div className="si-box" style={{ maxHeight: mobile ? 260 : 170 }}>
+                <div className="si-box"style={{ maxHeight: mobile ? 260 : 170 }}>
                   {prodMatches.map((p) => (
-                    <button key={p.id} type="button" className="si-mrow" style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", padding: mobile ? undefined : "3px 6px", border: 0, borderBottom: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", font: "inherit", textAlign: "left" }} onClick={() => selectCurrentProduct(p)}>
+                    <button key={p.id} type="button"className="si-mrow"style={{ display: "flex", justifyContent: "space-between", gap: 8, width: "100%", padding: mobile ? undefined : "3px 6px", border: 0, borderBottom: "1px solid #e2e8f0", background: "#fff", cursor: "pointer", font: "inherit", textAlign: "left" }} onClick={() => selectCurrentProduct(p)}>
                       <span><b>{p.name}</b>{p.code ? <span className="si-muted"> · {p.code}</span> : null}{p.brand ? <span className="si-muted"> · {p.brand}</span> : null}</span>
                       <span style={{ color: ACCENT, fontWeight: 700, whiteSpace: "nowrap" }}>{stockOf(p.id) == null ? "…" : fq(stockOf(p.id))} {p.unit || ""}</span>
                     </button>
@@ -603,38 +603,38 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                     <span className="si-muted">{L("এখন স্টক", "Stock now")}: <b>{stockOf(current.productId) == null ? "…" : fq(stockOf(current.productId))}</b> {current.unit}</span>
                   </div>
                   {modeButtons(current, updCurrent)}
-                  <div className="si-grid2" style={{ alignItems: "center" }}>
+                  <div className="si-grid2"style={{ alignItems: "center" }}>
                     {qtyInput(current, updCurrent, enterAddCurrent)}
                     <div style={{ textAlign: "right", fontWeight: 700, color: changeColor(resolved(current)) }}>{changeText(resolved(current))}</div>
                   </div>
                   <div style={{ display: "flex", gap: 4 }}>
-                    <button type="button" className="pm-btn pm-btn--primary" style={{ flex: 1, minHeight: mobile ? 38 : 24 }} onClick={addCurrentItem}>✅ {L("পণ্য যোগ করুন", "Add Item")}</button>
-                    <button type="button" className="pm-btn-secondary" style={{ minHeight: mobile ? 38 : 24 }} onClick={() => setCurrent(null)}>{L("বাদ", "Cancel")}</button>
+                    <button type="button"className="pm-btn pm-btn--primary"style={{ flex: 1, minHeight: mobile ? 38 : 24 }} onClick={addCurrentItem}> {L("পণ্য যোগ করুন", "Add Item")}</button>
+                    <button type="button"className="pm-btn-secondary"style={{ minHeight: mobile ? 38 : 24 }} onClick={() => setCurrent(null)}>{L("বাদ", "Cancel")}</button>
                   </div>
                 </div>
               )}
             </div>
           </fieldset>
 
-          <div className="si-box" style={{ flex: mobile ? undefined : 1, minHeight: 120 }}>
+          <div className="si-box"style={{ flex: mobile ? undefined : 1, minHeight: 120 }}>
             {!lines.length && <div className="si-empty">{L("উপরে পণ্য খুঁজে যোগ করুন", "Search above and add products")}</div>}
             {lines.length > 0 && (mobile ? lines.map((l) => {
               const cur = stockOf(l.productId);
               const r = resolved(l);
               const after = cur == null || !r ? null : cur + (r.direction === "out" ? -r.qty : r.qty);
               return (
-                <div key={l.productId} className="si-mrow" style={{ cursor: "default" }}>
+                <div key={l.productId} className="si-mrow"style={{ cursor: "default" }}>
                   <div className="si-mrow-top">
                     <span>{l.name}</span>
-                    <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => removeLine(l.productId)}>✕</button>
+                    <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => removeLine(l.productId)}>✕</button>
                   </div>
                   <div className="si-mrow-sub"><span>{l.code || ""}</span><span>{L("এখন", "Now")} <b>{cur == null ? "…" : fq(cur)}</b> {l.unit}</span></div>
                   <div style={{ marginTop: 4 }}>{modeButtons(l, (patch) => updLine(l.productId, patch))}</div>
-                  <div className="si-grid2" style={{ marginTop: 4, alignItems: "center" }}>
+                  <div className="si-grid2"style={{ marginTop: 4, alignItems: "center" }}>
                     {qtyInput(l, (patch) => updLine(l.productId, patch))}
                     <div style={{ textAlign: "right", fontWeight: 700, color: changeColor(r) }}>
                       {changeText(r)}
-                      {after != null && r?.qty > 0 && <div className="si-muted" style={{ fontWeight: 400 }}>{L("পরে", "After")}: {fq(after)}</div>}
+                      {after != null && r?.qty > 0 && <div className="si-muted"style={{ fontWeight: 400 }}>{L("পরে", "After")}: {fq(after)}</div>}
                     </div>
                   </div>
                 </div>
@@ -660,14 +660,14 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                     return (
                       <tr key={l.productId} className={r?.qty > 0 ? "is-editing" : undefined}>
                         <td className="si-center">{i + 1}</td>
-                        <td className="si-strong" title={l.name}>{l.name}</td>
+                        <td className="si-strong"title={l.name}>{l.name}</td>
                         <td>{l.code || ""}</td>
                         <td className="si-num">{cur == null ? "…" : fq(cur)} {l.unit}</td>
                         <td style={{ padding: "1px 2px" }}>{modeButtons(l, (patch) => updLine(l.productId, patch))}</td>
                         <td style={{ padding: "1px 2px" }}>{qtyInput(l, (patch) => updLine(l.productId, patch))}</td>
-                        <td className="si-num si-strong" style={{ color: changeColor(r) }}>{changeText(r)}</td>
-                        <td className="si-num" style={after != null && after < 0 ? { color: "#b91c1c", fontWeight: 700 } : undefined}>{after != null && r?.qty > 0 ? fq(after) : "—"}</td>
-                        <td className="si-center"><button type="button" className="pm-btn-secondary pm-btn--danger" style={{ minHeight: 17, padding: "0 5px" }} onClick={() => removeLine(l.productId)}>✕</button></td>
+                        <td className="si-num si-strong"style={{ color: changeColor(r) }}>{changeText(r)}</td>
+                        <td className="si-num"style={after != null && after < 0 ? { color: "#b91c1c", fontWeight: 700 } : undefined}>{after != null && r?.qty > 0 ? fq(after) : "—"}</td>
+                        <td className="si-center"><button type="button"className="pm-btn-secondary pm-btn--danger"style={{ minHeight: 17, padding: "0 5px" }} onClick={() => removeLine(l.productId)}>✕</button></td>
                       </tr>
                     );
                   })}
@@ -676,12 +676,12 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
             ))}
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {counting && !stockMap && <span className="si-hint">⏳ {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {counting && !stockMap && <span className="si-hint"> {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !lines.length || (counting && !stockMap)} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সমন্বয় সেভ", "Save Adjustment")}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !lines.length || (counting && !stockMap)} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সমন্বয় সেভ", "Save Adjustment")}`}
           </button>
         </div>
       </>
@@ -714,33 +714,33 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       if (next) { next.focus(); next.select?.(); }
     };
     const countInput = (p, idx) => (
-      <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" data-count-idx={idx}
+      <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"data-count-idx={idx}
         value={counted[p.id] ?? ""} onChange={(e) => setC(p.id, e.target.value)} onKeyDown={(e) => onCountKey(e, idx)}
         placeholder={L("গোনা", "Count")} style={{ textAlign: "right" }} />
     );
 
-    return shell(L("📋 ফিজিক্যাল স্টক গণনা", "📋 Physical Stock Count"), L("⚖️ স্টক সমন্বয়", "⚖️ Stock Adjustment"), (
+    return shell(L("ফিজিক্যাল স্টক গণনা", "Physical Stock Count"), L("স্টক সমন্বয়", "Stock Adjustment"), (
       <>
         <div className="si-toolbar">
-          <input type="date" className="pm-input" style={{ width: 130 }} value={countDate} onChange={(e) => setCountDate(e.target.value)} />
-          <select className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130 }} value={countBy} onChange={(e) => { setCountBy(e.target.value); setCountVal(""); }}>
+          <input type="date"className="pm-input"style={{ width: 130 }} value={countDate} onChange={(e) => setCountDate(e.target.value)} />
+          <select className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 130 }} value={countBy} onChange={(e) => { setCountBy(e.target.value); setCountVal(""); }}>
             <option value="">{L("সব পণ্য", "All products")}</option>
             <option value="company">{L("কোম্পানি / ব্র্যান্ড ধরে", "By company / brand")}</option>
             <option value="category">{L("ক্যাটাগরি ধরে", "By category")}</option>
-            <option value="rack">{L("র‍্যাক ধরে", "By rack")}</option>
+            <option value="rack">{L("র্যাক ধরে", "By rack")}</option>
           </select>
           {countBy && (
-            <select className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 170 }} value={countVal} onChange={(e) => setCountVal(e.target.value)}>
+            <select className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 170 }} value={countVal} onChange={(e) => setCountVal(e.target.value)}>
               <option value="">{L("— বেছে নিন —", "— Pick —")}</option>
               {groupOpts.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           )}
-          <div className="si-search" style={{ minWidth: 160, flex: 1 }}>
-            <input className="pm-input" value={countQ} onChange={(e) => setCountQ(e.target.value)} placeholder={L("নাম, কোড বা বারকোড…", "Name, code or barcode…")} />
-            {countQ && <button type="button" onClick={() => setCountQ("")}>✕</button>}
+          <div className="si-search"style={{ minWidth: 160, flex: 1 }}>
+            <input className="pm-input"value={countQ} onChange={(e) => setCountQ(e.target.value)} placeholder={L("নাম, কোড বা বারকোড…", "Name, code or barcode…")} />
+            {countQ && <button type="button"onClick={() => setCountQ("")}>✕</button>}
           </div>
-          <label className="pm-check"><input type="checkbox" checked={onlyInStock} onChange={(e) => setOnlyInStock(e.target.checked)} /> {L("শুধু যেগুলোর স্টক আছে", "Only items in stock")}</label>
-          <label className="pm-check"><input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> {L("শুধু পার্থক্য", "Only differences")}</label>
+          <label className="pm-check"><input type="checkbox"checked={onlyInStock} onChange={(e) => setOnlyInStock(e.target.checked)} /> {L("শুধু যেগুলোর স্টক আছে", "Only items in stock")}</label>
+          <label className="pm-check"><input type="checkbox"checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> {L("শুধু পার্থক্য", "Only differences")}</label>
         </div>
         <div className="si-kpis">
           <div className="si-kpi"><span>{L("তালিকায়", "On sheet")}</span><b>{sheet.length}</b></div>
@@ -750,10 +750,10 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
         </div>
         <div className="si-main is-all">
           <div className="si-box">
-            {!stockMap && <div className="si-empty">⏳ {L("স্টক লোড হচ্ছে…", "Loading stock…")}</div>}
+            {!stockMap && <div className="si-empty"> {L("স্টক লোড হচ্ছে…", "Loading stock…")}</div>}
             {stockMap && !sheet.length && <div className="si-empty">{L("এই ফিল্টারে কোনো পণ্য নেই", "No products for this filter")}</div>}
             {stockMap && sheet.length > 0 && (mobile ? shown.map((p, idx) => (
-              <div key={p.id} className="si-mrow" style={{ cursor: "default" }}>
+              <div key={p.id} className="si-mrow"style={{ cursor: "default" }}>
                 <div className="si-mrow-top"><span>{p.name}</span>{diffCell(p)}</div>
                 <div className="si-mrow-sub"><span>{[p.code, p.rackLocation].filter(Boolean).join(" · ")}</span><span>{L("সিস্টেম", "System")} <b>{stockOf(p.id) == null ? "…" : fq(stockOf(p.id))}</b> {p.unit || ""}</span></div>
                 <div style={{ marginTop: 4 }}>{countInput(p, idx)}</div>
@@ -764,7 +764,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                   <th style={{ width: 36 }} className="si-center">#</th>
                   <th>{L("পণ্য", "Item")}</th>
                   <th style={{ width: 120 }}>{L("কোড", "Code")}</th>
-                  <th style={{ width: 90 }}>{L("র‍্যাক", "Rack")}</th>
+                  <th style={{ width: 90 }}>{L("র্যাক", "Rack")}</th>
                   <th style={{ width: 100 }} className="si-num">{L("সিস্টেম স্টক", "System")}</th>
                   <th style={{ width: 120 }} className="si-num">{L("গুনে পাওয়া", "Counted")}</th>
                   <th style={{ width: 100 }} className="si-num">{L("পার্থক্য", "Difference")}</th>
@@ -774,7 +774,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                   {shown.map((p, idx) => (
                     <tr key={p.id} className={diffOf(p) ? "is-editing" : undefined}>
                       <td className="si-center">{idx + 1}</td>
-                      <td className="si-strong" title={p.name}>{p.name}</td>
+                      <td className="si-strong"title={p.name}>{p.name}</td>
                       <td>{p.code || ""}</td>
                       <td>{p.rackLocation || ""}</td>
                       <td className="si-num">{stockOf(p.id) == null ? "…" : fq(stockOf(p.id))}</td>
@@ -788,26 +788,26 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
             ))}
             {sheet.length > shown.length && (
               <div style={{ padding: 8, textAlign: "center" }}>
-                <button type="button" className="pm-btn-secondary" onClick={() => setCountLimit((x) => x + 300)}>
+                <button type="button"className="pm-btn-secondary"onClick={() => setCountLimit((x) => x + 300)}>
                   {L(`আরও দেখাও (${sheet.length - shown.length}টি বাকি)`, `Show more (${sheet.length - shown.length} left)`)}
                 </button>
               </div>
             )}
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" disabled={!stockMap} onClick={() => printCountSheet(sheet, false)}>🖨️ {L("খালি গণনা শীট", "Blank count sheet")}</button>}
-          {canPrint && <button type="button" className="pm-btn-secondary" disabled={!stockMap || !sum.entered} onClick={() => printCountSheet(sheet, true)}>🖨️ {L("ফলাফল প্রিন্ট", "Print result")}</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"disabled={!stockMap} onClick={() => printCountSheet(sheet, false)}> {L("খালি গণনা শীট", "Blank count sheet")}</button>}
+          {canPrint && <button type="button"className="pm-btn-secondary"disabled={!stockMap || !sum.entered} onClick={() => printCountSheet(sheet, true)}> {L("ফলাফল প্রিন্ট", "Print result")}</button>}
           {sum.entered > 0 && (
-            <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => {
+            <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => {
               if (window.confirm(L("সব গোনা সংখ্যা মুছে নতুন করে শুরু করবেন?", "Clear all counted numbers and start over?"))) setCounted({});
-            }}>🧹 {L("মুছে নতুন", "Clear")}</button>
+            }}> {L("মুছে নতুন", "Clear")}</button>
           )}
-          <span className="si-hint">💾 {L("গোনা সংখ্যা এই ডিভাইসে নিজে থেকে সেভ থাকে — পরে এসে বাকিটা গুনতে পারবেন", "Counts are kept on this device — you can come back and finish later")}</span>
+          <span className="si-hint"> {L("গোনা সংখ্যা এই ডিভাইসে নিজে থেকে সেভ থাকে — পরে এসে বাকিটা গুনতে পারবেন", "Counts are kept on this device — you can come back and finish later")}</span>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !stockMap || !sum.entered} onClick={saveCount}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `✅ ${L(`গণনা শেষ — ${sum.diffs.length}টি পার্থক্য সমন্বয় করুন`, `Finish — adjust ${sum.diffs.length} difference(s)`)}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !stockMap || !sum.entered} onClick={saveCount}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L(`গণনা শেষ — ${sum.diffs.length}টি পার্থক্য সমন্বয় করুন`, `Finish — adjust ${sum.diffs.length} difference(s)`)}`}
           </button>
         </div>
       </>
@@ -817,18 +817,18 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
   if (view === "detail" && sel) {
     const r = rows.find((x) => x.id === sel.id) || sel;
     const afterOf = (it) => (it.stockBefore == null ? null : n2(it.stockBefore) + (it.direction === "out" ? -n2(it.qty) : n2(it.qty)));
-    return shell(<>{r.adjustNo} {badge(r)}</>, L("⚖️ স্টক সমন্বয়", "⚖️ Stock Adjustment"), (
+    return shell(<>{r.adjustNo} {badge(r)}</>, L("স্টক সমন্বয়", "Stock Adjustment"), (
       <>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-cols"} style={{ paddingTop: 3 }}>
-              <div className="si-panel-body" style={{ paddingTop: 0 }}>
+              <div className="si-panel-body"style={{ paddingTop: 0 }}>
                 {vRow(L("নম্বর", "No"), r.adjustNo, { strong: true, color: ACCENT })}
                 {vRow(L("তারিখ", "Date"), fmtDay(r.adjustDate))}
                 {vRow(L("কারণ", "Reason"), reasonLabel(r.reason))}
               </div>
-              <div className="si-panel-body" style={{ paddingTop: 0 }}>
+              <div className="si-panel-body"style={{ paddingTop: 0 }}>
                 {vRow(L("নোট", "Note"), r.note || "—")}
                 {vRow(L("লিখেছেন", "By"), r.createdByName || "—")}
                 {r.status === "cancelled" && vRow(L("বাতিল", "Cancelled"), fmtDay(r.cancelledAt), { color: "#b91c1c" })}
@@ -837,7 +837,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
           </fieldset>
           <div className="si-box">
             {mobile ? (r.items || []).map((it, i) => (
-              <div key={i} className="si-mrow" style={{ cursor: "default" }}>
+              <div key={i} className="si-mrow"style={{ cursor: "default" }}>
                 <div className="si-mrow-top"><span>{i + 1}. {it.name}</span><span style={{ color: it.direction === "out" ? "#b91c1c" : "#15803d" }}>{it.direction === "out" ? "−" : "+"}{fq(it.qty)} {it.unit}</span></div>
                 <div className="si-mrow-sub"><span>{it.code || ""}</span><span>{L("আগে", "Before")} <b>{it.stockBefore == null ? "—" : fq(it.stockBefore)}</b>{afterOf(it) != null ? <> → <b>{fq(afterOf(it))}</b></> : null}</span></div>
               </div>
@@ -857,11 +857,11 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                   {(r.items || []).map((it, i) => (
                     <tr key={i}>
                       <td className="si-center">{i + 1}</td>
-                      <td className="si-strong" title={it.name}>{it.name}</td>
+                      <td className="si-strong"title={it.name}>{it.name}</td>
                       <td>{it.code || ""}</td>
                       <td className="si-num">{it.stockBefore == null ? "—" : fq(it.stockBefore)}</td>
                       <td className="si-num">{it.countedQty == null ? "—" : fq(it.countedQty)}</td>
-                      <td className="si-num si-strong" style={{ color: it.direction === "out" ? "#b91c1c" : "#15803d" }}>{it.direction === "out" ? "−" : "+"}{fq(it.qty)}</td>
+                      <td className="si-num si-strong"style={{ color: it.direction === "out" ? "#b91c1c" : "#15803d" }}>{it.direction === "out" ? "−" : "+"}{fq(it.qty)}</td>
                       <td className="si-num">{afterOf(it) == null ? "—" : fq(afterOf(it))}</td>
                       <td>{it.unit || ""}</td>
                     </tr>
@@ -871,12 +871,12 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
             )}
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
-          {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => cancelAdj(r)}>⛔ {L("বাতিল করুন", "Cancel")}</button>}
-          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteAdj(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canCancel(r) && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => cancelAdj(r)}> {L("বাতিল করুন", "Cancel")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => deleteAdj(r)}> {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));

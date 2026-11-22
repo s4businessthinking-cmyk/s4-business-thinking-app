@@ -37,7 +37,7 @@ export default function PeriodLockPanel({ lang = "bn", th, s, shop, user, profil
         history: [...history, { lockDate: lockDate || "", at, by, note: note.trim() }],
       });
       setDate(lockDate || "");
-      toast?.(lockDate ? L(`🔒 ${lockDate} পর্যন্ত হিসাব বন্ধ করা হলো`, `🔒 Books locked up to ${lockDate}`) : L("🔓 লক খুলে দেওয়া হলো", "🔓 Lock removed"));
+      toast?.(lockDate ? L(` ${lockDate} পর্যন্ত হিসাব বন্ধ করা হলো`, `Books locked up to ${lockDate}`) : L("লক খুলে দেওয়া হলো", "Lock removed"));
     } catch (e) {
       toast?.(e?.message || String(e), "err");
     } finally {
@@ -46,7 +46,7 @@ export default function PeriodLockPanel({ lang = "bn", th, s, shop, user, profil
   };
 
   const quick = (label, value) => (
-    <button type="button" style={{ ...s.addCoBtn, padding: "6px 10px", fontSize: 12 }} onClick={() => setDate(value)}>{label}</button>
+    <button type="button"style={{ ...s.addCoBtn, padding: "6px 10px", fontSize: 12 }} onClick={() => setDate(value)}>{label}</button>
   );
 
   return (
@@ -55,14 +55,14 @@ export default function PeriodLockPanel({ lang = "bn", th, s, shop, user, profil
         <div style={s.settingsLbl}>{L("বর্তমান অবস্থা", "Current status")}</div>
         {current.lockDate ? (
           <div style={{ fontSize: 14, color: th.txtPrimary, lineHeight: 1.6 }}>
-            🔒 <b>{current.lockDate}</b> {L("পর্যন্ত হিসাব বন্ধ", "— books closed up to this date")}
+             <b>{current.lockDate}</b> {L("পর্যন্ত হিসাব বন্ধ", "— books closed up to this date")}
             <div style={{ fontSize: 12, color: "#71717a" }}>
               {current.lockedByName && `${L("করেছেন", "By")}: ${current.lockedByName} · `}{String(current.lockedAt || "").slice(0, 10)}
               {current.note && ` · ${current.note}`}
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 13, color: "#71717a" }}>🔓 {L("কোনো লক নেই — যেকোনো তারিখের এন্ট্রি এডিট করা যায়।", "Not locked — entries of any date can be edited.")}</div>
+          <div style={{ fontSize: 13, color: "#71717a" }}> {L("কোনো লক নেই — যেকোনো তারিখের এন্ট্রি এডিট করা যায়।", "Not locked — entries of any date can be edited.")}</div>
         )}
       </div>
 
@@ -76,12 +76,12 @@ export default function PeriodLockPanel({ lang = "bn", th, s, shop, user, profil
           {quick(L(`গত মাস শেষ (${lastMonthEnd})`, `Last month end (${lastMonthEnd})`), lastMonthEnd)}
           {quick(L(`গত বছর শেষ (${lastYearEnd})`, `Last year end (${lastYearEnd})`), lastYearEnd)}
         </div>
-        <input type="date" style={{ ...s.inp, marginBottom: 8 }} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
+        <input type="date"style={{ ...s.inp, marginBottom: 8 }} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
         <input style={{ ...s.inp, marginBottom: 10 }} placeholder={L("নোট (যেমন: ২০২৫ সালের হিসাব অডিট শেষ)", "Note (e.g. 2025 audit finished)")} value={note} onChange={(e) => setNote(e.target.value)} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button type="button" style={{ ...s.sendBtn, flex: 1 }} disabled={busy || !date} onClick={() => save(date)}>🔒 {L("হিসাব বন্ধ / লক করুন", "Close / lock books")}</button>
+          <button type="button"style={{ ...s.sendBtn, flex: 1 }} disabled={busy || !date} onClick={() => save(date)}> {L("হিসাব বন্ধ / লক করুন", "Close / lock books")}</button>
           {current.lockDate && (
-            <button type="button" style={{ ...s.addCoBtn, borderColor: "#450a0a", color: "#ef4444" }} disabled={busy} onClick={() => save("")}>🔓 {L("লক খুলুন", "Unlock")}</button>
+            <button type="button"style={{ ...s.addCoBtn, borderColor: "#450a0a", color: "#ef4444" }} disabled={busy} onClick={() => save("")}> {L("লক খুলুন", "Unlock")}</button>
           )}
         </div>
       </div>
@@ -91,7 +91,7 @@ export default function PeriodLockPanel({ lang = "bn", th, s, shop, user, profil
           <div style={s.settingsLbl}>{L("লকের ইতিহাস", "Lock history")}</div>
           {[...current.history].reverse().map((h, i) => (
             <div key={i} style={{ fontSize: 12, color: th.txtPrimary, padding: "6px 0", borderTop: i ? `1px solid ${th.border}` : "none" }}>
-              {h.lockDate ? `🔒 ${h.lockDate}` : `🔓 ${L("খোলা", "Unlocked")}`} · <span style={{ color: "#71717a" }}>{String(h.at || "").slice(0, 16).replace("T", " ")} · {h.by}{h.note ? ` · ${h.note}` : ""}</span>
+              {h.lockDate ? ` ${h.lockDate}` : ` ${L("খোলা", "Unlocked")}`} · <span style={{ color: "#71717a" }}>{String(h.at || "").slice(0, 16).replace("T", " ")} · {h.by}{h.note ? ` · ${h.note}` : ""}</span>
             </div>
           ))}
         </div>

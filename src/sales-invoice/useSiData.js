@@ -26,6 +26,8 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
   const [siSaving,setSiSaving]     = useState(false);
   const siSaveLockRef = useRef(false);
   const [siSearch,setSiSearch]     = useState("");
+  const [siVehicleQ,setSiVehicleQ] = useState("");
+  const [siRefQ,setSiRefQ]         = useState("");
   const [siStatusF,setSiStatusF]   = useState("ALL");
   const [siViewAll,setSiViewAll]   = useState(seeAll);
 
@@ -43,6 +45,7 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
   const [cashRcptSaving,setCashRcptSaving] = useState(false);
   const [cashReceiptWin,setCashReceiptWin] = useState(null); // null | {} | { partyId, partyName, invoiceId } | { viewId }
   const [ledgerWin,setLedgerWin]       = useState(false);
+  const [siLedgerPartyKey,setSiLedgerPartyKey] = useState(null);
   const [siNavReturn,setSiNavReturn]   = useState(null); // null | "ledger"
 
   useEffect(()=>{
@@ -110,12 +113,22 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
         .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) })));
 
       if (Array.isArray(mergeSource)) {
+        // Cloud first, then local wins when dirty OR local stamp is newer (stale snapshot race).
+        const stampOf = (inv) => {
+          const t = Date.parse(inv?._offline_updated_at || inv?.updatedAt || inv?.createdAt || "");
+          return Number.isFinite(t) ? t : 0;
+        };
         const merged = new Map(mergeSource.map(inv => [String(inv.id), inv]));
         records
-          .filter(r => Number(r?.dirty || 0) === 1)
-          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
-          .filter(inv => inv.shopId === shopId && (seeAll || inv.createdBy === user.uid))
-          .forEach(inv => merged.set(String(inv.id), inv));
+          .map(r => ({ row: r, inv: { ...(r.data || r), id: (r.data?.id || r.document_id || r.id) } }))
+          .filter(({ inv }) => inv.shopId === shopId && (seeAll || inv.createdBy === user.uid))
+          .forEach(({ row, inv }) => {
+            const id = String(inv.id);
+            const cloud = merged.get(id);
+            if (!cloud || Number(row?.dirty || 0) === 1 || stampOf(inv) >= stampOf(cloud)) {
+              merged.set(id, inv);
+            }
+          });
         const rows = sortSiInvoices(filterSiRows([...merged.values()]));
         setInvoices(rows);
         return rows.length;
@@ -184,5 +197,5 @@ export function useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, i
       .catch(err=>console.warn("[S4 DN] legacy delivery note scan failed", err));
     return ()=>{ cancelled=true; };
   },[isDN, shopId]);
-  return { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiPrintModal, setSiPrintPayAsk, setSiSaving, setSiSearch, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siPrintModal, siPrintPayAsk, siQtyRef, siSaveLockRef, siSaving, siSearch, siSnapRef, siStatusF };
+  return { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiLedgerPartyKey, setSiPrintModal, setSiPrintPayAsk, setSiSaving, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siLedgerPartyKey, siPrintModal, siPrintPayAsk, siQtyRef, siSaveLockRef, siSaving, siSearch, siVehicleQ, siRefQ, siSnapRef, siStatusF };
 }

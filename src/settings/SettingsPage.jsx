@@ -22,34 +22,34 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
         const btCopy = isOwner ? branchTransferSettingsCopy(lang, branchTransferSettings.enabled) : null;
         const may = (key) => isOwner || (profile?.permissions || {})[key] === true;
         const items = [
-          { id:"profile", icon:"👤", label:plain(t.profileTitle), sub:profile.personName },
-          isOwner && { id:"period", icon:"📅", label:bnS?"হিসাব বছর বন্ধ / লক":"Accounting period lock", sub:periodLock.lockDate?(bnS?`${periodLock.lockDate} পর্যন্ত বন্ধ`:`Closed up to ${periodLock.lockDate}`):(bnS?"লক নেই — পুরোনো এন্ট্রি বন্ধ করুন":"Not locked — close old entries") },
-          isOwner && { id:"pin", icon:"🔒", label:bnS?"মালিকের পিন":"Owner PIN", sub:bnS?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN", action:()=>setPinModal("reset") },
-          localShop && { id:"shop", icon:"🏢", label:plain(t.shopInfoTitle), sub:`${localShop.companyName||""}${!isOwner?(bnS?" · শুধু দেখা":" · View only"):""}` },
-          isOwner && { id:"invite", icon:"🔗", label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` },
-          (isOwner || team.length>0) && { id:"team", icon:"👥", label:plain(t.teamTitle), sub:`${team.length} ${bnS?"জন সদস্য":"members"}` },
-          isOwner && { id:"groups", icon:"🛡️", label:bnS?"ইউজার গ্রুপ ও অনুমতি":"User groups & privileges", sub:`${userGroups.length} ${bnS?"টি গ্রুপ · দেখা / যোগ / এডিট / বাতিল / প্রিন্ট":"groups · view / add / edit / delete / print"}` },
-          isOwner && { id:"orderModule", icon:"🧾", label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") },
-          isOwner && { id:"branchTransfer", icon:"🚚", label:btCopy.title, sub:btCopy.subtitle },
-          isOwner && { id:"wastyle", icon:"💬", label:"WhatsApp Message Style", sub:WA_STYLES.find(w=>w.id===waStyle)?.[bnS?"labelBn":"labelEn"]||"" },
-          { id:"theme", icon:theme==="dark"?"🌙":"☀️", label:bnS?"থিম / রঙ":"Theme", sub:theme==="dark"?(bnS?"ডার্ক মোড":"Dark Mode"):(bnS?"লাইট মোড":"Light Mode") },
-          { id:"language", icon:"🌐", label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" },
-          { id:"print", icon:"🖨️", label:bnS?"প্রিন্ট সেটিংস":"Print Settings", sub:bnS?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview", action:()=>setPrintSettingsOpen(true) },
-          { id:"sync", icon:syncState==="connected"?"🟢":syncState==="offline"?"🔴":syncState==="reconnecting"?"🟠":"🟡", label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." },
-          (isOwner || may("manageBackup")) && { id:"backup", icon:"💾", label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" },
-          { id:"license", icon:"🔐", label:bnS?"লাইসেন্স স্ট্যাটাস":"License status", sub:bnS?"ঐচ্ছিক লাইসেন্স অ্যাক্টিভেশন":"Optional license activation" },
-          { id:"update", icon:"🔄", label:plain(t.updateTitle), sub:`v${APP_VERSION} · ${t.updateSub}` },
-          { id:"help", icon:"❓", label:plain(t.helpTitle), sub:t.helpMenuSub },
+          { id:"profile", icon:"", label:plain(t.profileTitle), sub:profile.personName },
+          isOwner && { id:"period", icon:"", label:bnS?"হিসাব বছর বন্ধ / লক":"Accounting period lock", sub:periodLock.lockDate?(bnS?`${periodLock.lockDate} পর্যন্ত বন্ধ`:`Closed up to ${periodLock.lockDate}`):(bnS?"লক নেই — পুরোনো এন্ট্রি বন্ধ করুন":"Not locked — close old entries") },
+          isOwner && { id:"pin", icon:"", label:bnS?"মালিকের পিন":"Owner PIN", sub:bnS?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN", action:()=>setPinModal("reset") },
+          localShop && { id:"shop", icon:"", label:plain(t.shopInfoTitle), sub:`${localShop.companyName||""}${!isOwner?(bnS?" · শুধু দেখা":" · View only"):""}` },
+          isOwner && { id:"invite", icon:"", label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` },
+          (isOwner || team.length>0) && { id:"team", icon:"", label:plain(t.teamTitle), sub:`${team.length} ${bnS?"জন সদস্য":"members"}` },
+          isOwner && { id:"groups", icon:"", label:bnS?"ইউজার গ্রুপ ও অনুমতি":"User groups & privileges", sub:`${userGroups.length} ${bnS?"টি গ্রুপ · দেখা / যোগ / এডিট / বাতিল / প্রিন্ট":"groups · view / add / edit / delete / print"}` },
+          isOwner && { id:"orderModule", icon:"", label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") },
+          isOwner && { id:"branchTransfer", icon:"", label:btCopy.title, sub:btCopy.subtitle },
+          isOwner && { id:"wastyle", icon:"", label:"WhatsApp Message Style", sub:WA_STYLES.find(w=>w.id===waStyle)?.[bnS?"labelBn":"labelEn"]||"" },
+          { id:"theme", icon:theme==="dark"?"":"", label:bnS?"থিম / রঙ":"Theme", sub:theme==="dark"?(bnS?"ডার্ক মোড":"Dark Mode"):(bnS?"লাইট মোড":"Light Mode") },
+          { id:"language", icon:"", label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" },
+          { id:"print", icon:"", label:bnS?"প্রিন্ট সেটিংস":"Print Settings", sub:bnS?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview", action:()=>setPrintSettingsOpen(true) },
+          { id:"sync", icon:syncState==="connected"?"":syncState==="offline"?"":syncState==="reconnecting"?"":"", label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." },
+          (isOwner || may("manageBackup")) && { id:"backup", icon:"", label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" },
+          { id:"license", icon:"", label:bnS?"লাইসেন্স স্ট্যাটাস":"License status", sub:bnS?"ঐচ্ছিক লাইসেন্স অ্যাক্টিভেশন":"Optional license activation" },
+          { id:"update", icon:"", label:plain(t.updateTitle), sub:`v${APP_VERSION} · ${t.updateSub}` },
+          { id:"help", icon:"", label:plain(t.helpTitle), sub:t.helpMenuSub },
         ].filter(Boolean);
         const openItem = (it)=>{ if (it.action) it.action(); else setSettingsPage(it.id); };
         const current = items.find(it=>it.id===stPage);
         const settingGroups = [
-          { key:"company", label:bnS?"🏢 অ্যাকাউন্ট ও দোকান":"🏢 Account & Company", ids:["profile","shop","pin","period","license"] },
-          { key:"team", label:bnS?"👥 টিম":"👥 Team", ids:["team","groups","invite"] },
-          { key:"features", label:bnS?"🧩 ফিচার":"🧩 Features", ids:["orderModule","branchTransfer","wastyle"] },
-          { key:"display", label:bnS?"🎨 দেখা ও প্রিন্ট":"🎨 Display & Print", ids:["print","theme","language"] },
-          { key:"data", label:bnS?"💾 ডেটা ও সিস্টেম":"💾 Data & System", ids:["backup","sync","update"] },
-          { key:"help", label:bnS?"❓ সাহায্য":"❓ Help", ids:["help"] },
+          { key:"company", label:bnS?"অ্যাকাউন্ট ও দোকান":"Account & Company", ids:["profile","shop","pin","period","license"] },
+          { key:"team", label:bnS?"টিম":"Team", ids:["team","groups","invite"] },
+          { key:"features", label:bnS?"ফিচার":"Features", ids:["orderModule","branchTransfer","wastyle"] },
+          { key:"display", label:bnS?"দেখা ও প্রিন্ট":"Display & Print", ids:["print","theme","language"] },
+          { key:"data", label:bnS?"ডেটা ও সিস্টেম":"Data & System", ids:["backup","sync","update"] },
+          { key:"help", label:bnS?"সাহায্য":"Help", ids:["help"] },
         ].map(g=>({ ...g, items:g.ids.map(id=>items.find(it=>it.id===id)).filter(Boolean) }))
           .concat([{ key:"other", label:"", items:items.filter(it=>!["profile","shop","pin","period","license","team","groups","invite","positions","orderModule","branchTransfer","wastyle","print","theme","language","backup","sync","update","help"].includes(it.id)) }])
           .filter(g=>g.items.length);
@@ -82,13 +82,13 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
           <div className={isDesktop?"st-pc":undefined}>
             {isDesktop ? (
               <aside className="st-side">
-                <div className="st-side-head">⚙️ {plain(t.settingsTitle)}</div>
+                <div className="st-side-head"> {plain(t.settingsTitle)}</div>
                 <div className="st-list">
                   {settingGroups.map((g,gi)=>(
                     <Fragment key={g.key}>
                       {groupHead(g.label, gi===0)}
                       {g.items.map(it=>(
-                        <button key={it.id} type="button" className={`st-item${stPage===it.id?" is-active":""}`} onClick={()=>openItem(it)} title={it.sub}>
+                        <button key={it.id} type="button"className={`st-item${stPage===it.id?"is-active":""}`} onClick={()=>openItem(it)} title={it.sub}>
                           <span className="st-ic">{it.icon}</span>
                           <span className="st-tx"><b>{it.label}</b><small>{it.sub}</small></span>
                         </button>
@@ -96,7 +96,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                     </Fragment>
                   ))}
                 </div>
-                <button type="button" className="st-out" onClick={handleLogout}>🚪 {t.logout}</button>
+                <button type="button"className="st-out"onClick={handleLogout}> {t.logout}</button>
               </aside>
             ) : !settingsPage&&(
               <>
@@ -116,7 +116,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                     ))}
                   </Fragment>
                 ))}
-                <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}>🚪 {t.logout}</button>
+                <button style={{ ...s.logoutBtn, marginTop:16 }} onClick={handleLogout}> {t.logout}</button>
               </>
             )}
             <section className={isDesktop?"st-main":undefined}>
@@ -137,11 +137,11 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
               <div style={s.card}>
                 <div style={s.settingsLbl}>{t.profileTitle}</div>
                 <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"🏢":"👨‍💼"}</div>
+                  <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"":""}</div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{profile.personName}</div>
                     <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-                    <div style={{ fontSize:12, color:"#71717a" }}>📱 {profile.mobile} · {profile.area}, {profile.countryName}</div>
+                    <div style={{ fontSize:12, color:"#71717a" }}> {profile.mobile} · {profile.area}, {profile.countryName}</div>
                   </div>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                   {inviteCodes.filter(c=>c.used).map(c=>(
                     <div key={c.code} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderTop:`1px solid ${th.border}` }}>
                       <span style={{ fontSize:13, fontWeight:700, color:th.txtMuted, fontFamily:"monospace", flex:1, letterSpacing:1 }}>{c.code}</span>
-                      <span style={{ fontSize:11, color:th.txtMuted }}>✅ {c.usedByName||"—"}</span>
+                      <span style={{ fontSize:11, color:th.txtMuted }}> {c.usedByName||"—"}</span>
                     </div>
                   ))}
                 </div>
@@ -218,17 +218,17 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                       : "Each staff member has their own username and password — a group does not share a login. The owner can later tick any permission on Team or Groups."}
                   </div>
                   <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.personName} value={staffForm.personName} onChange={e=>setStaffForm(p=>({...p,personName:e.target.value}))} />
-                  <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.usernameLbl} value={staffForm.username} onChange={e=>setStaffForm(p=>({...p,username:e.target.value}))} autoComplete="off" autoCapitalize="none" data-caps="off" />
-                  <input style={{ ...s.inp, marginBottom:8 }} type="password" placeholder={t.passwordLbl} value={staffForm.password} onChange={e=>setStaffForm(p=>({...p,password:e.target.value}))} autoComplete="new-password" />
-                  <input style={{ ...s.inp, marginBottom:8 }} type="tel" placeholder={t.mobileLbl} value={staffForm.mobile} onChange={e=>setStaffForm(p=>({...p,mobile:e.target.value}))} />
+                  <input style={{ ...s.inp, marginBottom:8 }} placeholder={t.usernameLbl} value={staffForm.username} onChange={e=>setStaffForm(p=>({...p,username:e.target.value}))} autoComplete="off"autoCapitalize="none"data-caps="off" />
+                  <input style={{ ...s.inp, marginBottom:8 }} type="password"placeholder={t.passwordLbl} value={staffForm.password} onChange={e=>setStaffForm(p=>({...p,password:e.target.value}))} autoComplete="new-password" />
+                  <input style={{ ...s.inp, marginBottom:8 }} type="tel"placeholder={t.mobileLbl} value={staffForm.mobile} onChange={e=>setStaffForm(p=>({...p,mobile:e.target.value}))} />
                   <select style={{ ...s.sel, marginBottom:10 }} value={staffForm.position} onChange={e=>setStaffForm(p=>({...p,position:e.target.value}))}>
                     <option value="Salesman">{t.defaultPosition}</option>
                     {(localShop?.positions||[]).map(p=><option key={p} value={p}>{p}</option>)}
                   </select>
                   {userGroups.length>0&&(
                     <select style={{ ...s.sel, marginBottom:10 }} value={staffForm.groupId||""} onChange={e=>setStaffForm(p=>({...p,groupId:e.target.value}))}>
-                      <option value="">{lang==="bn"?"🛡️ ইউজার গ্রুপ — নেই (সাধারণ অনুমতি)":"🛡️ User group — none (default permissions)"}</option>
-                      {userGroups.map(g=><option key={g.id} value={g.id}>🛡️ {g.name}</option>)}
+                      <option value="">{lang==="bn"?"ইউজার গ্রুপ — নেই (সাধারণ অনুমতি)":"User group — none (default permissions)"}</option>
+                      {userGroups.map(g=><option key={g.id} value={g.id}> {g.name}</option>)}
                     </select>
                   )}
                   <button style={s.sendBtn} onClick={createStaffMember} disabled={staffSaving}>{staffSaving?"...":t.addStaffBtn}</button>
@@ -247,14 +247,14 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                   return (
                 <div key={memberId} style={{ padding:"10px 0", borderTop:idx>0?`1px solid ${th.border}`:"none" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:isOwner&&m.role!=="owner"&&memberId!==user.uid?10:0 }}>
-                    <div style={{ width:34, height:34, borderRadius:"50%", background:th.border, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"🏢":"👨‍💼"}</div>
+                    <div style={{ width:34, height:34, borderRadius:"50%", background:th.border, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>{m.role==="owner"?"":""}</div>
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{m.personName}{memberId===user.uid&&<span style={{ color:"#f97316", fontSize:11 }}> ({t.youLabel})</span>}</div>
                       <div style={{ fontSize:11, color:"#71717a" }}>
                         {m.role==="owner"?t.ownerLabel:(m.position||t.salesmanLabel)}
                         {m.username&&<span> · @{m.username}</span>}
-                        {m.email&&<span> · ✉️ {m.email}</span>}
-                        {m.mobile&&<span> · 📱 {m.mobile}</span>}
+                        {m.email&&<span> ·  {m.email}</span>}
+                        {m.mobile&&<span> ·  {m.mobile}</span>}
                         {m.area&&<span> · {m.area}</span>}
                       </div>
                     </div>
@@ -277,7 +277,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                         return (
                           <>
                             <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, marginBottom:8, flexWrap:"wrap" }}>
-                              <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase" }}>🛡️ {lang==="bn"?"ইউজার গ্রুপ":"User group"}</span>
+                              <span style={{ fontSize:12, color:"#71717a", fontWeight:700, textTransform:"uppercase" }}> {lang==="bn"?"ইউজার গ্রুপ":"User group"}</span>
                               <div style={{ display:"flex", alignItems:"center", gap:6 }}>
                                 {gs.custom&&<span style={{ fontSize:10, color:"#f59e0b", fontWeight:700 }}>{lang==="bn"?"কাস্টম বদল":"Customised"}</span>}
                                 <select style={{ ...s.sel, flex:"unset", width:"auto", fontSize:12, padding:"5px 8px" }}
@@ -286,13 +286,13 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                                   <option value="">{lang==="bn"?"— গ্রুপ নেই (নিজস্ব) —":"— No group (custom) —"}</option>
                                   {userGroups.map(g=><option key={g.id} value={g.id}>{g.name}</option>)}
                                 </select>
-                                {gs.custom&&<button type="button" style={{ ...s.addCoBtn, padding:"4px 8px", fontSize:11 }} onClick={()=>applyGroupToMember(m, gs.group, { notify:true })}>{lang==="bn"?"গ্রুপ অনুযায়ী করুন":"Reset to group"}</button>}
+                                {gs.custom&&<button type="button"style={{ ...s.addCoBtn, padding:"4px 8px", fontSize:11 }} onClick={()=>applyGroupToMember(m, gs.group, { notify:true })}>{lang==="bn"?"গ্রুপ অনুযায়ী করুন":"Reset to group"}</button>}
                               </div>
                             </div>
                             {userGroups.length===0&&(
                               <div style={{ fontSize:11, color:"#71717a", marginBottom:8 }}>
                                 {lang==="bn"?"গ্রুপ বানাতে: সেটিংস → ইউজার গ্রুপ ও অনুমতি।":"Create groups in Settings → User groups & privileges."}
-                                {" "}<button type="button" style={{ background:"none", border:"none", color:"#f97316", cursor:"pointer", fontSize:11, fontWeight:700, padding:0 }} onClick={()=>setSettingsPage("groups")}>{lang==="bn"?"খুলুন →":"Open →"}</button>
+                                {" "}<button type="button"style={{ background:"none", border:"none", color:"#f97316", cursor:"pointer", fontSize:11, fontWeight:700, padding:0 }} onClick={()=>setSettingsPage("groups")}>{lang==="bn"?"খুলুন →":"Open →"}</button>
                               </div>
                             )}
                             <div style={{ fontSize:10, color:"#71717a", marginBottom:4, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>{t.permissionsTitle}</div>
@@ -310,7 +310,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                           <div style={{ height:1, background:th.bgCard, margin:"10px 0 8px" }} />
                           <div style={{ fontSize:10, color:"#71717a", marginBottom:8, textTransform:"uppercase", letterSpacing:0, fontWeight:700 }}>{t.resetPwLbl}</div>
                           <div style={s.row}>
-                            <input style={{ ...s.inp, flex:1 }} type="password" placeholder={t.resetPwLbl} value={staffPwReset[m.localUserId]||""}
+                            <input style={{ ...s.inp, flex:1 }} type="password"placeholder={t.resetPwLbl} value={staffPwReset[m.localUserId]||""}
                               onChange={e=>setStaffPwReset(prev=>({ ...prev, [m.localUserId]: e.target.value }))} autoComplete="new-password" />
                             <button style={s.savBtn} onClick={()=>resetStaffPassword(m)}>{t.resetPwBtn}</button>
                           </div>
@@ -365,7 +365,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
 
           {stPage==="orderModule"&&isOwner&&(
             <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"📋 Order Option":"📋 Order Option"}</div>
+              <div style={s.settingsLbl}>{lang==="bn"?"Order Option":"Order Option"}</div>
               <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.6, marginBottom:14 }}>
                 {lang==="bn"
                   ? "Single shop হলে এই option বন্ধ রাখতে পারেন। চালু করলে Orders/New Order দেখা যাবে (owner, salesman ও dashboard সবখানে)। বন্ধ থাকলে কারো কাছে দেখাবে না।"
@@ -388,7 +388,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
 
           {stPage==="wastyle"&&(
             <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"💬 WhatsApp Message Style":"💬 WhatsApp Message Style"}</div>
+              <div style={s.settingsLbl}>{lang==="bn"?"WhatsApp Message Style":"WhatsApp Message Style"}</div>
               <div style={{ fontSize:11, color:"#71717a", marginBottom:12 }}>
                 {lang==="bn"?"কোম্পানিকে WhatsApp করার সময় কোন style-এ message যাবে বেছে নিন":"Choose how messages look when sending to companies"}
               </div>
@@ -399,11 +399,11 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                     padding:"10px 12px", marginBottom:8, cursor:"pointer", fontFamily:"inherit" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
                     <span style={{ fontSize:12, fontWeight:700, color:waStyle===st.id?"#f97316":th.txtPrimary }}>
-                      {waStyle===st.id?"✅ ":""}{lang==="bn"?st.labelBn:st.labelEn}
+                      {waStyle===st.id?" ":""}{lang==="bn"?st.labelBn:st.labelEn}
                     </span>
                   </div>
                   <pre style={{ fontSize:11, color:th.txtMuted, margin:0, fontFamily:"monospace", whiteSpace:"pre-wrap", lineHeight:1.6 }}>
-                    {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._ 🙏 Thanks`}
+                    {lang==="bn"?`*পণ্যের তালিকা:*\n${st.previewBn}\n\n_দয়া করে দাম ও স্টক জানান।_  ধন্যবাদ`:`*Product List:*\n${st.previewEn}\n\n_Please share price and stock._  Thanks`}
                   </pre>
                 </button>
               ))}
@@ -422,31 +422,31 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
 
           {stPage==="theme"&&(
             <div style={s.card}>
-              <div style={s.settingsLbl}>{lang==="bn"?"🎨 থিম বেছে নিন":"🎨 Choose Theme"}</div>
+              <div style={s.settingsLbl}>{lang==="bn"?"থিম বেছে নিন":"Choose Theme"}</div>
               <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
                 <button onClick={()=>setTheme("dark")}
                   style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
                     border:`2px solid ${theme==="dark"?"#f97316":th.border}`,
                     background:theme==="dark"?"rgba(249,115,22,0.08)":"transparent",
                     cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
-                  <span style={{ fontSize:28 }}>🌙</span>
+                  <span style={{ fontSize:28 }}></span>
                   <div>
                     <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"ডার্ক মোড":"Dark Mode"}</div>
                     <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"চোখে আরামদায়ক অন্ধকার থিম":"Easy on the eyes dark theme"}</div>
                   </div>
-                  {theme==="dark"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
+                  {theme==="dark"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}></span>}
                 </button>
                 <button onClick={()=>setTheme("light")}
                   style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", borderRadius:12,
                     border:`2px solid ${theme==="light"?"#f97316":th.border}`,
                     background:theme==="light"?"rgba(249,115,22,0.08)":"transparent",
                     cursor:"pointer", fontFamily:"inherit", textAlign:"left", width:"100%" }}>
-                  <span style={{ fontSize:28 }}>☀️</span>
+                  <span style={{ fontSize:28 }}></span>
                   <div>
                     <div style={{ fontSize:14, fontWeight:700, color:th.txtPrimary }}>{lang==="bn"?"লাইট মোড":"Light Mode"}</div>
                     <div style={{ fontSize:12, color:th.txtMuted }}>{lang==="bn"?"উজ্জ্বল সাদা থিম":"Bright white theme"}</div>
                   </div>
-                  {theme==="light"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}>✅</span>}
+                  {theme==="light"&&<span style={{ marginLeft:"auto", color:"#f97316", fontSize:18 }}></span>}
                 </button>
               </div>
             </div>

@@ -37,7 +37,7 @@ export default function ProductListGrid({
           onChange={(e) => onSearchChange(e.target.value)}
         />
       )}
-      <div className="pm-list-scroll" onScroll={onScroll}>
+      <div className="pm-list-scroll"onScroll={onScroll}>
         <table className="pm-table">
           <thead>
             <tr>
@@ -51,16 +51,16 @@ export default function ProductListGrid({
             {!loading && visibleRows.map((p) => (
               <tr
                 key={p.id}
-                className={`pm-clickable${selectedId === p.id ? " pm-selected" : ""}`}
+                className={`pm-clickable${selectedId === p.id ? "pm-selected" : ""}`}
                 onClick={() => onSelect(p)}
               >
-                <td>{p.photoUrl ? <span title="Has photo">📷 </span> : null}{p.name}</td>
+                <td>{p.photoUrl ? <span title="Has photo"> </span> : null}{p.name}</td>
                 <td style={{ whiteSpace: "nowrap" }} title={p.code || p.barcode || ""}>{p.code || p.barcode || "-"}</td>
               </tr>
             ))}
             {!loading && shown < rows.length && (
               <tr>
-                <td colSpan={2} className="pm-empty pm-clickable" onClick={() => setLimit(shown + PAGE)}>
+                <td colSpan={2} className="pm-empty pm-clickable"onClick={() => setLimit(shown + PAGE)}>
                   Showing {shown} of {rows.length} — scroll for more
                 </td>
               </tr>

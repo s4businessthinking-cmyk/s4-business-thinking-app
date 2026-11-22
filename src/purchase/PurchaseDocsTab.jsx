@@ -28,15 +28,15 @@ const emptyCurrent = () => ({ productId: null, name: "", code: "", brand: "", un
 const KIND = {
   po: {
     col: "purchaseOrders", noKey: "orderNo", dateKey: "orderDate", prefix: "PO", serial: "lastPOSerial", accent: "#1d4ed8",
-    title: ["📋 পারচেজ অর্ডার", "📋 Purchase Order"], newBtn: ["নতুন অর্ডার", "New Order"], print: "PURCHASE ORDER",
+    title: ["পারচেজ অর্ডার", "Purchase Order"], newBtn: ["নতুন অর্ডার", "New Order"], print: "PURCHASE ORDER",
     empty: ["এখনো কোনো পারচেজ অর্ডার নেই", "No purchase orders yet"],
-    hint: ["সাপ্লায়ারকে মাল অর্ডার দিন — স্টক বদলায় না। মাল এলে 'মাল গ্রহণ' বা 'পারচেজ বিল' বানান।", "Order goods from a supplier — stock does not change. When goods arrive make a Goods Received note or a Purchase bill."],
+    hint: ["সাপ্লায়ারকে মাল অর্ডার দিন — স্টক বদলায় না। মাল এলে 'মাল গ্রহণ'বা 'পারচেজ বিল'বানান।", "Order goods from a supplier — stock does not change. When goods arrive make a Goods Received note or a Purchase bill."],
   },
   grn: {
     col: "goodsReceipts", noKey: "grnNo", dateKey: "receiveDate", prefix: "GRN", serial: "lastGRSerial", accent: "#0f766e",
-    title: ["📥 মাল গ্রহণ (Delivery Note Received)", "📥 Delivery Note (Received)"], newBtn: ["নতুন মাল গ্রহণ", "New Goods Received"], print: "GOODS RECEIVED NOTE",
+    title: ["মাল গ্রহণ (Delivery Note Received)", "Delivery Note (Received)"], newBtn: ["নতুন মাল গ্রহণ", "New Goods Received"], print: "GOODS RECEIVED NOTE",
     empty: ["এখনো কোনো মাল গ্রহণ নেই", "No goods received yet"],
-    hint: ["সাপ্লায়ারের মাল এসেছে কিন্তু বিল আসেনি — এখানে লিখলে সাথে সাথে স্টকে যোগ হয়। বিল এলে 'পারচেজ বিল বানান' চাপুন।", "Goods arrived before the supplier's bill — stock goes up now. When the bill comes press 'Make Purchase Bill'."],
+    hint: ["সাপ্লায়ারের মাল এসেছে কিন্তু বিল আসেনি — এখানে লিখলে সাথে সাথে স্টকে যোগ হয়। বিল এলে 'পারচেজ বিল বানান'চাপুন।", "Goods arrived before the supplier's bill — stock goes up now. When the bill comes press 'Make Purchase Bill'."],
   },
 };
 
@@ -107,7 +107,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   };
   const badge = (r) => {
     const [b, e, c] = STATUS[stateOf(r)] || STATUS.open;
-    return <span className="si-badge" style={{ color: c }}>{bn ? b : e}</span>;
+    return <span className="si-badge"style={{ color: c }}>{bn ? b : e}</span>;
   };
 
   const emptyForm = () => ({ date: localDay(), extra: "", refNo: "", vendorId: "", vendorName: "", vendorMobile: "", note: "", purchaseOrderId: "", purchaseOrderNo: "" });
@@ -179,8 +179,8 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     setTimeout(() => codeRef.current?.focus(), 30);
   };
   const addCurrentItem = () => {
-    if (!current.name.trim()) { toast?.(L("❌ পণ্যের নাম দিন", "❌ Enter a product name"), "err"); return; }
-    if (!current.qty || n2(current.qty) <= 0) { toast?.(L("❌ পরিমাণ দিন", "❌ Enter a quantity"), "err"); return; }
+    if (!current.name.trim()) { toast?.(L("পণ্যের নাম দিন", "Enter a product name"), "err"); return; }
+    if (!current.qty || n2(current.qty) <= 0) { toast?.(L("পরিমাণ দিন", "Enter a quantity"), "err"); return; }
     setLines((ls) => [...ls, { key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, productId: current.productId, name: current.name.trim(), code: current.code, brand: current.brand, unit: current.unit || "Pcs", qty: current.qty, unitCost: current.unitCost, taxPerc: current.taxPerc }]);
     setCurrent(emptyCurrent());
     setCodeChoices(null);
@@ -192,12 +192,12 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
 
   const save = async () => {
     if (saving) return;
-    if (!form.vendorName.trim()) return toast?.(L("❌ সাপ্লায়ারের নাম দিন", "❌ Enter the supplier"), "err");
-    if (!form.date) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
+    if (!form.vendorName.trim()) return toast?.(L("সাপ্লায়ারের নাম দিন", "Enter the supplier"), "err");
+    if (!form.date) return toast?.(L("তারিখ দিন", "Pick a date"), "err");
     const used = lines.filter((l) => n2(l.qty) > 0);
-    if (!used.length) return toast?.(L("❌ অন্তত একটা পণ্য ও পরিমাণ দিন", "❌ Add at least one product with a quantity"), "err");
+    if (!used.length) return toast?.(L("অন্তত একটা পণ্য ও পরিমাণ দিন", "Add at least one product with a quantity"), "err");
     const bad = used.find((l) => n2(l.unitCost) < 0 || n2(l.taxPerc) < 0);
-    if (bad) return toast?.(L(`❌ "${bad.name}": দাম বা VAT মাইনাস হতে পারে না`, `❌ "${bad.name}": cost or VAT can't be negative`), "err");
+    if (bad) return toast?.(L(` "${bad.name}": দাম বা VAT মাইনাস হতে পারে না`, ` "${bad.name}": cost or VAT can't be negative`), "err");
     const items = used.map((l) => ({
       productId: l.productId || null, name: l.name, code: l.code || "", brand: l.brand || "", unit: l.unit || "Pcs", unitFactor: 1,
       qty: n2(l.qty), unitCost: n2(l.unitCost), taxPerc: n2(l.taxPerc),
@@ -227,11 +227,11 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         setRows((list) => [saved, ...list.filter((r) => r.id !== saved.id)]);
         logAudit({ shopId, user, profile, action: "create", collection: K.col, docId: saved.id, docNo: no, amount: saved.grandTotal, note: saved.vendorName });
       }
-      toast?.(L(`✅ ${noOf(saved)} সেভ হয়েছে`, `✅ ${noOf(saved)} saved`));
+      toast?.(L(` ${noOf(saved)} সেভ হয়েছে`, ` ${noOf(saved)} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setLines([]); setEditId(null); setSel(saved); setView("detail");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -250,7 +250,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
       toast?.(msg, status === "cancelled" ? "err" : undefined);
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
   const remove = async (r) => {
@@ -260,11 +260,11 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
       await offlineRemove(K.col, r.id);
       setRows((list) => list.filter((x) => x.id !== r.id));
       logAudit({ shopId, user, profile, action: "delete", collection: K.col, docId: r.id, docNo: noOf(r) });
-      toast?.(L("🗑️ মুছে ফেলা হয়েছে", "🗑️ Deleted"), "err");
+      toast?.(L("মুছে ফেলা হয়েছে", "Deleted"), "err");
       setSel(null); setView("list");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -302,7 +302,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     if (missed.length) {
       if (!got.length && !window.confirm(L("সব পণ্য পাওয়া যায়নি — এগুলো আলাদা পারচেজ অর্ডারে যাবে। সাপ্লায়ার পরে বাছবেন। চালাবেন?", "None of the products were received — they will move to a new purchase order. Pick the supplier after. Continue?"))) return;
       try { await createBackorderFrom(r, missed, { open: !got.length }); }
-      catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); if (!got.length) return; }
+      catch (e) { toast?.(` ${e?.message || e}`, "err"); if (!got.length) return; }
     }
     if (got.length) onMakePurchase?.(kind, { ...r, docNo: noOf(r) }, forBill(got));
   };
@@ -322,7 +322,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   };
 
   const shell = (titleLeft, titleRight, children) => (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title"><strong style={{ color: K.accent }}>{titleLeft}</strong><span>{titleRight}</span></div>
@@ -334,7 +334,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     : { width: "100%", height: 20, padding: "1px 4px", border: "1px solid #8797a9", borderRadius: 0, background: "#fff", color: "#07101c", font: "11px Tahoma, Arial, sans-serif", outline: "none", boxSizing: "border-box" };
 
   // Memoized: re-renders on every keystroke anywhere in the form, not just search/filters. Must
-  // run before the "form"/"detail" early returns below, since hooks can't be conditionally skipped.
+  // run before the "form"/"detail"early returns below, since hooks can't be conditionally skipped.
   const sorted = useMemo(() => [...rows].sort((a, b) => String(b[K.dateKey] || b.createdAt || "").localeCompare(String(a[K.dateKey] || a.createdAt || "")) || String(noOf(b)).localeCompare(String(noOf(a)))), [rows, K.dateKey]);
   const withState = useMemo(() => sorted.map((r) => ({ r, st: stateOf(r) })), [sorted, bills, receipts, isPO]);
   const pendingStates = isPO ? ["open", "partial"] : ["confirmed"];
@@ -389,16 +389,16 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         {shell(T("title"), `${liveRows.length} ${L("টি", "entries")}`, (
           <>
             <div className="si-toolbar">
-              {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {T("newBtn")}</button>}
+              {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {T("newBtn")}</button>}
               <span className="si-toolbar-gap" />
               <div className="si-pills">
                 {[["active", L("সব", "All")], ["pending", isPO ? L("বাকি আছে", "Pending") : L("বিল হয়নি", "Not billed")], ["invoiced", isPO ? L("ইনভয়েস হয়েছে", "Invoiced") : L("বিল হয়েছে", "Billed")], ["cancelledToo", L("বাতিলসহ", "With cancelled")]].map(([k, label]) => (
-                  <button key={k} type="button" className={`pm-btn-secondary${filter === k ? " is-active" : ""}`} onClick={() => setFilter(k)}>{label}</button>
+                  <button key={k} type="button"className={`pm-btn-secondary${filter === k ? "is-active" : ""}`} onClick={() => setFilter(k)}>{label}</button>
                 ))}
               </div>
-              <div className="si-search" style={{ minWidth: mobile ? "100%" : 240 }}>
-                <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, সাপ্লায়ার বা পণ্য…", "Number, supplier or item…")} />
-                {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+              <div className="si-search"style={{ minWidth: mobile ? "100%" : 240 }}>
+                <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, সাপ্লায়ার বা পণ্য…", "Number, supplier or item…")} />
+                {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
               </div>
             </div>
             <div className="si-kpis">
@@ -409,13 +409,13 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
               <div className="si-kpi"><span>{L("মূল্য", "Value")}</span><b>{cur} {fm(value)}</b></div>
             </div>
             {combinable && combineSel.size > 0 && (
-              <div className="si-toolbar" style={{ background: "#ecfdf5", border: "1px solid #10b981", borderRadius: 8 }}>
+              <div className="si-toolbar"style={{ background: "#ecfdf5", border: "1px solid #10b981", borderRadius: 8 }}>
                 <span className="si-strong">{L(`${combineSel.size}টি বাছাই করা হয়েছে`, `${combineSel.size} selected`)}</span>
                 <span className="si-toolbar-gap" />
                 {combineSel.size >= 2
-                  ? <button type="button" className="pm-btn pm-btn--primary" onClick={combineIntoInvoice}>🧾 {L(`${combineSel.size}টি একসাথে বিল বানান`, `Combine ${combineSel.size} into one Purchase Bill`)}</button>
+                  ? <button type="button"className="pm-btn pm-btn--primary"onClick={combineIntoInvoice}> {L(`${combineSel.size}টি একসাথে বিল বানান`, `Combine ${combineSel.size} into one Purchase Bill`)}</button>
                   : <span className="si-hint">{L("একই সাপ্লায়ারের আরো অন্তত ১টি বেছে নিন", "Select at least one more from the same supplier")}</span>}
-                <button type="button" className="pm-btn-secondary" onClick={() => setCombineSel(new Set())}>{L("বাতিল", "Clear")}</button>
+                <button type="button"className="pm-btn-secondary"onClick={() => setCombineSel(new Set())}>{L("বাতিল", "Clear")}</button>
               </div>
             )}
             <div className="si-main is-all">
@@ -423,12 +423,12 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                 {filtered.length > 0 && (mobile ? filtered.map(({ r, st }) => (
                   <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 2 }}>
                     {combinable && st === "confirmed" && r.status !== "cancelled" && (
-                      <input type="checkbox" style={{ marginLeft: 8, width: 18, height: 18, flexShrink: 0 }}
+                      <input type="checkbox"style={{ marginLeft: 8, width: 18, height: 18, flexShrink: 0 }}
                         checked={combineSel.has(r.id)}
                         disabled={combineSel.size > 0 && !combineSel.has(r.id) && selVendorId && r.vendorId !== selVendorId}
                         onChange={() => toggleCombineSel(r)} />
                     )}
-                    <button type="button" className="si-mrow" style={{ flex: 1, ...(r.status === "cancelled" ? { opacity: 0.6 } : undefined) }} onClick={() => { setSel(r); setView("detail"); }}>
+                    <button type="button"className="si-mrow"style={{ flex: 1, ...(r.status === "cancelled" ? { opacity: 0.6 } : undefined) }} onClick={() => { setSel(r); setView("detail"); }}>
                       <div className="si-mrow-top"><span style={{ color: K.accent }}>{noOf(r)}</span>{badge(r)}</div>
                       <div className="si-mrow-sub"><span>{fmtDay(r[K.dateKey])} · {r.vendorName || (r.sourceOrderNo ? L("সাপ্লায়ার বাছুন", "Pick supplier") : "")}{isPO && pendingProductCount(r, bills, receipts) > 0 ? ` · ${pendingProductCount(r, bills, receipts)} ${L("পাওয়া যায়নি", "not received")}` : ""}</span><span>{cur} {fm(r.grandTotal)}</span></div>
                     </button>
@@ -447,18 +447,18 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                     </tr></thead>
                     <tbody>
                       {filtered.map(({ r, st }) => (
-                        <tr key={r.id} className="pm-clickable" onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+                        <tr key={r.id} className="pm-clickable"onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
                           {combinable && (
-                            <td className="si-center" onClick={(e) => e.stopPropagation()}>
+                            <td className="si-center"onClick={(e) => e.stopPropagation()}>
                               {st === "confirmed" && r.status !== "cancelled" && (
-                                <input type="checkbox" checked={combineSel.has(r.id)}
+                                <input type="checkbox"checked={combineSel.has(r.id)}
                                   disabled={combineSel.size > 0 && !combineSel.has(r.id) && selVendorId && r.vendorId !== selVendorId}
                                   onChange={() => toggleCombineSel(r)} />
                               )}
                             </td>
                           )}
                           <td>{fmtDay(r[K.dateKey])}</td>
-                          <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : K.accent }}>{noOf(r)}</td>
+                          <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : K.accent }}>{noOf(r)}</td>
                           <td title={r.vendorName}>{r.vendorName || (r.sourceOrderNo ? L("সাপ্লায়ার বাছুন", "Pick supplier") : "")}</td>
                           <td>{isPO ? fmtDay(r.expectedDate) : (r.supplierRef || "")}</td>
                           <td className="si-center">{(r.items || []).length}{isPO && pendingProductCount(r, bills, receipts) > 0 ? <span style={{ color: "#b45309" }}> · {pendingProductCount(r, bills, receipts)} {L("বাকি", "left")}</span> : null}</td>
@@ -497,14 +497,14 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: C.panel, border: `1px solid ${C.border}`, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 140px 140px 1fr", gap: 8 }}>
-            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date" style={inp()} value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
+            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date"lang="en-GB" style={inp()} value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
             <div>
               <div style={lbl}>{L("সাপ্লায়ার", "Supplier")} *</div>
               <input style={inp()} list={`vendors-${kind}-wd`} value={form.vendorName || ""} onChange={(e) => pickVendorByName(e.target.value)} placeholder={L("নাম লিখুন বা বাছুন", "Type or pick")} />
               <datalist id={`vendors-${kind}-wd`}>{activeVendors.map((v) => <option key={v.id} value={v.vendorName} />)}</datalist>
             </div>
             {isPO
-              ? <div><div style={lbl}>{L("কবে আসবে", "Expected on")}</div><input type="date" style={inp()} value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
+              ? <div><div style={lbl}>{L("কবে আসবে", "Expected on")}</div><input type="date"lang="en-GB" style={inp()} value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
               : <div><div style={lbl}>{L("সাপ্লায়ারের DN নং", "Supplier DN No")}</div><input style={inp()} value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>}
             <div><div style={lbl}>Ref.Number</div><input style={inp()} value={form.refNo || ""} onChange={(e) => setF("refNo", e.target.value)} /></div>
             <div><div style={lbl}>{L("নোট", "Note")}</div><input style={inp()} value={form.note || ""} onChange={(e) => setF("note", e.target.value)} /></div>
@@ -524,18 +524,18 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                 onPick={selectCurrentProduct} onExactLookup={exactCodeLookup}
                 selectedProduct={products.find((p) => p.id === current.productId) || null}
                 onEnterEmpty={() => qtyRef.current?.focus()}
-                onNotFound={() => toast?.(L("❌ এই Code/Barcode-এর কোনো পণ্য পাওয়া যায়নি", "❌ No product found for this code/barcode"), "err")}
+                onNotFound={() => toast?.(L("এই Code/Barcode-এর কোনো পণ্য পাওয়া যায়নি", "No product found for this code/barcode"), "err")}
                 style={inp()} />
             </div>
-            <div><div style={lbl}>{L("পরিমাণ", "Qty")}</div><input ref={qtyRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.qty} onChange={(e) => setCurrent((c) => ({ ...c, qty: e.target.value }))} onKeyDown={enterAdd} /></div>
+            <div><div style={lbl}>{L("পরিমাণ", "Qty")}</div><input ref={qtyRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.qty} onChange={(e) => setCurrent((c) => ({ ...c, qty: e.target.value }))} onKeyDown={enterAdd} /></div>
             <div><div style={lbl}>{L("একক", "Unit")}</div>
               <select style={inp()} value={current.unit} onChange={(e) => changeCurrentUnit(e.target.value)}>
                 {siUnitOptionsFor(products.find((p) => p.id === current.productId), current.unit).map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
-            <div><div style={lbl}>{isPO ? L("দাম", "Rate") : L("দাম", "Rate")}</div><input style={inp({ textAlign: "right", fontWeight: 700 })} inputMode="decimal" value={current.unitCost} onChange={(e) => setCurrent((c) => ({ ...c, unitCost: e.target.value }))} onKeyDown={enterAdd} /></div>
-            {isPO && <div><div style={lbl}>VAT%</div><input style={inp({ textAlign: "right" })} inputMode="decimal" value={current.taxPerc} onChange={(e) => setCurrent((c) => ({ ...c, taxPerc: e.target.value }))} onKeyDown={enterAdd} /></div>}
-            <button type="button" style={btn("#15803d", "#fff")} onClick={addCurrentItem}>{L("যোগ", "Add")}</button>
+            <div><div style={lbl}>{isPO ? L("দাম", "Rate") : L("দাম", "Rate")}</div><input style={inp({ textAlign: "right", fontWeight: 700 })} inputMode="decimal"value={current.unitCost} onChange={(e) => setCurrent((c) => ({ ...c, unitCost: e.target.value }))} onKeyDown={enterAdd} /></div>
+            {isPO && <div><div style={lbl}>VAT%</div><input style={inp({ textAlign: "right" })} inputMode="decimal"value={current.taxPerc} onChange={(e) => setCurrent((c) => ({ ...c, taxPerc: e.target.value }))} onKeyDown={enterAdd} /></div>}
+            <button type="button"style={btn("#15803d", "#fff")} onClick={addCurrentItem}>{L("যোগ", "Add")}</button>
           </div>
 
           <div style={{ flex: 1, minHeight: 0, overflow: "auto", border: `1px solid ${C.border}`, background: "#fff" }}>
@@ -559,7 +559,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                     {isPO && <td style={td}>{fm(netVal)}</td>}
                     {isPO && <td style={td}>{fm(vatAmt)}</td>}
                     <td style={td}>{fm(netVal + vatAmt)}</td>
-                    <td style={td}><button type="button" style={btn("#fee2e2", C.red, { height: 20, padding: "0 6px" })} onClick={() => removeLine(l.key)}>✕</button></td>
+                    <td style={td}><button type="button"style={btn("#fee2e2", C.red, { height: 20, padding: "0 6px" })} onClick={() => removeLine(l.key)}>✕</button></td>
                   </tr>
                   );
                 })}
@@ -568,12 +568,12 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
           </div>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button type="button" style={btn()} onClick={backToList}>{L("তালিকা", "List")}</button>
+            <button type="button"style={btn()} onClick={backToList}>{L("তালিকা", "List")}</button>
             <div style={{ display: "flex", gap: 14, alignItems: "center", fontWeight: 800, color: C.label }}>
               <span>{L("পণ্য", "Lines")}: {lines.length}</span>
               {isPO && <span>VAT: {fm(totals.tax)}</span>}
               <span>{L("মোট", "Total")}: {cur} {fm(isPO ? totals.grand : totals.sub)}</span>
-              <button type="button" disabled={saving || !lines.length} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সেভ", "Save")}`}</button>
+              <button type="button"disabled={saving || !lines.length} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ", "Save")}`}</button>
             </div>
           </div>
         </div>
@@ -587,25 +587,25 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     return shell(editId ? L("এডিট", "Edit") : T("newBtn"), T("title"), (
       <>
         <div className="si-body">
-          <div className="si-hint" style={{ padding: "2px 4px" }}>💡 {T("hint")}</div>
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <div className="si-hint"style={{ padding: "2px 4px" }}> {T("hint")}</div>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}{form.purchaseOrderNo ? ` · PO ${form.purchaseOrderNo}` : ""}</legend>
             <div className={mobile ? undefined : "si-grid2"} style={mobile ? { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } : { gridTemplateColumns: "140px minmax(220px,1fr) 160px 160px minmax(0,1fr)", paddingTop: 3 }}>
-              <div className="si-field" style={mobile ? { gridColumn: "1 / -1" } : undefined}><span className="pm-label">{L("সাপ্লায়ার", "Supplier")} *</span>
-                <input className="pm-input" list={`vendors-${kind}`} value={form.vendorName || ""} onChange={(e) => pickVendorByName(e.target.value)} placeholder={L("নাম লিখুন বা বাছুন", "Type or pick")} />
+              <div className="si-field"style={mobile ? { gridColumn: "1 / -1" } : undefined}><span className="pm-label">{L("সাপ্লায়ার", "Supplier")} *</span>
+                <input className="pm-input"list={`vendors-${kind}`} value={form.vendorName || ""} onChange={(e) => pickVendorByName(e.target.value)} placeholder={L("নাম লিখুন বা বাছুন", "Type or pick")} />
                 <datalist id={`vendors-${kind}`}>{activeVendors.map((v) => <option key={v.id} value={v.vendorName} />)}</datalist>
               </div>
-              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date" className="pm-input" value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"lang="en-GB" className="pm-input"value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
               {isPO
-                ? <div className="si-field"><span className="pm-label">{L("কবে আসবে", "Expected on")}</span><input type="date" className="pm-input" value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
-                : <div className="si-field"><span className="pm-label">{L("সাপ্লায়ারের DN নং", "Supplier DN No")}</span><input className="pm-input" value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>}
-              <div className="si-field"><span className="pm-label">Ref.Number</span><input className="pm-input" value={form.refNo || ""} onChange={(e) => setF("refNo", e.target.value)} /></div>
-              <div className="si-field" style={mobile ? { gridColumn: "1 / -1" } : undefined}><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input" value={form.note || ""} onChange={(e) => setF("note", e.target.value)} /></div>
+                ? <div className="si-field"><span className="pm-label">{L("কবে আসবে", "Expected on")}</span><input type="date"lang="en-GB" className="pm-input"value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
+                : <div className="si-field"><span className="pm-label">{L("সাপ্লায়ারের DN নং", "Supplier DN No")}</span><input className="pm-input"value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>}
+              <div className="si-field"><span className="pm-label">Ref.Number</span><input className="pm-input"value={form.refNo || ""} onChange={(e) => setF("refNo", e.target.value)} /></div>
+              <div className="si-field"style={mobile ? { gridColumn: "1 / -1" } : undefined}><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input"value={form.note || ""} onChange={(e) => setF("note", e.target.value)} /></div>
             </div>
           </fieldset>
-          <fieldset className="pm-panel" style={{ margin: 0, flex: mobile ? undefined : 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <fieldset className="pm-panel"style={{ margin: 0, flex: mobile ? undefined : 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
             <legend className="pm-panel-legend">{L("পণ্য", "Items")}</legend>
-            <div className="si-panel-body" style={{ display: "flex", flexDirection: "column", gap: 4, minHeight: 0, flex: 1 }}>
+            <div className="si-panel-body"style={{ display: "flex", flexDirection: "column", gap: 4, minHeight: 0, flex: 1 }}>
               <div className="si-entry">
                 <div className="si-field">
                   <span className="pm-label">{L("পণ্যের নাম", "Product name")}</span>
@@ -623,30 +623,30 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                       onPick={selectCurrentProduct} onExactLookup={exactCodeLookup}
                       selectedProduct={products.find((p) => p.id === current.productId) || null}
                       onEnterEmpty={() => qtyRef.current?.focus()}
-                      onNotFound={() => toast?.(L("❌ এই Code/Barcode-এর কোনো পণ্য পাওয়া যায়নি", "❌ No product found for this code/barcode"), "err")}
+                      onNotFound={() => toast?.(L("এই Code/Barcode-এর কোনো পণ্য পাওয়া যায়নি", "No product found for this code/barcode"), "err")}
                       style={pmInputStyle} />
                   </div>
-                  <div className="si-field"><span className="pm-label">{L("ব্র্যান্ড", "Brand")}</span><input className="pm-input" value={current.brand} onChange={(e) => setCurrent((c) => ({ ...c, brand: e.target.value }))} /></div>
+                  <div className="si-field"><span className="pm-label">{L("ব্র্যান্ড", "Brand")}</span><input className="pm-input"value={current.brand} onChange={(e) => setCurrent((c) => ({ ...c, brand: e.target.value }))} /></div>
                 </div>
-                <div className="si-grid3" style={{ gridTemplateColumns: isPO ? "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 70px" : "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)" }}>
-                  <div className="si-field"><span className="pm-label">{L("পরিমাণ", "Qty")}</span><input ref={qtyRef} type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "center" }} value={current.qty} onChange={(e) => setCurrent((c) => ({ ...c, qty: e.target.value }))} onKeyDown={enterAdd} /></div>
+                <div className="si-grid3"style={{ gridTemplateColumns: isPO ? "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 70px" : "minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)" }}>
+                  <div className="si-field"><span className="pm-label">{L("পরিমাণ", "Qty")}</span><input ref={qtyRef} type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "center" }} value={current.qty} onChange={(e) => setCurrent((c) => ({ ...c, qty: e.target.value }))} onKeyDown={enterAdd} /></div>
                   <div className="si-field">
                     <span className="pm-label">{L("একক", "Unit")}</span>
-                    <select className="pm-input" value={current.unit} onChange={(e) => changeCurrentUnit(e.target.value)}>
+                    <select className="pm-input"value={current.unit} onChange={(e) => changeCurrentUnit(e.target.value)}>
                       {siUnitOptionsFor(products.find((p) => p.id === current.productId), current.unit).map((u) => <option key={u} value={u}>{u}</option>)}
                     </select>
                   </div>
-                  <div className="si-field"><span className="pm-label">{isPO ? L("দাম", "Rate") : L("দাম (ঐচ্ছিক)", "Rate (optional)")}</span><input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ fontWeight: 700 }} value={current.unitCost} onChange={(e) => setCurrent((c) => ({ ...c, unitCost: e.target.value }))} onKeyDown={enterAdd} /></div>
-                  {isPO && <div className="si-field"><span className="pm-label">VAT%</span><input type="number" min="0" step="any" inputMode="decimal" className="pm-input" value={current.taxPerc} onChange={(e) => setCurrent((c) => ({ ...c, taxPerc: e.target.value }))} onKeyDown={enterAdd} /></div>}
+                  <div className="si-field"><span className="pm-label">{isPO ? L("দাম", "Rate") : L("দাম (ঐচ্ছিক)", "Rate (optional)")}</span><input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ fontWeight: 700 }} value={current.unitCost} onChange={(e) => setCurrent((c) => ({ ...c, unitCost: e.target.value }))} onKeyDown={enterAdd} /></div>
+                  {isPO && <div className="si-field"><span className="pm-label">VAT%</span><input type="number"min="0"step="any"inputMode="decimal"className="pm-input"value={current.taxPerc} onChange={(e) => setCurrent((c) => ({ ...c, taxPerc: e.target.value }))} onKeyDown={enterAdd} /></div>}
                 </div>
                 <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                  <button type="button" className="pm-btn pm-btn--primary" style={{ flex: 1, minHeight: mobile ? 38 : 24 }} onClick={addCurrentItem}>✅ {L("পণ্য যোগ করুন", "Add Item")}</button>
+                  <button type="button"className="pm-btn pm-btn--primary"style={{ flex: 1, minHeight: mobile ? 38 : 24 }} onClick={addCurrentItem}> {L("পণ্য যোগ করুন", "Add Item")}</button>
                   {n2(current.qty) > 0 && n2(current.unitCost) > 0 && (
                     <b style={{ color: K.accent, whiteSpace: "nowrap" }}>= {cur} {fm(n2(current.qty) * n2(current.unitCost) * (1 + (isPO ? n2(current.taxPerc) : 0) / 100))}</b>
                   )}
                 </div>
               </div>
-              <div className="si-box" style={{ flex: mobile ? undefined : 1, minHeight: 100 }}>
+              <div className="si-box"style={{ flex: mobile ? undefined : 1, minHeight: 100 }}>
                 {!lines.length && <div className="si-empty">{L("উপরে খুঁজে পণ্য যোগ করুন", "Search above and add products")}</div>}
                 {lines.length > 0 && (
                   <table className="pm-table">
@@ -670,16 +670,16 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                         return (
                         <tr key={l.key}>
                           <td className="si-center">{i + 1}</td>
-                          <td className="si-strong" title={l.name}>{l.name}{mobile && l.code ? <span className="si-muted"> · {l.code}</span> : null}</td>
+                          <td className="si-strong"title={l.name}>{l.name}{mobile && l.code ? <span className="si-muted"> · {l.code}</span> : null}</td>
                           {!mobile && <td>{l.code}</td>}
-                          <td style={{ padding: "1px 2px" }}><input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "right" }} value={l.qty} onChange={(e) => updLine(l.key, { qty: e.target.value })} /></td>
+                          <td style={{ padding: "1px 2px" }}><input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "right" }} value={l.qty} onChange={(e) => updLine(l.key, { qty: e.target.value })} /></td>
                           {!mobile && <td>{l.unit}</td>}
-                          <td style={{ padding: "1px 2px" }}><input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "right" }} value={l.unitCost} onChange={(e) => updLine(l.key, { unitCost: e.target.value })} /></td>
-                          {isPO && !mobile && <td style={{ padding: "1px 2px" }}><input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "right" }} value={l.taxPerc} onChange={(e) => updLine(l.key, { taxPerc: e.target.value })} /></td>}
+                          <td style={{ padding: "1px 2px" }}><input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "right" }} value={l.unitCost} onChange={(e) => updLine(l.key, { unitCost: e.target.value })} /></td>
+                          {isPO && !mobile && <td style={{ padding: "1px 2px" }}><input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "right" }} value={l.taxPerc} onChange={(e) => updLine(l.key, { taxPerc: e.target.value })} /></td>}
                           {isPO && !mobile && <td className="si-num">{fm(netVal)}</td>}
                           {isPO && !mobile && <td className="si-num">{fm(vatAmt)}</td>}
                           {!mobile && <td className="si-num">{fm(netVal + vatAmt)}</td>}
-                          <td className="si-center"><button type="button" className="pm-btn-secondary pm-btn--danger" style={{ minHeight: 17, padding: "0 5px" }} onClick={() => removeLine(l.key)}>✕</button></td>
+                          <td className="si-center"><button type="button"className="pm-btn-secondary pm-btn--danger"style={{ minHeight: 17, padding: "0 5px" }} onClick={() => removeLine(l.key)}>✕</button></td>
                         </tr>
                         );
                       })}
@@ -695,11 +695,11 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
             </div>
           </fieldset>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !lines.length} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সেভ করুন", "Save")}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !lines.length} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}`}
           </button>
         </div>
       </>
@@ -719,9 +719,9 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     return shell(<>{noOf(r)} {badge(r)}</>, T("title"), (
       <>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
-            <div className="si-panel-body" style={{ paddingTop: 3, display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 4 }}>
+            <div className="si-panel-body"style={{ paddingTop: 3, display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 4 }}>
               <div><b style={{ color: K.accent }}>{noOf(r)}</b> · {fmtDay(r[K.dateKey])}</div>
               <div>{L("সাপ্লায়ার", "Supplier")}: <b>{r.vendorName}</b>{r.vendorMobile ? ` · ${r.vendorMobile}` : ""}</div>
               {r.refNo && <div>Ref.Number: <b>{r.refNo}</b></div>}
@@ -736,7 +736,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
             </div>
           </fieldset>
           {isPO && remaining.length > 0 && live && (
-            <div className="si-hint" style={{ color: "#b45309", fontWeight: 700 }}>
+            <div className="si-hint"style={{ color: "#b45309", fontWeight: 700 }}>
               {L("যে পণ্য আসেনি, «পাওয়া যায়নি» টিক দিন — তারপর ইনভয়েস করুন। টিক দেওয়া পণ্য আলাদা অর্ডারে যাবে।", "Tick “Not received” on products that did not arrive, then invoice. Ticked products go to a new purchase order.")}
               {notGot.size > 0 ? ` · ${notGot.size} ${L("টি টিক দেওয়া", "ticked")}` : ""}
             </div>
@@ -759,16 +759,16 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                 {pl.map((it, i) => (
                   <tr key={i}>
                     <td className="si-center">{i + 1}</td>
-                    <td className="si-strong" title={it.name}>{it.name}{mobile && it.code ? <span className="si-muted"> · {it.code}</span> : null}</td>
+                    <td className="si-strong"title={it.name}>{it.name}{mobile && it.code ? <span className="si-muted"> · {it.code}</span> : null}</td>
                     {!mobile && <td>{it.code}</td>}
                     <td className="si-num">{fq(it.qty)}</td>
-                    {isPO && <td className="si-num" style={{ color: "#15803d" }}>{fq(it.received)}</td>}
-                    {isPO && <td className="si-num si-strong" style={{ color: it.remaining > 0 ? "#b45309" : "#64748b" }}>{fq(it.remaining)}</td>}
+                    {isPO && <td className="si-num"style={{ color: "#15803d" }}>{fq(it.received)}</td>}
+                    {isPO && <td className="si-num si-strong"style={{ color: it.remaining > 0 ? "#b45309" : "#64748b" }}>{fq(it.remaining)}</td>}
                     {isPO && canBill && (
-                      <td className="si-center" onClick={(e) => e.stopPropagation()}>
+                      <td className="si-center"onClick={(e) => e.stopPropagation()}>
                         {it.remaining > 1e-9 && (
                           <label style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer", fontWeight: 800, color: notGot.has(orderLineKey(it)) ? "#b45309" : "#64748b" }}>
-                            <input type="checkbox" checked={notGot.has(orderLineKey(it))} onChange={() => toggleNotGot(orderLineKey(it))} />
+                            <input type="checkbox"checked={notGot.has(orderLineKey(it))} onChange={() => toggleNotGot(orderLineKey(it))} />
                             {L("পাওয়া যায়নি", "Not received")}
                           </label>
                         )}
@@ -787,18 +787,18 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
             </div>
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
-          {canBill && isPO && onMakeReceipt && <button type="button" className="pm-btn" onClick={() => onMakeReceipt({ ...r, docNo: noOf(r) }, forBill(remaining))}>📥 {L("মাল গ্রহণ করুন", "Receive Goods")}</button>}
-          {canBill && onMakePurchase && <button type="button" className="pm-btn pm-btn--primary" onClick={() => billFromOrder(r, remaining)}>🧾 {notGot.size ? L("ইনভয়েস + বাকি অর্ডার", "Invoice + leftover order") : L("পারচেজ বিল বানান", "Make Purchase Bill")}</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
+          {canBill && isPO && onMakeReceipt && <button type="button"className="pm-btn"onClick={() => onMakeReceipt({ ...r, docNo: noOf(r) }, forBill(remaining))}> {L("মাল গ্রহণ করুন", "Receive Goods")}</button>}
+          {canBill && onMakePurchase && <button type="button"className="pm-btn pm-btn--primary"onClick={() => billFromOrder(r, remaining)}> {notGot.size ? L("ইনভয়েস + বাকি অর্ডার", "Invoice + leftover order") : L("পারচেজ বিল বানান", "Make Purchase Bill")}</button>}
           <span className="si-toolbar-gap" />
-          {mine(r) && live && nothingIn && <button type="button" className="pm-btn-secondary" onClick={() => openEdit(r)}>✏️ {L("এডিট", "Edit")}</button>}
-          {mine(r) && isPO && st === "partial" && <button type="button" className="pm-btn-secondary" onClick={() => { if (window.confirm(L("বাকি মাল আর আসবে না — অর্ডারটা বন্ধ করবেন?", "The rest will not come — close this order?"))) setStatus(r, "closed", L("অর্ডার বন্ধ হয়েছে", "Order closed")); }}>🔒 {L("বন্ধ করুন", "Close")}</button>}
-          {mine(r) && isPO && r.status === "closed" && <button type="button" className="pm-btn-secondary" onClick={() => setStatus(r, "open", L("অর্ডার আবার খোলা হয়েছে", "Order reopened"))}>🔓 {L("আবার খুলুন", "Reopen")}</button>}
-          {mine(r) && live && nothingIn && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => { if (window.confirm(L(`${noOf(r)} বাতিল করবেন?${isPO ? "" : " স্টক থেকে বাদ যাবে।"}`, `Cancel ${noOf(r)}?${isPO ? "" : " Its stock is taken back out."}`))) setStatus(r, "cancelled", L("🚫 বাতিল হয়েছে", "🚫 Cancelled")); }}>⛔ {L("বাতিল", "Cancel")}</button>}
+          {mine(r) && live && nothingIn && <button type="button"className="pm-btn-secondary"onClick={() => openEdit(r)}> {L("এডিট", "Edit")}</button>}
+          {mine(r) && isPO && st === "partial" && <button type="button"className="pm-btn-secondary"onClick={() => { if (window.confirm(L("বাকি মাল আর আসবে না — অর্ডারটা বন্ধ করবেন?", "The rest will not come — close this order?"))) setStatus(r, "closed", L("অর্ডার বন্ধ হয়েছে", "Order closed")); }}> {L("বন্ধ করুন", "Close")}</button>}
+          {mine(r) && isPO && r.status === "closed" && <button type="button"className="pm-btn-secondary"onClick={() => setStatus(r, "open", L("অর্ডার আবার খোলা হয়েছে", "Order reopened"))}> {L("আবার খুলুন", "Reopen")}</button>}
+          {mine(r) && live && nothingIn && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => { if (window.confirm(L(`${noOf(r)} বাতিল করবেন?${isPO ? "" : "স্টক থেকে বাদ যাবে।"}`, `Cancel ${noOf(r)}?${isPO ? "" : "Its stock is taken back out."}`))) setStatus(r, "cancelled", L("বাতিল হয়েছে", "Cancelled")); }}> {L("বাতিল", "Cancel")}</button>}
           {!nothingIn && live && !isPO && <span className="si-hint">{L("বিল হয়ে গেছে — বদলাতে আগে পারচেজ বিল বাতিল করুন", "Already billed — cancel the purchase bill first to change it")}</span>}
-          {canDelete && !live && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => remove(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canDelete && !live && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => remove(r)}> {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));

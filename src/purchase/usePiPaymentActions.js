@@ -23,7 +23,7 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
 
   // ── Save a Vendor Payment Voucher — offline-first with local invoice updates ──
   const piSavePaymentVoucher = async (payload, { stayOpen = false } = {}) => {
-    // payload: { vendorId, vendorName, vendorMobile, method, paymentDate, note, chequeNo, chequeBank, chequeDate, allocations:[{invoiceId,invoiceNo,invoiceDate,amount}] }
+    // payload: { editId?, vendorId, vendorName, vendorMobile, method, paymentDate, note, chequeNo, chequeBank, chequeDate, allocations:[{invoiceId,invoiceNo,invoiceDate,amount}] }
     if (!payload.vendorName) { toast(t.pi_vendorRequired,"err"); return null; }
     const allocations = (payload.allocations||[]).filter(a=>piN2(a.amount)>0);
     if (!allocations.length) { toast(t.pi_amountRequired,"err"); return null; }
@@ -43,31 +43,63 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
       }
     }
 
+    const prior = payload.editId ? payments.find((p) => p.id === payload.editId) : null;
+    if (payload.editId && (!prior || prior.status === "cancelled")) {
+      toast(lang==="bn"?"এডিটের পেমেন্ট পাওয়া যায়নি বা বাতিল":"Payment to edit was not found or is cancelled","err");
+      return null;
+    }
+    if (prior?.method === "cheque" && prior.chequeStatus === "cleared") {
+      toast(lang==="bn"?"ক্লিয়ার চেক এডিট করা যাবে না":"Cannot edit a cleared cheque payment","err");
+      return null;
+    }
+
     setPmtSaving(true);
     try {
-      const paymentNo = await genPaymentNo();
       const totalAmount = parseFloat(piFmt2(allocations.reduce((s,a)=>s+piN2(a.amount),0)));
       const nowIso = new Date().toISOString();
+      const priorByInv = new Map();
+      for (const a of (prior?.allocations || [])) {
+        priorByInv.set(a.invoiceId, piN2(a.amount) + (priorByInv.get(a.invoiceId) || 0));
+      }
       const invoiceUpdates = [];
+      const seen = new Set();
 
       for (const alloc of allocations) {
         const cur = invoices.find((inv) => inv.id === alloc.invoiceId);
         if (!cur) throw new Error(lang==="bn"?`ইনভয়েস ${alloc.invoiceNo} খুঁজে পাওয়া যায়নি`:`Invoice ${alloc.invoiceNo} not found`);
+        const credit = priorByInv.get(alloc.invoiceId) || 0;
         if (cur.status==="draft"||cur.status==="cancelled") throw new Error(lang==="bn"?`${alloc.invoiceNo} ড্রাফট বা বাতিল — পেমেন্ট করা যাবে না`:`${alloc.invoiceNo} is draft/cancelled — cannot pay`);
+        if (!credit && cur.status === "paid") throw new Error(lang==="bn"?`${alloc.invoiceNo} ইতিমধ্যে পরিশোধিত`:`${alloc.invoiceNo} is already paid`);
         const curPaid = piN2(cur.amountPaid);
         const grand   = piN2(cur.grandTotal);
-        const curBalance = Math.max(0, grand-curPaid);
+        const curBalance = Math.max(0, grand-curPaid) + credit;
         const amt = piN2(alloc.amount);
         if (amt > curBalance + 0.01) throw new Error(lang==="bn"?`${alloc.invoiceNo}-এর বাকির চেয়ে বেশি পরিমাণ দেওয়া হয়েছে`:`Amount for ${alloc.invoiceNo} exceeds its balance due`);
-        const newAmountPaid = parseFloat(piFmt2(curPaid+amt));
+        const newAmountPaid = parseFloat(piFmt2(curPaid - credit + amt));
         const newBalance    = Math.max(0, parseFloat(piFmt2(grand-newAmountPaid)));
-        const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : cur.status);
+        const newStatus     = newBalance<0.01 ? "paid" : (newAmountPaid>0 ? "partial" : "confirmed");
+        seen.add(alloc.invoiceId);
+        invoiceUpdates.push({ invoice: cur, newAmountPaid, newBalance, newStatus });
+      }
+      for (const [invId, credit] of priorByInv) {
+        if (seen.has(invId) || credit <= 0) continue;
+        const cur = invoices.find((inv) => inv.id === invId);
+        if (!cur || cur.status === "cancelled") continue;
+        const newAmountPaid = Math.max(0, parseFloat(piFmt2(piN2(cur.amountPaid) - credit)));
+        const grand = piN2(cur.grandTotal);
+        const newBalance = Math.max(0, parseFloat(piFmt2(grand - newAmountPaid)));
+        const newStatus = newBalance < 0.01 ? "paid" : (newAmountPaid > 0 ? "partial" : "confirmed");
         invoiceUpdates.push({ invoice: cur, newAmountPaid, newBalance, newStatus });
       }
 
-      const paymentPayload = {
-        shopId,
-        paymentNo,
+      const discountFields = payload.method === "cheque" && payload.chequeAmount != null ? {
+        chequeAmount: parseFloat(piFmt2(payload.chequeAmount)),
+        discountAmount: parseFloat(piFmt2(Math.max(0, totalAmount - piN2(payload.chequeAmount)))),
+      } : payload.discountAmount != null && piN2(payload.discountAmount) > 0 ? {
+        discountAmount: parseFloat(piFmt2(payload.discountAmount)),
+      } : { discountAmount: 0, chequeAmount: null };
+
+      const paymentBody = {
         vendorId: payload.vendorId || null,
         vendorName: payload.vendorName,
         vendorMobile: payload.vendorMobile || "",
@@ -77,17 +109,11 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
         chequeNo: payload.method === "cheque" ? (payload.chequeNo || "").trim() : "",
         chequeBank: payload.method === "cheque" ? (payload.chequeBank || "").trim() : "",
         chequeDate: payload.method === "cheque" ? (payload.chequeDate || "") : "",
-        chequeStatus: payload.method === "cheque" ? "pending" : null,
+        chequeStatus: payload.method === "cheque" ? (prior?.chequeStatus || "pending") : null,
         chequeReceivedBy: payload.method === "cheque" ? (payload.chequeReceivedBy || "").trim() : "",
         vendorReceiptNo: (payload.vendorReceiptNo || "").trim(),
-        // which month the payment / cheque is for (YYYY-MM), shown in the PDC register
         chequeMonth: /^\d{4}-\d{2}$/.test(payload.chequeMonth || "") ? payload.chequeMonth : "",
-        ...(payload.method === "cheque" && payload.chequeAmount != null ? {
-          chequeAmount: parseFloat(piFmt2(payload.chequeAmount)),
-          discountAmount: parseFloat(piFmt2(Math.max(0, totalAmount - piN2(payload.chequeAmount)))),
-        } : payload.discountAmount != null && piN2(payload.discountAmount) > 0 ? {
-          discountAmount: parseFloat(piFmt2(payload.discountAmount)),
-        } : {}),
+        ...discountFields,
         refNo: (payload.refNo || "").trim(),
         refBank: (payload.refBank || "").trim(),
         refDate: payload.refDate || "",
@@ -97,16 +123,39 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
           invoiceNo: a.invoiceNo,
           supplierInvoiceNo: a.supplierInvoiceNo || invoices.find((i) => i.id === a.invoiceId)?.supplierInvoiceNo || "",
           invoiceDate: a.invoiceDate || "",
-          invoiceAmount: piN2(invoices.find((i) => i.id === a.invoiceId)?.grandTotal),
+          invoiceAmount: piN2(invoices.find((i) => i.id === a.invoiceId)?.grandTotal || a.invoiceAmount),
           amount: parseFloat(piFmt2(a.amount)),
         })),
         status: "active",
-        createdBy: user.uid,
-        createdByName: profile.personName,
-        createdAt: nowIso,
         updatedAt: nowIso,
         updatedBy: user?.uid || "",
       };
+
+      if (prior) {
+        const result = await offlinePatch("purchasePayments", prior.id, paymentBody, prior);
+        const updated = { ...prior, ...result.data, id: prior.id };
+        setPayments((prev) => prev.map((p) => (p.id === prior.id ? updated : p)));
+        await applyBillPayments(invoiceUpdates, nowIso);
+        if (navigator.onLine) {
+          window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] purchase payment update sync failed", err));
+        }
+        toast(lang==="bn" ? `পেমেন্ট ${prior.paymentNo} আপডেট হয়েছে` : `Payment ${prior.paymentNo} updated`);
+        logAudit({ shopId, user, profile, action:"edit", collection:"purchasePayments", docId:prior.id, docNo:prior.paymentNo, amount:totalAmount, note:payload.vendorName });
+        if (!stayOpen) { setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); }
+        return updated;
+      }
+
+      const paymentNo = await genPaymentNo();
+      const paymentPayload = {
+        shopId,
+        paymentNo,
+        ...paymentBody,
+        createdBy: user.uid,
+        createdByName: profile.personName,
+        createdAt: nowIso,
+      };
+      if (!(paymentPayload.discountAmount > 0)) delete paymentPayload.discountAmount;
+      if (paymentPayload.chequeAmount == null) delete paymentPayload.chequeAmount;
 
       // Voucher first: if anything fails afterwards, a voucher exists rather than a bill marked paid without one.
       const result = await offlineCreate("purchasePayments", paymentPayload);
@@ -194,7 +243,7 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
     try {
       await offlineRemove("purchasePayments", payment.id);
       setPayments(prev => prev.filter(p => p.id !== payment.id));
-      toast(lang==="bn" ? "🗑️ ভাউচার মুছে ফেলা হয়েছে" : "🗑️ Voucher deleted", "err");
+      toast(lang==="bn" ? "ভাউচার মুছে ফেলা হয়েছে" : "Voucher deleted", "err");
       logAudit({ shopId, user, profile, action:"delete", collection:"purchasePayments", docId:payment.id, docNo:payment.paymentNo, amount:payment.totalAmount, note:payment.vendorName });
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] purchase payment delete sync failed", err));
       return true;

@@ -25,20 +25,20 @@ export const FREQUENCIES = [
  * profit credited to the partner minus what they took out. A reinvest moves profit into capital without cash.
  */
 export const ENTRY_KINDS = {
-  capitalIn: { cash: "in", bn: "মূলধন জমা", en: "Capital brought in", icon: "💵" },
-  capitalOut: { cash: "out", bn: "মূলধন ফেরত নেওয়া", en: "Capital withdrawn", icon: "🏧" },
-  drawing: { cash: "out", bn: "অগ্রিম তোলা (Drawing)", en: "Drawing (advance on profit)", icon: "👛" },
-  payout: { cash: "out", bn: "পার্টনারকে টাকা দেওয়া (লাভ / খরচ ফেরত)", en: "Paid to partner (profit / expense refund)", icon: "💸" },
-  reinvest: { cash: "", bn: "লাভ মূলধনে যোগ", en: "Profit added to capital", icon: "🔁" },
+  capitalIn: { cash: "in", bn: "মূলধন জমা", en: "Capital brought in", icon: "" },
+  capitalOut: { cash: "out", bn: "মূলধন ফেরত নেওয়া", en: "Capital withdrawn", icon: "" },
+  drawing: { cash: "out", bn: "অগ্রিম তোলা (Drawing)", en: "Drawing (advance on profit)", icon: "" },
+  payout: { cash: "out", bn: "পার্টনারকে টাকা দেওয়া (লাভ / খরচ ফেরত)", en: "Paid to partner (profit / expense refund)", icon: "" },
+  reinvest: { cash: "", bn: "লাভ মূলধনে যোগ", en: "Profit added to capital", icon: "" },
 };
 export const PAY_METHODS = [["cash", "নগদ", "Cash"], ["bank_transfer", "ব্যাংক ট্রান্সফার", "Bank transfer"], ["cheque", "চেক", "Cheque"], ["card", "কার্ড", "Card"]];
 
 export const PARTNER_SECTIONS = [
-  { key: "basic", icon: "👤", bn: "মূল তথ্য", en: "Basic" },
-  { key: "money", icon: "💰", bn: "শেয়ার ও টাকা", en: "Share & money" },
-  { key: "id", icon: "🪪", bn: "পরিচয় ও ঠিকানা", en: "Identity & address" },
-  { key: "agreement", icon: "📄", bn: "চুক্তি", en: "Agreement" },
-  { key: "nominee", icon: "👪", bn: "নমিনি ও জরুরি যোগাযোগ", en: "Nominee & emergency" },
+  { key: "basic", icon: "", bn: "মূল তথ্য", en: "Basic" },
+  { key: "money", icon: "", bn: "শেয়ার ও টাকা", en: "Share & money" },
+  { key: "id", icon: "", bn: "পরিচয় ও ঠিকানা", en: "Identity & address" },
+  { key: "agreement", icon: "", bn: "চুক্তি", en: "Agreement" },
+  { key: "nominee", icon: "", bn: "নমিনি ও জরুরি যোগাযোগ", en: "Nominee & emergency" },
 ];
 
 /** Every profile field: t = input type, opts = [value, bn, en], show(form) hides fields that don't apply. */
@@ -116,7 +116,7 @@ const monthIdx = (d) => { const x = day10(d); return Number(x.slice(0, 4)) * 12 
 const idxStart = (i) => `${Math.floor(i / 12)}-${pad((i % 12) + 1)}-01`;
 const idxEnd = (i) => { const y = Math.floor(i / 12), m = (i % 12) + 1; return `${y}-${pad(m)}-${pad(new Date(y, m, 0).getDate())}`; };
 
-/** The profit-sharing period that contains `date`, aligned to the settings' first month. */
+/** The profit-sharing period that contains `date`, aligned to the settings'first month. */
 export function periodOf(date, settings) {
   const months = FREQUENCIES.find((f) => f.key === settings.frequency)?.months || 3;
   const m = monthIdx(date);
@@ -125,7 +125,7 @@ export function periodOf(date, settings) {
   return { from: idxStart(start), to: idxEnd(start + months - 1), months };
 }
 
-/** The last `count` periods that have fully ended before `today`, newest first. */
+/** The last `count`periods that have fully ended before `today`, newest first. */
 export function endedPeriods(today, settings, count = 6) {
   const out = [];
   let p = periodOf(today, settings);
@@ -155,7 +155,7 @@ export const partnerDirectoryFrom = (partners, shopId) => (partners || [])
 export const partnerDirectoryOf = (shop) => (Array.isArray(shop?.partnerDirectory) ? shop.partnerDirectory.filter((p) => p && p.id && p.name) : []);
 
 const normName = (v) => String(v || "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-/** The partner a typed "paid to" name points at, if any (exact, or one name containing the other). */
+/** The partner a typed "paid to"name points at, if any (exact, or one name containing the other). */
 export function matchPartnerName(text, directory) {
   const t = normName(text);
   if (t.length < 3) return null;
@@ -301,20 +301,20 @@ const when = (d, bn) => (d === 0 ? (bn ? "আজ" : "today") : d > 0 ? (bn ? `${
 export function partnerAlertText(a, bn, cur = "AED") {
   switch (a.kind) {
     case "shareTotal":
-      return { icon: "⚠️", title: bn ? `পার্টনারদের মোট শেয়ার ${a.total}% — ১০০% হওয়া উচিত` : `Partner shares add up to ${a.total}%, not 100%`, sub: bn ? "পার্টনার পাতায় শেয়ার % ঠিক করুন" : "Fix the share % on the Partners page" };
+      return { icon: "", title: bn ? `পার্টনারদের মোট শেয়ার ${a.total}% — ১০০% হওয়া উচিত` : `Partner shares add up to ${a.total}%, not 100%`, sub: bn ? "পার্টনার পাতায় শেয়ার % ঠিক করুন" : "Fix the share % on the Partners page" };
     case "undistributed":
-      return { icon: "📊", title: bn ? `${periodLabel(a, true)}-এর লাভ এখনো ভাগ করা হয়নি` : `${periodLabel(a, false)} profit not shared yet`, sub: bn ? `সময় শেষ হয়েছে ${fmtDay(a.to)} · "লাভ ভাগ" থেকে ভাগ করুন` : `Period ended ${fmtDay(a.to)} · share it from "Profit sharing"` };
+      return { icon: "", title: bn ? `${periodLabel(a, true)}-এর লাভ এখনো ভাগ করা হয়নি` : `${periodLabel(a, false)} profit not shared yet`, sub: bn ? `সময় শেষ হয়েছে ${fmtDay(a.to)} · "লাভ ভাগ"থেকে ভাগ করুন` : `Period ended ${fmtDay(a.to)} · share it from "Profit sharing"` };
     case "payout":
-      return { icon: "💸", title: bn ? `${a.name}-কে লাভের টাকা দিতে হবে · ${cur} ${money(a.amount)}` : `Pay ${a.name}'s profit share · ${cur} ${money(a.amount)}`, sub: bn ? `দেওয়ার তারিখ ${fmtDay(a.date)} (${when(a.daysLeft, true)})` : `Due ${fmtDay(a.date)} (${when(a.daysLeft, false)})` };
+      return { icon: "", title: bn ? `${a.name}-কে লাভের টাকা দিতে হবে · ${cur} ${money(a.amount)}` : `Pay ${a.name}'s profit share · ${cur} ${money(a.amount)}`, sub: bn ? `দেওয়ার তারিখ ${fmtDay(a.date)} (${when(a.daysLeft, true)})` : `Due ${fmtDay(a.date)} (${when(a.daysLeft, false)})` };
     case "overdrawn":
-      return { icon: "👛", title: bn ? `${a.name} তার ভাগের চেয়ে ${cur} ${money(a.amount)} বেশি তুলেছেন` : `${a.name} has drawn ${cur} ${money(a.amount)} more than their share`, sub: bn ? "পরের লাভ থেকে কেটে যাবে, অথবা ফেরত নিন" : "It comes off the next profit, or get it back" };
+      return { icon: "", title: bn ? `${a.name} তার ভাগের চেয়ে ${cur} ${money(a.amount)} বেশি তুলেছেন` : `${a.name} has drawn ${cur} ${money(a.amount)} more than their share`, sub: bn ? "পরের লাভ থেকে কেটে যাবে, অথবা ফেরত নিন" : "It comes off the next profit, or get it back" };
     case "capitalDue":
-      return { icon: "💵", title: bn ? `${a.name}-এর মূলধন বাকি · ${cur} ${money(a.amount)}` : `${a.name} still owes capital · ${cur} ${money(a.amount)}`, sub: bn ? "চুক্তি অনুযায়ী যত টাকা দেওয়ার কথা তার বাকি অংশ" : "The rest of the capital agreed in the agreement" };
+      return { icon: "", title: bn ? `${a.name}-এর মূলধন বাকি · ${cur} ${money(a.amount)}` : `${a.name} still owes capital · ${cur} ${money(a.amount)}`, sub: bn ? "চুক্তি অনুযায়ী যত টাকা দেওয়ার কথা তার বাকি অংশ" : "The rest of the capital agreed in the agreement" };
     case "agreement":
-      return { icon: "📄", title: bn ? `${a.name}-এর পার্টনারশিপ চুক্তি শেষ ${a.daysLeft < 0 ? "হয়ে গেছে" : when(a.daysLeft, true)}` : `${a.name}'s partnership agreement ${a.daysLeft < 0 ? "has ended" : `ends ${when(a.daysLeft, false)}`}`, sub: bn ? `${fmtDay(a.date)} · নবায়ন করুন` : `${fmtDay(a.date)} · renew it` };
+      return { icon: "", title: bn ? `${a.name}-এর পার্টনারশিপ চুক্তি শেষ ${a.daysLeft < 0 ? "হয়ে গেছে" : when(a.daysLeft, true)}` : `${a.name}'s partnership agreement ${a.daysLeft < 0 ? "has ended" : `ends ${when(a.daysLeft, false)}`}`, sub: bn ? `${fmtDay(a.date)} · নবায়ন করুন` : `${fmtDay(a.date)} · renew it` };
     case "idExpiry":
-      return { icon: "🪪", title: bn ? `${a.name}-এর ${a.docBn}-এর মেয়াদ ${a.daysLeft < 0 ? "শেষ হয়ে গেছে" : `শেষ হবে ${when(a.daysLeft, true)}`}` : `${a.name}'s ${a.docEn} ${a.daysLeft < 0 ? "has expired" : `expires ${when(a.daysLeft, false)}`}`, sub: bn ? `${fmtDay(a.date)} · নবায়ন করে নতুন কপি যোগ করুন` : `${fmtDay(a.date)} · renew it and attach the new copy` };
+      return { icon: "", title: bn ? `${a.name}-এর ${a.docBn}-এর মেয়াদ ${a.daysLeft < 0 ? "শেষ হয়ে গেছে" : `শেষ হবে ${when(a.daysLeft, true)}`}` : `${a.name}'s ${a.docEn} ${a.daysLeft < 0 ? "has expired" : `expires ${when(a.daysLeft, false)}`}`, sub: bn ? `${fmtDay(a.date)} · নবায়ন করে নতুন কপি যোগ করুন` : `${fmtDay(a.date)} · renew it and attach the new copy` };
     default:
-      return { icon: "🤝", title: a.name || "", sub: "" };
+      return { icon: "", title: a.name || "", sub: "" };
   }
 }

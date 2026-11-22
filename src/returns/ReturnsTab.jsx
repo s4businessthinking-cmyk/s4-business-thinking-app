@@ -98,7 +98,7 @@ export default function ReturnsTab({
     const found = invoices.find((i) => i.id === openInvoiceId);
     if (!found || found.isDeleted || found.deleted || !RETURNABLE_STATUSES.includes(found.status) || isBranchTransferBill(found)) {
       onOpenInvoiceHandled?.();
-      toast?.(L("❌ এই বিল থেকে রিটার্ন করা যাচ্ছে না", "❌ This bill can't be returned"), "err");
+      toast?.(L("এই বিল থেকে রিটার্ন করা যাচ্ছে না", "This bill can't be returned"), "err");
       return;
     }
     setDate(localDay());
@@ -387,14 +387,14 @@ export default function ReturnsTab({
 
   const save = async () => {
     if (saving) return;
-    if (!inv) return toast?.(L("❌ আগে বিল বেছে নিন", "❌ Pick the bill first"), "err");
-    if (!date) return toast?.(L("❌ রিটার্নের তারিখ দিন", "❌ Pick the return date"), "err");
+    if (!inv) return toast?.(L("আগে বিল বেছে নিন", "Pick the bill first"), "err");
+    if (!date) return toast?.(L("রিটার্নের তারিখ দিন", "Pick the return date"), "err");
     const billDay = String(inv.invoiceDate || "").slice(0, 10);
-    if (billDay && date < billDay) return toast?.(L(`❌ রিটার্নের তারিখ বিলের তারিখের (${billDay}) আগে হতে পারে না`, `❌ The return date can't be before the bill date (${billDay})`), "err");
+    if (billDay && date < billDay) return toast?.(L(`রিটার্নের তারিখ বিলের তারিখের (${billDay}) আগে হতে পারে না`, `The return date can't be before the bill date (${billDay})`), "err");
     const picked = lines.filter((l) => l.qty > 0);
-    if (!picked.length) return toast?.(L("❌ কোন পণ্য কতটা ফেরত, সেটা লিখুন", "❌ Enter the quantity to return"), "err");
+    if (!picked.length) return toast?.(L("কোন পণ্য কতটা ফেরত, সেটা লিখুন", "Enter the quantity to return"), "err");
     const over = lines.find((l) => n2(qtys[l.idx]) > l.returnable + 1e-9);
-    if (over) return toast?.(L(`❌ "${over.it.name}": সর্বোচ্চ ${over.returnable} ফেরত দেওয়া যায়`, `❌ "${over.it.name}": at most ${over.returnable} can be returned`), "err");
+    if (over) return toast?.(L(` "${over.it.name}": সর্বোচ্চ ${over.returnable} ফেরত দেওয়া যায়`, ` "${over.it.name}": at most ${over.returnable} can be returned`), "err");
     setSaving(true);
     const editing = editOf && editOf.status !== "cancelled" ? editOf : null;
     let reversedForEdit = false;
@@ -493,7 +493,7 @@ export default function ReturnsTab({
         : [saved, ...returns.filter((r) => r.id !== saved.id)];
       setReturns(list);
       await refreshPurchaseAvgCosts(core.items.map((it) => it.productId), list);
-      toast?.(L(`✅ ${returnNo} সেভ হয়েছে`, `✅ ${returnNo} saved`));
+      toast?.(L(` ${returnNo} সেভ হয়েছে`, ` ${returnNo} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setEditOf(null);
       setSel(saved); setView("detail");
@@ -515,7 +515,7 @@ export default function ReturnsTab({
           console.warn("[S4 Return] create rollback failed", restoreErr);
         }
       }
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -538,11 +538,11 @@ export default function ReturnsTab({
       setSel((s) => (s?.id === r.id ? updated : s));
       await refreshPurchaseAvgCosts((r.items || []).map((it) => it.productId), nextReturns);
       logAudit({ shopId, user, profile, action: "cancel", collection: K.col, docId: r.id, docNo: r.returnNo, amount: r.total, note: `${r.partyName} · ${r.invoiceNo}` });
-      if (!silent) toast?.(L("🚫 রিটার্ন বাতিল হয়েছে", "🚫 Return cancelled"), "err");
+      if (!silent) toast?.(L("রিটার্ন বাতিল হয়েছে", "Return cancelled"), "err");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       return true;
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
       return false;
     } finally {
       setSaving(false);
@@ -554,7 +554,7 @@ export default function ReturnsTab({
     const bill = invoices.find((i) => i.id === r.invoiceId)
       || (await offlineGetById(K.invCol, r.invoiceId).catch(() => null))?.data;
     const fresh = bill ? { ...bill, id: r.invoiceId } : null;
-    if (!fresh) return toast?.(L("❌ মূল বিল পাওয়া যায়নি", "❌ Source bill not found"), "err");
+    if (!fresh) return toast?.(L("মূল বিল পাওয়া যায়নি", "Source bill not found"), "err");
     if (!window.confirm(L(`${r.returnNo} এডিট করবেন? একই রিটার্ন আপডেট হবে — বাতিল হয়ে নতুন নম্বর তৈরি হবে না।`, `Edit ${r.returnNo}? The same return is updated — it is not cancelled into a new number.`))) return;
     loadReturnIntoForm(r, fresh);
   };
@@ -566,11 +566,11 @@ export default function ReturnsTab({
       await offlineRemove(K.col, r.id);
       setReturns((list) => list.filter((x) => x.id !== r.id));
       logAudit({ shopId, user, profile, action: "delete", collection: K.col, docId: r.id, docNo: r.returnNo, amount: r.total, note: `${r.partyName} · ${r.invoiceNo}` });
-      toast?.(L("🗑️ মুছে ফেলা হয়েছে", "🗑️ Deleted"), "err");
+      toast?.(L("মুছে ফেলা হয়েছে", "Deleted"), "err");
       setSel(null); setView("list");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -620,23 +620,23 @@ export default function ReturnsTab({
   };
   const backToList = () => { if (leaveOk()) { setSel(null); setView("list"); } };
   const statusBadge = (r) => (
-    <span className="si-badge" style={{ color: r.status === "cancelled" ? "#6b7280" : K.accent }}>
+    <span className="si-badge"style={{ color: r.status === "cancelled" ? "#6b7280" : K.accent }}>
       {r.status === "cancelled" ? L("বাতিল", "Cancelled") : L("সম্পন্ন", "Done")}
     </span>
   );
   const vRow = (label, value, opts = {}) => (
     <div className="pm-form-row">
       <span className="pm-label">{label}</span>
-      <div className={`si-val${opts.strong ? " is-strong" : ""}`} style={opts.color ? { color: opts.color } : undefined}>{value}</div>
+      <div className={`si-val${opts.strong ? "is-strong" : ""}`} style={opts.color ? { color: opts.color } : undefined}>{value}</div>
     </div>
   );
   const totalRow = (label, value, opts = {}) => (
-    <div className={`si-total-row${opts.grand ? " is-grand" : ""}`} style={opts.color ? { color: opts.color } : undefined}>
+    <div className={`si-total-row${opts.grand ? "is-grand" : ""}`} style={opts.color ? { color: opts.color } : undefined}>
       <span>{label}</span><b>{value}</b>
     </div>
   );
   const shell = (titleLeft, titleRight, children) => (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title">
@@ -653,23 +653,23 @@ export default function ReturnsTab({
     return shell(L("নতুন রিটার্ন", "New Return"), K.title[bn ? "bn" : "en"], (
       <>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("বিল", "Bill")}</legend>
             <div className="si-panel-body">
               <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? { padding: 0 } : { gridTemplateColumns: "150px minmax(0,1fr)" }}>
                 <div className="si-field">
                   <span className="pm-label">{L("রিটার্নের তারিখ", "Return date")} *</span>
-                  <input type="date" className="pm-input" value={date} onChange={(e) => setDate(e.target.value)} style={dateBad ? { borderColor: "#b91c1c" } : undefined} />
+                  <input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} style={dateBad ? { borderColor: "#b91c1c" } : undefined} />
                 </div>
                 <div className="si-field">
                   <span className="pm-label">{L("কোন বিলের মাল ফেরত", "Return against bill")} *</span>
                   {inv ? (
-                    <div className="si-val is-strong" style={{ justifyContent: "space-between", gap: 6 }}>
+                    <div className="si-val is-strong"style={{ justifyContent: "space-between", gap: 6 }}>
                       <span>{inv.invoiceNo}{inv.supplierInvoiceNo ? ` (${inv.supplierInvoiceNo})` : ""} · {inv[K.partyName] || "—"}</span>
-                      <button type="button" className="pm-btn-secondary" onClick={() => { setInv(null); setQtys({}); }} title={L("অন্য বিল", "Another bill")}>✕</button>
+                      <button type="button"className="pm-btn-secondary"onClick={() => { setInv(null); setQtys({}); }} title={L("অন্য বিল", "Another bill")}>✕</button>
                     </div>
                   ) : (
-                    <input className="pm-input" value={invQ} onChange={(e) => setInvQ(e.target.value)} autoFocus={!mobile} placeholder={L(`বিল নং, ${K.party.bn}, পণ্যের নাম/কোড…`, `Bill no, ${K.party.en.toLowerCase()}, product name/code…`)} />
+                    <input className="pm-input"value={invQ} onChange={(e) => setInvQ(e.target.value)} autoFocus={!mobile} placeholder={L(`বিল নং, ${K.party.bn}, পণ্যের নাম/কোড…`, `Bill no, ${K.party.en.toLowerCase()}, product name/code…`)} />
                   )}
                 </div>
               </div>
@@ -686,9 +686,9 @@ export default function ReturnsTab({
           </fieldset>
 
           {!inv && (
-            <div className="si-box" style={{ flex: mobile ? undefined : 1, minHeight: 160 }}>
+            <div className="si-box"style={{ flex: mobile ? undefined : 1, minHeight: 160 }}>
               {mobile ? invMatches.map((i) => (
-                <button key={i.id} type="button" className="si-mrow" onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
+                <button key={i.id} type="button"className="si-mrow"onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
                   <div className="si-mrow-top"><span>{i.invoiceNo}{i.supplierInvoiceNo ? ` (${i.supplierInvoiceNo})` : ""}</span><span>{cur} {f2(i.grandTotal)}</span></div>
                   <div className="si-mrow-sub"><span>{i[K.partyName] || "—"}</span><span>{fmtDay(i.invoiceDate)}</span></div>
                 </button>
@@ -706,13 +706,13 @@ export default function ReturnsTab({
                     {invMatches.map((i) => {
                       const iDue = Math.max(0, r2(n2(i.grandTotal) - n2(i.amountPaid)));
                       return (
-                        <tr key={i.id} className="pm-clickable" onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
+                        <tr key={i.id} className="pm-clickable"onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
                           <td>{fmtDay(i.invoiceDate)}</td>
                           <td className="si-strong">{i.invoiceNo}{i.supplierInvoiceNo ? ` (${i.supplierInvoiceNo})` : ""}</td>
                           <td>{i[K.partyName] || "—"}</td>
                           <td className="si-center">{(i.items || []).length}</td>
                           <td className="si-num">{f2(i.grandTotal)}</td>
-                          <td className={`si-num${iDue > 0 ? " si-due" : ""}`}>{f2(iDue)}</td>
+                          <td className={`si-num${iDue > 0 ? "si-due" : ""}`}>{f2(iDue)}</td>
                         </tr>
                       );
                     })}
@@ -725,26 +725,26 @@ export default function ReturnsTab({
 
           {inv && (
             <>
-              <fieldset className="pm-panel" style={{ margin: 0 }}>
+              <fieldset className="pm-panel"style={{ margin: 0 }}>
                 <legend className="pm-panel-legend">{L("কোন পণ্য কতটা ফেরত", "Items to return")}</legend>
-                <div className="si-field" style={{ marginBottom: 8 }}>
-                  <input className="pm-input" value={itemQ} onChange={(e) => setItemQ(e.target.value)} placeholder={L("এই বিলে পণ্য খুঁজুন (নাম/কোড)…", "Filter items on this bill (name/code)…")} />
+                <div className="si-field"style={{ marginBottom: 8 }}>
+                  <input className="pm-input"value={itemQ} onChange={(e) => setItemQ(e.target.value)} placeholder={L("এই বিলে পণ্য খুঁজুন (নাম/কোড)…", "Filter items on this bill (name/code)…")} />
                 </div>
                 {mobile ? (
                   <div className="si-box">
                     {visibleLines.map((l) => (
-                      <div key={l.idx} className="si-mrow" style={{ cursor: "default", background: l.qty > 0 ? "#f0fdf4" : undefined }}>
+                      <div key={l.idx} className="si-mrow"style={{ cursor: "default", background: l.qty > 0 ? "#f0fdf4" : undefined }}>
                         <div className="si-mrow-top"><span>{l.it.name}</span><span style={{ color: K.accent }}>{l.qty > 0 ? f2(l.amount) : "—"}</span></div>
                         <div className="si-mrow-sub">
                           <span>{[l.it.code, `${L("বিলে", "Billed")} ${l.sold} ${l.it.unit || ""}`, l.already ? `${L("আগে ফেরত", "Returned")} ${l.already}` : "", `@ ${f2(l.rate)}`].filter(Boolean).join(" · ")}</span>
                         </div>
-                        <div className="si-grid2" style={{ marginTop: 4, alignItems: "center" }}>
+                        <div className="si-grid2"style={{ marginTop: 4, alignItems: "center" }}>
                           <span className="si-muted">{L("ফেরতযোগ্য", "Can return")}: <b>{l.returnable}</b></span>
-                          <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" disabled={l.returnable <= 0} value={qtys[l.idx] ?? ""}
-                            placeholder="0" onChange={(e) => setQtys((q) => ({ ...q, [l.idx]: e.target.value }))} style={{ textAlign: "right" }} />
+                          <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"disabled={l.returnable <= 0} value={qtys[l.idx] ?? ""}
+                            placeholder="0"onChange={(e) => setQtys((q) => ({ ...q, [l.idx]: e.target.value }))} style={{ textAlign: "right" }} />
                         </div>
                         {l.qty > 0 && (
-                          <input className="pm-input" style={{ marginTop: 4 }} value={serials[l.idx] ?? l.it.serialNo ?? ""}
+                          <input className="pm-input"style={{ marginTop: 4 }} value={serials[l.idx] ?? l.it.serialNo ?? ""}
                             placeholder={L("সিরিয়াল / IMEI (ঐচ্ছিক)", "Serial / IMEI (optional)")}
                             onChange={(e) => setSerials((s) => ({ ...s, [l.idx]: e.target.value }))} />
                         )}
@@ -774,16 +774,16 @@ export default function ReturnsTab({
                             <td className="si-num">{l.sold} {l.it.unit || ""}</td>
                             <td className="si-num">{l.already || "—"}</td>
                             <td className="si-num si-strong">{l.returnable}</td>
-                            <td className="si-num" style={{ padding: "1px 2px" }}>
-                              <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" disabled={l.returnable <= 0} value={qtys[l.idx] ?? ""}
-                                placeholder="0" onChange={(e) => setQtys((q) => ({ ...q, [l.idx]: e.target.value }))} style={{ textAlign: "right" }} />
+                            <td className="si-num"style={{ padding: "1px 2px" }}>
+                              <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"disabled={l.returnable <= 0} value={qtys[l.idx] ?? ""}
+                                placeholder="0"onChange={(e) => setQtys((q) => ({ ...q, [l.idx]: e.target.value }))} style={{ textAlign: "right" }} />
                             </td>
                             <td style={{ padding: "1px 2px" }}>
-                              <input className="pm-input" disabled={!(l.qty > 0)} value={serials[l.idx] ?? l.it.serialNo ?? ""}
-                                placeholder="—" onChange={(e) => setSerials((s) => ({ ...s, [l.idx]: e.target.value }))} />
+                              <input className="pm-input"disabled={!(l.qty > 0)} value={serials[l.idx] ?? l.it.serialNo ?? ""}
+                                placeholder="—"onChange={(e) => setSerials((s) => ({ ...s, [l.idx]: e.target.value }))} />
                             </td>
                             <td className="si-num">{f2(l.rate)}</td>
-                            <td className="si-num si-strong" style={{ color: K.accent }}>{l.qty > 0 ? f2(l.amount) : "—"}</td>
+                            <td className="si-num si-strong"style={{ color: K.accent }}>{l.qty > 0 ? f2(l.amount) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -792,27 +792,27 @@ export default function ReturnsTab({
                   </div>
                 )}
                 <div className="si-line-tools">
-                  <button type="button" className="pm-btn-secondary" onClick={() => setQtys(Object.fromEntries(lines.filter((l) => l.returnable > 0).map((l) => [l.idx, String(l.returnable)])))}>{L("সব ফেরত", "Return all")}</button>
-                  <button type="button" className="pm-btn-secondary" onClick={() => setQtys({})}>{L("সব মুছুন", "Clear")}</button>
+                  <button type="button"className="pm-btn-secondary"onClick={() => setQtys(Object.fromEntries(lines.filter((l) => l.returnable > 0).map((l) => [l.idx, String(l.returnable)])))}>{L("সব ফেরত", "Return all")}</button>
+                  <button type="button"className="pm-btn-secondary"onClick={() => setQtys({})}>{L("সব মুছুন", "Clear")}</button>
                 </div>
               </fieldset>
 
               <div className="si-cols">
-                <fieldset className="pm-panel" style={{ margin: 0 }}>
+                <fieldset className="pm-panel"style={{ margin: 0 }}>
                   <legend className="pm-panel-legend">{L("কারণ", "Reason")}</legend>
                   <div className="si-panel-body">
-                    <input className="pm-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={L("যেমন: নষ্ট মাল / ভুল পণ্য", "e.g. damaged / wrong item")} />
+                    <input className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)} placeholder={L("যেমন: নষ্ট মাল / ভুল পণ্য", "e.g. damaged / wrong item")} />
                     {refund > 0.009 && (
                       <div className="si-field">
                         <span className="pm-label">{K.refund[bn ? "bn" : "en"]} — {L("কীভাবে", "how")}</span>
-                        <select className="pm-input" value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)}>
+                        <select className="pm-input"value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)}>
                           {REFUND_METHODS.map((m) => <option key={m.key} value={m.key}>{bn ? m.bn : m.en}</option>)}
                         </select>
                       </div>
                     )}
                   </div>
                 </fieldset>
-                <fieldset className="pm-panel" style={{ margin: 0 }}>
+                <fieldset className="pm-panel"style={{ margin: 0 }}>
                   <legend className="pm-panel-legend">{L("হিসাব", "Summary")}</legend>
                   <div className="si-panel-body">
                     {totalVat > 0 && totalRow("VAT", `${cur} ${f2(totalVat)}`)}
@@ -830,11 +830,11 @@ export default function ReturnsTab({
             </>
           )}
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !inv || total <= 0 || dateBad} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editOf ? L("এডিট সেভ", "Save Edit") : L("রিটার্ন সেভ", "Save Return")}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !inv || total <= 0 || dateBad} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${editOf ? L("এডিট সেভ", "Save Edit") : L("রিটার্ন সেভ", "Save Return")}`}
           </button>
         </div>
       </>
@@ -847,7 +847,7 @@ export default function ReturnsTab({
       <>
         <div className="si-body">
           <div className="si-cols">
-            <fieldset className="pm-panel" style={{ margin: 0 }}>
+            <fieldset className="pm-panel"style={{ margin: 0 }}>
               <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
               <div className="si-panel-body">
                 {vRow(L("রিটার্ন নং", "Return No"), r.returnNo, { strong: true, color: K.accent })}
@@ -862,7 +862,7 @@ export default function ReturnsTab({
                 {r.status === "cancelled" && vRow(L("বাতিল", "Cancelled"), fmtDay(r.cancelledAt), { color: "#b91c1c" })}
               </div>
             </fieldset>
-            <fieldset className="pm-panel" style={{ margin: 0 }}>
+            <fieldset className="pm-panel"style={{ margin: 0 }}>
               <legend className="pm-panel-legend">{L("হিসাব", "Summary")}</legend>
               <div className="si-panel-body">
                 {n2(r.totalVat) > 0 && totalRow("VAT", `${cur} ${f2(r.totalVat)}`)}
@@ -874,7 +874,7 @@ export default function ReturnsTab({
           </div>
           <div className="si-box">
             {mobile ? (r.items || []).map((it, i) => (
-              <div key={i} className="si-mrow" style={{ cursor: "default" }}>
+              <div key={i} className="si-mrow"style={{ cursor: "default" }}>
                 <div className="si-mrow-top"><span>{i + 1}. {it.name}</span><span style={{ color: K.accent }}>{f2(it.amount)}</span></div>
                 <div className="si-mrow-sub"><span>{[it.code, it.serialNo && `S/N ${it.serialNo}`].filter(Boolean).join(" · ") || "—"}</span><span>{it.qty} {it.unit || ""} × {f2(it.rate)}</span></div>
               </div>
@@ -894,13 +894,13 @@ export default function ReturnsTab({
                   {(r.items || []).map((it, i) => (
                     <tr key={i}>
                       <td className="si-center">{i + 1}</td>
-                      <td className="si-strong" title={it.name}>{it.name}</td>
+                      <td className="si-strong"title={it.name}>{it.name}</td>
                       <td>{it.code || ""}</td>
                       <td>{it.serialNo || "—"}</td>
                       <td className="si-num">{it.qty} {it.unit || ""}</td>
                       <td className="si-num">{f2(it.rate)}</td>
                       <td className="si-num">{f2(it.vatAmt)}</td>
-                      <td className="si-num si-strong" style={{ color: K.accent }}>{f2(it.amount)}</td>
+                      <td className="si-num si-strong"style={{ color: K.accent }}>{f2(it.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -908,13 +908,13 @@ export default function ReturnsTab({
             )}
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
-          {canCancel(r) && <button type="button" className="pm-btn" disabled={saving} onClick={() => startEdit(r)}>✏️ {L("এডিট", "Edit")}</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
+          {canCancel(r) && <button type="button"className="pm-btn"disabled={saving} onClick={() => startEdit(r)}> {L("এডিট", "Edit")}</button>}
           <span className="si-toolbar-gap" />
-          {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelReturn(r)}>⛔ {L("রিটার্ন বাতিল", "Cancel Return")}</button>}
-          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteReturn(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canCancel(r) && <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => cancelReturn(r)}> {L("রিটার্ন বাতিল", "Cancel Return")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => deleteReturn(r)}> {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));
@@ -939,15 +939,15 @@ export default function ReturnsTab({
   return shell(K.title[bn ? "bn" : "en"], `${L("মোট", "Total")} ${cur} ${f2(activeTotal)}`, (
     <>
       <div className="si-toolbar">
-        {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন রিটার্ন", "New Return")}</button>}
+        {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন রিটার্ন", "New Return")}</button>}
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (
-            <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
+            <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className="si-kpis">
         <div className="si-kpi"><span>{L("রিটার্ন", "Returns")}</span><b>{liveShown.length}</b></div>
@@ -957,15 +957,15 @@ export default function ReturnsTab({
       </div>
       <div className="si-filters">
         <div className="si-search">
-          <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("রিটার্ন নং, বিল নং, নাম বা পণ্য…", "Return no, bill no, name or item…")} />
-          {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+          <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("রিটার্ন নং, বিল নং, নাম বা পণ্য…", "Return no, bill no, name or item…")} />
+          {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
         </div>
-        <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
+        <label className="pm-check"><input type="checkbox"checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
       </div>
       <div className="si-main is-all">
         <div className="si-box">
           {mobile ? filtered.map((r) => (
-            <button key={r.id} type="button" className="si-mrow" onClick={() => openDetail(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
+            <button key={r.id} type="button"className="si-mrow"onClick={() => openDetail(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
               <div className="si-mrow-top"><span style={{ color: K.accent }}>{r.returnNo}</span><span>{cur} {f2(r.total)}</span></div>
               <div className="si-mrow-sub"><span>{fmtDay(r.returnDate)} · {L("বিল", "Bill")} {r.invoiceNo}</span>{statusBadge(r)}</div>
               <div className="si-mrow-sub"><span>{r.partyName || "—"} · {(r.items || []).length} {L("টি পণ্য", "items")}</span>{n2(r.refundAmount) > 0 && <span>{L("ফেরত", "Refund")} <b>{f2(r.refundAmount)}</b></span>}</div>
@@ -986,16 +986,16 @@ export default function ReturnsTab({
               </tr></thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.id} className="pm-clickable" onClick={() => openDetail(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+                  <tr key={r.id} className="pm-clickable"onClick={() => openDetail(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
                     <td>{fmtDay(r.returnDate)}</td>
-                    <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : K.accent }}>{r.returnNo}</td>
+                    <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : K.accent }}>{r.returnNo}</td>
                     <td>{r.invoiceNo}{r.supplierInvoiceNo ? ` (${r.supplierInvoiceNo})` : ""}</td>
                     <td title={r.partyName || ""}>{r.partyName || "—"}</td>
                     <td className="si-center">{(r.items || []).length}</td>
                     <td title={r.reason || ""}>{r.reason || ""}</td>
                     <td className="si-num">{f2(r.appliedToInvoice)}</td>
                     <td className="si-num">{n2(r.refundAmount) > 0 ? f2(r.refundAmount) : "—"}</td>
-                    <td className="si-num si-strong" style={r.status === "cancelled" ? { textDecoration: "line-through" } : undefined}>{f2(r.total)}</td>
+                    <td className="si-num si-strong"style={r.status === "cancelled" ? { textDecoration: "line-through" } : undefined}>{f2(r.total)}</td>
                     <td className="si-center">{statusBadge(r)}</td>
                   </tr>
                 ))}

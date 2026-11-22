@@ -52,7 +52,7 @@ export default function NotificationBell({ lang, theme, items = [] }) {
           cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", position: "relative",
         }}
       >
-        🔔
+        
         {count > 0 && (
           <span style={{
             position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9,
@@ -71,11 +71,11 @@ export default function NotificationBell({ lang, theme, items = [] }) {
           boxShadow: dark ? "0 18px 40px rgba(0,0,0,0.55)" : "0 18px 40px rgba(15,23,42,0.18)",
         }}>
           <div style={{ padding: "11px 14px", fontSize: 13, fontWeight: 900, color: colors.text, borderBottom: `1px solid ${colors.border}` }}>
-            🔔 {bn ? "নোটিফিকেশন" : "Notifications"}
+             {bn ? "নোটিফিকেশন" : "Notifications"}
           </div>
           {items.length === 0 ? (
             <div style={{ padding: "18px 14px", fontSize: 13, color: colors.muted, textAlign: "center" }}>
-              {bn ? "কোনো নতুন নোটিফিকেশন নেই ✅" : "No new notifications ✅"}
+              {bn ? "কোনো নতুন নোটিফিকেশন নেই " : "No new notifications "}
             </div>
           ) : (
             items.map((it) => (

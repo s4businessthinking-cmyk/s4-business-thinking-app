@@ -519,20 +519,29 @@ export function shopHeaderExtras(shop) {
 export function applyDesign(html, kind, styleOverride) {
   const style = styleOverride || loadPrintDesign().style[kind] || STYLE_DEFAULT;
   // Sheet flex helpers stay for all docs; terms CSS/text only for invoices.
-  const sheetCss = `.sheet-mid{flex:1 1 auto!important;min-height:50mm!important}
-.sheet-bot{flex:0 0 auto!important;margin-top:auto!important}
-table.items{height:auto!important;margin:0!important}`;
+  // Do not pin the totals block to the page bottom — that left a huge empty gap when
+  // items overflowed and pushed totals onto page 2. Totals sit right under the item table.
+  const sheetCss = `.sheet-mid{flex:0 1 auto!important;min-height:0!important}
+.sheet-bot{flex:0 0 auto!important;margin-top:0!important}
+table.items{height:auto!important;margin:0!important}
+.invoice.paged{min-height:0!important;page-break-after:always;break-after:page}
+.invoice.paged:last-of-type{page-break-after:auto;break-after:auto}
+@media print{.invoice.paged{min-height:0!important}}`;
   const termsCss = kind === "invoice" ? `.footer.s4-terms{text-align:left!important;white-space:normal!important;line-height:1.35!important;height:auto!important;min-height:0!important;flex:none!important;padding:6px 12px!important}
 .s4-terms-title{text-align:center;font-weight:900;margin-bottom:4px}
 .s4-term-line{display:flex;align-items:flex-start;gap:4px;margin:1px 0}
 .s4-term-no{flex:0 0 18px;font-weight:800}.s4-terms-thanks{text-align:center;font-weight:900;margin-top:4px}` : "";
   let out = html.replace("</style>", `${templateCss(style)}${sheetCss}${termsCss}</style>`);
-  const shopName = /(<div class="shop-name">[\s\S]*?<\/div>)/;
-  if (style.logo) out = out.replace(shopName, `<div class="s4-logo-wrap"><img class="s4-logo" src="${style.logo}" alt=""></div>$1`);
-  if (style.headerNote) out = out.replace(shopName, `$1<div class="shop-sub" style="white-space:pre-line">${esc(style.headerNote)}</div>`);
-  // Invoice T&C only — statement (PO/returns/ledgers/reports) and voucher keep their own footer.
+  // Multi-page invoices repeat the shop header — logo / header note must apply on every page.
+  if (style.logo) {
+    out = out.replace(/(<div class="shop-name">[\s\S]*?<\/div>)/g, `<div class="s4-logo-wrap"><img class="s4-logo" src="${style.logo}" alt=""></div>$1`);
+  }
+  if (style.headerNote) {
+    out = out.replace(/(<div class="shop-name">[\s\S]*?<\/div>)/g, `$1<div class="shop-sub" style="white-space:pre-line">${esc(style.headerNote)}</div>`);
+  }
+  // Invoice T&C only on the thank-you footer (last page). Continued pages have no .footer.
   if (style.footerText && kind === "invoice") {
-    out = out.replace(/<div class="footer">[\s\S]*?<\/div>/, `<div class="footer s4-terms">${termsHtml(style.footerText)}</div>`);
+    out = out.replace(/<div class="footer">[\s\S]*?<\/div>/g, `<div class="footer s4-terms">${termsHtml(style.footerText)}</div>`);
   }
   return out;
 }

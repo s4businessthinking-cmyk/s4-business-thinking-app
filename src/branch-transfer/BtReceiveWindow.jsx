@@ -37,41 +37,41 @@ export function ReceiveWindow({ lang, mobile, transfer, busy, allowPartial, onCl
   const confirm = () => {
     if (busy) return;
     const bad = items.find(problem);
-    if (bad) return toast(`❌ ${bad.name}: ${problem(bad)}`, "err");
+    if (bad) return toast(` ${bad.name}: ${problem(bad)}`, "err");
     if (totalRec <= 0) return toast(normalizeError(new Error("RECEIPT_QUANTITY_REQUIRED"), lang), "err");
     if (!allowPartial && totalRec < totalRemaining - 1e-9) return toast(normalizeError(new Error("PARTIAL_RECEIVE_DISABLED"), lang), "err");
     onConfirm(lines);
   };
 
   const numInput = (item, key) => (
-    <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" value={lineOf(item.lineId)[key] ?? ""} onChange={(e) => upd(item.lineId, key, e.target.value)} style={{ textAlign: "right" }} />
+    <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"value={lineOf(item.lineId)[key] ?? ""} onChange={(e) => upd(item.lineId, key, e.target.value)} style={{ textAlign: "right" }} />
   );
 
   return (
-    <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
-      <div className="pm-window" style={{ maxWidth: mobile ? undefined : 860 }}>
+    <div className="pm-backdrop"onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
+      <div className="pm-window"style={{ maxWidth: mobile ? undefined : 860 }}>
         <div className="pm-window-title">
-          <span>📥 {t.receive} — {transfer.transferNo} · {transfer.branchName}</span>
-          <button type="button" className="pm-window-close" disabled={busy} onClick={onClose}>✕</button>
+          <span> {t.receive} — {transfer.transferNo} · {transfer.branchName}</span>
+          <button type="button"className="pm-window-close"disabled={busy} onClick={onClose}>✕</button>
         </div>
         <div className="pm-window-body">
-          <div className="si-pills" style={{ marginBottom: 4 }}>
-            <button type="button" className="pm-btn-secondary" onClick={() => setAll(true)}>✓ {L("সব বাকি পেয়েছি", "Got all remaining")}</button>
-            <button type="button" className="pm-btn-secondary" onClick={() => setAll(false)}>0 {L("সব শূন্য", "Clear all")}</button>
+          <div className="si-pills"style={{ marginBottom: 4 }}>
+            <button type="button"className="pm-btn-secondary"onClick={() => setAll(true)}>✓ {L("সব বাকি পেয়েছি", "Got all remaining")}</button>
+            <button type="button"className="pm-btn-secondary"onClick={() => setAll(false)}>0 {L("সব শূন্য", "Clear all")}</button>
           </div>
-          <div className="si-box" style={{ maxHeight: mobile ? undefined : 380 }}>
+          <div className="si-box"style={{ maxHeight: mobile ? undefined : 380 }}>
             {mobile ? items.map((item) => {
               const line = lineOf(item.lineId);
               const err = problem(item);
           return (
-                <div key={item.lineId} className="si-mrow" style={{ cursor: "default" }}>
+                <div key={item.lineId} className="si-mrow"style={{ cursor: "default" }}>
                   <div className="si-mrow-top"><span>{item.name}</span><span>{t.remaining} <b>{fq(remainingQuantityForLine(transfer, item))}</b> {item.unit}</span></div>
-                  <div className="si-grid2" style={{ marginTop: 4 }}>
+                  <div className="si-grid2"style={{ marginTop: 4 }}>
                     <div className="si-field"><span className="pm-label">{t.received}</span>{numInput(item, "receivedQty")}</div>
                     <div className="si-field"><span className="pm-label">{t.damaged}</span>{numInput(item, "damagedQty")}</div>
               </div>
-                  <input className="pm-input" style={{ marginTop: 4 }} value={line.issueNote || ""} onChange={(e) => upd(item.lineId, "issueNote", e.target.value)} placeholder={t.issueNote} />
-                  {err && <div style={{ color: "#b91c1c", fontWeight: 700 }}>⚠️ {err}</div>}
+                  <input className="pm-input"style={{ marginTop: 4 }} value={line.issueNote || ""} onChange={(e) => upd(item.lineId, "issueNote", e.target.value)} placeholder={t.issueNote} />
+                  {err && <div style={{ color: "#b91c1c", fontWeight: 700 }}> {err}</div>}
             </div>
               );
             }) : (
@@ -90,14 +90,14 @@ export function ReceiveWindow({ lang, mobile, transfer, busy, allowPartial, onCl
                     const line = lineOf(item.lineId);
                     const err = problem(item);
                     return (
-                      <tr key={item.lineId} className="is-editing" title={err || undefined}>
+                      <tr key={item.lineId} className="is-editing"title={err || undefined}>
                         <td className="si-center">{index + 1}</td>
-                        <td className="si-strong" title={item.name}>{item.name}{item.code ? <span className="si-muted"> · {item.code}</span> : null}</td>
+                        <td className="si-strong"title={item.name}>{item.name}{item.code ? <span className="si-muted"> · {item.code}</span> : null}</td>
                         <td className="si-num">{fq(remainingQuantityForLine(transfer, item))} {item.unit}</td>
                         <td style={{ padding: "1px 2px" }}>{numInput(item, "receivedQty")}</td>
                         <td style={{ padding: "1px 2px" }}>{numInput(item, "damagedQty")}</td>
-                        <td className="si-num si-strong" style={{ color: err ? "#b91c1c" : "#15803d" }}>{err ? "⚠️" : fq(numberValue(line.receivedQty) - numberValue(line.damagedQty))}</td>
-                        <td style={{ padding: "1px 2px" }}><input className="pm-input" value={line.issueNote || ""} onChange={(e) => upd(item.lineId, "issueNote", e.target.value)} /></td>
+                        <td className="si-num si-strong"style={{ color: err ? "#b91c1c" : "#15803d" }}>{err ? "" : fq(numberValue(line.receivedQty) - numberValue(line.damagedQty))}</td>
+                        <td style={{ padding: "1px 2px" }}><input className="pm-input"value={line.issueNote || ""} onChange={(e) => upd(item.lineId, "issueNote", e.target.value)} /></td>
                       </tr>
           );
         })}
@@ -105,14 +105,14 @@ export function ReceiveWindow({ lang, mobile, transfer, busy, allowPartial, onCl
               </table>
             )}
           </div>
-          <div className="si-hint" style={{ marginLeft: 0 }}>
+          <div className="si-hint"style={{ marginLeft: 0 }}>
             {t.received} <b>{fq(totalRec)}</b> · {t.damaged} <b>{fq(totalDmg)}</b> · {L("ভালো", "Good")} <b>{fq(totalRec - totalDmg)}</b>
             {!allowPartial && ` · ${L("আংশিক রিসিভ বন্ধ — সব বাকি একসাথে রিসিভ করতে হবে", "Partial receive is off — receive all remaining at once")}`}
           </div>
-          <div className="si-actions" style={{ padding: 0 }}>
-            <button type="button" className="pm-btn-secondary" disabled={busy} onClick={onClose}>{L("বন্ধ", "Close")}</button>
+          <div className="si-actions"style={{ padding: 0 }}>
+            <button type="button"className="pm-btn-secondary"disabled={busy} onClick={onClose}>{L("বন্ধ", "Close")}</button>
             <span className="si-toolbar-gap" />
-            <button type="button" className="pm-btn pm-btn--primary" disabled={busy} onClick={confirm}>{busy ? L("সেভ হচ্ছে…", "Saving…") : `✓ ${t.confirmReceive}`}</button>
+            <button type="button"className="pm-btn pm-btn--primary"disabled={busy} onClick={confirm}>{busy ? L("সেভ হচ্ছে…", "Saving…") : `✓ ${t.confirmReceive}`}</button>
           </div>
         </div>
       </div>

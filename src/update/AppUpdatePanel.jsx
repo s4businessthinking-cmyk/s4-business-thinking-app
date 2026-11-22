@@ -22,7 +22,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
   const txt =
     lang === "bn"
       ? {
-          title: "🔄 অ্যাপ আপডেট",
+          title: "অ্যাপ আপডেট",
           installed: "আপনার installed version",
           latest: "GitHub-এ সর্বশেষ version",
           check: "আপডেট চেক করুন",
@@ -33,11 +33,11 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           upToDate: "আপনার installed app আপ-টু-ডেট",
           downloadApk: "APK ডাউনলোড (backup)",
           desktopPending:
-            "✅ নতুন version download হলে app নিজে থেকে restart হয়ে update হয়ে যাবে — কোনো button চাপতে হবে না।",
+            "নতুন version download হলে app নিজে থেকে restart হয়ে update হয়ে যাবে — কোনো button চাপতে হবে না।",
           desktopRestart:
             "Windows app WhatsApp-এর মতো নিজে থেকে update নেয়। Internet থাকলে download + restart automatic — uninstall লাগবে না।",
           mobileAuto:
-            "✅ Mobile app WhatsApp-এর মতো নিজে থেকে auto update নেবে। Internet থাকলে app খুললেই update হবে — uninstall/APK লাগবে না।",
+            "Mobile app WhatsApp-এর মতো নিজে থেকে auto update নেবে। Internet থাকলে app খুললেই update হবে — uninstall/APK লাগবে না।",
           mobileManualApk:
             "খুব পুরোনো app-এ OTA না থাকলে একবার APK install করুন। তারপর থেকে সব update automatic।",
           noBundleHint:
@@ -50,10 +50,10 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           webReload: "সার্ভার থেকে নতুন ভার্সন লোড করুন",
           webReloading: "লোড হচ্ছে...",
           webFootnote:
-            "মোবাইল Chrome-এ ওয়েব আপডেট = নিচের বাটন বা 🔒 → Site settings → Clear data। Home screen shortcut পুরনো রাখতে পারে।",
+            "মোবাইল Chrome-এ ওয়েব আপডেট = নিচের বাটন বা  → Site settings → Clear data। Home screen shortcut পুরনো রাখতে পারে।",
         }
       : {
-          title: "🔄 App Update",
+          title: "App Update",
           installed: "Your installed version",
           latest: "Latest version on GitHub",
           check: "Check for updates",
@@ -64,11 +64,11 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           upToDate: "Your installed app is up to date",
           downloadApk: "Download APK (backup)",
           desktopPending:
-            "✅ When a new version downloads, the app restarts and updates by itself — no buttons to press.",
+            "When a new version downloads, the app restarts and updates by itself — no buttons to press.",
           desktopRestart:
             "The Windows app updates itself like WhatsApp. Online = automatic download + restart. No uninstall.",
           mobileAuto:
-            "✅ The mobile app updates itself like WhatsApp. When online, opening the app applies updates — no uninstall or APK.",
+            "The mobile app updates itself like WhatsApp. When online, opening the app applies updates — no uninstall or APK.",
           mobileManualApk:
             "If the app is too old for OTA, install the APK once. After that, all updates are automatic.",
           noBundleHint:
@@ -81,7 +81,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
           webReload: "Load latest from server",
           webReloading: "Loading...",
           webFootnote:
-            "On mobile Chrome, refresh the web app with the button above or 🔒 → Site settings → Clear data. A home-screen shortcut may still open the old copy.",
+            "On mobile Chrome, refresh the web app with the button above or  → Site settings → Clear data. A home-screen shortcut may still open the old copy.",
         };
 
   useEffect(() => {
@@ -127,8 +127,8 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
     try {
       toast(
         lang === "bn"
-          ? `🔄 Version ${result.latestVersion} apply হচ্ছে...`
-          : `🔄 Applying version ${result.latestVersion}...`,
+          ? `Version ${result.latestVersion} apply হচ্ছে...`
+          : `Applying version ${result.latestVersion}...`,
         "ok"
       );
       await applyMobileOtaUpdate({
@@ -313,7 +313,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
 }
 
 export async function runStartupUpdatePrompt({ lang, toast }) {
-  // Fully silent startup update (WhatsApp-style). No confirms, no "download?" prompts.
+  // Fully silent startup update (WhatsApp-style). No confirms, no "download?"prompts.
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
 
   try {

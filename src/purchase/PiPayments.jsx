@@ -2,6 +2,7 @@ import { PI_CHEQUE_STATUSES, piToday, VOUCHER_CARD_TYPES } from "./purchaseShare
 import { PI_VOUCHER_METHODS, piFmt2, piN2, AutoTA } from "../shared/appShared.jsx";
 import { useState, useRef, useEffect } from "react";
 import { UAE_BANKS } from "../cheque/chequeConfig.js";
+import { fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 
 function paymentMethodKey(v) {
   return String(v?.method || "cash").toLowerCase();
@@ -75,53 +76,53 @@ export function PiPaymentsListTab({ payments, invoices = [], loading, t, lang, o
   const total = filtered.reduce((sum,p)=>sum+(p.status==="cancelled"?0:piN2(p.totalAmount)), 0);
   const statusCell = (v) => {
     const st = paymentListStatus(v, invoices, lang);
-    return <span className="si-badge" style={{ color: st.color }}>{st.text}</span>;
+    return <span className="si-badge"style={{ color: st.color }}>{st.text}</span>;
   };
   return (
     <>
       <div className="si-filters">
         <div className="si-search">
-          <input className="pm-input" placeholder={t.pi_searchVoucherPh} value={q} onChange={e=>setQ(e.target.value)} />
-          {q&&<button type="button" aria-label="Clear" onClick={()=>setQ("")}>✕</button>}
+          <input className="pm-input"placeholder={t.pi_searchVoucherPh} value={q} onChange={e=>setQ(e.target.value)} />
+          {q&&<button type="button"aria-label="Clear"onClick={()=>setQ("")}>✕</button>}
         </div>
         <div className="si-pills">
           {statusPills.map(([id, label]) => (
-            <button key={`st-${id}`} type="button" className={`pm-btn-secondary${listF===id?" is-active":""}`}
+            <button key={`st-${id}`} type="button"className={`pm-btn-secondary${listF===id?"is-active":""}`}
               onClick={()=>setListF(id)}>{label}</button>
           ))}
         </div>
         <div className="si-pills">
           {methodPills.map(([id, label]) => (
-            <button key={`md-${id}`} type="button" className={`pm-btn-secondary${listF===id?" is-active":""}`}
+            <button key={`md-${id}`} type="button"className={`pm-btn-secondary${listF===id?"is-active":""}`}
               onClick={()=>setListF(id)}>{label}</button>
           ))}
         </div>
       </div>
-      <div className="si-box" style={{ flex:1, minWidth:0 }}>
-        {loading ? <div className="si-empty">⏳</div>
-          : payments.length===0 ? <div className="si-empty">💳 {t.pi_noVouchers}</div>
-          : filtered.length===0 ? <div className="si-empty">🔍 {t.pi_noResults}</div>
+      <div className="si-box"style={{ flex:1, minWidth:0 }}>
+        {loading ? <div className="si-empty"></div>
+          : payments.length===0 ? <div className="si-empty"> {t.pi_noVouchers}</div>
+          : filtered.length===0 ? <div className="si-empty"> {t.pi_noResults}</div>
           : mobile ? filtered.map(v=>(
-            <button key={v.id} type="button" className="si-mrow" style={v.status==="cancelled"?{ opacity:0.6 }:undefined} onClick={()=>onOpen(v)}>
+            <button key={v.id} type="button"className="si-mrow"style={v.status==="cancelled"?{ opacity:0.6 }:undefined} onClick={()=>onOpen(v)}>
               <div className="si-mrow-top">
-                <span style={{ color:"#c2410c" }}>{PI_VOUCHER_METHODS[paymentMethodKey(v)]?.icon||"💵"} {v.paymentNo}</span>
+                <span style={{ color:"#c2410c" }}>{PI_VOUCHER_METHODS[paymentMethodKey(v)]?.icon||""} {v.paymentNo}</span>
                 <span>{statusCell(v)}</span>
               </div>
               <div className="si-mrow-sub"><span>{v.vendorName||"—"}</span><b style={{ color:"#15803d" }}>{t.cur} {piFmt2(v.totalAmount)}</b></div>
               <div className="si-mrow-sub">
-                <span>{v.paymentDate} · {(v.allocations||[]).length} {bn?"টি ইনভয়েস":"invoices"}</span>
+                <span>{fmtDate(v.paymentDate)} · {(v.allocations||[]).length} {bn?"টি ইনভয়েস":"invoices"}</span>
                 {piN2(v.discountAmount)>0&&<span>{bn?"ছাড়":"Disc"} {piFmt2(v.discountAmount)}</span>}
               </div>
               {(v.chequeNo || v.vendorReceiptNo) && (
                 <div className="si-mrow-sub">
-                  {v.chequeNo ? <span>📃 {v.chequeNo}</span> : null}
-                  {v.vendorReceiptNo ? <span>🧾 {v.vendorReceiptNo}</span> : null}
+                  {v.chequeNo ? <span> {v.chequeNo}</span> : null}
+                  {v.vendorReceiptNo ? <span> {v.vendorReceiptNo}</span> : null}
                 </div>
               )}
             </button>
           ))
           : (
-            <table className="pm-table" style={{ minWidth: 1240 }}>
+            <table className="pm-table"style={{ minWidth: 1240 }}>
               <colgroup>
                 <col style={{ width:100 }} /><col style={{ width:80 }} /><col style={{ width:160 }} />
                 {PMT_METHOD_COLS.map((m) => <col key={m} style={{ width:74 }} />)}
@@ -131,12 +132,12 @@ export function PiPaymentsListTab({ payments, invoices = [], loading, t, lang, o
               <thead><tr>
                 <th>{bn?"ভাউচার":"Voucher"}</th><th>{bn?"তারিখ":"Date"}</th><th>{bn?"ভেন্ডর":"Vendor"}</th>
                 {PMT_METHOD_COLS.map((m) => (
-                  <th key={m} className="si-center" title={PI_VOUCHER_METHODS[m]?.[lang]||m}>{PI_VOUCHER_METHODS[m]?.[lang]||m}</th>
+                  <th key={m} className="si-center"title={PI_VOUCHER_METHODS[m]?.[lang]||m}>{PI_VOUCHER_METHODS[m]?.[lang]||m}</th>
                 ))}
                 <th>{bn?"চেক নং":"Cheque No"}</th><th>{bn?"ভেন্ডর রিসিট":"Vendor Rcpt"}</th>
                 <th className="si-num">{bn?"ইনভয়েস":"Bills"}</th><th className="si-num">{bn?"টাকা":"Amount"}</th>
                 {PMT_STATUS_COLS.map((st) => (
-                  <th key={st} className="si-center" title={PMT_STATUS_META[st][lang==="bn"?"bn":"en"]}>{PMT_STATUS_META[st][lang==="bn"?"bn":"en"]}</th>
+                  <th key={st} className="si-center"title={PMT_STATUS_META[st][lang==="bn"?"bn":"en"]}>{PMT_STATUS_META[st][lang==="bn"?"bn":"en"]}</th>
                 ))}
               </tr></thead>
               <tbody>
@@ -145,9 +146,9 @@ export function PiPaymentsListTab({ payments, invoices = [], loading, t, lang, o
                   const method = paymentMethodKey(v);
                   const stKey = paymentStatusKey(v, invoices);
                   return (
-                    <tr key={v.id} className="pm-clickable" style={off?{ opacity:0.6 }:undefined} onClick={()=>onOpen(v)}>
-                      <td className="si-strong" style={{ color:"#c2410c" }}>{v.paymentNo}</td>
-                      <td>{v.paymentDate}</td>
+                    <tr key={v.id} className="pm-clickable"style={off?{ opacity:0.6 }:undefined} onClick={()=>onOpen(v)}>
+                      <td className="si-strong"style={{ color:"#c2410c" }}>{v.paymentNo}</td>
+                      <td>{fmtDate(v.paymentDate)}</td>
                       <td title={v.vendorName||""}>{v.vendorName||"—"}</td>
                       {PMT_METHOD_COLS.map((m) => (
                         <td key={m} className="si-center">
@@ -157,7 +158,7 @@ export function PiPaymentsListTab({ payments, invoices = [], loading, t, lang, o
                       <td style={{ fontFamily:"Consolas, monospace" }}>{v.chequeNo||"—"}</td>
                       <td style={{ fontFamily:"Consolas, monospace" }}>{v.vendorReceiptNo||"—"}</td>
                       <td className="si-num">{(v.allocations||[]).length}</td>
-                      <td className="si-num si-strong" style={off?{ textDecoration:"line-through" }:{ color:"#15803d" }}>{piFmt2(v.totalAmount)}</td>
+                      <td className="si-num si-strong"style={off?{ textDecoration:"line-through" }:{ color:"#15803d" }}>{piFmt2(v.totalAmount)}</td>
                       {PMT_STATUS_COLS.map((st) => {
                         const show = stKey === st || (st === "pending" && stKey === "bounced");
                         const meta = stKey === "bounced" && st === "pending"
@@ -176,7 +177,7 @@ export function PiPaymentsListTab({ payments, invoices = [], loading, t, lang, o
             </table>
           )}
       </div>
-      <div className="si-statusbar" style={{ borderTop:0, padding:"2px 0" }}>
+      <div className="si-statusbar"style={{ borderTop:0, padding:"2px 0" }}>
         <span>{bn?"দেখানো":"Showing"}: <b>{filtered.length}</b></span>
         <span>{bn?"মোট":"Total"}: <b>{t.cur} {piFmt2(total)}</b></span>
       </div>
@@ -213,8 +214,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
     if (v) setVendor({ id:v.id, name:v.vendorName, mobile:v.mobileNumber||v.whatsappNumber||"" });
   },[prefillVendorId, vendors]);
 
-  // "Cancel & Edit" on an old voucher: refill vendor, method, cheque/ref details, note and every
-  // allocation amount so the user corrects and re-saves instead of retyping everything.
+  // Prefill from an existing voucher snapshot (in-place edit or legacy resume).
   useEffect(()=>{
     if (!prefillVoucher) return;
     const partyId = prefillVoucher.raw?.vendorId || null;
@@ -268,6 +268,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
       .filter(inv => piN2(amounts[inv.id])>0)
       .map(inv => ({ invoiceId:inv.id, invoiceNo:inv.invoiceNo, supplierInvoiceNo:inv.supplierInvoiceNo||"", invoiceDate:inv.invoiceDate||"", amount:piN2(amounts[inv.id]) }));
     onSave({
+      editId: prefillVoucher?.id || prefillVoucher?.raw?.id || null,
       vendorId:vendor?.id||null, vendorName:vendor?.name||"", vendorMobile:vendor?.mobile||"",
       method, paymentDate, note,
       chequeNo: method==="cheque"?chequeNo:"",
@@ -289,7 +290,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
       <button onClick={onCancel} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.pi_backToPayments}</button>
 
       <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:16, marginBottom:12 }}>
-        <div style={{ fontSize:14, fontWeight:800, color:"#f97316", marginBottom:12 }}>💳 {t.pi_paymentVoucherTitle}</div>
+        <div style={{ fontSize:14, fontWeight:800, color:"#f97316", marginBottom:12 }}> {t.pi_paymentVoucherTitle}</div>
 
         {/* Vendor selector */}
         <div style={{ marginBottom:14 }}>
@@ -305,8 +306,8 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
                       style={{ padding:"10px 12px", cursor:"pointer", borderBottom:`1px solid ${th.border}`, fontSize:13 }}
                       onMouseEnter={e=>e.currentTarget.style.background=th.bgInp}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <div style={{ fontWeight:700, color:th.txtPrimary }}>🏭 {v.vendorName}</div>
-                      {(v.mobileNumber||v.whatsappNumber)&&<div style={{ fontSize:11, color:th.txtMuted }}>📱 {v.mobileNumber||v.whatsappNumber}</div>}
+                      <div style={{ fontWeight:700, color:th.txtPrimary }}> {v.vendorName}</div>
+                      {(v.mobileNumber||v.whatsappNumber)&&<div style={{ fontSize:11, color:th.txtMuted }}> {v.mobileNumber||v.whatsappNumber}</div>}
                     </div>
                   ))}
                 </div>
@@ -315,8 +316,8 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
           ) : (
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", background:th.bgInp, borderRadius:10, border:`1px solid ${th.border}` }}>
               <div>
-                <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>🏭 {vendor.name}</div>
-                {vendor.mobile&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:1 }}>📱 {vendor.mobile}</div>}
+                <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}> {vendor.name}</div>
+                {vendor.mobile&&<div style={{ fontSize:11, color:th.txtMuted, marginTop:1 }}> {vendor.mobile}</div>}
               </div>
               <button onClick={()=>{ setVendor(null); setAmounts({}); setDiscount(""); }} style={{ padding:"6px 12px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:11, fontWeight:700, cursor:"pointer" }}>{t.pi_changeVendor}</button>
             </div>
@@ -336,15 +337,15 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
 
           <div style={{ marginBottom:14 }}>
             <div style={lbl}>{t.pi_paymentDate}</div>
-            <input type="date" style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
+            <input type="date"lang="en-GB" style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
           </div>
 
           {method==="cheque"&&(
             <div style={{ background:"rgba(99,102,241,0.06)", border:"1px solid #6366f1", borderRadius:10, padding:12, marginBottom:14 }}>
-              <div style={{ fontSize:11, color:"#818cf8", fontWeight:700, marginBottom:10 }}>📃 {lang==="bn"?"চেকের তথ্য":"Cheque Details"}</div>
+              <div style={{ fontSize:11, color:"#818cf8", fontWeight:700, marginBottom:10 }}> {lang==="bn"?"চেকের তথ্য":"Cheque Details"}</div>
               <div style={{ marginBottom:8 }}>
                 <div style={lbl}>{t.pi_chequeNo}</div>
-                <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="000123" value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
+                <input style={{ ...inp(), fontFamily:"monospace" }} placeholder="000123"value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
                 <div>
@@ -356,7 +357,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
                 </div>
                 <div>
                   <div style={lbl}>{t.pi_chequeDate}</div>
-                  <input type="date" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
+                  <input type="date"lang="en-GB" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
                 </div>
               </div>
               <div style={{ marginTop:8 }}>
@@ -372,7 +373,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
           </div>
           <div style={{ marginBottom:14 }}>
             <div style={lbl}>{lang==="bn"?"চেক / পেমেন্ট কোন মাসের (ঐচ্ছিক)":"Cheque / payment for month (optional)"}</div>
-            <input type="month" style={inp()} value={chequeMonth} onChange={e=>setChequeMonth(e.target.value)} />
+            <input type="month"style={inp()} value={chequeMonth} onChange={e=>setChequeMonth(e.target.value)} />
           </div>
 
           {(method==="bank_transfer"||method==="card")&&(
@@ -399,7 +400,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
             <div style={{ display:"flex", gap:8, marginBottom:14, alignItems:"flex-end" }}>
               <div style={{ flex:1 }}>
                 <div style={lbl}>{t.pi_autoDistributeAmt}</div>
-                <input style={inp()} inputMode="decimal" placeholder={t.pi_autoDistributePh} value={distAmt} onChange={e=>setDistAmt(e.target.value)} />
+                <input style={inp()} inputMode="decimal"placeholder={t.pi_autoDistributePh} value={distAmt} onChange={e=>setDistAmt(e.target.value)} />
               </div>
               <button onClick={autoDistribute} style={{ padding:"10px 14px", borderRadius:8, border:"1px solid #f97316", background:"rgba(249,115,22,0.08)", color:"#f97316", fontSize:12, fontWeight:700, cursor:"pointer", height:42 }}>{t.pi_autoDistribute}</button>
             </div>
@@ -411,11 +412,11 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
           {openInvoices.map(inv=>(
             <div key={inv.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}` }}>
               <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>🧾 {inv.supplierInvoiceNo||inv.invoiceNo}{inv.supplierInvoiceNo&&<span style={{ fontSize:11, fontWeight:600, color:th.txtMuted }}> · {inv.invoiceNo}</span>}</div>
-                <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>📅 {inv.invoiceDate} · {t.pi_balanceDue}: <span style={{ color:"#ef4444", fontWeight:700 }}>{t.cur} {piFmt2(inv.balanceDue)}</span></div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}> {inv.supplierInvoiceNo||inv.invoiceNo}{inv.supplierInvoiceNo&&<span style={{ fontSize:11, fontWeight:600, color:th.txtMuted }}> · {inv.invoiceNo}</span>}</div>
+                <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}> {inv.invoiceDate} · {t.pi_balanceDue}: <span style={{ color:"#ef4444", fontWeight:700 }}>{t.cur} {piFmt2(inv.balanceDue)}</span></div>
               </div>
               <input style={{ ...inp(), width:100, flex:"0 0 100px", textAlign:"right", fontWeight:700, color:"#22c55e", borderColor:piN2(amounts[inv.id])>0?"#22c55e":th.borderMid }}
-                inputMode="decimal" placeholder="0.00" value={amounts[inv.id]||""} onChange={e=>setAmt(inv.id,e.target.value)} />
+                inputMode="decimal"placeholder="0.00"value={amounts[inv.id]||""} onChange={e=>setAmt(inv.id,e.target.value)} />
               <button onClick={()=>payFull(inv)} style={{ padding:"8px 10px", borderRadius:8, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtMuted, fontSize:10, fontWeight:700, cursor:"pointer", flexShrink:0 }}>{t.pi_payFull}</button>
             </div>
           ))}
@@ -432,8 +433,8 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
       {vendor&&openInvoices.length>0&&(
         <div style={{ position:isDesktop?"static":"sticky", bottom:0, background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:12 }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-            <span style={{ fontSize:12, fontWeight:700, color:th.txtMuted }}>🏷️ {lang==="bn"?"ছাড় (ঐচ্ছিক)":"Discount (optional)"}</span>
-            <input style={{ ...inp(), width:110, flex:"0 0 110px", textAlign:"right" }} inputMode="decimal" placeholder="0.00" value={discount} onChange={e=>setDiscount(e.target.value)} />
+            <span style={{ fontSize:12, fontWeight:700, color:th.txtMuted }}> {lang==="bn"?"ছাড় (ঐচ্ছিক)":"Discount (optional)"}</span>
+            <input style={{ ...inp(), width:110, flex:"0 0 110px", textAlign:"right" }} inputMode="decimal"placeholder="0.00"value={discount} onChange={e=>setDiscount(e.target.value)} />
           </div>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
             <span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{piN2(discount)>0?(lang==="bn"?"নেট পরিশোধ":"Net Payment"):t.pi_totalPayment}</span>
@@ -449,7 +450,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
 }
 
 // ─── PI: VOUCHER DETAIL VIEW ────────────────────────────────────
-export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onCancelAndEdit, onDelete, onSetChequeStatus, onPrint, onViewInvoice, onPrintCheque, onPrintChequeVoucher, onHandover }) {
+export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onCancel, onEdit, onDelete, onSetChequeStatus, onPrint, onViewInvoice, onPrintCheque, onPrintChequeVoucher, onHandover }) {
   const isCheque = voucher.method==="cheque";
   const isCancelled = voucher.status==="cancelled";
   const chequeSt = PI_CHEQUE_STATUSES[voucher.chequeStatus]||PI_CHEQUE_STATUSES.pending;
@@ -462,49 +463,49 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
           <div>
             <div style={{ fontSize:20, fontWeight:900, color:"#f97316", letterSpacing:1 }}>{PI_VOUCHER_METHODS[voucher.method]?.icon} {voucher.paymentNo}</div>
-            <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}>📅 {voucher.paymentDate}</div>
+            <div style={{ fontSize:12, color:th.txtMuted, marginTop:2 }}> {fmtDate(voucher.paymentDate)}</div>
           </div>
           {isCancelled
             ? <span style={{ fontSize:10, fontWeight:700, color:"#ef4444", background:"#450a0a", padding:"4px 10px", borderRadius:10 }}>{lang==="bn"?"বাতিল":"CANCELLED"}</span>
             : isCheque&&<span style={{ fontSize:10, fontWeight:700, color:chequeSt.color, background:chequeSt.bg, padding:"4px 10px", borderRadius:10 }}>{chequeSt[lang]}</span>}
         </div>
-        <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏭 {t.pi_payToVendor}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorName}</span></div>
-        <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>💳 {t.pi_paymentMethod}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{PI_VOUCHER_METHODS[voucher.method]?.icon} {PI_VOUCHER_METHODS[voucher.method]?.[lang]}</span></div>
+        <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {t.pi_payToVendor}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorName}</span></div>
+        <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {t.pi_paymentMethod}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{PI_VOUCHER_METHODS[voucher.method]?.icon} {PI_VOUCHER_METHODS[voucher.method]?.[lang]}</span></div>
         {isCheque&&(
           <>
-            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📃 {t.pi_chequeNo}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeNo||"—"}</span></div>
-            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏦 {t.pi_chequeBank}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeBank||"—"}</span></div>
-            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>📅 {t.pi_chequeDate}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeDate||"—"}</span></div>
-            {voucher.chequeReceivedBy&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🙋 {lang==="bn"?"চেক গ্রহণকারী":"Cheque Received By"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeReceivedBy}</span></div>}
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {t.pi_chequeNo}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeNo||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {t.pi_chequeBank}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeBank||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {t.pi_chequeDate}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeDate ? fmtDate(voucher.chequeDate) : "—"}</span></div>
+            {voucher.chequeReceivedBy&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {lang==="bn"?"চেক গ্রহণকারী":"Cheque Received By"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.chequeReceivedBy}</span></div>}
           </>
         )}
-        {voucher.chequeMonth&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🗓️ {lang==="bn"?"কোন মাসের":"For Month"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{new Date(`${voucher.chequeMonth}-01T00:00:00`).toLocaleString("en-GB",{ month:"short", year:"numeric" })}</span></div>}
-        {voucher.vendorReceiptNo&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🧾 {lang==="bn"?"ভেন্ডরের রিসিট নম্বর":"Vendor Receipt No."}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorReceiptNo}</span></div>}
+        {voucher.chequeMonth&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {lang==="bn"?"কোন মাসের":"For Month"}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{new Date(`${voucher.chequeMonth}-01T00:00:00`).toLocaleString("en-GB",{ month:"short", year:"numeric" })}</span></div>}
+        {voucher.vendorReceiptNo&&<div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {lang==="bn"?"ভেন্ডরের রিসিট নম্বর":"Vendor Receipt No."}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.vendorReceiptNo}</span></div>}
         {(voucher.method==="bank_transfer"||voucher.method==="card")&&(
           <>
-            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🔖 {voucher.method==="card"?(lang==="bn"?"অনুমোদন / রেফ নং":"Approval / Ref No"):(lang==="bn"?"রেফারেন্স নং":"Reference No")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refNo||"—"}</span></div>
-            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{voucher.method==="card"?(lang==="bn"?"💳 কার্ডের ধরন":"💳 Card Type"):(lang==="bn"?"🏦 ব্যাংক":"🏦 Bank")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refBank||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {voucher.method==="card"?(lang==="bn"?"অনুমোদন / রেফ নং":"Approval / Ref No"):(lang==="bn"?"রেফারেন্স নং":"Reference No")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refNo||"—"}</span></div>
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>{voucher.method==="card"?(lang==="bn"?"কার্ডের ধরন":"Card Type"):(lang==="bn"?"ব্যাংক":"Bank")}</span><span style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{voucher.refBank||"—"}</span></div>
           </>
         )}
         <div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{t.pi_totalPayment}</span><span style={{ fontSize:18, fontWeight:900, color:isCancelled?th.txtFaint:"#22c55e", textDecoration:isCancelled?"line-through":"none" }}>{t.cur} {piFmt2(voucher.totalAmount)}</span></div>
         {piN2(voucher.discountAmount)>0&&(
           <>
-            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}>🏷️ {lang==="bn"?"ছাড়":"Discount"}</span><span style={{ fontSize:13, fontWeight:700, color:"#f59e0b" }}>{t.cur} {piFmt2(voucher.discountAmount)}</span></div>
-            {isCheque&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}>🖋️ {lang==="bn"?"চেকের পরিমাণ":"Cheque Amount"}</span><span style={{ fontSize:15, fontWeight:900, color:"#3b82f6" }}>{t.cur} {piFmt2(voucher.chequeAmount)}</span></div>}
+            <div style={dr}><span style={{ fontSize:12, color:th.txtMuted }}> {lang==="bn"?"ছাড়":"Discount"}</span><span style={{ fontSize:13, fontWeight:700, color:"#f59e0b" }}>{t.cur} {piFmt2(voucher.discountAmount)}</span></div>
+            {isCheque&&<div style={{ ...dr, borderBottom:"none" }}><span style={{ fontSize:12, color:th.txtMuted }}> {lang==="bn"?"চেকের পরিমাণ":"Cheque Amount"}</span><span style={{ fontSize:15, fontWeight:900, color:"#3b82f6" }}>{t.cur} {piFmt2(voucher.chequeAmount)}</span></div>}
           </>
         )}
-        {voucher.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #f97316" }}>📝 {voucher.note}</div>}
+        {voucher.note&&<div style={{ marginTop:8, padding:"8px 10px", background:th.bgInp, borderRadius:8, fontSize:12, color:th.txtSecondary, borderLeft:"3px solid #f97316" }}> {voucher.note}</div>}
       </div>
 
       {isCheque&&!isCancelled&&(onPrintCheque||onPrintChequeVoucher||onHandover)&&(
         <div style={{ background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:14, padding:14, marginBottom:10, display:"flex", flexDirection:"column", gap:8 }}>
-          <div style={{ fontSize:11, color:"#3b82f6", fontWeight:700, textTransform:"uppercase" }}>🖨️ {lang==="bn"?"চেক ও ডকুমেন্ট":"Cheque & documents"}</div>
-          {voucher.chequePrintedAt&&<div style={{ fontSize:11, color:th.txtMuted }}>✅ {lang==="bn"?"চেক প্রিন্ট হয়েছে":"Cheque printed"}: {String(voucher.chequePrintedAt).slice(0,10)}{voucher.chequePrintCount>1?` (×${voucher.chequePrintCount})`:""}</div>}
-          {voucher.handover?.receiverName&&<div style={{ fontSize:11, color:th.txtMuted }}>🪪 {lang==="bn"?"হস্তান্তর":"Handed over to"}: <b style={{ color:th.txtPrimary }}>{voucher.handover.receiverName}</b>{voucher.handover.receivedAt?` · ${voucher.handover.receivedAt}`:""}</div>}
+          <div style={{ fontSize:11, color:"#3b82f6", fontWeight:700, textTransform:"uppercase" }}> {lang==="bn"?"চেক ও ডকুমেন্ট":"Cheque & documents"}</div>
+          {voucher.chequePrintedAt&&<div style={{ fontSize:11, color:th.txtMuted }}> {lang==="bn"?"চেক প্রিন্ট হয়েছে":"Cheque printed"}: {String(voucher.chequePrintedAt).slice(0,10)}{voucher.chequePrintCount>1?` (×${voucher.chequePrintCount})`:""}</div>}
+          {voucher.handover?.receiverName&&<div style={{ fontSize:11, color:th.txtMuted }}> {lang==="bn"?"হস্তান্তর":"Handed over to"}: <b style={{ color:th.txtPrimary }}>{voucher.handover.receiverName}</b>{voucher.handover.receivedAt?` · ${voucher.handover.receivedAt}`:""}</div>}
           <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
-            {onPrintCheque&&<button onClick={onPrintCheque} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>🖨️ {lang==="bn"?"চেক প্রিন্ট":"Print Cheque"}</button>}
-            {onPrintChequeVoucher&&<button onClick={onPrintChequeVoucher} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"1px solid #3b82f6", background:"rgba(59,130,246,0.08)", color:"#3b82f6", fontSize:13, fontWeight:700, cursor:"pointer" }}>📄 {lang==="bn"?"চেক পেমেন্ট ভাউচার":"Cheque Payment Voucher"}</button>}
-            {onHandover&&<button onClick={onHandover} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}>🪪 {voucher.handover?(lang==="bn"?"হস্তান্তর ডকুমেন্ট দেখুন":"View Handover"):(lang==="bn"?"হস্তান্তর ডকুমেন্ট":"Handover Document")}</button>}
+            {onPrintCheque&&<button onClick={onPrintCheque} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#f97316,#ea580c)", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}> {lang==="bn"?"চেক প্রিন্ট":"Print Cheque"}</button>}
+            {onPrintChequeVoucher&&<button onClick={onPrintChequeVoucher} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"1px solid #3b82f6", background:"rgba(59,130,246,0.08)", color:"#3b82f6", fontSize:13, fontWeight:700, cursor:"pointer" }}> {lang==="bn"?"চেক পেমেন্ট ভাউচার":"Cheque Payment Voucher"}</button>}
+            {onHandover&&<button onClick={onHandover} style={{ flex:"1 1 140px", padding:"11px", borderRadius:10, border:"1px solid #22c55e", background:"rgba(34,197,94,0.08)", color:"#22c55e", fontSize:13, fontWeight:700, cursor:"pointer" }}> {voucher.handover?(lang==="bn"?"হস্তান্তর ডকুমেন্ট দেখুন":"View Handover"):(lang==="bn"?"হস্তান্তর ডকুমেন্ট":"Handover Document")}</button>}
           </div>
         </div>
       )}
@@ -515,8 +516,8 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
         {(voucher.allocations||[]).map((a,i)=>(
           <button key={i} onClick={()=>onViewInvoice(a.invoiceId)} style={{ width:"100%", textAlign:"left", display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", background:th.bgInp, borderRadius:10, marginBottom:6, border:`1px solid ${th.border}`, cursor:"pointer", fontFamily:"inherit" }}>
             <div>
-              <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}>🧾 {a.supplierInvoiceNo||a.invoiceNo}</div>
-              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>{a.supplierInvoiceNo?`${a.invoiceNo} · `:""}{a.invoiceDate?`📅 ${a.invoiceDate}`:""}</div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#f97316" }}> {a.supplierInvoiceNo||a.invoiceNo}</div>
+              <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>{a.supplierInvoiceNo?`${a.invoiceNo} · `:""}{a.invoiceDate?` ${a.invoiceDate}`:""}</div>
             </div>
             <span style={{ fontSize:14, fontWeight:800, color:"#22c55e" }}>{t.cur} {piFmt2(a.amount)}</span>
           </button>
@@ -529,7 +530,7 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
           {onPrint && <button onClick={()=>onPrint()} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_printReceipt}</button>}
           {(voucher.allocations||[]).length>1&&(
             <button onClick={()=>onPrint?.({ summaryOnly:true })} style={{ padding:"12px", borderRadius:10, border:`1px solid ${th.borderMid}`, background:"transparent", color:th.txtPrimary, fontSize:13, fontWeight:700, cursor:"pointer" }}>
-              🖨️ {lang==="bn"?"প্রিন্ট (সংক্ষিপ্ত — ইনভয়েস তালিকা ছাড়া)":"Print (Summary — no invoice list)"}
+               {lang==="bn"?"প্রিন্ট (সংক্ষিপ্ত — ইনভয়েস তালিকা ছাড়া)":"Print (Summary — no invoice list)"}
             </button>
           )}
           {isOwner&&!isCancelled&&isCheque&&voucher.chequeStatus==="pending"&&(
@@ -541,11 +542,11 @@ export function PiVoucherDetailView({ voucher, t, th, lang, isOwner, onBack, onC
           {!isCancelled&&onCancel&&(
             <button onClick={onCancel} style={{ padding:"11px", borderRadius:10, border:"1px solid #450a0a", background:"transparent", color:"#ef4444", fontSize:13, fontWeight:700, cursor:"pointer" }}>{t.pi_cancelVoucher}</button>
           )}
-          {!isCancelled&&onCancelAndEdit&&(
-            <button onClick={onCancelAndEdit} style={{ padding:"11px", borderRadius:10, border:"1px solid #92400e", background:"rgba(146,64,14,0.08)", color:"#92400e", fontSize:13, fontWeight:700, cursor:"pointer" }}>✏️ {lang==="bn"?"বাতিল করে এডিট করুন":"Cancel & Edit"}</button>
+          {!isCancelled&&onEdit&&(
+            <button onClick={onEdit} style={{ padding:"11px", borderRadius:10, border:"1px solid #92400e", background:"rgba(146,64,14,0.08)", color:"#92400e", fontSize:13, fontWeight:700, cursor:"pointer" }}> {lang==="bn"?"এডিট":"Edit"}</button>
           )}
           {isCancelled&&onDelete&&(
-            <button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #7f1d1d", background:"#7f1d1d", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}>🗑️ {lang==="bn"?"ভাউচার মুছুন":"Delete Voucher"}</button>
+            <button onClick={onDelete} style={{ padding:"11px", borderRadius:10, border:"1px solid #7f1d1d", background:"#7f1d1d", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer" }}> {lang==="bn"?"ভাউচার মুছুন":"Delete Voucher"}</button>
           )}
         </div>
       )}

@@ -16,7 +16,7 @@ export default function ProductInvoiceEntryInfo({
   const bn = lang === "bn";
   const rack = splitRack(product.rackLocation);
   const loc = [
-    rack.rack && `${bn ? "র‍্যাক" : "Rack"}: ${rack.rack}`,
+    rack.rack && `${bn ? "র্যাক" : "Rack"}: ${rack.rack}`,
     rack.floor && `${bn ? "ফ্লোর" : "Floor"}: ${rack.floor}`,
     rack.bin && `${bn ? "বিন" : "Bin"}: ${rack.bin}`,
   ].filter(Boolean);
@@ -57,7 +57,7 @@ export default function ProductInvoiceEntryInfo({
       )}
       {loc.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 12px", color: "#334155" }}>
-          <span style={{ opacity: 0.85 }}>📍</span>
+          <span style={{ opacity: 0.85 }}></span>
           {loc.map((line) => <span key={line}>{line}</span>)}
         </div>
       )}

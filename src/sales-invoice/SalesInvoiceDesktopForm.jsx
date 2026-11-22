@@ -66,7 +66,7 @@ export function Modal({ title, onClose, width = 640, children }) {
       <div style={{ width: "100%", maxWidth: width, maxHeight: "85vh", display: "flex", flexDirection: "column", background: C.panel, border: `1px solid ${C.bar}`, borderRadius: 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "6px 10px", fontWeight: 800, fontSize: 13 }}>
           <span>{title}</span>
-          <button type="button" onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
+          <button type="button"onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
         </div>
         <div style={{ padding: 12, overflow: "auto", minHeight: 0 }}>{children}</div>
       </div>
@@ -259,7 +259,7 @@ export default function SalesInvoiceDesktopForm({
     const available = (stockMap.get(pid) || 0) + savedQty - otherQty;
     const want = itemBaseQty(current, currentProduct);
     if (want > available + 1e-9) {
-      toast(bn ? `⚠ স্টক কম: আছে ${parseFloat(available.toFixed(2))} ${currentProduct.unit || "Pcs"}, দিচ্ছেন ${parseFloat(want.toFixed(2))}` : `⚠ Low stock: ${parseFloat(available.toFixed(2))} ${currentProduct.unit || "Pcs"} available, entering ${parseFloat(want.toFixed(2))}`, "err");
+      toast(bn ? `স্টক কম: আছে ${parseFloat(available.toFixed(2))} ${currentProduct.unit || "Pcs"}, দিচ্ছেন ${parseFloat(want.toFixed(2))}` : `Low stock: ${parseFloat(available.toFixed(2))} ${currentProduct.unit || "Pcs"} available, entering ${parseFloat(want.toFixed(2))}`, "err");
     }
   };
 
@@ -405,7 +405,7 @@ export default function SalesInvoiceDesktopForm({
             )}
             {locked && (
               <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: "#e2e8f0", color: "#334155" }}>
-                🔒 {bn ? "শুধু দেখা" : "View only"}
+                 {bn ? "শুধু দেখা" : "View only"}
               </span>
             )}
           </div>
@@ -435,7 +435,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
+          <input type="date"lang="en-GB" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
         </div>
       </div>
 
@@ -448,7 +448,7 @@ export default function SalesInvoiceDesktopForm({
         <div>
           <div style={{ ...lbl, display: "flex", justifyContent: "space-between" }}>
             <span><u>C</u>ustomer (Home Key)</span>
-            <button type="button" onClick={() => handlersRef.current.history()}
+            <button type="button"onClick={() => handlersRef.current.history()}
               style={{ background: "none", border: "none", padding: 0, color: C.label, fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
               F8 - Customer Bill History
             </button>
@@ -463,7 +463,7 @@ export default function SalesInvoiceDesktopForm({
                 if (form.customerId) ["customerId", "customerMobile", "customerAddress", "customerTrn", "customerType", "creditDays"].forEach((f) => setField(f, ""));
               }}
               onSelect={(c) => { onSelectCustomer(c); setTimeout(() => nameRef.current?.focus(), 60); }} />
-            <button type="button" onClick={onOpenCustomerPicker} title="Home" style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
+            <button type="button"onClick={onOpenCustomerPicker} title="Home"style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
           </div>
         </div>
         <div>
@@ -482,7 +482,7 @@ export default function SalesInvoiceDesktopForm({
         {isQuote ? (
           <div style={{ maxWidth: 170 }}>
             <div style={lbl}>{isSO ? "Delivery By" : "Valid Until"}</div>
-            <input type="date" style={inp()} value={form.validUntil || ""} onChange={(e) => setField("validUntil", e.target.value)} />
+            <input type="date"lang="en-GB" style={inp()} value={form.validUntil || ""} onChange={(e) => setField("validUntil", e.target.value)} />
           </div>
         ) : <div />}
         <div>
@@ -499,7 +499,7 @@ export default function SalesInvoiceDesktopForm({
           <div>
             <div style={{ ...lbl, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span>Product Nam<u>e</u>{" "}
-                <button type="button" onClick={() => handlersRef.current.productSearch()} title={bn ? "প্রোডাক্ট সার্চ" : "Search Product"}
+                <button type="button"onClick={() => handlersRef.current.productSearch()} title={bn ? "প্রোডাক্ট সার্চ" : "Search Product"}
                   style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>(F10)</button>
               </span>
               {!isQuote && currentProduct && stockOf != null && (
@@ -513,7 +513,7 @@ export default function SalesInvoiceDesktopForm({
                   style={{ marginTop: 0, fontSize: 11 }}
                 />
               )}
-              <button type="button" onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
+              <button type="button"onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
                 New Product [F9]
               </button>
             </div>
@@ -535,7 +535,7 @@ export default function SalesInvoiceDesktopForm({
           </div>
           <div>
             <div style={lbl}>Qty</div>
-            <input ref={qtyRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.qty}
+            <input ref={qtyRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.qty}
               onChange={(e) => setCurrent((p) => ({ ...p, qty: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, unitRef)} />
@@ -549,35 +549,35 @@ export default function SalesInvoiceDesktopForm({
           </div>
           <div>
             <div style={lbl}>Rate [Excl]</div>
-            <input ref={rateRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.unitPrice}
+            <input ref={rateRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.unitPrice}
               onChange={(e) => setCurrent((p) => ({ ...p, unitPrice: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, isDelivery ? null : !canDiscount ? (isTax ? vatRef : null) : disPRef)} />
           </div>
           <div>
             <div style={lbl}>Dis %</div>
-            <input ref={disPRef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : current.discountPerc}
+            <input ref={disPRef} style={inp({ textAlign: "right" })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : current.discountPerc}
               onChange={(e) => setCurrent((p) => ({ ...p, discountPerc: e.target.value, ...(siN2(e.target.value) > 0 ? { discountFlat: "" } : {}) }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, disARef)} />
           </div>
           <div>
             <div style={lbl}>Dis Amt</div>
-            <input ref={disARef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : current.discountFlat}
+            <input ref={disARef} style={inp({ textAlign: "right" })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : current.discountFlat}
               onChange={(e) => setCurrent((p) => ({ ...p, discountFlat: e.target.value, ...(siN2(e.target.value) > 0 ? { discountPerc: "0" } : {}) }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, isTax ? vatRef : null)} />
           </div>
           <div>
             <div style={lbl}>VAT %</div>
-            <input ref={vatRef} style={inp({ textAlign: "right" })} inputMode="decimal" disabled={!isTax} value={isTax ? current.vatPerc : ""}
+            <input ref={vatRef} style={inp({ textAlign: "right" })} inputMode="decimal"disabled={!isTax} value={isTax ? current.vatPerc : ""}
               onChange={(e) => setCurrent((p) => ({ ...p, vatPerc: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, null)} />
           </div>
           <div style={{ display: "flex", gap: 4 }}>
-            <button type="button" onClick={addOrUpdate} style={btn("#2c5aa0", "#fff", { height: 26 })}>{editingLineId ? (bn ? "আপডেট" : "Update") : (bn ? "যোগ" : "Add")}</button>
-            {editingLineId && <button type="button" onClick={resetEntry} style={btn("#e7eef9", C.label, { height: 26, padding: "0 8px" })}>✕</button>}
+            <button type="button"onClick={addOrUpdate} style={btn("#2c5aa0", "#fff", { height: 26 })}>{editingLineId ? (bn ? "আপডেট" : "Update") : (bn ? "যোগ" : "Add")}</button>
+            {editingLineId && <button type="button"onClick={resetEntry} style={btn("#e7eef9", C.label, { height: 26, padding: "0 8px" })}>✕</button>}
           </div>
         </div>
         {/* Product info strip */}
@@ -585,8 +585,8 @@ export default function SalesInvoiceDesktopForm({
           {currentProduct ? (
             <>
               {stockOf == null
-                ? <span>📦 {bn ? "স্টক" : "Stock"}: …</span>
-                : <StockBadgeLabel stock={stockOf} extraQty={stockExtraQty} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span" style={{ fontSize: 12.5 }} />}
+                ? <span> {bn ? "স্টক" : "Stock"}: …</span>
+                : <StockBadgeLabel stock={stockOf} extraQty={stockExtraQty} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span"style={{ fontSize: 12.5 }} />}
               <span>MRP: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.mrp)}</span></span>
               {canSeeCost && <span>Lnd. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.landingCost)}</span></span>}
               {canSeeCost && <span>Avg. Cost: <span style={{ color: "#1e3a8a" }}>{siFmt2(currentProduct.averageCost || currentProduct.landingCost)}</span></span>}
@@ -603,7 +603,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         {salesSpecs(currentProduct) && (
           <div title={salesSpecs(currentProduct)} style={{ marginTop: 4, padding: "3px 8px", background: "#fff8db", border: "1px solid #e6c65c", borderRadius: 3, fontSize: 12.5, fontWeight: 700, color: "#5b4300", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            📐 Spec: {salesSpecs(currentProduct)}
+             Spec: {salesSpecs(currentProduct)}
           </div>
         )}
       </div>
@@ -657,7 +657,7 @@ export default function SalesInvoiceDesktopForm({
                   <td style={{ ...td, fontWeight: 800 }}>{siFmt2(c.total)}</td>
                   <td style={td}>{prod?.mrp ? siFmt2(prod.mrp) : ""}</td>
                   <td style={{ ...td, textAlign: "center" }}>
-                    <button type="button" title={bn ? "মুছুন" : "Delete"}
+                    <button type="button"title={bn ? "মুছুন" : "Delete"}
                       onClick={(e) => { e.stopPropagation(); if (selected) resetEntry(); onDelLine(it.id); }}
                       style={{ background: "none", border: "none", color: C.red, fontWeight: 900, cursor: "pointer", fontSize: 14 }}>×</button>
                   </td>
@@ -688,11 +688,11 @@ export default function SalesInvoiceDesktopForm({
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14, padding: "6px 12px", background: C.panel, flexShrink: 0 }}>
         <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
           {field("Disc %", (
-            <input style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.billDiscPerc}
+            <input style={inp({ textAlign: "right" })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.billDiscPerc}
               onChange={(e) => { setField("billDiscPerc", e.target.value); if (siN2(e.target.value) > 0) setField("billDiscAmt", ""); }} />
           ))}
           {field("Disc Amount", (
-            <input style={inp({ textAlign: "right" })} inputMode="decimal" disabled={isDelivery || !canDiscount}
+            <input style={inp({ textAlign: "right" })} inputMode="decimal"disabled={isDelivery || !canDiscount}
               value={isDelivery ? "" : (siN2(form.billDiscPerc) > 0 ? siFmt2(totals.billDisc) : form.billDiscAmt)}
               readOnly={siN2(form.billDiscPerc) > 0}
               onChange={(e) => setField("billDiscAmt", e.target.value)} />
@@ -710,7 +710,7 @@ export default function SalesInvoiceDesktopForm({
           ))}
           {field("Crdt. Period", (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input style={inp({ textAlign: "right", width: 80 })} inputMode="numeric" value={form.creditDays || ""}
+              <input style={inp({ textAlign: "right", width: 80 })} inputMode="numeric"value={form.creditDays || ""}
                 onChange={(e) => setField("creditDays", e.target.value.replace(/[^\d]/g, ""))} />
               <span style={{ ...lbl, fontWeight: 600 }}>{bn ? "দিন" : "days"}</span>
             </div>
@@ -718,7 +718,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
           {isDelivery && !isDN && field(bn ? "ডেলিভারি নোট" : "DN No", <input style={inp()} value={form.deliveryNoteNo} onChange={(e) => setField("deliveryNoteNo", e.target.value)} />)}
-          {!isSO && field(bn ? "গাড়ি নং" : "Vehicle No", <input style={inp()} value={form.vehicleNo || ""} placeholder="ABC-1234" onChange={(e) => setField("vehicleNo", e.target.value)} />)}
+          {!isSO && field(bn ? "গাড়ি নং" : "Vehicle No", <input style={inp()} value={form.vehicleNo || ""} placeholder="ABC-1234"onChange={(e) => setField("vehicleNo", e.target.value)} />)}
           <div>
             <div style={lbl}>Narration</div>
             <textarea style={inp({ height: isDelivery ? 32 : isQuote ? 92 : 62, resize: "none", padding: 6 })} value={form.note} onChange={(e) => setField("note", e.target.value)} />
@@ -733,15 +733,15 @@ export default function SalesInvoiceDesktopForm({
             <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700 }}><span>{l}</span><span>{v}</span></div>
           ))}
           {field(<span>Adjustments <span style={{ color: "#4b5f86", fontWeight: 600 }}>[Insert]</span></span>, (
-            <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
-              placeholder="+ / -" onChange={(e) => setField("adjustment", e.target.value)} />
+            <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
+              placeholder="+ / -"onChange={(e) => setField("adjustment", e.target.value)} />
           ), 128)}
           {field(bn ? "রাউন্ড অফ" : "Round Off", (
             <div style={{ display: "flex", gap: 4 }}>
-              <input style={inp({ textAlign: "right", height: 24 })} inputMode="decimal" disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
+              <input style={inp({ textAlign: "right", height: 24 })} inputMode="decimal"disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
                 title={canDiscount ? "" : (bn ? "অনুমতি ছাড়া শুধু ১ পর্যন্ত কমানো যাবে" : "Without discount permission only up to 1 can be rounded down")}
-                placeholder="+ / -" onChange={(e) => setField("roundOff", e.target.value)} />
-              <button type="button" disabled={isDelivery} title={bn ? "নিকটতম পূর্ণ সংখ্যায়" : "Round to nearest whole number"}
+                placeholder="+ / -"onChange={(e) => setField("roundOff", e.target.value)} />
+              <button type="button"disabled={isDelivery} title={bn ? "নিকটতম পূর্ণ সংখ্যায়" : "Round to nearest whole number"}
                 onClick={() => {
                   const before = totals.grand - totals.roundOff;
                   const diff = Math.round(before) - before;
@@ -760,7 +760,7 @@ export default function SalesInvoiceDesktopForm({
                 <span style={{ ...lbl, whiteSpace: "nowrap" }}>Received</span>
                 {isCash
                   ? <input style={inp({ textAlign: "right", height: 24, fontWeight: 700 })} readOnly value={siFmt2(formPaid)} />
-                  : <input style={inp({ textAlign: "right", height: 24, fontWeight: 700 })} inputMode="decimal" value={form.amountPaid}
+                  : <input style={inp({ textAlign: "right", height: 24, fontWeight: 700 })} inputMode="decimal"value={form.amountPaid}
                       onChange={(e) => setField("amountPaid", e.target.value)} />}
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 900, color: balance > 0.01 ? C.red : C.green }}>
@@ -775,56 +775,56 @@ export default function SalesInvoiceDesktopForm({
       {/* Action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
-          <button type="button" onClick={() => setShowSearch(true)} style={btn()}>🔍 {bn ? "খুঁজুন" : "Search"}</button>
+          <button type="button"onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
+          <button type="button"onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন" : "Search"}</button>
           {onPrintInvoice && (() => {
             const canPrintNow = !!savedInvoice || lines.some((it) => String(it.name || "").trim());
             return (
-              <button type="button" disabled={!canPrintNow} onClick={() => onPrintInvoice(savedInvoice)}
-                style={btn("#e7eef9", C.label, { opacity: canPrintNow ? 1 : 0.5 })}>🖨️ {bn ? "প্রিন্ট" : "Print"}</button>
+              <button type="button"disabled={!canPrintNow} onClick={() => onPrintInvoice(savedInvoice)}
+                style={btn("#e7eef9", C.label, { opacity: canPrintNow ? 1 : 0.5 })}> {bn ? "প্রিন্ট" : "Print"}</button>
             );
           })()}
           {onOpenReminder && savedInvoice && (
-            <button type="button" onClick={() => onOpenReminder(savedInvoice)} style={btn("#fef3c7", "#92400e")}>⏰ {bn ? "রিমাইন্ডার" : "Remind me"}</button>
+            <button type="button"onClick={() => onOpenReminder(savedInvoice)} style={btn("#fef3c7", "#92400e")}> {bn ? "রিমাইন্ডার" : "Remind me"}</button>
           )}
           {onConvertToDN && savedInvoice && ["draft", "open"].includes(savedInvoice.status) && (
-            <button type="button" onClick={() => onConvertToDN(savedInvoice)} disabled={saving}
-              style={btn("#6d28d9", "#fff")}>🚚 {bn ? "ডেলিভারি নোট বানান" : "Make Delivery Note"}</button>
+            <button type="button"onClick={() => onConvertToDN(savedInvoice)} disabled={saving}
+              style={btn("#6d28d9", "#fff")}> {bn ? "ডেলিভারি নোট বানান" : "Make Delivery Note"}</button>
           )}
           {onConvertQuote && savedInvoice && (isQuote ? ["draft", "open"] : isDN ? ["confirmed"] : []).includes(savedInvoice.status) && (
-            <button type="button" onClick={() => onConvertQuote(savedInvoice)} disabled={saving}
-              style={btn("#15803d", "#fff")}>🧾 {bn ? "সেলস ইনভয়েস বানান" : "Convert to Invoice"}</button>
+            <button type="button"onClick={() => onConvertQuote(savedInvoice)} disabled={saving}
+              style={btn("#15803d", "#fff")}> {bn ? "সেলস ইনভয়েস বানান" : "Convert to Invoice"}</button>
           )}
           {onCancelInvoice && savedInvoice && (isQuote ? ["draft", "open"] : isDN ? ["draft", "confirmed"] : ["draft", "confirmed", "partial", "paid"]).includes(savedInvoice.status) && (
-            <button type="button" onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
-              style={btn("#fee2e2", C.red)}>⛔ {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
+            <button type="button"onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
+              style={btn("#fee2e2", C.red)}> {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
           )}
           {onDeleteInvoice && savedInvoice && canDeleteInvoice?.(savedInvoice) && (
-            <button type="button" onClick={() => onDeleteInvoice(savedInvoice)} disabled={saving}
-              style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "মুছুন" : "Delete"}</button>
+            <button type="button"onClick={() => onDeleteInvoice(savedInvoice)} disabled={saving}
+              style={btn("#7f1d1d", "#fff")}> {bn ? "মুছুন" : "Delete"}</button>
           )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
+          <button type="button"onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
           {locked ? (
             canEditInvoice(savedInvoice) ? (
-              <button type="button" onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
-                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}>✏️ {bn ? "এডিট" : "Edit"}</button>
+              <button type="button"onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
+                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}> {bn ? "এডিট" : "Edit"}</button>
             ) : (
-              <button type="button" disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / রূপান্তরিত / রিসিট আছে / অনুমতি নেই)" : "This bill cannot be edited (cancelled / converted / has receipts / no permission)"}
-                style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}>🔒 {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
+              <button type="button"disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / রূপান্তরিত / রিসিট আছে / অনুমতি নেই)" : "This bill cannot be edited (cancelled / converted / has receipts / no permission)"}
+                style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}> {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
             )
           ) : (
             <>
-              <button type="button" onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
-              <button type="button" onClick={onConfirm} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
+              <button type="button"onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
+              <button type="button"onClick={onConfirm} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
                 {saving ? "…" : (bn ? "সেভ" : "Save")}
               </button>
             </>
           )}
-          <button type="button" title={bn ? "আগের বিল" : "Previous bill"} disabled={!olderInvoice} onClick={() => olderInvoice && onOpenInvoice(olderInvoice)}
+          <button type="button"title={bn ? "আগের বিল" : "Previous bill"} disabled={!olderInvoice} onClick={() => olderInvoice && onOpenInvoice(olderInvoice)}
             style={btn("#e7eef9", C.label, { padding: "0 12px", marginLeft: 10, opacity: olderInvoice ? 1 : 0.4 })}>&lt;</button>
-          <button type="button" title={bn ? "পরের বিল" : "Next bill"} disabled={!newerInvoice} onClick={() => newerInvoice && onOpenInvoice(newerInvoice)}
+          <button type="button"title={bn ? "পরের বিল" : "Next bill"} disabled={!newerInvoice} onClick={() => newerInvoice && onOpenInvoice(newerInvoice)}
             style={btn("#e7eef9", C.label, { padding: "0 12px", opacity: newerInvoice ? 1 : 0.4 })}>&gt;</button>
         </div>
       </div>
@@ -840,7 +840,7 @@ export default function SalesInvoiceDesktopForm({
           })() : ""}
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: C.label, whiteSpace: "nowrap", cursor: "pointer" }}>
-          <input type="checkbox" checked={!!form.hideCodeInPrint} onChange={(e) => setField("hideCodeInPrint", e.target.checked)} />
+          <input type="checkbox"checked={!!form.hideCodeInPrint} onChange={(e) => setField("hideCodeInPrint", e.target.checked)} />
           Do not Print Code in Bill
         </label>
       </div>
@@ -875,13 +875,13 @@ export default function SalesInvoiceDesktopForm({
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 12, color: C.label, fontWeight: 700 }}>{savedInvoice.invoiceNo}{savedInvoice.customerName ? ` — ${savedInvoice.customerName}` : ""}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <input type="date" style={inp()} value={reminderForm.date} onChange={(e) => onChangeReminder?.((p) => ({ ...p, date: e.target.value }))} />
-              <input type="time" style={inp()} value={reminderForm.time} onChange={(e) => onChangeReminder?.((p) => ({ ...p, time: e.target.value }))} />
+              <input type="date"lang="en-GB" style={inp()} value={reminderForm.date} onChange={(e) => onChangeReminder?.((p) => ({ ...p, date: e.target.value }))} />
+              <input type="time"style={inp()} value={reminderForm.time} onChange={(e) => onChangeReminder?.((p) => ({ ...p, time: e.target.value }))} />
             </div>
             <input style={inp()} placeholder={bn ? "নোট (ঐচ্ছিক)" : "Note (optional)"} value={reminderForm.note} onChange={(e) => onChangeReminder?.((p) => ({ ...p, note: e.target.value }))} />
             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-              <button type="button" onClick={onCloseReminder} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
-              <button type="button" disabled={!reminderForm.date} onClick={onSaveReminder} style={btn("#15803d", "#fff")}>✅ {bn ? "সেভ করুন" : "Save"}</button>
+              <button type="button"onClick={onCloseReminder} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
+              <button type="button"disabled={!reminderForm.date} onClick={onSaveReminder} style={btn("#15803d", "#fff")}> {bn ? "সেভ করুন" : "Save"}</button>
             </div>
           </div>
         </Modal>
@@ -1032,12 +1032,12 @@ function ProductHistoryModal({ lang, kind = "sales", bills, customerName, produc
         <span style={lbl}>Bill No</span>
         <input style={inp({ width: 110 })} value={billNo} onChange={(e) => setBillNo(e.target.value)} />
         <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-          <input type="checkbox" checked={extended} onChange={(e) => setExtended(e.target.checked)} /> Extended Search
+          <input type="checkbox"checked={extended} onChange={(e) => setExtended(e.target.checked)} /> Extended Search
         </label>
         {byProduct && <span style={{ ...lbl, marginLeft: 20 }}>Total: <span style={{ color: C.green }}>{parseFloat(totalQty.toFixed(3))} {totalUnit}</span></span>}
         <span style={{ fontSize: 11.5, color: "#4b5f86", marginLeft: "auto" }}>{bn ? "Invoice খুলতে row-তে double click করুন" : "Double click a row to open the invoice"}</span>
-        <button type="button" onClick={printList} disabled={!rows.length} style={btn()}>Print</button>
-        <button type="button" onClick={onClose} style={btn()}>CLOSE</button>
+        <button type="button"onClick={printList} disabled={!rows.length} style={btn()}>Print</button>
+        <button type="button"onClick={onClose} style={btn()}>CLOSE</button>
       </div>
     </Modal>
   );
@@ -1092,15 +1092,15 @@ function InvoiceSearchModal({ invoices, siFmt2, SI_PAY, lang, onClose, onPick })
   ];
 
   return (
-    <Modal title="Search" onClose={onClose} width={780}>
+    <Modal title="Search"onClose={onClose} width={780}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={lbl}><u>F</u>rom</span>
-        <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}><u>T</u>o</span>
-        <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button type="button" onClick={display} style={btn("#e7eef9", C.label, { width: 80 })}>Display</button>
-          <button type="button" onClick={onClose} style={btn("#e7eef9", C.label, { width: 80 })}>Close</button>
+          <button type="button"onClick={display} style={btn("#e7eef9", C.label, { width: 80 })}>Display</button>
+          <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { width: 80 })}>Close</button>
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 4px" }}>
@@ -1112,11 +1112,11 @@ function InvoiceSearchModal({ invoices, siFmt2, SI_PAY, lang, onClose, onPick })
         {box("Reference No", "refNo")}
       </div>
       <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, marginTop: 8, cursor: "pointer" }}>
-        <input type="checkbox" checked={extended} onChange={(e) => setExtended(e.target.checked)} /> Extended Search
+        <input type="checkbox"checked={extended} onChange={(e) => setExtended(e.target.checked)} /> Extended Search
         <span style={{ color: "#8b1a1a", marginLeft: 20, fontWeight: 700 }}>(Will display all details containing the search text in any part of the field)</span>
       </label>
       <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, marginTop: 4, marginBottom: 6, cursor: "pointer" }}>
-        <input type="checkbox" checked={autoSearch} onChange={(e) => { setAutoSearch(e.target.checked); if (!e.target.checked) display(); }} /> Auto Search while typing in text box
+        <input type="checkbox"checked={autoSearch} onChange={(e) => { setAutoSearch(e.target.checked); if (!e.target.checked) display(); }} /> Auto Search while typing in text box
       </label>
       <div style={{ border: `1px solid ${C.border}`, height: "44vh", overflow: "auto" }}>
         <GridTable columns={columns} rows={rows} rowKey={(r) => r.id} onRowDoubleClick={onPick} minRows={16} />

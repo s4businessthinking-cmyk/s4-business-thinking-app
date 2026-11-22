@@ -46,19 +46,19 @@ function PhotoField({ label: lbl, value, onChange, bn, kind = "id" }) {
         }}>
         {value
           ? (isPdf
-            ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center" }}>📄 PDF</span>
-            : <img src={value} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#fff", display: "block" }} />)
-          : <span style={{ fontSize: 12, color: "#64748b", padding: 12, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>{busy ? "…" : (bn ? "📷 স্ক্যান / ক্যামেরা" : "📷 Scan / camera")}</span>}
+            ? <span style={{ fontSize: 12, color: "#334155", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", height: "100%", textAlign: "center" }}> PDF</span>
+            : <img src={value} alt=""style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "contain", background: "#fff", display: "block" }} />)
+          : <span style={{ fontSize: 12, color: "#64748b", padding: 12, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>{busy ? "…" : (bn ? "স্ক্যান / ক্যামেরা" : "Scan / camera")}</span>}
       </div>
       <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
-        <button type="button" onClick={() => run(false)} disabled={busy} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+        <button type="button"onClick={() => run(false)} disabled={busy} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
           {bn ? "স্ক্যান" : "Scan"}
         </button>
-        <button type="button" onClick={() => run(true)} disabled={busy} style={{ border: "none", background: "none", color: "#64748b", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+        <button type="button"onClick={() => run(true)} disabled={busy} style={{ border: "none", background: "none", color: "#64748b", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>
           {bn ? "ফোল্ডার" : "Folder"}
         </button>
-        {value && isPdf && <button type="button" onClick={() => openDocFile({ file: value, label: lbl })} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "দেখুন" : "View"}</button>}
-        {value && <button type="button" onClick={() => onChange("")} style={{ border: "none", background: "none", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "সরান" : "Remove"}</button>}
+        {value && isPdf && <button type="button"onClick={() => openDocFile({ file: value, label: lbl })} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "দেখুন" : "View"}</button>}
+        {value && <button type="button"onClick={() => onChange("")} style={{ border: "none", background: "none", color: "#dc2626", fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0 }}>{bn ? "সরান" : "Remove"}</button>}
       </div>
     </div>
   );
@@ -224,7 +224,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
 
   const save = async () => {
     const missing = validateSecurityCheque(form, bn);
-    if (missing) { alert(bn ? `"${missing}" পূরণ করুন` : `Please fill "${missing}"`); return; }
+    if (missing) { alert(bn ? `"${missing}"পূরণ করুন` : `Please fill "${missing}"`); return; }
     if (!String(form.partyId || "").trim()) {
       alert(bn ? "তালিকা থেকে পার্টি বাছাই করুন" : "Pick the party from the list");
       return;
@@ -325,7 +325,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
   }, [leaveGuard, form, bn]);
 
   if (!canManage) {
-    return <div className="pm-card" style={{ padding: 16 }}>{bn ? "সিকিউরিটি চেক মডিউল আপনার জন্য খোলা নেই।" : "Security Cheque module is not open for you."}</div>;
+    return <div className="pm-card"style={{ padding: 16 }}>{bn ? "সিকিউরিটি চেক মডিউল আপনার জন্য খোলা নেই।" : "Security Cheque module is not open for you."}</div>;
   }
 
   const card = { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 12, marginBottom: 10 };
@@ -336,8 +336,8 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
     <div ref={rootRef} style={{ height: fitH, display: "flex", flexDirection: "column", gap: 10, color: "#0f172a", fontFamily: "inherit" }}>
       <style>{SI_CSS}</style>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <h2 style={{ margin: 0, fontSize: 17 }}>🔒 {bn ? "সিকিউরিটি চেক" : "Security Cheques"}</h2>
-        <button type="button" onClick={openNew} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 800, cursor: "pointer" }}>
+        <h2 style={{ margin: 0, fontSize: 17 }}> {bn ? "সিকিউরিটি চেক" : "Security Cheques"}</h2>
+        <button type="button"onClick={openNew} style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "#2563eb", color: "#fff", fontWeight: 800, cursor: "pointer" }}>
           + {bn ? "নতুন রেকর্ড" : "New Record"}
         </button>
       </div>
@@ -346,7 +346,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
         <div style={card}>
           {alerts.slice(0, 5).map((a) => (
             <div key={a.key} style={{ padding: "6px 0", borderBottom: "1px solid #f1f5f9", fontSize: 12.5 }}>
-              {a.tone === "bad" ? "⚠️" : "🔔"} <b>{a.party}</b> — {a.kind === "stale" ? (bn ? `${a.months} মাস লেনদেন নেই` : `no transaction for ${a.months} months`) : a.kind === "closure" ? (bn ? "বন্ধের অনুরোধ অপেক্ষমাণ" : "closure request pending") : (bn ? "ডকুমেন্ট অসম্পূর্ণ" : "documents incomplete")}
+              {a.tone === "bad" ? "" : ""} <b>{a.party}</b> — {a.kind === "stale" ? (bn ? `${a.months} মাস লেনদেন নেই` : `no transaction for ${a.months} months`) : a.kind === "closure" ? (bn ? "বন্ধের অনুরোধ অপেক্ষমাণ" : "closure request pending") : (bn ? "ডকুমেন্ট অসম্পূর্ণ" : "documents incomplete")}
             </div>
           ))}
         </div>
@@ -364,7 +364,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
       {filterPartyId && (
         <div style={{ ...card, padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, background: "#eff6ff", borderColor: "#bfdbfe" }}>
           <span style={{ fontSize: 12.5 }}>{bn ? "ফিল্টার করা হয়েছে" : "Filtered to"}: <b>{filterPartyName || filterPartyId}</b></span>
-          <button type="button" onClick={() => setFilterPartyId("")} style={{ marginLeft: "auto", border: "none", background: "none", color: "#2563eb", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>✕ {bn ? "ফিল্টার সরান" : "Clear filter"}</button>
+          <button type="button"onClick={() => setFilterPartyId("")} style={{ marginLeft: "auto", border: "none", background: "none", color: "#2563eb", fontWeight: 700, cursor: "pointer", fontSize: 12 }}>✕ {bn ? "ফিল্টার সরান" : "Clear filter"}</button>
         </div>
       )}
 
@@ -408,8 +408,8 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                       : label(STATUSES, r.status, bn)}
                   </td>
                   <td style={{ padding: "7px 8px", display: "flex", gap: 4 }}>
-                    <button type="button" onClick={() => openEdit(r)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "খুলুন" : "Open"}</button>
-                    <button type="button" onClick={() => printSecurityChequeReceipt(r, shop, lang, cur, docsByRecordId[r.id] || {})} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "A4 রসিদ" : "A4 receipt"}</button>
+                    <button type="button"onClick={() => openEdit(r)} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "খুলুন" : "Open"}</button>
+                    <button type="button"onClick={() => printSecurityChequeReceipt(r, shop, lang, cur, docsByRecordId[r.id] || {})} style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "A4 রসিদ" : "A4 receipt"}</button>
                   </td>
                 </tr>
               );
@@ -423,7 +423,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
           <div style={{ width: "100%", maxWidth: mobile ? "none" : 720, maxHeight: mobile ? "100dvh" : "92vh", background: "#f1f5f9", borderRadius: mobile ? 0 : 14, display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: 12, background: "linear-gradient(135deg,#1e3a8a,#2563eb)", color: "#fff" }}>
               <div style={{ fontWeight: 900 }}>{editId ? (bn ? "রেকর্ড এডিট" : "Edit Record") : (bn ? "নতুন সিকিউরিটি চেক" : "New Security Cheque")}</div>
-              <button type="button" onClick={closeForm} style={{ border: "none", background: "rgba(255,255,255,0.18)", color: "#fff", width: 32, height: 32, borderRadius: 8, cursor: "pointer" }}>✕</button>
+              <button type="button"onClick={closeForm} style={{ border: "none", background: "rgba(255,255,255,0.18)", color: "#fff", width: 32, height: 32, borderRadius: 8, cursor: "pointer" }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
               <div style={card}>
@@ -446,7 +446,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                   <div style={{ display: "flex", gap: 6 }}>
                     <input readOnly onClick={() => setPickerOpen(true)} style={{ ...fieldStyle, cursor: "pointer", background: "#f8fafc" }}
                       placeholder={bn ? "ক্লিক করে তালিকা থেকে বেছে নিন" : "Click to pick from the list"} value={form.party} />
-                    <button type="button" onClick={() => setPickerOpen(true)} style={{ padding: "0 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 13 }}>🔎</button>
+                    <button type="button"onClick={() => setPickerOpen(true)} style={{ padding: "0 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 13 }}></button>
                   </div>
                   <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 3 }}>
                     {bn ? "Product/Vendor/Customer Master-এ যা আছে, তা থেকেই বাছতে হবে — নতুন করে টাইপ করার দরকার নেই।" : "Picked from the existing Vendor/Customer master — no need to type a new name."}
@@ -472,17 +472,17 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                   <div><span style={lblStyle}>{bn ? "চেক নম্বর *" : "Cheque number *"}</span><input style={fieldStyle} value={form.chequeNo} onChange={(e) => set("chequeNo", e.target.value)} /></div>
                   <div><span style={lblStyle}>{bn ? "ব্যাংক *" : "Bank *"}</span><input style={fieldStyle} value={form.bank} onChange={(e) => set("bank", e.target.value)} /></div>
-                  <div><span style={lblStyle}>{bn ? "চেকের পরিমাণ *" : "Cheque amount *"}</span><input type="number" min="0.01" step="0.01" style={fieldStyle} value={form.amount} onChange={(e) => set("amount", e.target.value)} /></div>
+                  <div><span style={lblStyle}>{bn ? "চেকের পরিমাণ *" : "Cheque amount *"}</span><input type="number"min="0.01"step="0.01"style={fieldStyle} value={form.amount} onChange={(e) => set("amount", e.target.value)} /></div>
                   <div>
                     <span style={lblStyle}>{bn ? "হস্তান্তর / গ্রহণের তারিখ *" : "Handover / received date *"}</span>
-                    <input type="date" style={fieldStyle} value={form.handoverDate} onChange={(e) => set("handoverDate", e.target.value)} />
+                    <input type="date"style={fieldStyle} value={form.handoverDate} onChange={(e) => set("handoverDate", e.target.value)} />
                     <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 3 }}>
                       {bn ? "এটা শুধু রেকর্ডের তারিখ (কবে চেক হাতবদল হলো) — সিকিউরিটি চেকের নিজের কোনো তারিখ থাকে না, এটা আনডেটেড।" : "This is only the internal record date (when the cheque changed hands) — a security cheque itself is undated, it has no cheque date."}
                     </div>
                   </div>
-                  <div><span style={lblStyle}>{bn ? "সর্বশেষ লেনদেনের তারিখ *" : "Last transaction date *"}</span><input type="date" style={fieldStyle} value={form.lastTxn} onChange={(e) => set("lastTxn", e.target.value)} /></div>
+                  <div><span style={lblStyle}>{bn ? "সর্বশেষ লেনদেনের তারিখ *" : "Last transaction date *"}</span><input type="date"style={fieldStyle} value={form.lastTxn} onChange={(e) => set("lastTxn", e.target.value)} /></div>
                   <div><span style={lblStyle}>{bn ? "দায়িত্বে থাকা কর্মী" : "Responsible staff"}</span><input style={fieldStyle} value={form.staff} onChange={(e) => set("staff", e.target.value)} /></div>
-                  <div><span style={lblStyle}>{bn ? "রিমাইন্ডার (মাস)" : "Reminder (months)"}</span><input type="number" min="1" max="24" style={fieldStyle} value={form.reminderMonths} onChange={(e) => set("reminderMonths", e.target.value)} /></div>
+                  <div><span style={lblStyle}>{bn ? "রিমাইন্ডার (মাস)" : "Reminder (months)"}</span><input type="number"min="1"max="24"style={fieldStyle} value={form.reminderMonths} onChange={(e) => set("reminderMonths", e.target.value)} /></div>
                 </div>
                 <div style={{ marginTop: 8 }}>
                   <span style={lblStyle}>{bn ? "চুক্তি / ক্রেডিট শর্ত" : "Agreement / credit terms"}</span>
@@ -491,14 +491,14 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ marginTop: 8 }}>
                   <span style={lblStyle}>{bn ? "চুক্তির কপি (ঐচ্ছিক, PDF/ছবি)" : "Agreement document (optional, PDF/image)"}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <input ref={agreementFileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={pickAgreementFile} />
-                    <button type="button" onClick={() => agreementFileRef.current?.click()} disabled={agreementBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
-                      {agreementBusy ? "…" : (docs.agreementFile ? (bn ? "🔁 বদলান" : "🔁 Replace") : (bn ? "📎 আপলোড" : "📎 Upload"))}
+                    <input ref={agreementFileRef} type="file"accept="application/pdf,image/*"style={{ display: "none" }} onChange={pickAgreementFile} />
+                    <button type="button"onClick={() => agreementFileRef.current?.click()} disabled={agreementBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
+                      {agreementBusy ? "…" : (docs.agreementFile ? (bn ? "বদলান" : "Replace") : (bn ? "আপলোড" : "Upload"))}
                     </button>
                     {docs.agreementFile && (
                       <>
-                        <span style={{ fontSize: 12, color: "#334155" }}>📄 {form.agreementFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
-                        <button type="button" onClick={() => openDocFile({ file: docs.agreementFile, label: form.agreementFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
+                        <span style={{ fontSize: 12, color: "#334155" }}> {form.agreementFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
+                        <button type="button"onClick={() => openDocFile({ file: docs.agreementFile, label: form.agreementFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
                       </>
                     )}
                   </div>
@@ -522,7 +522,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                       });
                       return open.map((inv) => (
                         <label key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0", fontSize: 12.5, cursor: "pointer" }}>
-                          <input type="checkbox" checked={linked.has(inv.id)} onChange={() => toggle(inv)} />
+                          <input type="checkbox"checked={linked.has(inv.id)} onChange={() => toggle(inv)} />
                           {inv.invoiceNo} — {money(inv.balanceDue, cur)} {bn ? "বাকি" : "due"}
                         </label>
                       ));
@@ -540,7 +540,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ fontWeight: 800, fontSize: 12.5, marginBottom: 6 }}>{bn ? "রসিদের কাগজপত্র (ভেন্ডর/কাস্টমারের রসিদ + সই করা A4 কপি, একই জায়গায়)" : "Receipt documents (vendor/customer receipt + signed A4 copy, kept together)"}</div>
                 <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                   <div><span style={lblStyle}>{bn ? "রসিদ নম্বর" : "Receipt number"}</span><input style={fieldStyle} value={form.receiptNo} onChange={(e) => set("receiptNo", e.target.value)} /></div>
-                  <div><span style={lblStyle}>{bn ? "রসিদের তারিখ" : "Receipt date"}</span><input type="date" style={fieldStyle} value={form.receiptDate} onChange={(e) => set("receiptDate", e.target.value)} /></div>
+                  <div><span style={lblStyle}>{bn ? "রসিদের তারিখ" : "Receipt date"}</span><input type="date"style={fieldStyle} value={form.receiptDate} onChange={(e) => set("receiptDate", e.target.value)} /></div>
                 </div>
                 <div style={{ marginTop: 8 }}>
                   <span style={lblStyle}>{bn ? "শিরোনাম / বিবরণ (ঐচ্ছিক)" : "Title / description (optional)"}</span>
@@ -549,14 +549,14 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ marginTop: 8 }}>
                   <span style={lblStyle}>{bn ? "রসিদের কপি (PDF, JPG, PNG)" : "Receipt document (PDF, JPG, PNG)"}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <input ref={receiptFileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={pickReceiptFile} />
-                    <button type="button" onClick={() => receiptFileRef.current?.click()} disabled={receiptBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
-                      {receiptBusy ? "…" : (docs.receiptFile ? (bn ? "🔁 বদলান" : "🔁 Replace") : (bn ? "📎 আপলোড" : "📎 Upload"))}
+                    <input ref={receiptFileRef} type="file"accept="application/pdf,image/*"style={{ display: "none" }} onChange={pickReceiptFile} />
+                    <button type="button"onClick={() => receiptFileRef.current?.click()} disabled={receiptBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
+                      {receiptBusy ? "…" : (docs.receiptFile ? (bn ? "বদলান" : "Replace") : (bn ? "আপলোড" : "Upload"))}
                     </button>
                     {docs.receiptFile && (
                       <>
-                        <span style={{ fontSize: 12, color: "#334155" }}>📄 {form.receiptFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
-                        <button type="button" onClick={() => openDocFile({ file: docs.receiptFile, label: form.receiptFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
+                        <span style={{ fontSize: 12, color: "#334155" }}> {form.receiptFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
+                        <button type="button"onClick={() => openDocFile({ file: docs.receiptFile, label: form.receiptFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
                       </>
                     )}
                   </div>
@@ -568,14 +568,14 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #cbd5e1" }}>
                   <span style={lblStyle}>{bn ? "সই করা A4 রসিদের কপি (প্রিন্ট করে সই নেওয়ার পর স্ক্যান/ছবি তুলে আপলোড করুন)" : "Signed A4 receipt copy (after printing and getting it signed, scan/photograph and upload it here)"}</span>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <input ref={signedCopyFileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={pickSignedCopy} />
-                    <button type="button" onClick={() => signedCopyFileRef.current?.click()} disabled={signedCopyBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
-                      {signedCopyBusy ? "…" : (docs.signedReceiptCopy ? (bn ? "🔁 বদলান" : "🔁 Replace") : (bn ? "📎 আপলোড" : "📎 Upload"))}
+                    <input ref={signedCopyFileRef} type="file"accept="application/pdf,image/*"style={{ display: "none" }} onChange={pickSignedCopy} />
+                    <button type="button"onClick={() => signedCopyFileRef.current?.click()} disabled={signedCopyBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
+                      {signedCopyBusy ? "…" : (docs.signedReceiptCopy ? (bn ? "বদলান" : "Replace") : (bn ? "আপলোড" : "Upload"))}
                     </button>
                     {docs.signedReceiptCopy && (
                       <>
-                        <span style={{ fontSize: 12, color: "#334155" }}>📄 {form.signedReceiptCopyFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
-                        <button type="button" onClick={() => openDocFile({ file: docs.signedReceiptCopy, label: form.signedReceiptCopyFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
+                        <span style={{ fontSize: 12, color: "#334155" }}> {form.signedReceiptCopyFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
+                        <button type="button"onClick={() => openDocFile({ file: docs.signedReceiptCopy, label: form.signedReceiptCopyFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
                       </>
                     )}
                   </div>
@@ -589,13 +589,13 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ fontWeight: 800, fontSize: 12.5, marginBottom: 6 }}>{bn ? "ডকুমেন্ট চেকলিস্ট" : "Documents checklist"}</div>
                 {SECURITY_CHEQUE_DOC_FLAGS.map((f) => (
                   <label key={f.k} style={{ display: "flex", alignItems: "center", gap: 8, margin: "4px 0", fontSize: 12.5, cursor: "pointer" }}>
-                    <input type="checkbox" checked={!!form[f.k]} onChange={(e) => set(f.k, e.target.checked)} /> {bn ? f.bn : f.en}
+                    <input type="checkbox"checked={!!form[f.k]} onChange={(e) => set(f.k, e.target.checked)} /> {bn ? f.bn : f.en}
                   </label>
                 ))}
               </div>
 
               <div style={card}>
-                <PhotoField bn={bn} kind="cheque" label={bn ? "চেকের ছবি / স্ক্যান" : "Cheque photo / scan"} value={docs.chequePhoto} onChange={(v) => setDocs((d) => ({ ...d, chequePhoto: v }))} />
+                <PhotoField bn={bn} kind="cheque"label={bn ? "চেকের ছবি / স্ক্যান" : "Cheque photo / scan"} value={docs.chequePhoto} onChange={(v) => setDocs((d) => ({ ...d, chequePhoto: v }))} />
                 <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 4 }}>
                   {bn ? "স্ক্যান চাপলে পিসিতে স্ক্যানার/প্রিন্টার খুলবে, মোবাইলে ক্যামেরা। স্ক্যান হয়ে সরাসরি এই বক্সে বসবে। ফোল্ডার থেকেও বেছে নিতে পারবেন।" : "Scan opens the PC scanner/printer, or the phone camera. The scan lands in this box. You can still pick a file from a folder."}
                 </div>
@@ -616,38 +616,38 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={card}>
                   <div style={{ fontWeight: 800, fontSize: 12.5, marginBottom: 6 }}>{bn ? "রেকর্ড অ্যাকশন" : "Record actions"} — {bn ? "স্ট্যাটাস" : "Status"}: <b>{label(STATUSES, form.status, bn)}</b></div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                    {canPrint && <button type="button" onClick={() => printSecurityChequeReceipt(form, shop, lang, cur, docs)} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>🖨️ {bn ? "A4 রসিদ প্রিন্ট" : "Print A4 receipt"}</button>}
+                    {canPrint && <button type="button"onClick={() => printSecurityChequeReceipt(form, shop, lang, cur, docs)} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}> {bn ? "A4 রসিদ প্রিন্ট" : "Print A4 receipt"}</button>}
                     {form.status === "held" && !form.closureRequested && (
-                      <button type="button" onClick={() => requestClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "বন্ধের অনুরোধ" : "Request closure"}</button>
+                      <button type="button"onClick={() => requestClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "বন্ধের অনুরোধ" : "Request closure"}</button>
                     )}
                     {form.status === "held" && form.closureRequested && !form.closureApproved && (
-                      <button type="button" onClick={() => cancelClosureRequest(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "অনুরোধ বাতিল" : "Cancel closure request"}</button>
+                      <button type="button"onClick={() => cancelClosureRequest(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "অনুরোধ বাতিল" : "Cancel closure request"}</button>
                     )}
                     {isOwner && form.status === "held" && form.closureRequested && !form.closureApproved && (
-                      <button type="button" onClick={() => approveClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #15803d", background: "#f0fdf4", color: "#15803d", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>✅ {bn ? "বন্ধের অনুমোদন (মালিক)" : "Approve closure (owner)"}</button>
+                      <button type="button"onClick={() => approveClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #15803d", background: "#f0fdf4", color: "#15803d", cursor: "pointer", fontSize: 12, fontWeight: 700 }}> {bn ? "বন্ধের অনুমোদন (মালিক)" : "Approve closure (owner)"}</button>
                     )}
                     {isOwner && form.status === "held" && (
-                      <button type="button" onClick={() => markReturned(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "চেক ফেরত মার্ক (মালিক)" : "Mark returned (owner)"}</button>
+                      <button type="button"onClick={() => markReturned(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "চেক ফেরত মার্ক (মালিক)" : "Mark returned (owner)"}</button>
                     )}
                     {isOwner && form.status === "held" && (
-                      <button type="button" onClick={() => markPresented(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "ব্যাংকে জমা মার্ক (মালিক)" : "Mark presented (owner)"}</button>
+                      <button type="button"onClick={() => markPresented(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "ব্যাংকে জমা মার্ক (মালিক)" : "Mark presented (owner)"}</button>
                     )}
                     {canDelete && (
-                      <button type="button" onClick={() => deleteRecord(form)} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#b91c1c", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>🗑️ {bn ? "ডিলিট" : "Delete"}</button>
+                      <button type="button"onClick={() => deleteRecord(form)} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#b91c1c", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}> {bn ? "ডিলিট" : "Delete"}</button>
                     )}
                   </div>
                   {isOwner && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #cbd5e1" }}>
                       <span style={lblStyle}>{bn ? "ফেরতের প্রমাণ (ঐচ্ছিক — চেক ফেরত দেওয়ার স্বীকৃতি/ছবি)" : "Return evidence (optional — the signed return acknowledgement/photo)"}</span>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <input ref={evidenceFileRef} type="file" accept="application/pdf,image/*" style={{ display: "none" }} onChange={pickEvidenceFile} />
-                        <button type="button" onClick={() => evidenceFileRef.current?.click()} disabled={evidenceBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
-                          {evidenceBusy ? "…" : (docs.returnEvidence ? (bn ? "🔁 বদলান" : "🔁 Replace") : (bn ? "📎 আপলোড" : "📎 Upload"))}
+                        <input ref={evidenceFileRef} type="file"accept="application/pdf,image/*"style={{ display: "none" }} onChange={pickEvidenceFile} />
+                        <button type="button"onClick={() => evidenceFileRef.current?.click()} disabled={evidenceBusy} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>
+                          {evidenceBusy ? "…" : (docs.returnEvidence ? (bn ? "বদলান" : "Replace") : (bn ? "আপলোড" : "Upload"))}
                         </button>
                         {docs.returnEvidence && (
                           <>
-                            <span style={{ fontSize: 12, color: "#334155" }}>📄 {form.returnEvidenceFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
-                            <button type="button" onClick={() => openDocFile({ file: docs.returnEvidence, label: form.returnEvidenceFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
+                            <span style={{ fontSize: 12, color: "#334155" }}> {form.returnEvidenceFileName || (bn ? "ফাইল সংযুক্ত" : "File attached")}</span>
+                            <button type="button"onClick={() => openDocFile({ file: docs.returnEvidence, label: form.returnEvidenceFileName })} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 11.5 }}>{bn ? "দেখুন" : "View"}</button>
                           </>
                         )}
                       </div>
@@ -657,9 +657,9 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
               )}
             </div>
             <div style={{ display: "flex", gap: 8, padding: 12, background: "#fff", borderTop: "1px solid #e2e8f0" }}>
-              <button type="button" onClick={closeForm} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#334155", fontWeight: 800, cursor: "pointer" }}>{bn ? "বাতিল" : "Cancel"}</button>
-              <button type="button" onClick={save} disabled={busy} style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: busy ? "#94a3b8" : "linear-gradient(135deg,#15803d,#16a34a)", color: "#fff", fontWeight: 900, cursor: busy ? "default" : "pointer" }}>
-                {busy ? "…" : `💾 ${bn ? "সেভ করুন" : "Save"}`}
+              <button type="button"onClick={closeForm} style={{ flex: 1, padding: 12, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#334155", fontWeight: 800, cursor: "pointer" }}>{bn ? "বাতিল" : "Cancel"}</button>
+              <button type="button"onClick={save} disabled={busy} style={{ flex: 2, padding: 12, borderRadius: 10, border: "none", background: busy ? "#94a3b8" : "linear-gradient(135deg,#15803d,#16a34a)", color: "#fff", fontWeight: 900, cursor: busy ? "default" : "pointer" }}>
+                {busy ? "…" : ` ${bn ? "সেভ করুন" : "Save"}`}
               </button>
             </div>
           </div>

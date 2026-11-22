@@ -77,7 +77,7 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
   const piMobile = usePmMobile();
   const piRootRef = useRef(null);
   const [piFitH,setPiFitH] = useState(null);
-  const { billReturns, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, payments, piCurrent, piEditLineId, piForm, piInvoiceNo, piLedgerHidden, piLines, piNameRef, piNavReturn, piQtyRef, piSaveLockRef, piSaving, piSearch, piSnapRef, piStatusF, piSubTab, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, selInvoice, selVoucher, setBillReturns, setChqHandover, setChqHandoverSaving, setChqWizard, setEditInvoiceId, setPayments, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiSaving, setPiSearch, setPiStatusF, setPiSubTab, setPmtEditSnapshot, setPmtLoading, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, vendorDropOpen, vendorSearchQ, vendorSearchRef } = usePiData({ authSyncReady, canManagePurchase, canVendorPayments, canViewSupplierLedger, piMobile, piRootRef, piView, piWin, setInvoices, setPiFitH, setPiLoading, shopId, syncRefreshKey });
+  const { billReturns, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, payments, piCurrent, piEditLineId, piForm, piInvoiceNo, piLedgerHidden, piLines, piNameRef, piNavReturn, piLedgerPartyKey, piQtyRef, piSaveLockRef, piSaving, piSearch, piSnapRef, piStatusF, piSubTab, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, selInvoice, selVoucher, setBillReturns, setChqHandover, setChqHandoverSaving, setChqWizard, setEditInvoiceId, setPayments, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiLedgerPartyKey, setPiSaving, setPiSearch, setPiStatusF, setPiSubTab, setPmtEditSnapshot, setPmtLoading, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, vendorDropOpen, vendorSearchQ, vendorSearchRef } = usePiData({ authSyncReady, canManagePurchase, canVendorPayments, canViewSupplierLedger, piMobile, piRootRef, piView, piWin, setInvoices, setPiFitH, setPiLoading, shopId, syncRefreshKey });
 
   const { bumpShopPiSerial, genPaymentNo, piFormatPaymentNo, piMaxLocalPaymentSerial, piPreviewNextInvoiceNo, reservePiInvoiceNo } = createPiNumbering({ editInvoiceId, invoices, isOwner, payments, piInvoiceNo, setPiInvoiceNo, shop, shopId });
 
@@ -119,15 +119,22 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
       try {
         const res = await offlineList("purchasePayments");
         const records = Array.isArray(res) ? res : (res.records || []);
-        const dirty = records
-          .filter(r => Number(r?.dirty || 0) === 1)
-          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
-          .filter(p => p.shopId === shopId);
-        if (dirty.length) {
-          const map = new Map(rows.map(p => [String(p.id), p]));
-          dirty.forEach(p => map.set(String(p.id), p));
-          merged = sortPiPayments([...map.values()]);
-        }
+        const stampOf = (p) => {
+          const t = Date.parse(p?._offline_updated_at || p?.updatedAt || p?.createdAt || "");
+          return Number.isFinite(t) ? t : 0;
+        };
+        const map = new Map(rows.map(p => [String(p.id), p]));
+        records
+          .map(r => ({ row: r, p: { ...(r.data || r), id: (r.data?.id || r.document_id || r.id) } }))
+          .filter(({ p }) => p.shopId === shopId)
+          .forEach(({ row, p }) => {
+            const id = String(p.id);
+            const cloud = map.get(id);
+            if (!cloud || Number(row?.dirty || 0) === 1 || stampOf(p) >= stampOf(cloud)) {
+              map.set(id, p);
+            }
+          });
+        merged = sortPiPayments([...map.values()]);
       } catch {}
       setPayments(merged);
       offlineCacheCloudRecords("purchasePayments", rows).catch(err => console.warn("[S4 Offline] purchasePayments cache failed", err));
@@ -164,7 +171,7 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
   }, [openNewRequest]);
   const { getRelatedPayments, piCancelPaymentVoucher, piDeletePaymentVoucher, piSavePaymentVoucher, piSetVoucherChequeStatus } = usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices, isOwner, lang, onVoucherHandled, payments, piView, profile, setInvoices, setPayments, setPiSubTab, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, shopId, t, toast, user, voucherRequest });
 
-  const { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource } = usePiInvoiceForm({ canManagePurchase, canViewAllPurchase, canEditDraftPurchase: can("editDraftPurchase"), canEditConfirmedPurchase: can("editConfirmedPurchase"), editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors });
+  const { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource } = usePiInvoiceForm({ canManagePurchase, canViewAllPurchase, canEditDraftPurchase: can("editDraftPurchase"), canEditConfirmedPurchase: can("editConfirmedPurchase"), editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors });
 
   const { piCancelInv, piConfirm, piDelete, piEarlyDuplicateCheck, piGoToMakePayment, piSaveDraft, refreshAverageCosts } = createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, canManagePurchase, canVendorPayments, editInvoiceId, invoices, isOwner, lang, onOpenProductMaster, onProductPatched, payments, piBaseCur, piCurrent, piForm, piInvoiceNo, piLines, piMoneyInvoices, piOpenNew, piSaveLockRef, piSource, piVendorRecord, products, profile, reservePiInvoiceNo, setInvoices, setPiSaving, setPiSource, setPiSubTab, setPiView, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, shop, shopId, t, toast, user });
   // One-time catch-up per shop and device: Avg. Cost of products saved before it followed the purchases.
@@ -200,9 +207,9 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
   // ══════ LIST VIEW ══════
   const bnL = lang==="bn";
   const piAccent = "#c2410c";
-  const piBadge = (st) => <span className="si-badge" style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{PI_STATUSES[st]?.[lang]||st}</span>;
+  const piBadge = (st) => <span className="si-badge"style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{PI_STATUSES[st]?.[lang]||st}</span>;
   const piRowDue = (inv) => ["cancelled","draft"].includes(inv.status) || isBranchTransferBill(inv) ? 0 : Math.max(0, piN2(inv.grandTotal) - piN2(inv.amountPaid));
-  const piBtTag = (inv) => isBranchTransferBill(inv) ? <span className="si-badge" style={{ color:"#0e7490", marginLeft:4 }} title={bnL?"Branch Transfer — মোট/বাকিতে ধরা হয় না":"Branch Transfer — not in totals/dues"}>🚚 Branch</span> : null;
+  const piBtTag = (inv) => isBranchTransferBill(inv) ? <span className="si-badge"style={{ color:"#0e7490", marginLeft:4 }} title={bnL?"Branch Transfer — মোট/বাকিতে ধরা হয় না":"Branch Transfer — not in totals/dues"}> Branch</span> : null;
   const piOpenInvoice = (inv) => { if (!piLeaveMinOk()) return; setSelInvoice(inv); setPiView("detail"); };
   useEffect(() => {
     if (!openInvoiceId) return;
@@ -230,13 +237,13 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
       const qty = piN2(it.qty);
       const { tax, total } = piCalcLine(it);
       const landing = qty>0 ? (total - tax)/qty : piN2(it.unitCost);
-      return <div key={i} className="si-match" style={{ color:piAccent }}>📦 {it.name}{it.code?` · ${it.code}`:""} — {it.qty} {it.unit} × {piFmt2(landing)} ({bnL?"ল্যান্ডিং":"landing"})</div>;
+      return <div key={i} className="si-match"style={{ color:piAccent }}> {it.name}{it.code?` · ${it.code}`:""} — {it.qty} {it.unit} × {piFmt2(landing)} ({bnL?"ল্যান্ডিং":"landing"})</div>;
     });
   };
 
   return (
     <>
-      {renderPiScreens({ onStartReturn, onProductPatched, onScanBill: canManagePurchase ? () => setScanOpen(true) : undefined, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs })}
+      {renderPiScreens({ onStartReturn, onProductPatched, onScanBill: canManagePurchase ? () => setScanOpen(true) : undefined, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs })}
       {scanOpen && (
         <InvoiceScanWindow lang={lang} products={products} vendors={pickVendors} onApply={applyScan} onClose={() => setScanOpen(false)}
           onOpenProductMaster={onOpenProductMaster} onProductPatched={onProductPatched} />

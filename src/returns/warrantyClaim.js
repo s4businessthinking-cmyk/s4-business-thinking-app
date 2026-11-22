@@ -68,7 +68,7 @@ export function buildWarrantyReminder({ claim, claimNo, dueDate, shopId, user, p
   const at = new Date().toISOString();
   const product = claim.productName || claim.productCode || "Product";
   const company = claim.vendorName || "Company";
-  const title = `🔋 গ্যারান্টি চেঞ্জ বাকি · ${claimNo} · ${product}`;
+  const title = `গ্যারান্টি চেঞ্জ বাকি · ${claimNo} · ${product}`;
   const note = [
     `${company} থেকে নতুন পণ্য এখনো আসেনি`,
     claim.customerName ? `কাস্টমার: ${claim.customerName}` : "",
@@ -132,7 +132,7 @@ export function warrantyAlertText(a, bn = false) {
     ? (bn ? "সময় পার — কোম্পানি থেকে চেঞ্জ আনেননি" : "OVERDUE — company has not replaced yet")
     : (bn ? "আজ কোম্পানি থেকে চেঞ্জ নিন" : "Get the company replacement TODAY");
   return {
-    icon: "🔋",
+    icon: "",
     title: bn
       ? `গ্যারান্টি চেঞ্জ বাকি · ${a.claimNo || ""}`
       : `Warranty change pending · ${a.claimNo || ""}`,

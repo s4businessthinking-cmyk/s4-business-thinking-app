@@ -15,7 +15,7 @@ function systemNotify(title, body, onClick) {
     return;
   }
   try {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (typeof window === "undefined" || !("Notification"in window)) return;
     const show = () => { const n = new Notification(title, { body, tag: "s4-employee-alerts" }); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; };
     if (Notification.permission === "granted") show();
     else if (Notification.permission === "default") Notification.requestPermission().then((p) => p === "granted" && show()).catch(() => {});
@@ -65,7 +65,7 @@ export function useEmployeeAlerts({ shopId, enabled, shopCountry = "", lang = "e
     writeJson(storeKey, sent);
     const bn = lang === "bn";
     const first = alertText(fresh[0], bn, cur);
-    const title = fresh.length === 1 ? `${first.icon} ${first.title}` : bn ? `👷 কর্মচারীদের ${fresh.length}টি বিষয় দেখতে হবে` : `👷 ${fresh.length} employee matters need attention`;
+    const title = fresh.length === 1 ? `${first.icon} ${first.title}` : bn ? `কর্মচারীদের ${fresh.length}টি বিষয় দেখতে হবে` : ` ${fresh.length} employee matters need attention`;
     const body = fresh.length === 1 ? first.sub : fresh.slice(0, 3).map((a) => alertText(a, bn, cur).title).join("\n") + (fresh.length > 3 ? (bn ? `\n…আরও ${fresh.length - 3}টি` : `\n…and ${fresh.length - 3} more`) : "");
     latest.current.toast?.(`${title}\n${body}`);
     systemNotify(title, body, latest.current.onOpen);

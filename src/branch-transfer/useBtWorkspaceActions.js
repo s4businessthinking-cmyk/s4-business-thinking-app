@@ -67,7 +67,7 @@ export function useBtWorkspaceActions({ L, actor, busy, dirtyRef, lang, leaveGua
     upsertTransfer(updated);
     logAudit({ shopId, user, profile, action: status === "cancelled" ? "cancel" : "edit", collection: "branchTransfers", docId: transfer.id, docNo: transfer.transferNo, note: `${statusLabel(status, "en")} · ${transfer.branchName || ""}` });
     return updated;
-  }, status === "cancelled" ? L("🚫 ট্রান্সফার বাতিল হয়েছে", "🚫 Transfer cancelled") : t.statusUpdated);
+  }, status === "cancelled" ? L("ট্রান্সফার বাতিল হয়েছে", "Transfer cancelled") : t.statusUpdated);
   const deleteTransfer = (transfer) => run(async () => {
     await deleteBranchTransfer({ transfer, actor });
     setTransfers((list) => (list || []).filter((row) => row.id !== transfer.id));

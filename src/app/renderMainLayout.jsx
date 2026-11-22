@@ -16,7 +16,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
       <div style={s.root}>
         <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme} />
         <div style={isDesktop?s.desktopPanel:s.panel}>
-          <div style={s.empty}>⏳</div>
+          <div style={s.empty}></div>
         </div>
       </div>
     );
@@ -28,7 +28,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
         <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme} />
         <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={{ ...s.card, border:"1px solid #ef4444", background:th.bgCard }}>
-            <div style={{ fontSize:34, marginBottom:8 }}>🔐</div>
+            <div style={{ fontSize:34, marginBottom:8 }}></div>
             <div style={{ fontSize:22, fontWeight:900, color:"#ef4444", marginBottom:6 }}>
               {lang==="bn"?"ফ্রি ট্রায়াল শেষ":"Free trial expired"}
             </div>
@@ -52,7 +52,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
           />
 
           <button style={s.logoutBtn} onClick={handleLogout}>
-            🚪 {lang==="bn"?"লগআউট":"Logout"}
+             {lang==="bn"?"লগআউট":"Logout"}
           </button>
         </div>
       </div>
@@ -99,7 +99,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
                 onClick={() => window.dispatchEvent(new CustomEvent("s4-focus-global-search"))}
                 style={{ border: "none", background: "transparent", fontSize: 20, lineHeight: 1, padding: "2px 6px", cursor: "pointer" }}
               >
-                🔎
+                
               </button>
             )}
             <NotificationBell lang={lang} theme={theme} items={notificationItems} />
@@ -121,9 +121,9 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
               )} />
             <div style={{ flex:1 }} />
             <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
-              {syncState==="connected"?"🟢 Online":syncState==="offline"?"🔴 Offline":syncState==="reconnecting"?"🟠 Reconnecting...":"🟡 Connecting..."}
+              {syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..."}
             </div>
-            <button style={s.sideLogout} onClick={handleLogout}>🚪 {t.logout}</button>
+            <button style={s.sideLogout} onClick={handleLogout}> {t.logout}</button>
           </div>}
           <div style={s.desktopContent}>
             {tab!=="dashboard"&&(
@@ -223,9 +223,9 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
             <div style={{ width:"min(640px,100%)", maxHeight:"calc(100vh - 80px)", display:"flex", flexDirection:"column", border:`1px solid ${th.borderMid}`, borderRadius:16, background:th.bgCard, boxShadow:"0 18px 60px rgba(0,0,0,0.35)", overflow:"hidden" }}>
               <div style={{ padding:"12px 14px", borderBottom:`1px solid ${th.border}`, display:"flex", alignItems:"center", gap:8 }}>
                 <div style={{ flex:1, fontWeight:800, fontSize:14, color:th.txtPrimary }}>
-                  🚚 {bn?"Invoice দিয়ে ডেলিভারি":"Receive with Invoice"} · {getOrderDisplayNo(rcOrder)}
+                   {bn?"Invoice দিয়ে ডেলিভারি":"Receive with Invoice"} · {getOrderDisplayNo(rcOrder)}
                 </div>
-                <button type="button" onClick={()=>!orderReceiveSaving&&setOrderReceive(null)}
+                <button type="button"onClick={()=>!orderReceiveSaving&&setOrderReceive(null)}
                   style={{ width:28, height:28, borderRadius:14, border:`1px solid ${th.borderMid}`, background:th.bgInp, color:th.txtMuted, cursor:"pointer" }}>✕</button>
               </div>
               <div style={{ padding:14, overflowY:"auto", WebkitOverflowScrolling:"touch" }}>
@@ -245,7 +245,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
                   </label>
                   <label>
                     <span style={lbl}>{bn?"Invoice তারিখ":"Invoice Date"}</span>
-                    <input type="date" style={s.inp} value={orderReceive.invoiceDate}
+                    <input type="date"style={s.inp} value={orderReceive.invoiceDate}
                       onChange={e=>setRc({ invoiceDate:e.target.value })} />
                   </label>
                   <label>
@@ -261,22 +261,22 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
                   return (
                     <div key={l.iIdx} style={{ ...s.oiCard, opacity:l.checked?1:0.55 }}>
                       <label style={{ display:"flex", alignItems:"center", gap:8, fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:6, cursor:"pointer" }}>
-                        <input type="checkbox" checked={l.checked} onChange={e=>setLine(l.iIdx,{ checked:e.target.checked })} />
+                        <input type="checkbox"checked={l.checked} onChange={e=>setLine(l.iIdx,{ checked:e.target.checked })} />
                         <span style={{ flex:1 }}>
                           {it.name}
-                          {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>📋 {it.code}</span>}
-                          {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
+                          {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}> {it.code}</span>}
+                          {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}> {it.brand}</span>}
                         </span>
                       </label>
                       <div style={{ display:"flex", gap:8, alignItems:"flex-end" }}>
                         <label style={{ flex:1 }}>
                           <span style={lbl}>Qty ({it.unit||"Pcs"})</span>
-                          <input style={s.inp} inputMode="decimal" value={l.qty} disabled={!l.checked}
+                          <input style={s.inp} inputMode="decimal"value={l.qty} disabled={!l.checked}
                             onChange={e=>setLine(l.iIdx,{ qty:e.target.value })} />
                         </label>
                         <label style={{ flex:1 }}>
                           <span style={lbl}>{bn?"দাম (৳)":"Cost (৳)"}</span>
-                          <input style={s.inp} inputMode="decimal" value={l.unitCost} disabled={!l.checked}
+                          <input style={s.inp} inputMode="decimal"value={l.unitCost} disabled={!l.checked}
                             onChange={e=>setLine(l.iIdx,{ unitCost:e.target.value })} />
                         </label>
                         <div style={{ flex:1, fontSize:13, fontWeight:700, color:th.txtPrimary, textAlign:"right", paddingBottom:10 }}>
@@ -291,11 +291,11 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
                 <div style={{ flex:1, fontSize:14, fontWeight:800, color:th.txtPrimary }}>
                   {bn?"মোট":"Total"}: ৳ {total.toFixed(2)}
                 </div>
-                <button type="button" style={s.stBtn} disabled={orderReceiveSaving} onClick={()=>setOrderReceive(null)}>
+                <button type="button"style={s.stBtn} disabled={orderReceiveSaving} onClick={()=>setOrderReceive(null)}>
                   {bn?"বাতিল":"Cancel"}
                 </button>
-                <button type="button" style={s.sendBtn} disabled={orderReceiveSaving} onClick={saveOrderReceive}>
-                  {orderReceiveSaving ? "..." : (bn?"✅ Save ও ডেলিভারি":"✅ Save & Deliver")}
+                <button type="button"style={s.sendBtn} disabled={orderReceiveSaving} onClick={saveOrderReceive}>
+                  {orderReceiveSaving ? "..." : (bn?"Save ও ডেলিভারি":"Save & Deliver")}
                 </button>
               </div>
             </div>
@@ -323,7 +323,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
                   onInput={e=>setSupplierPickerQuery(e.currentTarget.value)}
                   onKeyDown={e=>e.stopPropagation()}
                 />
-                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
+                <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}></span>
                 <button
                   type="button"
                   onClick={closeOrderSupplierPicker}
@@ -386,8 +386,8 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
               }}
             />
             <div style={{ display:"flex", gap:8 }}>
-              <button type="button" style={{ ...s.stBtn, flex:1 }} onClick={closePriceEditor}>{lang==="bn"?"বন্ধ":"Cancel"}</button>
-              <button type="button" style={{ ...s.savBtn, flex:1 }} onClick={savePriceEditor}>{t.save}</button>
+              <button type="button"style={{ ...s.stBtn, flex:1 }} onClick={closePriceEditor}>{lang==="bn"?"বন্ধ":"Cancel"}</button>
+              <button type="button"style={{ ...s.savBtn, flex:1 }} onClick={savePriceEditor}>{t.save}</button>
             </div>
           </div>
         </div>

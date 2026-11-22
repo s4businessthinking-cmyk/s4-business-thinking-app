@@ -48,7 +48,7 @@ export function usePiCheque({ chequeHandoverRequest, invoices, lang, onChequeHan
       setPayments(prev => prev.map(p => p.id===v.id ? updated : p));
       setSelVoucher(prev => prev && prev.id===v.id ? updated : prev);
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] handover sync failed", err));
-      toast(lang==="bn" ? "✅ হস্তান্তর ডকুমেন্ট সেভ হয়েছে" : "✅ Handover document saved");
+      toast(lang==="bn" ? "হস্তান্তর ডকুমেন্ট সেভ হয়েছে" : "Handover document saved");
       setChqHandover(null);
       return updated;
     } catch (e) { toast(e.message, "err"); return null; }

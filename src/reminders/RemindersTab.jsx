@@ -77,8 +77,8 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
   };
 
   const save = async () => {
-    if (!form.title.trim()) return toast?.(L("❌ কী মনে করাতে হবে লিখুন", "❌ Write what to remind"), "err");
-    if (!form.dueDate) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
+    if (!form.title.trim()) return toast?.(L("কী মনে করাতে হবে লিখুন", "Write what to remind"), "err");
+    if (!form.dueDate) return toast?.(L("তারিখ দিন", "Pick a date"), "err");
     setBusy(true);
     try {
       const at = new Date().toISOString();
@@ -94,11 +94,11 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
       } else {
         await offlineCreate("reminders", { ...data, shopId, status: "open", createdAt: at, createdBy: uid, createdByName: profile?.personName || "" });
       }
-      toast?.(L("✅ রিমাইন্ডার সেভ হয়েছে", "✅ Reminder saved"));
+      toast?.(L("রিমাইন্ডার সেভ হয়েছে", "Reminder saved"));
       setForm(null); setEditId("");
       sync();
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setBusy(false);
     }
@@ -108,51 +108,51 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
     try {
       const patch = donePatch(r, { uid, name: profile?.personName || "", stop });
       await offlinePatch("reminders", r.id, patch, r);
-      toast?.(patch.status === "done" ? L("✅ শেষ হিসেবে রাখা হলো", "✅ Marked done") : L(`✅ হয়েছে — পরের বার ${patch.dueDate}`, `✅ Done — next on ${patch.dueDate}`));
+      toast?.(patch.status === "done" ? L("শেষ হিসেবে রাখা হলো", "Marked done") : L(`হয়েছে — পরের বার ${patch.dueDate}`, `Done — next on ${patch.dueDate}`));
       sync();
-    } catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); }
+    } catch (e) { toast?.(` ${e?.message || e}`, "err"); }
   };
   const snooze = async (r, days) => {
     try {
       const at = new Date().toISOString();
       await offlinePatch("reminders", r.id, { snoozedUntil: addDays(today, days), updatedAt: at, updatedBy: uid }, r);
-      toast?.(L(`😴 ${days} দিন পরে আবার মনে করাবে`, `😴 Will remind again in ${days} day(s)`));
+      toast?.(L(` ${days} দিন পরে আবার মনে করাবে`, `Will remind again in ${days} day(s)`));
       sync();
-    } catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); }
+    } catch (e) { toast?.(` ${e?.message || e}`, "err"); }
   };
   const reopen = async (r) => {
     try {
       await offlinePatch("reminders", r.id, { status: "open", doneAt: "", updatedAt: new Date().toISOString(), updatedBy: uid }, r);
       sync();
-    } catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); }
+    } catch (e) { toast?.(` ${e?.message || e}`, "err"); }
   };
   const remove = async (r) => {
-    if (!window.confirm(L(`"${r.title}" মুছে ফেলবেন?`, `Delete "${r.title}"?`))) return;
-    try { await offlineRemove("reminders", r.id); sync(); } catch (e) { toast?.(`❌ ${e?.message || e}`, "err"); }
+    if (!window.confirm(L(`"${r.title}"মুছে ফেলবেন?`, `Delete "${r.title}"?`))) return;
+    try { await offlineRemove("reminders", r.id); sync(); } catch (e) { toast?.(` ${e?.message || e}`, "err"); }
   };
 
   const fmt = (d) => String(d || "").slice(0, 10).split("-").reverse().join("/");
   const repeatLabel = (k) => (REPEATS.find((x) => x.key === k) || REPEATS[0])[lang] || "";
-  const badge = (state) => <span className="si-badge" style={{ color: STATE_STYLE[state].color }}>{STATE_STYLE[state][lang] || STATE_STYLE[state].en}</span>;
+  const badge = (state) => <span className="si-badge"style={{ color: STATE_STYLE[state].color }}>{STATE_STYLE[state][lang] || STATE_STYLE[state].en}</span>;
   const actions = (r, state) => {
     const repeating = r.repeat && r.repeat !== "none";
     const next = repeating ? fmt(nextDue(r.dueDate, r.repeat)) : "";
     return (
       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "flex-end" }}>
         {state !== "done" && canMarkDone(r) && (
-          <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); markDone(r); }}>
-            ✅ {repeating ? L(`হয়েছে · পরের বার ${next}`, `Done · next ${next}`) : L("হয়েছে", "Done")}
+          <button type="button"className="pm-btn-secondary"onClick={(e) => { e.stopPropagation(); markDone(r); }}>
+             {repeating ? L(`হয়েছে · পরের বার ${next}`, `Done · next ${next}`) : L("হয়েছে", "Done")}
           </button>
         )}
         {state !== "done" && repeating && canMarkDone(r) && (
-          <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); markDone(r, { stop: true }); }}>
-            🏁 {L("পুনরাবৃত্তি বন্ধ করে শেষ করুন", "Finish, stop repeating")}
+          <button type="button"className="pm-btn-secondary"onClick={(e) => { e.stopPropagation(); markDone(r, { stop: true }); }}>
+             {L("পুনরাবৃত্তি বন্ধ করে শেষ করুন", "Finish, stop repeating")}
           </button>
         )}
-        {state !== "done" && (state === "overdue" || state === "today") && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); snooze(r, 1); }}>😴 {L("কাল", "Tomorrow")}</button>}
-        {state === "done" && canEdit(r) && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); reopen(r); }}>↩️ {L("আবার খুলুন", "Reopen")}</button>}
-        {r.linkType && r.linkId && onOpenLink && <button type="button" className="pm-btn-secondary" onClick={(e) => { e.stopPropagation(); onOpenLink(r.linkType, r.linkId); }}>🔗 {L(LINK_LABELS[r.linkType]?.bn || "খুলুন", LINK_LABELS[r.linkType]?.en || "Open")}</button>}
-        {canEdit(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={(e) => { e.stopPropagation(); remove(r); }}>🗑️</button>}
+        {state !== "done" && (state === "overdue" || state === "today") && <button type="button"className="pm-btn-secondary"onClick={(e) => { e.stopPropagation(); snooze(r, 1); }}> {L("কাল", "Tomorrow")}</button>}
+        {state === "done" && canEdit(r) && <button type="button"className="pm-btn-secondary"onClick={(e) => { e.stopPropagation(); reopen(r); }}> {L("আবার খুলুন", "Reopen")}</button>}
+        {r.linkType && r.linkId && onOpenLink && <button type="button"className="pm-btn-secondary"onClick={(e) => { e.stopPropagation(); onOpenLink(r.linkType, r.linkId); }}> {L(LINK_LABELS[r.linkType]?.bn || "খুলুন", LINK_LABELS[r.linkType]?.en || "Open")}</button>}
+        {canEdit(r) && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={(e) => { e.stopPropagation(); remove(r); }}></button>}
       </div>
     );
   };
@@ -160,41 +160,41 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
   if (form) {
     const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
     return (
-      <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+      <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
         <style>{PM_CSS}</style><style>{SI_CSS}</style>
-        <div className="pm-reference-title"><strong style={{ color: ACCENT }}>{editId ? L("রিমাইন্ডার এডিট", "Edit reminder") : L("নতুন রিমাইন্ডার", "New reminder")}</strong><span>🔔 {L("রিমাইন্ডার", "Reminders")}</span></div>
+        <div className="pm-reference-title"><strong style={{ color: ACCENT }}>{editId ? L("রিমাইন্ডার এডিট", "Edit reminder") : L("নতুন রিমাইন্ডার", "New reminder")}</strong><span> {L("রিমাইন্ডার", "Reminders")}</span></div>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("কী মনে করাবে", "What to remind")}</legend>
-            <div className="si-panel-body" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <input className="pm-input" autoFocus value={form.title} onChange={(e) => set("title", e.target.value)} placeholder={L("যেমন: দোকান ভাড়া দিতে হবে / ট্রেড লাইসেন্স নবায়ন", "e.g. Pay shop rent / renew trade licence")} />
-              <textarea className="pm-input" rows={3} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder={L("বিস্তারিত (ঐচ্ছিক)", "Details (optional)")} style={{ resize: "vertical", minHeight: 60 }} />
+            <div className="si-panel-body"style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <input className="pm-input"autoFocus value={form.title} onChange={(e) => set("title", e.target.value)} placeholder={L("যেমন: দোকান ভাড়া দিতে হবে / ট্রেড লাইসেন্স নবায়ন", "e.g. Pay shop rent / renew trade licence")} />
+              <textarea className="pm-input"rows={3} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder={L("বিস্তারিত (ঐচ্ছিক)", "Details (optional)")} style={{ resize: "vertical", minHeight: 60 }} />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <label className="si-field" style={{ minWidth: 140 }}><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date" className="pm-input" value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} /></label>
-                <label className="si-field" style={{ minWidth: 100 }}><span className="pm-label">{L("সময় (ঐচ্ছিক)", "Time (optional)")}</span><input type="time" className="pm-input" value={form.dueTime} onChange={(e) => set("dueTime", e.target.value)} /></label>
-                <label className="si-field" style={{ minWidth: 120 }}><span className="pm-label">{L("পুনরাবৃত্তি", "Repeat")}</span>
-                  <select className="pm-input" value={form.repeat} onChange={(e) => set("repeat", e.target.value)}>{REPEATS.map((r) => <option key={r.key} value={r.key}>{r[lang] || r.en}</option>)}</select>
+                <label className="si-field"style={{ minWidth: 140 }}><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"className="pm-input"value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} /></label>
+                <label className="si-field"style={{ minWidth: 100 }}><span className="pm-label">{L("সময় (ঐচ্ছিক)", "Time (optional)")}</span><input type="time"className="pm-input"value={form.dueTime} onChange={(e) => set("dueTime", e.target.value)} /></label>
+                <label className="si-field"style={{ minWidth: 120 }}><span className="pm-label">{L("পুনরাবৃত্তি", "Repeat")}</span>
+                  <select className="pm-input"value={form.repeat} onChange={(e) => set("repeat", e.target.value)}>{REPEATS.map((r) => <option key={r.key} value={r.key}>{r[lang] || r.en}</option>)}</select>
                 </label>
-                <label className="si-field" style={{ minWidth: 120 }}><span className="pm-label">{L("কত দিন আগে জানাবে", "Notify days before")}</span><input type="number" min="0" max="60" className="pm-input" value={form.remindBefore} onChange={(e) => set("remindBefore", e.target.value)} /></label>
+                <label className="si-field"style={{ minWidth: 120 }}><span className="pm-label">{L("কত দিন আগে জানাবে", "Notify days before")}</span><input type="number"min="0"max="60"className="pm-input"value={form.remindBefore} onChange={(e) => set("remindBefore", e.target.value)} /></label>
               </div>
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
                 {!form.private && (
-                  <label className="si-field" style={{ minWidth: 180 }}><span className="pm-label">{L("কাকে মনে করাবে", "Remind whom")}</span>
-                    <select className="pm-input" value={form.assignedTo} onChange={(e) => set("assignedTo", e.target.value)}>
+                  <label className="si-field"style={{ minWidth: 180 }}><span className="pm-label">{L("কাকে মনে করাবে", "Remind whom")}</span>
+                    <select className="pm-input"value={form.assignedTo} onChange={(e) => set("assignedTo", e.target.value)}>
                       <option value="">{L("সবাইকে (দোকানের সবাই)", "Everyone in the shop")}</option>
                       {team.filter((m) => m.status !== "disabled").map((m) => <option key={m.uid || m.id} value={m.uid || m.id}>{m.personName || m.username}</option>)}
                     </select>
                   </label>
                 )}
-                <label className="pm-check"><input type="checkbox" checked={form.private} onChange={(e) => set("private", e.target.checked)} /> 🔒 {L("শুধু আমি দেখব (প্রাইভেট)", "Only me (private)")}</label>
+                <label className="pm-check"><input type="checkbox"checked={form.private} onChange={(e) => set("private", e.target.checked)} />  {L("শুধু আমি দেখব (প্রাইভেট)", "Only me (private)")}</label>
               </div>
             </div>
           </fieldset>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={busy} onClick={() => { setForm(null); setEditId(""); }}>← {L("তালিকা", "List")}</button>
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={busy} onClick={() => { setForm(null); setEditId(""); }}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={busy} onClick={save}>{busy ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সেভ", "Save")}`}</button>
+          <button type="button"className="pm-btn pm-btn--primary"disabled={busy} onClick={save}>{busy ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ", "Save")}`}</button>
         </div>
       </div>
     );
@@ -202,14 +202,14 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
 
   const filters = [["open", L("চলমান", "Open")], ["due", L("এখন দেখতে হবে", "Due now")], ["mine", L("আমার", "Mine")], ["done", L("শেষ", "Done")], ["all", L("সব", "All")]];
   return (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style><style>{SI_CSS}</style>
-      <div className="pm-reference-title"><strong style={{ color: ACCENT }}>🔔 {L("রিমাইন্ডার", "Reminders")}</strong><span>{counts.open} {L("টি চলমান", "open")}</span></div>
+      <div className="pm-reference-title"><strong style={{ color: ACCENT }}> {L("রিমাইন্ডার", "Reminders")}</strong><span>{counts.open} {L("টি চলমান", "open")}</span></div>
       <div className="si-toolbar">
-        <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন রিমাইন্ডার", "New reminder")}</button>
+        <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন রিমাইন্ডার", "New reminder")}</button>
         <span className="si-toolbar-gap" />
         <div className="si-pills">
-          {filters.map(([k, label]) => <button key={k} type="button" className={`pm-btn-secondary${filter === k ? " is-active" : ""}`} onClick={() => setFilter(k)}>{label}</button>)}
+          {filters.map(([k, label]) => <button key={k} type="button"className={`pm-btn-secondary${filter === k ? "is-active" : ""}`} onClick={() => setFilter(k)}>{label}</button>)}
         </div>
       </div>
       <div className="si-kpis">
@@ -220,21 +220,21 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
       </div>
       <div className="si-filters">
         <div className="si-search">
-          <input className="pm-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={L("খুঁজুন…", "Search…")} />
-          {q && <button type="button" onClick={() => setQ("")}>✕</button>}
+          <input className="pm-input"value={q} onChange={(e) => setQ(e.target.value)} placeholder={L("খুঁজুন…", "Search…")} />
+          {q && <button type="button"onClick={() => setQ("")}>✕</button>}
         </div>
       </div>
       <div className="si-main is-all">
         <div className="si-box">
           {!shown.length && <div className="si-empty">{visible.length ? L("এই ফিল্টারে কিছু নেই", "Nothing here") : L("এখনো কোনো রিমাইন্ডার নেই। ভাড়া, লাইসেন্স নবায়ন, কাউকে ফোন করা — যা মনে রাখতে হবে লিখে রাখুন।", "No reminders yet. Rent, licence renewals, calls to make — note anything you must not forget.")}</div>}
           {shown.map(({ r, state }) => (
-            <div key={r.id} className="si-mrow" style={{ cursor: canEdit(r) ? "pointer" : "default", opacity: state === "done" ? 0.65 : 1 }} onClick={() => canEdit(r) && openEdit(r)}>
+            <div key={r.id} className="si-mrow"style={{ cursor: canEdit(r) ? "pointer" : "default", opacity: state === "done" ? 0.65 : 1 }} onClick={() => canEdit(r) && openEdit(r)}>
               <div className="si-mrow-top">
-                <span>{r.private ? "🔒 " : ""}{r.title}</span>
+                <span>{r.private ? " " : ""}{r.title}</span>
                 {badge(state)}
               </div>
               <div className="si-mrow-sub">
-                <span>📅 {fmt(r.dueDate)}{r.dueTime ? ` ${r.dueTime}` : ""}{r.repeat && r.repeat !== "none" ? ` · 🔁 ${repeatLabel(r.repeat)}` : ""}{r.assignedTo ? ` · 👤 ${r.assignedToName || memberName(r.assignedTo)}` : ""}</span>
+                <span> {fmt(r.dueDate)}{r.dueTime ? ` ${r.dueTime}` : ""}{r.repeat && r.repeat !== "none" ? ` ·  ${repeatLabel(r.repeat)}` : ""}{r.assignedTo ? ` ·  ${r.assignedToName || memberName(r.assignedTo)}` : ""}</span>
                 <span className="si-muted">{r.createdByName || ""}</span>
               </div>
               {r.note && <div className="si-mrow-sub"><span>{r.note}</span></div>}

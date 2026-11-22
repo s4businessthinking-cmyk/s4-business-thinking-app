@@ -32,6 +32,7 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
   const piSnapRef = useRef(null);
   const [piLedgerHidden,setPiLedgerHidden] = useState(false);
   const [piNavReturn,setPiNavReturn] = useState(null); // null | "ledger"
+  const [piLedgerPartyKey,setPiLedgerPartyKey] = useState(null);
 
   // ── Vendor Payment Voucher state (Cash/Cheque, partial payment against open invoices) ──
   const [payments,setPayments]         = useState([]);       // all vouchers for this shop (live)
@@ -135,12 +136,22 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
         .filter(inv => inv.shopId === shopId);
 
       if (Array.isArray(mergeSource)) {
+        // Cloud first; local wins when dirty OR local stamp is newer (stale snapshot race).
+        const stampOf = (inv) => {
+          const t = Date.parse(inv?._offline_updated_at || inv?.updatedAt || inv?.createdAt || "");
+          return Number.isFinite(t) ? t : 0;
+        };
         const merged = new Map(mergeSource.map(inv => [String(inv.id), inv]));
         records
-          .filter(r => Number(r?.dirty || 0) === 1)
-          .map(r => ({ ...(r.data || r), id:(r.data?.id || r.document_id || r.id) }))
-          .filter(inv => inv.shopId === shopId)
-          .forEach(inv => merged.set(String(inv.id), inv));
+          .map(r => ({ row: r, inv: { ...(r.data || r), id: (r.data?.id || r.document_id || r.id) } }))
+          .filter(({ inv }) => inv.shopId === shopId)
+          .forEach(({ row, inv }) => {
+            const id = String(inv.id);
+            const cloud = merged.get(id);
+            if (!cloud || Number(row?.dirty || 0) === 1 || stampOf(inv) >= stampOf(cloud)) {
+              merged.set(id, inv);
+            }
+          });
         const rows = sortPiInvoices([...merged.values()]);
         setInvoices(rows);
         return rows.length;
@@ -185,5 +196,5 @@ export function usePiData({ authSyncReady, canManagePurchase, canVendorPayments,
     }
     return ()=>{ cancelled=true; unsub1(); unsub2&&unsub2(); };
   },[shopId,syncRefreshKey,authSyncReady]);
-  return { billReturns, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, payments, piCurrent, piEditLineId, piForm, piInvoiceNo, piLedgerHidden, piLines, piNameRef, piNavReturn, piQtyRef, piSaveLockRef, piSaving, piSearch, piSnapRef, piStatusF, piSubTab, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, selInvoice, selVoucher, setBillReturns, setChqHandover, setChqHandoverSaving, setChqWizard, setEditInvoiceId, setPayments, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiSaving, setPiSearch, setPiStatusF, setPiSubTab, setPmtEditSnapshot, setPmtLoading, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, vendorDropOpen, vendorSearchQ, vendorSearchRef };
+  return { billReturns, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, payments, piCurrent, piEditLineId, piForm, piInvoiceNo, piLedgerHidden, piLines, piNameRef, piNavReturn, piLedgerPartyKey, piQtyRef, piSaveLockRef, piSaving, piSearch, piSnapRef, piStatusF, piSubTab, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, selInvoice, selVoucher, setBillReturns, setChqHandover, setChqHandoverSaving, setChqWizard, setEditInvoiceId, setPayments, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiLedgerPartyKey, setPiSaving, setPiSearch, setPiStatusF, setPiSubTab, setPmtEditSnapshot, setPmtLoading, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtSaving, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, vendorDropOpen, vendorSearchQ, vendorSearchRef };
 }

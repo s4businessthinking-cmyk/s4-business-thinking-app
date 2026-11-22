@@ -17,7 +17,7 @@ function systemNotify(title, body, onClick) {
     return;
   }
   try {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (typeof window === "undefined" || !("Notification"in window)) return;
     const show = () => { const n = new Notification(title, { body, tag: "s4-partner-alerts" }); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; };
     if (Notification.permission === "granted") show();
     else if (Notification.permission === "default") Notification.requestPermission().then((p) => p === "granted" && show()).catch(() => {});
@@ -63,7 +63,7 @@ export function usePartnerAlerts({ shopId, enabled, shop, lang = "en", cur = "AE
     writeJson(storeKey, sent);
     const bn = lang === "bn";
     const first = partnerAlertText(fresh[0], bn, cur);
-    const title = fresh.length === 1 ? `${first.icon} ${first.title}` : bn ? `🤝 পার্টনারদের ${fresh.length}টি বিষয় দেখতে হবে` : `🤝 ${fresh.length} partner matters need attention`;
+    const title = fresh.length === 1 ? `${first.icon} ${first.title}` : bn ? `পার্টনারদের ${fresh.length}টি বিষয় দেখতে হবে` : ` ${fresh.length} partner matters need attention`;
     const body = fresh.length === 1 ? first.sub : fresh.slice(0, 3).map((a) => partnerAlertText(a, bn, cur).title).join("\n") + (fresh.length > 3 ? (bn ? `\n…আরও ${fresh.length - 3}টি` : `\n…and ${fresh.length - 3} more`) : "");
     latest.current.toast?.(`${title}\n${body}`);
     systemNotify(title, body, latest.current.onOpen);

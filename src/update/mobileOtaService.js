@@ -114,8 +114,8 @@ export async function runMobileAutoUpdate({
     if (!silent && toast) {
       toast(
         lang === "bn"
-          ? `🔄 Version ${update.latestVersion} download হচ্ছে...`
-          : `🔄 Downloading version ${update.latestVersion}...`,
+          ? `Version ${update.latestVersion} download হচ্ছে...`
+          : `Downloading version ${update.latestVersion}...`,
         "ok"
       );
     }
@@ -135,8 +135,8 @@ export async function runMobileAutoUpdate({
     if (!silent && toast) {
       toast(
         lang === "bn"
-          ? `✅ Version ${update.latestVersion} apply হয়েছে। App reload হচ্ছে...`
-          : `✅ Version ${update.latestVersion} applied. Reloading app...`,
+          ? `Version ${update.latestVersion} apply হয়েছে। App reload হচ্ছে...`
+          : `Version ${update.latestVersion} applied. Reloading app...`,
         "ok"
       );
     }

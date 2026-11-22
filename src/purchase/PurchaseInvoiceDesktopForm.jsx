@@ -23,7 +23,7 @@ function vendorHaystack(v) {
 }
 
 function VendorPickerWindow({ vendors, onPick, onClose, lang }) {
-  return <PartyPickerWindow title="Select Vendor" columns={VENDOR_PICKER_COLS} items={vendors} onPick={onPick} onClose={onClose} lang={lang} partyWord="vendor" modalId="vendor-picker" />;
+  return <PartyPickerWindow title="Select Vendor"columns={VENDOR_PICKER_COLS} items={vendors} onPick={onPick} onClose={onClose} lang={lang} partyWord="vendor"modalId="vendor-picker" />;
 }
 
 function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang, inputRef, onEnterEmpty }) {
@@ -310,7 +310,7 @@ export default function PurchaseInvoiceDesktopForm({
         <div style={{ position: "relative", border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
           {status && (
             <span style={{ position: "absolute", left: 10, fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: status.color, color: "#fff" }}>
-              {status[lang] || savedInvoice.status}{locked ? ` · 🔒 ${bn ? "শুধু দেখা" : "View only"}` : ""}
+              {status[lang] || savedInvoice.status}{locked ? ` ·  ${bn ? "শুধু দেখা" : "View only"}` : ""}
             </span>
           )}
           <div style={{ textAlign: "center", lineHeight: 1.1 }}>
@@ -320,7 +320,7 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>{bn ? "এন্ট্রি তারিখ" : "Entry Date"}</div>
-          <input type="date" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
+          <input type="date"lang="en-GB" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
         </div>
       </div>
 
@@ -335,7 +335,7 @@ export default function PurchaseInvoiceDesktopForm({
         <div>
           <div style={{ ...lbl, display: "flex", justifyContent: "space-between" }}>
             <span><u>S</u>upplier (Home Key) <span style={{ color: C.red }}>*</span></span>
-            <button type="button" onClick={() => handlersRef.current.history()}
+            <button type="button"onClick={() => handlersRef.current.history()}
               style={{ background: "none", border: "none", padding: 0, color: C.label, fontWeight: 800, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
               F8 - Purchase History
             </button>
@@ -346,7 +346,7 @@ export default function PurchaseInvoiceDesktopForm({
               onEnterEmpty={() => nameRef.current?.focus()}
               onChange={(v) => { setField("vendorName", v); if (form.vendorId) setField("vendorId", ""); }}
               onSelect={(v) => { onPickVendor(v); setTimeout(() => nameRef.current?.focus(), 60); }} />
-            <button type="button" onClick={() => setVendorPickerOpen(true)} title="Home" style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
+            <button type="button"onClick={() => setVendorPickerOpen(true)} title="Home"style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
           </div>
           {vendorPickerOpen && (
             <VendorPickerWindow vendors={vendors} lang={lang}
@@ -356,11 +356,11 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
         <div>
           <div style={lbl}>Invoice Date</div>
-          <input type="date" style={inp()} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
+          <input type="date"lang="en-GB" style={inp()} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
         </div>
         <div>
           <div style={lbl}>Mobile</div>
-          <input style={inp()} inputMode="tel" value={form.vendorMobile} onChange={(e) => setField("vendorMobile", e.target.value)} />
+          <input style={inp()} inputMode="tel"value={form.vendorMobile} onChange={(e) => setField("vendorMobile", e.target.value)} />
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
           {showRef && (
@@ -381,17 +381,17 @@ export default function PurchaseInvoiceDesktopForm({
               {foreign && (
                 <div style={{ width: 120 }}>
                   <div style={lbl}>1 {billCur} = ? {baseCurrency}</div>
-                  <input style={inp(fxRate > 0 ? { textAlign: "right", fontWeight: 700 } : { textAlign: "right", borderColor: C.red })} inputMode="decimal" value={form.exchangeRate || ""} placeholder="3.6725"
+                  <input style={inp(fxRate > 0 ? { textAlign: "right", fontWeight: 700 } : { textAlign: "right", borderColor: C.red })} inputMode="decimal"value={form.exchangeRate || ""} placeholder="3.6725"
                     onChange={(e) => setField("exchangeRate", e.target.value)} />
                 </div>
               )}
             </>
           )}
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={() => setScanOpen(true)} title={bn ? "সাপ্লায়ারের বিলের PDF / ছবি থেকে বসান" : "Fill from the supplier bill PDF / picture"}
-            style={btn("#ecfdf5", "#15803d", { height: 26, whiteSpace: "nowrap", marginRight: 6 })}>📄 {bn ? "বিল স্ক্যান" : "Scan Bill"}</button>
+          <button type="button"onClick={() => setScanOpen(true)} title={bn ? "সাপ্লায়ারের বিলের PDF / ছবি থেকে বসান" : "Fill from the supplier bill PDF / picture"}
+            style={btn("#ecfdf5", "#15803d", { height: 26, whiteSpace: "nowrap", marginRight: 6 })}> {bn ? "বিল স্ক্যান" : "Scan Bill"}</button>
           {onSaveOptions && (
-            <button type="button" onClick={() => setOptionsOpen(true)} style={btn("#e7eef9", C.label, { height: 26, whiteSpace: "nowrap" })}>⚙️ Options</button>
+            <button type="button"onClick={() => setOptionsOpen(true)} style={btn("#e7eef9", C.label, { height: 26, whiteSpace: "nowrap" })}> Options</button>
           )}
         </div>
       </div>
@@ -402,13 +402,13 @@ export default function PurchaseInvoiceDesktopForm({
           <div>
             <div style={{ ...lbl, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span>Product Nam<u>e</u>{" "}
-                <button type="button" onClick={() => handlersRef.current.productSearch()} title={bn ? "প্রোডাক্ট সার্চ" : "Search Product"}
+                <button type="button"onClick={() => handlersRef.current.productSearch()} title={bn ? "প্রোডাক্ট সার্চ" : "Search Product"}
                   style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>(F10)</button>
               </span>
               {currentProduct && stockOf != null && (
-                <StockBadgeLabel stock={stockOf} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span" style={{ marginTop: 0, fontSize: 11 }} />
+                <StockBadgeLabel stock={stockOf} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span"style={{ marginTop: 0, fontSize: 11 }} />
               )}
-              <button type="button" onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
+              <button type="button"onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
                 New Product [F9]
               </button>
             </div>
@@ -430,7 +430,7 @@ export default function PurchaseInvoiceDesktopForm({
           </div>
           <div>
             <div style={lbl}>Qty</div>
-            <input ref={qtyRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.qty}
+            <input ref={qtyRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.qty}
               onChange={(e) => setCurrent((p) => ({ ...p, qty: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, unitRef)} />
@@ -444,21 +444,21 @@ export default function PurchaseInvoiceDesktopForm({
           </div>
           <div>
             <div style={lbl}>Unit Cost{foreign ? ` (${billCur})` : ""}</div>
-            <input ref={costRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.unitCost}
+            <input ref={costRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.unitCost}
               onChange={(e) => setCurrent((p) => ({ ...p, unitCost: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, discRef)} />
           </div>
           <div>
             <div style={lbl}>Dis %</div>
-            <input ref={discRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.discountPerc}
+            <input ref={discRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.discountPerc}
               onChange={(e) => setCurrent((p) => ({ ...p, discountPerc: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, discAmtRef)} />
           </div>
           <div>
             <div style={lbl}>Dis Amt</div>
-            <input ref={discAmtRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.discountFlat || ""}
+            <input ref={discAmtRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.discountFlat || ""}
               disabled={piN2(current.discountPerc) > 0} title={piN2(current.discountPerc) > 0 ? (bn ? "Dis % দেওয়া আছে — টাকায় ছাড় দিতে Dis % ০ করুন" : "Dis % is set; make it 0 to give a flat discount") : ""}
               onChange={(e) => setCurrent((p) => ({ ...p, discountFlat: e.target.value }))}
               onFocus={(e) => e.target.select()}
@@ -466,21 +466,21 @@ export default function PurchaseInvoiceDesktopForm({
           </div>
           <div>
             <div style={lbl}>VAT %</div>
-            <input ref={vatRef} style={inp({ textAlign: "right" })} inputMode="decimal" value={current.taxPerc}
+            <input ref={vatRef} style={inp({ textAlign: "right" })} inputMode="decimal"value={current.taxPerc}
               onChange={(e) => setCurrent((p) => ({ ...p, taxPerc: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, saleRef)} />
           </div>
           <div>
             <div style={lbl}>Sale Price{foreign ? ` (${baseCurrency})` : ""}</div>
-            <input ref={saleRef} style={inp({ textAlign: "right", color: C.green, fontWeight: 700 })} inputMode="decimal" value={current.salePrice}
+            <input ref={saleRef} style={inp({ textAlign: "right", color: C.green, fontWeight: 700 })} inputMode="decimal"value={current.salePrice}
               onChange={(e) => setCurrent((p) => ({ ...p, salePrice: e.target.value }))}
               onFocus={(e) => e.target.select()}
               onKeyDown={(e) => enterTo(e, null)} />
           </div>
           <div style={{ display: "flex", gap: 4 }}>
-            <button type="button" onClick={addOrUpdate} style={btn("#2c5aa0", "#fff", { height: 26 })}>{editingLineId ? (bn ? "আপডেট" : "Update") : (bn ? "যোগ" : "Add")}</button>
-            {editingLineId && <button type="button" onClick={resetEntry} style={btn("#e7eef9", C.label, { height: 26, padding: "0 8px" })}>✕</button>}
+            <button type="button"onClick={addOrUpdate} style={btn("#2c5aa0", "#fff", { height: 26 })}>{editingLineId ? (bn ? "আপডেট" : "Update") : (bn ? "যোগ" : "Add")}</button>
+            {editingLineId && <button type="button"onClick={resetEntry} style={btn("#e7eef9", C.label, { height: 26, padding: "0 8px" })}>✕</button>}
           </div>
         </div>
         {/* Product info strip */}
@@ -488,8 +488,8 @@ export default function PurchaseInvoiceDesktopForm({
           {currentProduct ? (
             <>
               {stockOf == null
-                ? <span>📦 {bn ? "স্টক" : "Stock"}: …</span>
-                : <StockBadgeLabel stock={stockOf} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span" style={{ fontSize: 12.5 }} />}
+                ? <span> {bn ? "স্টক" : "Stock"}: …</span>
+                : <StockBadgeLabel stock={stockOf} unit={currentProduct.unit} reorderMin={currentProduct.reorderMin} lang={lang} as="span"style={{ fontSize: 12.5 }} />}
               <span>Lnd. Cost: <span style={{ color: "#1e3a8a" }}>{piFmt2(currentProduct.landingCost)}</span></span>
               <span>Avg. Cost: <span style={{ color: "#1e3a8a" }}>{piFmt2(currentProduct.averageCost || currentProduct.landingCost)}</span></span>
               <span>Last Cost: <span style={{ color: ACCENT }}>{lastPurchase ? `${piFmt2(lastPurchase.it.unitCost)} (${fmtDate(lastPurchase.inv.invoiceDate)})` : "—"}</span></span>
@@ -541,7 +541,7 @@ export default function PurchaseInvoiceDesktopForm({
                   <td style={{ ...td, textAlign: "center" }}>{i + 1}</td>
                   <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>
                     {it.name}
-                    {it.batchNo && <span title={bn ? "আলাদা stock (ব্যাচ)" : "Separate stock (batch)"} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#fff", background: "#7c3aed", borderRadius: 8, padding: "0 6px" }}>📦 {it.batchNo}</span>}
+                    {it.batchNo && <span title={bn ? "আলাদা stock (ব্যাচ)" : "Separate stock (batch)"} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#fff", background: "#7c3aed", borderRadius: 8, padding: "0 6px" }}> {it.batchNo}</span>}
                   </td>
                   <td style={{ ...td, textAlign: "left" }}>{it.code}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.brand}</td>
@@ -555,7 +555,7 @@ export default function PurchaseInvoiceDesktopForm({
                   <td style={{ ...td, fontWeight: 800 }}>{piFmt2(c.total)}</td>
                   <td style={{ ...td, color: C.green }}>{piN2(it.salePrice) > 0 ? piFmt2(it.salePrice) : ""}</td>
                   <td style={{ ...td, textAlign: "center" }}>
-                    <button type="button" title={bn ? "মুছুন" : "Delete"}
+                    <button type="button"title={bn ? "মুছুন" : "Delete"}
                       onClick={(e) => { e.stopPropagation(); if (selected) resetEntry(); onDelLine(it.id); }}
                       style={{ background: "none", border: "none", color: C.red, fontWeight: 900, cursor: "pointer", fontSize: 14 }}>×</button>
                   </td>
@@ -595,9 +595,9 @@ export default function PurchaseInvoiceDesktopForm({
                 title={bn ? "ক্যাশে পুরো টাকা পরিশোধ ধরা হয়" : "Cash bills are fully paid"} />
             ) : (
               <div style={{ display: "flex", gap: 4 }}>
-                <input style={inp({ textAlign: "right", fontWeight: 700 })} inputMode="decimal" placeholder="0.00" value={form.amountPaid}
+                <input style={inp({ textAlign: "right", fontWeight: 700 })} inputMode="decimal"placeholder="0.00"value={form.amountPaid}
                   onChange={(e) => setField("amountPaid", e.target.value)} />
-                <button type="button" disabled={totals.grand <= 0} onClick={() => setField("amountPaid", piFmt2(totals.grand))}
+                <button type="button"disabled={totals.grand <= 0} onClick={() => setField("amountPaid", piFmt2(totals.grand))}
                   title={bn ? "পুরো টাকা পরিশোধ" : "Pay full amount"}
                   style={btn("#e7eef9", C.green, { height: 26, padding: "0 8px", fontSize: 11 })}>{bn ? "পুরো" : "Full"}</button>
               </div>
@@ -637,46 +637,46 @@ export default function PurchaseInvoiceDesktopForm({
       {/* Action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
-          <button type="button" onClick={() => setShowSearch(true)} style={btn()}>🔍 {bn ? "খুঁজুন" : "Search"}</button>
+          <button type="button"onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
+          <button type="button"onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন" : "Search"}</button>
           {purchaseOptions.enablePrint && savedInvoice && canPrint && (
-            <button type="button" onClick={() => {
+            <button type="button"onClick={() => {
               const vm = vendors.find((v) => v.id === savedInvoice.vendorId);
               printPurchaseInvoice({ ...savedInvoice, vendorAddress: savedInvoice.vendorAddress || vm?.address || "", vendorTrn: savedInvoice.vendorTrn || vm?.trnNumber || "" }, shop, lang);
-            }} style={btn()}>🖨️ {bn ? "প্রিন্ট" : "Print"}</button>
+            }} style={btn()}> {bn ? "প্রিন্ট" : "Print"}</button>
           )}
           {onCancelInvoice && savedInvoice && ["draft", "confirmed", "partial", "paid"].includes(savedInvoice.status) && (
-            <button type="button" onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
-              style={btn("#fee2e2", C.red)}>⛔ {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
+            <button type="button"onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
+              style={btn("#fee2e2", C.red)}> {bn ? "বিল বাতিল" : "Cancel Bill"}</button>
           )}
           {onDeleteInvoice && savedInvoice && ["draft", "cancelled"].includes(savedInvoice.status) && (
-            <button type="button" onClick={() => onDeleteInvoice(savedInvoice)} disabled={saving}
-              style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "মুছুন" : "Delete"}</button>
+            <button type="button"onClick={() => onDeleteInvoice(savedInvoice)} disabled={saving}
+              style={btn("#7f1d1d", "#fff")}> {bn ? "মুছুন" : "Delete"}</button>
           )}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button" onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
+          <button type="button"onClick={onClose} disabled={saving} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
           {locked ? (
             canEditInvoice(savedInvoice) ? (
-              <button type="button" onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
-                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}>✏️ {bn ? "এডিট" : "Edit"}</button>
+              <button type="button"onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
+                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}> {bn ? "এডিট" : "Edit"}</button>
             ) : (
-              <button type="button" disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / ওপেনিং / ট্রান্সফার / অনুমতি নেই)" : "This bill cannot be edited (cancelled / opening / transfer / no permission)"}
-                style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}>🔒 {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
+              <button type="button"disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / ওপেনিং / ট্রান্সফার / অনুমতি নেই)" : "This bill cannot be edited (cancelled / opening / transfer / no permission)"}
+                style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}> {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
             )
           ) : (
             <>
               {(!savedInvoice || savedInvoice.status === "draft") && (
-                <button type="button" onClick={() => { focusMissingHeader(); onSaveDraft(); }} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
+                <button type="button"onClick={() => { focusMissingHeader(); onSaveDraft(); }} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
               )}
-              <button type="button" onClick={() => { focusMissingHeader(); onConfirm(); }} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
+              <button type="button"onClick={() => { focusMissingHeader(); onConfirm(); }} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
                 {saving ? "…" : (bn ? "সেভ" : "Save")}
               </button>
             </>
           )}
-          <button type="button" title={bn ? "আগের বিল" : "Previous bill"} disabled={!olderInvoice} onClick={() => olderInvoice && onOpenInvoice(olderInvoice)}
+          <button type="button"title={bn ? "আগের বিল" : "Previous bill"} disabled={!olderInvoice} onClick={() => olderInvoice && onOpenInvoice(olderInvoice)}
             style={btn("#e7eef9", C.label, { padding: "0 12px", marginLeft: 10, opacity: olderInvoice ? 1 : 0.4 })}>&lt;</button>
-          <button type="button" title={bn ? "পরের বিল" : "Next bill"} disabled={!newerInvoice} onClick={() => newerInvoice && onOpenInvoice(newerInvoice)}
+          <button type="button"title={bn ? "পরের বিল" : "Next bill"} disabled={!newerInvoice} onClick={() => newerInvoice && onOpenInvoice(newerInvoice)}
             style={btn("#e7eef9", C.label, { padding: "0 12px", opacity: newerInvoice ? 1 : 0.4 })}>&gt;</button>
         </div>
       </div>
@@ -741,7 +741,7 @@ function PurchaseOptionsModal({ lang, options, onSave, onClose, toast }) {
     setBusy(true);
     try {
       await onSave(draft);
-      toast?.(bn ? "✅ Purchase Options সেভ হয়েছে — সব ডিভাইসে চালু হবে" : "✅ Purchase Options saved for all devices");
+      toast?.(bn ? "Purchase Options সেভ হয়েছে — সব ডিভাইসে চালু হবে" : "Purchase Options saved for all devices");
       onClose();
     } catch (e) {
       toast?.(e?.message || String(e), "err");
@@ -750,11 +750,11 @@ function PurchaseOptionsModal({ lang, options, onSave, onClose, toast }) {
     }
   };
   return (
-    <Modal title="Purchase Options" width={560} onClose={() => { if (!busy) onClose(); }}>
+    <Modal title="Purchase Options"width={560} onClose={() => { if (!busy) onClose(); }}>
       <div style={{ display: "grid", gap: 9 }}>
         {PURCHASE_OPTION_LABELS.map(([key, en, bnText]) => (
           <label key={key} style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 13, fontWeight: 700, color: C.label, cursor: "pointer" }}>
-            <input type="checkbox" checked={!!draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.checked }))} style={{ marginTop: 2 }} />
+            <input type="checkbox"checked={!!draft[key]} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.checked }))} style={{ marginTop: 2 }} />
             <span>{en}<div style={{ fontWeight: 500, fontSize: 11.5, color: "#4b5f86" }}>{bnText}</div></span>
           </label>
         ))}
@@ -764,8 +764,8 @@ function PurchaseOptionsModal({ lang, options, onSave, onClose, toast }) {
             : "With the separate-stock options on, adding a line asks when earlier stock is on hand and the vendor / M.R.P / Landing Cost differs. Yes gives the line a new batch number."}
         </div>
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
-          <button type="button" onClick={onClose} disabled={busy} style={btn()}>{bn ? "বন্ধ" : "Close"}</button>
-          <button type="button" onClick={save} disabled={busy} style={btn("#15803d", "#fff", { padding: "0 22px" })}>{busy ? "…" : "OK"}</button>
+          <button type="button"onClick={onClose} disabled={busy} style={btn()}>{bn ? "বন্ধ" : "Close"}</button>
+          <button type="button"onClick={save} disabled={busy} style={btn("#15803d", "#fff", { padding: "0 22px" })}>{busy ? "…" : "OK"}</button>
         </div>
       </div>
     </Modal>
@@ -801,7 +801,7 @@ function PurchaseHistoryModal({ lang, invoices, excludeId, product, productName,
   }, [invoices, excludeId, byProduct, allSuppliers, product, wantName, vendorId, wantVendor, piCalcLine, piN2]);
 
   const title = byProduct
-    ? `PURCHASE HISTORY OF ${(product?.name || productName || "").toUpperCase()}${allSuppliers ? " (ALL SUPPLIERS)" : ` FROM ${String(vendorName || "").toUpperCase()}`}`
+    ? `PURCHASE HISTORY OF ${(product?.name || productName || "").toUpperCase()}${allSuppliers ? " (ALL SUPPLIERS)" : `FROM ${String(vendorName || "").toUpperCase()}`}`
     : `PURCHASES FROM ${String(vendorName || "").toUpperCase()}`;
 
   const columns = byProduct ? [
@@ -834,11 +834,11 @@ function PurchaseHistoryModal({ lang, invoices, excludeId, product, productName,
       <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 8 }}>
         {byProduct && !noVendor && (
           <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-            <input type="checkbox" checked={allSuppliersTick} onChange={(e) => setAllSuppliers(e.target.checked)} /> All Suppliers
+            <input type="checkbox"checked={allSuppliersTick} onChange={(e) => setAllSuppliers(e.target.checked)} /> All Suppliers
           </label>
         )}
         <span style={{ fontSize: 11.5, color: "#4b5f86" }}>{bn ? "বিল খুলতে row-তে double click করুন" : "Double click a row to open the bill"}</span>
-        <button type="button" onClick={onClose} style={btn("#e7eef9", C.label, { marginLeft: "auto" })}>CLOSE</button>
+        <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { marginLeft: "auto" })}>CLOSE</button>
       </div>
     </Modal>
   );
@@ -882,13 +882,13 @@ function PurchaseSearchModal({ invoices, piFmt2, PI_PAY_METHODS, lang, onClose, 
   ];
 
   return (
-    <Modal title="Search" onClose={onClose} width={800}>
+    <Modal title="Search"onClose={onClose} width={800}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={lbl}><u>F</u>rom</span>
-        <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}><u>T</u>o</span>
-        <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
-        <button type="button" onClick={onClose} style={btn("#e7eef9", C.label, { width: 80, marginLeft: "auto" })}>Close</button>
+        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+        <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { width: 80, marginLeft: "auto" })}>Close</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 4px" }}>
         {box("PI No", "billNo")}
@@ -897,7 +897,7 @@ function PurchaseSearchModal({ invoices, piFmt2, PI_PAY_METHODS, lang, onClose, 
         {box("Net Amount", "net")}
       </div>
       <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, marginTop: 8, marginBottom: 6, cursor: "pointer" }}>
-        <input type="checkbox" checked={extended} onChange={(e) => setExtended(e.target.checked)} /> Extended Search
+        <input type="checkbox"checked={extended} onChange={(e) => setExtended(e.target.checked)} /> Extended Search
         <span style={{ color: "#8b1a1a", marginLeft: 20, fontWeight: 700 }}>(Will display all details containing the search text in any part of the field)</span>
       </label>
       <div style={{ border: `1px solid ${C.border}`, height: "44vh", overflow: "auto" }}>

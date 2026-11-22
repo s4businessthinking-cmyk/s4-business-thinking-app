@@ -92,7 +92,7 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
-      toast(`✅ ${label}: ${txt.copied}`);
+      toast(` ${label}: ${txt.copied}`);
     } catch {
       toast("Copy failed", "err");
     }
@@ -223,7 +223,7 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
           onChange={e=>setLicenseKey(e.target.value)}
           placeholder={txt.keyPlaceholder}
         />
-        <button type="submit" style={s.sendBtn} disabled={activating}>
+        <button type="submit"style={s.sendBtn} disabled={activating}>
           {activating ? "..." : txt.activate}
         </button>
       </form>
@@ -288,12 +288,12 @@ export function ProfilePasswordSettings({ t, lang, profile, toast, th, s }) {
 
   return (
     <div style={{ ...s.card, marginTop:12 }}>
-      <div style={s.settingsLbl}>{lang==="bn"?"🔐 পাসওয়ার্ড পরিবর্তন":"🔐 Change Password"}</div>
+      <div style={s.settingsLbl}>{lang==="bn"?"পাসওয়ার্ড পরিবর্তন":"Change Password"}</div>
       <form onSubmit={submit}>
-        <input style={inp} type="password" placeholder={t.currentPwLbl} value={currentPw} onChange={e=>setCurrentPw(e.target.value)} autoComplete="current-password" />
-        <input style={inp} type="password" placeholder={t.newPwLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
-        <input style={inp} type="password" placeholder={t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
-        <button type="submit" style={s.sendBtn} disabled={busy}>{busy?"...":t.changePwSettingsBtn}</button>
+        <input style={inp} type="password"placeholder={t.currentPwLbl} value={currentPw} onChange={e=>setCurrentPw(e.target.value)} autoComplete="current-password" />
+        <input style={inp} type="password"placeholder={t.newPwLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
+        <input style={inp} type="password"placeholder={t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
+        <button type="submit"style={s.sendBtn} disabled={busy}>{busy?"...":t.changePwSettingsBtn}</button>
       </form>
     </div>
   );
@@ -429,7 +429,7 @@ export function SyncSettingsPanel({
                 padding:0, cursor:"pointer", fontSize:12, color:"#f59e0b", fontFamily:"inherit",
               }}
             >
-              {lang==="bn" ? "⚠️ বারবার ব্যর্থ (retry চলছে)" : "⚠️ Repeatedly failing (still retrying)"}: <strong style={{ color:"#f59e0b" }}>{syncDashboard.failingSync}</strong>{" "}
+              {lang==="bn" ? "বারবার ব্যর্থ (retry চলছে)" : "Repeatedly failing (still retrying)"}: <strong style={{ color:"#f59e0b" }}>{syncDashboard.failingSync}</strong>{" "}
               {showFailingDetails ? "▲" : (lang==="bn" ? "▼ বিস্তারিত দেখুন" : "▼ tap for details")}
             </button>
             {showFailingDetails && (
@@ -482,8 +482,8 @@ export function SyncSettingsPanel({
         >
           {cloudPullBusy ? "..." : t.syncDownloadBtn}
         </button>
-        <button type="button" onClick={onRefresh} style={s.stBtn}>
-          {lang==="bn"?"🔄 রিফ্রেশ":"🔄 Refresh"}
+        <button type="button"onClick={onRefresh} style={s.stBtn}>
+          {lang==="bn"?"রিফ্রেশ":"Refresh"}
         </button>
       </div>
 

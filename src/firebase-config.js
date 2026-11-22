@@ -1,5 +1,5 @@
 // ============================================================
-// ☁️ CLOUD CONFIG — S4 Business Thinking (own ERP server on the VPS)
+//  CLOUD CONFIG — S4 Business Thinking (own ERP server on the VPS)
 // ============================================================
 import { getAuth } from "./backend/auth";
 import { getFirestore } from "./backend/firestore";

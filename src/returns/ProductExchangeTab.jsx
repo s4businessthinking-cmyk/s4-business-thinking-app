@@ -96,15 +96,15 @@ export default function ProductExchangeTab({
 
   const save = async () => {
     if (saving) return;
-    if (!date) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
+    if (!date) return toast?.(L("তারিখ দিন", "Pick a date"), "err");
     const built = buildExchangeItems({ out, outQty, into, inQty, stockMap });
     if (built.error) {
       const msg = {
-        noOut: L("❌ যে পণ্য বের করবেন সেটা বেছে নিন", "❌ Pick the product leaving stock"),
-        noIn: L("❌ যে পণ্য ঢুকাবেন সেটা বেছে নিন", "❌ Pick the product coming into stock"),
-        same: L("❌ একই পণ্য দুই দিকে রাখা যাবে না — ভিন্ন পণ্য দিন", "❌ Both sides can't be the same product"),
-        noOutQty: L("❌ বের হওয়া পরিমাণ লিখুন", "❌ Enter the outgoing quantity"),
-        noInQty: L("❌ ঢোকা পরিমাণ লিখুন", "❌ Enter the incoming quantity"),
+        noOut: L("যে পণ্য বের করবেন সেটা বেছে নিন", "Pick the product leaving stock"),
+        noIn: L("যে পণ্য ঢুকাবেন সেটা বেছে নিন", "Pick the product coming into stock"),
+        same: L("একই পণ্য দুই দিকে রাখা যাবে না — ভিন্ন পণ্য দিন", "Both sides can't be the same product"),
+        noOutQty: L("বের হওয়া পরিমাণ লিখুন", "Enter the outgoing quantity"),
+        noInQty: L("ঢোকা পরিমাণ লিখুন", "Enter the incoming quantity"),
       }[built.error];
       return toast?.(msg, "err");
     }
@@ -143,11 +143,11 @@ export default function ProductExchangeTab({
         note: `Product exchange · ${exchangeSummary(created)} · ${exchangeReasonLabel(reason)}`,
       });
       setAllRows((list) => [created, ...list.filter((r) => r.id !== created.id)]);
-      toast?.(L(`✅ ${adjustNo} সেভ হয়েছে`, `✅ ${adjustNo} saved`));
+      toast?.(L(` ${adjustNo} সেভ হয়েছে`, ` ${adjustNo} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setSel(created); setView("detail");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -165,10 +165,10 @@ export default function ProductExchangeTab({
       setAllRows((list) => list.map((x) => (x.id === r.id ? updated : x)));
       setSel((s) => (s?.id === r.id ? updated : s));
       logAudit({ shopId, user, profile, action: "cancel", collection: "stockAdjustments", docId: r.id, docNo: r.adjustNo });
-      toast?.(L("🚫 বাতিল হয়েছে", "🚫 Cancelled"), "err");
+      toast?.(L("বাতিল হয়েছে", "Cancelled"), "err");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
   const deleteDoc = async (r) => {
@@ -178,11 +178,11 @@ export default function ProductExchangeTab({
       await offlineRemove("stockAdjustments", r.id);
       setAllRows((list) => list.filter((x) => x.id !== r.id));
       logAudit({ shopId, user, profile, action: "delete", collection: "stockAdjustments", docId: r.id, docNo: r.adjustNo });
-      toast?.(L("🗑️ মুছে ফেলা হয়েছে", "🗑️ Deleted"), "err");
+      toast?.(L("মুছে ফেলা হয়েছে", "Deleted"), "err");
       setSel(null); setView("list");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -212,12 +212,12 @@ export default function ProductExchangeTab({
   };
 
   const badge = (r) => (
-    <span className="si-badge" style={{ color: r.status === "cancelled" ? "#6b7280" : ACCENT }}>
+    <span className="si-badge"style={{ color: r.status === "cancelled" ? "#6b7280" : ACCENT }}>
       {r.status === "cancelled" ? L("বাতিল", "Cancelled") : L("সম্পন্ন", "Done")}
     </span>
   );
   const shell = (titleLeft, titleRight, children) => (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title"><strong style={{ color: ACCENT }}>{titleLeft}</strong><span>{titleRight}</span></div>
@@ -235,44 +235,44 @@ export default function ProductExchangeTab({
           <b>{p.name}</b>{p.code ? <span className="si-muted"> · {p.code}</span> : null}
           <div className="si-muted">{L("এখন স্টক", "Stock now")}: <b>{st == null ? "…" : fq(st)}</b> {p.unit}</div>
         </div>
-        <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "right" }}
+        <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "right" }}
           value={qty} onChange={(e) => setQty(e.target.value)} placeholder={L("কতটা", "Qty")} />
         <div style={{ fontWeight: 800, color: outSide ? "#b91c1c" : "#15803d" }}>
           {outSide ? "−" : "+"}{fq(q)} {p.unit}
-          {after != null && q > 0 && <div className="si-muted" style={{ fontWeight: 400 }}>{L("পরে", "After")}: {fq(after)}</div>}
+          {after != null && q > 0 && <div className="si-muted"style={{ fontWeight: 400 }}>{L("পরে", "After")}: {fq(after)}</div>}
         </div>
-        <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={onClear}>✕ {L("বদলান", "Change")}</button>
+        <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={onClear}>✕ {L("বদলান", "Change")}</button>
       </div>
     );
   };
 
   if (view === "form") {
     const exclude = [out?.productId, into?.productId].filter(Boolean);
-    return shell(L("নতুন পণ্য বদল", "New Product Exchange"), L("🔄 পণ্য বদল (Exchange)", "🔄 Product Exchange"), (
+    return shell(L("নতুন পণ্য বদল", "New Product Exchange"), L("পণ্য বদল (Exchange)", "Product Exchange"), (
       <>
         <div className="si-body">
-          <div className="si-hint" style={{ padding: "6px 8px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 8 }}>
-            💡 {L("দোকানের ভুল/নষ্ট পণ্য ↔ সঠিক পণ্য স্টক বদল।", "Shop stock swap: wrong/damaged ↔ correct product.")}
+          <div className="si-hint"style={{ padding: "6px 8px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 8 }}>
+             {L("দোকানের ভুল/নষ্ট পণ্য  সঠিক পণ্য স্টক বদল।", "Shop stock swap: wrong/damaged  correct product.")}
             <br />
             <b style={{ color: "#9a3412" }}>{L("ব্যাটারি গ্যারান্টি / কোম্পানি চেঞ্জ এখানে নয় — মেনু › গ্যারান্টি ক্লেইম ব্যবহার করুন (নইলে স্টক ডাবল হবে)।", "Battery guarantee / company change: use menu › Warranty Claim (or stock will double).")}</b>
           </div>
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "140px 180px minmax(0,1fr)", paddingTop: 3 }}>
               <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span>
-                <input type="date" className="pm-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+                <input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
               <div className="si-field"><span className="pm-label">{L("কারণ", "Reason")} *</span>
-                <select className="pm-input" value={reason} onChange={(e) => setReason(e.target.value)}>
+                <select className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)}>
                   {EXCHANGE_REASONS.map((r) => <option key={r.key} value={r.key}>{r[bn ? "bn" : "en"]}</option>)}
                 </select>
               </div>
               <div className="si-field"><span className="pm-label">{L("নোট", "Note")}</span>
-                <input className="pm-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder={L("ঐচ্ছিক", "Optional")} /></div>
+                <input className="pm-input"value={note} onChange={(e) => setNote(e.target.value)} placeholder={L("ঐচ্ছিক", "Optional")} /></div>
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
-            <legend className="pm-panel-legend" style={{ background: "linear-gradient(180deg,#ef4444,#b91c1c)" }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
+            <legend className="pm-panel-legend"style={{ background: "linear-gradient(180deg,#ef4444,#b91c1c)" }}>
               − {L("বের হবে (ভুল / নষ্ট / ফিটিং)", "Out (wrong / damaged / fitting)")}
             </legend>
             <div className="si-panel-body">
@@ -285,8 +285,8 @@ export default function ProductExchangeTab({
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
-            <legend className="pm-panel-legend" style={{ background: "linear-gradient(180deg,#22c55e,#15803d)" }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
+            <legend className="pm-panel-legend"style={{ background: "linear-gradient(180deg,#22c55e,#15803d)" }}>
               + {L("ঢুকবে (সঠিক পণ্য)", "In (correct product)")}
             </legend>
             <div className="si-panel-body">
@@ -299,11 +299,11 @@ export default function ProductExchangeTab({
             </div>
           </fieldset>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !out || !into} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সেভ করুন", "Save")}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !out || !into} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}`}
           </button>
         </div>
       </>
@@ -312,12 +312,12 @@ export default function ProductExchangeTab({
 
   if (view === "detail" && sel) {
     const r = rows.find((x) => x.id === sel.id) || sel;
-    return shell(<>{r.adjustNo} {badge(r)}</>, L("🔄 পণ্য বদল", "🔄 Product Exchange"), (
+    return shell(<>{r.adjustNo} {badge(r)}</>, L("পণ্য বদল", "Product Exchange"), (
       <>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
-            <div className="si-panel-body" style={{ paddingTop: 3 }}>
+            <div className="si-panel-body"style={{ paddingTop: 3 }}>
               <div><b style={{ color: ACCENT }}>{r.adjustNo}</b> · {fmtDay(r.adjustDate)} · {exchangeReasonLabel(r.reason, bn)} · {r.createdByName || ""}</div>
               {r.note && <div className="si-muted">{r.note}</div>}
               <div style={{ fontWeight: 700 }}>{exchangeSummary(r)}</div>
@@ -338,10 +338,10 @@ export default function ProductExchangeTab({
                 {(r.items || []).map((it, i) => (
                   <tr key={i}>
                     <td className="si-center">{i + 1}</td>
-                    <td className="si-strong" title={it.name}>{it.name}{it.code ? <span className="si-muted"> · {it.code}</span> : null}</td>
+                    <td className="si-strong"title={it.name}>{it.name}{it.code ? <span className="si-muted"> · {it.code}</span> : null}</td>
                     <td className="si-num">{it.stockBefore == null ? "—" : fq(it.stockBefore)}</td>
-                    <td className="si-num si-strong" style={{ color: "#b91c1c" }}>{it.direction === "out" ? `−${fq(it.qty)}` : ""}</td>
-                    <td className="si-num si-strong" style={{ color: "#15803d" }}>{it.direction === "in" ? `+${fq(it.qty)}` : ""}</td>
+                    <td className="si-num si-strong"style={{ color: "#b91c1c" }}>{it.direction === "out" ? `−${fq(it.qty)}` : ""}</td>
+                    <td className="si-num si-strong"style={{ color: "#15803d" }}>{it.direction === "in" ? `+${fq(it.qty)}` : ""}</td>
                     <td>{it.unit || ""}</td>
                   </tr>
                 ))}
@@ -349,32 +349,32 @@ export default function ProductExchangeTab({
             </table>
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
-          {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => cancelDoc(r)}>⛔ {L("বাতিল করুন", "Cancel")}</button>}
-          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteDoc(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canCancel(r) && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => cancelDoc(r)}> {L("বাতিল করুন", "Cancel")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => deleteDoc(r)}> {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));
   }
 
-  return shell(L("🔄 পণ্য বদল (Exchange)", "🔄 Product Exchange"), `${liveCount} ${L("টি", "entries")}`, (
+  return shell(L("পণ্য বদল (Exchange)", "Product Exchange"), `${liveCount} ${L("টি", "entries")}`, (
     <>
       <div className="si-toolbar">
-        {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন বদল", "New Exchange")}</button>}
+        {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন বদল", "New Exchange")}</button>}
         <span className="si-toolbar-gap" />
-        <div className="si-search" style={{ minWidth: mobile ? "100%" : 260 }}>
-          <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, নোট বা পণ্য…", "Number, note or item…")} />
-          {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+        <div className="si-search"style={{ minWidth: mobile ? "100%" : 260 }}>
+          <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, নোট বা পণ্য…", "Number, note or item…")} />
+          {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
         </div>
-        <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও", "Show cancelled")}</label>
+        <label className="pm-check"><input type="checkbox"checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও", "Show cancelled")}</label>
       </div>
       <div className="si-main is-all">
         <div className="si-box">
           {filtered.length > 0 && (mobile ? filtered.map((r) => (
-            <button key={r.id} type="button" className="si-mrow" onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
+            <button key={r.id} type="button"className="si-mrow"onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
               <div className="si-mrow-top"><span style={{ color: ACCENT }}>{r.adjustNo}</span>{badge(r)}</div>
               <div className="si-mrow-sub"><span>{fmtDay(r.adjustDate)} · {exchangeReasonLabel(r.reason, bn)}</span><span>{r.createdByName || ""}</span></div>
               <div className="si-mrow-sub"><span>{exchangeSummary(r)}</span></div>
@@ -392,9 +392,9 @@ export default function ProductExchangeTab({
               </tr></thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.id} className="pm-clickable" onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+                  <tr key={r.id} className="pm-clickable"onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
                     <td>{fmtDay(r.adjustDate)}</td>
-                    <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.adjustNo}</td>
+                    <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.adjustNo}</td>
                     <td>{exchangeReasonLabel(r.reason, bn)}</td>
                     <td title={exchangeSummary(r)}>{exchangeSummary(r)}</td>
                     <td title={r.note || ""}>{r.note || ""}</td>

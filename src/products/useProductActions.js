@@ -83,7 +83,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
     const headers = ["ProductId","ProductName","CodeModel","Barcode","EAN","ProductGroup","Company","Category","SubCategory","CommodityCode","BaseUnit","ProductType","ArabicName","SalesVAT","PurchaseVAT","LandingCost","AverageCost","Margin%","MarginAmount","VATExclusive","VATInclusive","VATOnMrp","MRP","OpeningStock","OpeningRate","Warehouse","Rack","DefaultDiscount","ReorderMin","ReorderMax","ReorderQty","WeightBarcode","RateBarcode","MoreBarcodes","UnitPricesJson","CustomUnitsJson","UnitDefinitionsJson","CustomerTypesJson","MultiCustomerRatesEnabled","SpecificationText","SpecShowInSales","PhotoUrl","Description"];
     const body = rows.map(p => [p.id,p.name,p.code,p.barcode,p.ean,p.productGroup,p.company||p.brand,p.category,p.subcategory,p.commodityCode,p.unit,p.productType,p.arabicName,p.salesVat,p.purchaseVat,p.landingCost,p.averageCost,p.marginPerc,p.marginAmount,p.vatExclusive,p.vatInclusive,p.vatOnMrp,p.mrp,p.openingStock,p.openingRate,p.openingWarehouse,p.rackLocation,p.defaultDiscount,p.reorderMin,p.reorderMax,p.reorderQty,p.weightBarcode?"TRUE":"",p.rateBarcode?"TRUE":"",Array.isArray(p.moreBarcodes)?p.moreBarcodes.join(";"):"",Array.isArray(p.unitPrices)?JSON.stringify(p.unitPrices):"",Array.isArray(p.customUnits)?JSON.stringify(p.customUnits):"",Array.isArray(p.unitDefinitions)?JSON.stringify(p.unitDefinitions):"",Array.isArray(p.customerTypes)?JSON.stringify(p.customerTypes):"",p.multiCustomerRatesEnabled?"TRUE":"",p.specificationText,p.specShowInSales?"TRUE":"",p.photoUrl,p.description].map(csvCell).join(","));
     const saved = await saveTextFile(`product-master-${new Date().toISOString().slice(0,10)}.csv`, [headers.map(csvCell).join(","), ...body].join("\n"));
-    if (saved && !silent) toast(lang==="bn"?"✅ Product export হয়েছে":"✅ Products exported");
+    if (saved && !silent) toast(lang==="bn"?"Product export হয়েছে":"Products exported");
     return saved;
   };
 
@@ -91,7 +91,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
   // (src/product-master/modals/ImportModal.jsx). Rows are created one by one so a
   // single bad row is reported instead of aborting the whole file.
   const productEditDeniedMessage = () => lang==="bn"
-    ? "পণ্য যোগ / এডিট / Import করার অনুমতি নেই। Owner-এর কাছে 'পণ্য যোগ / এডিট / Import' permission চান।"
+    ? "পণ্য যোগ / এডিট / Import করার অনুমতি নেই। Owner-এর কাছে 'পণ্য যোগ / এডিট / Import'permission চান।"
     : "You don't have permission to add, edit or import products. Ask the Owner for 'Add / Edit / Import Products'.";
 
   const importProductRecords = async (records) => {
@@ -195,7 +195,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       const openingNum = rawOpening === "" ? 0 : Number(rawOpening.replace(/,/g, ""));
       const openingValid = Number.isFinite(openingNum) && openingNum >= 0;
       if (!openingValid) {
-        summary.errors.push({ row:rowNo, reason:`Opening stock "${rawOpening}" is not valid — imported with 0` });
+        summary.errors.push({ row:rowNo, reason:`Opening stock "${rawOpening}"is not valid — imported with 0` });
       }
 
       const now = new Date().toISOString();
@@ -283,7 +283,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       setProducts(prev => [...createdById.values(), ...prev.filter(p=>!createdById.has(p.id))].sort(compareProductNames));
     }
 
-    toast(lang==="bn"?`✅ ${summary.created} import, ${summary.skipped} skip`:`✅ ${summary.created} imported, ${summary.skipped} skipped`);
+    toast(lang==="bn"?` ${summary.created} import, ${summary.skipped} skip`:` ${summary.created} imported, ${summary.skipped} skipped`);
     if (navigator.onLine) window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product import sync failed", err));
     return summary;
   };
@@ -292,7 +292,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
     try {
       const body = rows.filter(p=>p.weightBarcode||p.rateBarcode).map(p => [p.barcode||p.ean||p.code, p.name, p.vatInclusive||p.mrp||p.vatExclusive||0, p.unit||"Pcs", p.weightBarcode?"WEIGHT":"RATE"].map(csvCell).join(","));
       const saved = await saveTextFile(`weighing-barcode-${new Date().toISOString().slice(0,10)}.csv`, [["Barcode","ProductName","Rate","Unit","Type"].map(csvCell).join(","), ...body].join("\n"));
-      if (saved) toast(lang==="bn"?"✅ Weighing barcode file তৈরি হয়েছে":"✅ Weighing barcode file generated");
+      if (saved) toast(lang==="bn"?"Weighing barcode file তৈরি হয়েছে":"Weighing barcode file generated");
     } catch (e) { hErr(e); }
   };
 
@@ -410,7 +410,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       await savePosted(wanted);
     } catch (err) {
       console.warn("[S4 Stock] opening stock mark failed", product.id, err);
-      toast(lang==="bn"?"⚠️ Opening stock ledger-এ যোগ হয়নি, আবার Save করুন":"⚠️ Opening stock was not posted to the ledger. Save again.", "err");
+      toast(lang==="bn"?"Opening stock ledger-এ যোগ হয়নি, আবার Save করুন":"Opening stock was not posted to the ledger. Save again.", "err");
       return;
     }
     try {
@@ -427,7 +427,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
     } catch (err) {
       console.warn("[S4 Stock] opening stock ledger entry failed", product.id, err);
       await savePosted(posted).catch((revertErr) => console.warn("[S4 Stock] opening stock mark revert failed", product.id, revertErr));
-      toast(lang==="bn"?"⚠️ Opening stock ledger-এ যোগ হয়নি, আবার Save করুন":"⚠️ Opening stock was not posted to the ledger. Save again.", "err");
+      toast(lang==="bn"?"Opening stock ledger-এ যোগ হয়নি, আবার Save করুন":"Opening stock was not posted to the ledger. Save again.", "err");
     }
   };
 
@@ -580,7 +580,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       });
       const ids = new Set([...cloudBlank.map((d) => d.id), ...localBlank.map((r) => r.document_id)]);
       if (!ids.size) {
-        toast(lang==="bn"?"✅ কোনো খালি প্রোডাক্ট নেই":"✅ No blank products found");
+        toast(lang==="bn"?"কোনো খালি প্রোডাক্ট নেই":"No blank products found");
         return;
       }
       const msg = lang==="bn"
@@ -608,7 +608,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       }
       for (const id of ids) await offlinePurgeLocal("products", id);
       setProducts((prev) => prev.filter((p) => !ids.has(p.id)));
-      toast(lang==="bn"?`🗑️ ${ids.size}টা খালি প্রোডাক্ট মুছে ফেলা হয়েছে`:`🗑️ Removed ${ids.size} blank products`);
+      toast(lang==="bn"?` ${ids.size}টা খালি প্রোডাক্ট মুছে ফেলা হয়েছে`:`Removed ${ids.size} blank products`);
     } catch (e) {
       hErr(e);
     }
@@ -635,7 +635,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
     const nextEpoch = (Number(productMaintenanceRef.current.catalogEpoch) || 0) + 1;
 
     const reportProgress = (total) => {
-      toast(lang==="bn"?`🗑️ ${done}/${total}...`:`🗑️ ${done}/${total}...`);
+      toast(lang==="bn"?` ${done}/${total}...`:` ${done}/${total}...`);
     };
 
     const commitBatchWithRetry = async (buildBatch, retries = 4) => {
@@ -691,7 +691,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       setProducts([]);
       setPmEditId(null);
 
-      toast(lang==="bn"?"🗑️ মুছা হচ্ছে...":"🗑️ Deleting...");
+      toast(lang==="bn"?"মুছা হচ্ছে...":"Deleting...");
       reportProgress(rows.length);
 
       for (let i = 0; i < rows.length; i += chunkSize) {
@@ -710,7 +710,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       if (!verifyCloud.empty || localRemaining.length) {
         throw new Error(`Clear verification failed (cloud ${verifyCloud.size}, local ${localRemaining.length}).`);
       }
-      toast("✅ Backup downloaded and Product Master cleared. Select the new import file.");
+      toast("Backup downloaded and Product Master cleared. Select the new import file.");
       return { ok:true, deleted:rows.length, catalogEpoch:nextEpoch };
     } catch (e) {
       hErr(e);
@@ -783,7 +783,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
         if (cloudCount !== localCount) {
           toast(`Replacement saved, but verification differs (local ${localCount}, cloud ${cloudCount}). Sync will retry.`, "err");
         } else {
-          toast(`✅ Product replacement completed. Verified ${localCount} products locally and in Firebase.`);
+          toast(`Product replacement completed. Verified ${localCount} products locally and in Firebase.`);
         }
       }
     } catch (error) {

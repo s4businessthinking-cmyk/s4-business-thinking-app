@@ -33,7 +33,7 @@ export default class S4BootErrorBoundary extends React.Component {
         }}
       >
         <div style={{ maxWidth: 420, margin: "0 auto" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>⚠️</div>
+          <div style={{ fontSize: 40, marginBottom: 12 }}></div>
           <h1 style={{ fontSize: 20, fontWeight: 900, marginBottom: 8, color: "#f87171" }}>
             {bn ? "অ্যাপ লোড হয়নি" : "App failed to load"}
           </h1>
@@ -74,7 +74,7 @@ export default class S4BootErrorBoundary extends React.Component {
               fontFamily: "inherit",
             }}
           >
-            {bn ? "🔄 আবার চালু করুন" : "🔄 Reload"}
+            {bn ? "আবার চালু করুন" : "Reload"}
           </button>
         </div>
       </div>

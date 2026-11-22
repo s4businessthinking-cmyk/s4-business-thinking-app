@@ -341,7 +341,7 @@ html,body{margin:0;padding:0;background:transparent}
       {/* ── PAGE HEADER ── */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap:"wrap", gap:10 }}>
         <div style={s.secTitle}>
-          {lang==="bn" ? "🖨️ UAE ব্যাংক চেক প্রিন্টার" : "🖨️ UAE Bank Cheque Printer"}
+          {lang==="bn" ? "UAE ব্যাংক চেক প্রিন্টার" : "UAE Bank Cheque Printer"}
         </div>
         <div style={{ fontSize:11, color:th.txtMuted, background:th.bgCard, border:`1px solid ${th.border}`, borderRadius:8, padding:"5px 10px" }}>
           {lang==="bn" ? "প্রিন্টারে চেক লিফ রেখে প্রিন্ট করুন" : "Place cheque leaf in printer then print"}
@@ -357,7 +357,7 @@ html,body{margin:0;padding:0;background:transparent}
 
           {/* ── Bank Selector ── */}
           <div style={{ ...s.card, border:`1px solid ${th.border}`, marginBottom:14 }}>
-            <div style={sec}>🏦 {lang==="bn" ? "ব্যাংক বেছে নিন" : "Select Bank"}</div>
+            <div style={sec}> {lang==="bn" ? "ব্যাংক বেছে নিন" : "Select Bank"}</div>
             <div
               onClick={() => setShowBankList(!showBankList)}
               style={{
@@ -415,13 +415,13 @@ html,body{margin:0;padding:0;background:transparent}
 
           {/* ── Cheque Details Form ── */}
           <div style={{ ...s.card, marginBottom:14 }}>
-            <div style={sec}>📝 {lang==="bn" ? "চেকের তথ্য" : "Cheque Details"}</div>
+            <div style={sec}> {lang==="bn" ? "চেকের তথ্য" : "Cheque Details"}</div>
 
             {/* Date */}
             <div style={{ marginBottom:10 }}>
               <span style={lbl}>{lang==="bn" ? "তারিখ" : "Date"}</span>
               <input
-                style={inp} type="date" value={dateVal}
+                style={inp} type="date"value={dateVal}
                 onChange={e => setDateVal(e.target.value)}
               />
             </div>
@@ -461,13 +461,13 @@ html,body{margin:0;padding:0;background:transparent}
               />
               {!wordsManual && amount && (
                 <div style={{ fontSize:10, color:th.txtMuted, marginTop:3 }}>
-                  ✨ {lang==="bn" ? "স্বয়ংক্রিয় — এডিট করা যাবে" : "Auto-filled — editable"}
+                   {lang==="bn" ? "স্বয়ংক্রিয় — এডিট করা যাবে" : "Auto-filled — editable"}
                 </div>
               )}
             </div>
           </div>
 
-          {/* ── 🎯 Position Calibration Card ── */}
+          {/* ──  Position Calibration Card ── */}
           {(() => {
             // Reusable 4-direction control for one field
             const FieldCtrl = ({ icon, label, xVal, yVal, onXL, onXR, onYU, onYD }) => {
@@ -489,7 +489,7 @@ html,body{margin:0;padding:0;background:transparent}
                   <div style={{ display:"flex", gap:10, alignItems:"center", flexWrap:"wrap" }}>
                     {/* Up / Down */}
                     <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                      <span style={{ fontSize:9, color:th.txtMuted, marginRight:2 }}>↕</span>
+                      <span style={{ fontSize:9, color:th.txtMuted, marginRight:2 }}></span>
                       <button style={btnSt} onClick={onYU}>▲</button>
                       <div style={valSt(yVal)}>{yVal>0?"+":""}{yVal}mm</div>
                       <button style={btnSt} onClick={onYD}>▼</button>
@@ -497,7 +497,7 @@ html,body{margin:0;padding:0;background:transparent}
                     <div style={{ width:1, height:24, background:th.border }} />
                     {/* Left / Right */}
                     <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                      <span style={{ fontSize:9, color:th.txtMuted, marginRight:2 }}>↔</span>
+                      <span style={{ fontSize:9, color:th.txtMuted, marginRight:2 }}></span>
                       <button style={btnSt} onClick={onXL}>◄</button>
                       <div style={valSt(xVal)}>{xVal>0?"+":""}{xVal}mm</div>
                       <button style={btnSt} onClick={onXR}>►</button>
@@ -520,7 +520,7 @@ html,body{margin:0;padding:0;background:transparent}
             return (
               <div style={{ ...s.card, marginBottom:14, border:`1.5px solid ${th.accent}44` }}>
                 <div style={{ fontSize:12, fontWeight:700, color:th.accent, textTransform:"uppercase", letterSpacing:0, marginBottom:4 }}>
-                  🎯 {lang==="bn" ? "প্রিন্ট ক্যালিব্রেশন" : "Print Calibration"}
+                   {lang==="bn" ? "প্রিন্ট ক্যালিব্রেশন" : "Print Calibration"}
                 </div>
                 <div style={{ fontSize:10, color:th.txtMuted, marginBottom:10, lineHeight:1.6 }}>
                   {lang==="bn"
@@ -531,7 +531,7 @@ html,body{margin:0;padding:0;background:transparent}
                 {/* Page size */}
                 <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
                   <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6 }}>
-                    📐 {lang==="bn" ? "চেকের সাইজ" : "Cheque Size (mm)"}
+                     {lang==="bn" ? "চেকের সাইজ" : "Cheque Size (mm)"}
                   </div>
                   <div style={{ display:"flex", gap:10, alignItems:"center" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:4, flex:1 }}>
@@ -552,26 +552,26 @@ html,body{margin:0;padding:0;background:transparent}
 
                 {/* Per-field controls */}
                 <FieldCtrl
-                  icon="👤" label={lang==="bn" ? "Pay to — নাম" : "Pay to (Name)"}
+                  icon=""label={lang==="bn" ? "Pay to — নাম" : "Pay to (Name)"}
                   xVal={payeeX} yVal={payeeY}
                   onYU={() => adj(setPayeeY)(-1)} onYD={() => adj(setPayeeY)(+1)}
                   onXL={() => adj(setPayeeX)(-1)} onXR={() => adj(setPayeeX)(+1)}
                 />
                 <FieldCtrl
-                  icon="📝" label={lang==="bn" ? "কথায় পরিমাণ" : "Amount in Words"}
+                  icon=""label={lang==="bn" ? "কথায় পরিমাণ" : "Amount in Words"}
                   xVal={wordsX} yVal={wordsY}
                   onYU={() => adj(setWordsY)(-1)} onYD={() => adj(setWordsY)(+1)}
                   onXL={() => adj(setWordsX)(-1)} onXR={() => adj(setWordsX)(+1)}
                 />
                 <FieldCtrl
-                  icon="💰" label={lang==="bn" ? "পরিমাণ (AED)" : "Amount (AED)"}
+                  icon=""label={lang==="bn" ? "পরিমাণ (AED)" : "Amount (AED)"}
                   xVal={amtX} yVal={amtY}
                   onYU={() => adj(setAmtY)(-1)} onYD={() => adj(setAmtY)(+1)}
                   onXL={() => adj(setAmtX)(-1)} onXR={() => adj(setAmtX)(+1)}
                 />
                 {/* Date: main position */}
                 <FieldCtrl
-                  icon="📅" label={lang==="bn" ? "তারিখ (DD উপর/নিচ/বাম/ডান)" : "Date DD (Up/Down/Left/Right)"}
+                  icon=""label={lang==="bn" ? "তারিখ (DD উপর/নিচ/বাম/ডান)" : "Date DD (Up/Down/Left/Right)"}
                   xVal={dateX} yVal={dateY}
                   onYU={() => adj(setDateY)(-1)} onYD={() => adj(setDateY)(+1)}
                   onXL={() => adj(setDateX)(-1)} onXR={() => adj(setDateX)(+1)}
@@ -580,7 +580,7 @@ html,body{margin:0;padding:0;background:transparent}
                 {/* Date format selector */}
                 <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
                   <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:6 }}>
-                    📅 {lang==="bn" ? "তারিখের ফরম্যাট" : "Date Format"}
+                     {lang==="bn" ? "তারিখের ফরম্যাট" : "Date Format"}
                   </div>
                   <select
                     value={dateMode}
@@ -611,7 +611,7 @@ html,body{margin:0;padding:0;background:transparent}
                 {/* Date gap controls */}
                 <div style={{ background:th.bgInp, borderRadius:8, padding:"8px 10px", marginBottom:10, border:`1px solid ${th.border}` }}>
                   <div style={{ fontSize:10, fontWeight:700, color:th.txtSecondary, marginBottom:8 }}>
-                    📅 {lang==="bn" ? "তারিখের মাঝের gap (MM ও YYYY)" : "Date gap — MM & YYYY spacing"}
+                     {lang==="bn" ? "তারিখের মাঝের gap (MM ও YYYY)" : "Date gap — MM & YYYY spacing"}
                   </div>
                   {/* MM gap */}
                   <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:8 }}>
@@ -656,8 +656,8 @@ html,body{margin:0;padding:0;background:transparent}
                     }}
                   >
                     {saveDone
-                      ? `✅ ${lang==="bn" ? "সেভ হয়েছে!" : "Saved!"}`
-                      : `💾 ${lang==="bn" ? "সেভ করুন" : "Save All"}`}
+                      ? ` ${lang==="bn" ? "সেভ হয়েছে!" : "Saved!"}`
+                      : ` ${lang==="bn" ? "সেভ করুন" : "Save All"}`}
                   </button>
                   <button
                     onClick={resetAll}
@@ -673,7 +673,7 @@ html,body{margin:0;padding:0;background:transparent}
           {linkedVoucher&&(
             <div style={{ marginBottom:10, padding:"9px 12px", borderRadius:10, border:"1px solid #2563eb", background:"rgba(37,99,235,0.08)", display:"flex", alignItems:"center", gap:8 }}>
               <div style={{ flex:1, minWidth:0, fontSize:12, color:th.txtPrimary }}>
-                🔗 <b>{linkedVoucher.paymentNo}</b> · {linkedVoucher.vendorName}
+                 <b>{linkedVoucher.paymentNo}</b> · {linkedVoucher.vendorName}
                 {(linkedVoucher.chequeStatus || linkedVoucher.status) && (
                   <span style={{ marginLeft:6, fontSize:10, fontWeight:700, color:linkedVoucher.chequeStatus==="bounced"?"#b91c1c":"#64748b" }}>
                     · {linkedVoucher.chequeStatus || linkedVoucher.status}
@@ -691,7 +691,7 @@ html,body{margin:0;padding:0;background:transparent}
             onClick={printCheque}
             style={{ ...s.sendBtn, marginBottom:10, fontSize:15, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
           >
-            🖨️ {lang==="bn" ? "চেক প্রিন্ট করুন" : "Print Cheque"}
+             {lang==="bn" ? "চেক প্রিন্ট করুন" : "Print Cheque"}
           </button>
           <button
             onClick={() => {
@@ -704,17 +704,17 @@ html,body{margin:0;padding:0;background:transparent}
             }}
             style={{ ...s.stBtn, width:"100%", padding:"11px", textAlign:"center", fontSize:13 }}
           >
-            🗑️ {lang==="bn" ? "ক্লিয়ার করুন" : "Clear All"}
+             {lang==="bn" ? "ক্লিয়ার করুন" : "Clear All"}
           </button>
 
           {/* ── Tips card ── */}
           <div style={{ marginTop:14, padding:"10px 12px", background:th.bgCard, borderRadius:8, border:`1px solid ${th.border}`, fontSize:11, color:th.txtMuted, lineHeight:1.8 }}>
-            💡 <strong style={{ color:th.txtSecondary }}>{lang==="bn" ? "টিপস:" : "Tips:"}</strong>
+             <strong style={{ color:th.txtSecondary }}>{lang==="bn" ? "টিপস:" : "Tips:"}</strong>
             {lang==="bn"
-              ? " প্রিন্টারে Paper Size: Custom 210×90mm, Scale: 100%, Margins: None সেট করুন।"
-              : " Set printer: Paper Size=Custom 210×90mm, Scale=100%, Margins=None."}
+              ? "প্রিন্টারে Paper Size: Custom 210×90mm, Scale: 100%, Margins: None সেট করুন।"
+              : "Set printer: Paper Size=Custom 210×90mm, Scale=100%, Margins=None."}
             <div style={{ marginTop:6, padding:"6px 8px", background:"#fef3c7", borderRadius:6, border:"1px solid #fcd34d", color:"#92400e", fontWeight:700 }}>
-              ⚠️ {lang==="bn" ? "Chrome → More settings → Paper size → Custom → 210mm × 90mm" : "Chrome → More settings → Paper size → Custom → 210 × 90 mm"}
+               {lang==="bn" ? "Chrome → More settings → Paper size → Custom → 210mm × 90mm" : "Chrome → More settings → Paper size → Custom → 210 × 90 mm"}
             </div>
           </div>
         </div>
@@ -926,12 +926,12 @@ html,body{margin:0;padding:0;background:transparent}
           {/* Info box */}
           <div style={{ ...s.card, fontSize:12, color:th.txtMuted, lineHeight:1.9 }}>
             <div style={{ fontSize:11, fontWeight:700, color:th.txtSecondary, marginBottom:6, textTransform:"uppercase", letterSpacing:0 }}>
-              ℹ️ {lang==="bn" ? "প্রিন্ট নির্দেশনা" : "Print Instructions"}
+               {lang==="bn" ? "প্রিন্ট নির্দেশনা" : "Print Instructions"}
             </div>
-            <div>📐 {lang==="bn" ? "UAE চেক সাইজ: 210mm × 90mm" : "UAE standard cheque: 210mm × 90mm"}</div>
-            <div>🖨️ {lang==="bn" ? "প্রিন্টার সেটিং: Landscape, Margins → None, Scale → 100%" : "Printer: Landscape · Margins: None · Scale: 100%"}</div>
-            <div>📋 {lang==="bn" ? "প্রতিটি ব্যাংকের চেকে field position একটু আলাদা হতে পারে" : "Field positions may vary slightly per bank"}</div>
-            <div>✅ {lang==="bn" ? "আসল চেকে দেওয়ার আগে সাদা কাগজে মিলিয়ে নিন" : "Verify alignment on plain paper before printing on real cheque"}</div>
+            <div> {lang==="bn" ? "UAE চেক সাইজ: 210mm × 90mm" : "UAE standard cheque: 210mm × 90mm"}</div>
+            <div> {lang==="bn" ? "প্রিন্টার সেটিং: Landscape, Margins → None, Scale → 100%" : "Printer: Landscape · Margins: None · Scale: 100%"}</div>
+            <div> {lang==="bn" ? "প্রতিটি ব্যাংকের চেকে field position একটু আলাদা হতে পারে" : "Field positions may vary slightly per bank"}</div>
+            <div> {lang==="bn" ? "আসল চেকে দেওয়ার আগে সাদা কাগজে মিলিয়ে নিন" : "Verify alignment on plain paper before printing on real cheque"}</div>
           </div>
         </div>
       </div>
@@ -939,9 +939,9 @@ html,body{margin:0;padding:0;background:transparent}
       {/* ── Vendor cheque folders ── */}
       {!foldersVisible&&onUnlockFolders&&(
         <button onClick={onUnlockFolders} style={{ ...s.card, marginTop:16, width:"100%", display:"flex", alignItems:"center", gap:10, cursor:"pointer", fontFamily:"inherit", textAlign:"left", border:`1px solid ${th.border}` }}>
-          <span style={{ fontSize:24 }}>🔒</span>
+          <span style={{ fontSize:24 }}></span>
           <span style={{ flex:1, fontSize:13, fontWeight:800, color:th.txtPrimary }}>{lang==="bn"?"ভেন্ডর চেক ফোল্ডার লক করা — দেখতে পিন দিন":"Vendor cheque folders are locked — enter PIN to view"}</span>
-          <span style={{ fontSize:13, fontWeight:800, color:"#2563eb" }}>🔓</span>
+          <span style={{ fontSize:13, fontWeight:800, color:"#2563eb" }}></span>
         </button>
       )}
       {foldersVisible&&(()=>{
@@ -963,18 +963,18 @@ html,body{margin:0;padding:0;background:transparent}
             <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:10 }}>
               <div style={{ fontSize:13, fontWeight:800, color:th.accent, flex:1 }}>
                 {open
-                  ? <><button onClick={()=>setOpenFolder(null)} style={{ ...btn("transparent", th.accent), padding:"0 8px 0 0" }}>←</button>📂 {open.name}</>
-                  : <>📁 {bn?"ভেন্ডর চেক ফোল্ডার":"Vendor cheque folders"} <span style={{ fontSize:11, color:th.txtMuted, fontWeight:600 }}>({vendorCheques.length})</span></>}
+                  ? <><button onClick={()=>setOpenFolder(null)} style={{ ...btn("transparent", th.accent), padding:"0 8px 0 0" }}>←</button> {open.name}</>
+                  : <> {bn?"ভেন্ডর চেক ফোল্ডার":"Vendor cheque folders"} <span style={{ fontSize:11, color:th.txtMuted, fontWeight:600 }}>({vendorCheques.length})</span></>}
               </div>
               {!open&&<input value={folderSearch} onChange={e=>setFolderSearch(e.target.value)} placeholder={bn?"ভেন্ডর খুঁজুন…":"Search vendor…"} style={{ ...inp, width:isDesktop?220:"100%", padding:"7px 10px", fontSize:13 }} />}
-              {onLockFolders&&<button onClick={()=>{ setOpenFolder(null); onLockFolders(); }} style={btn("transparent", th.txtSecondary, `1px solid ${th.borderMid}`)}>🔒 {bn?"লক":"Lock"}</button>}
+              {onLockFolders&&<button onClick={()=>{ setOpenFolder(null); onLockFolders(); }} style={btn("transparent", th.txtSecondary, `1px solid ${th.borderMid}`)}> {bn?"লক":"Lock"}</button>}
             </div>
             {!open&&(list.length===0
-              ? <div style={{ fontSize:12, color:th.txtMuted, padding:"12px 0" }}>{bn?"এখনো কোনো ভেন্ডর ভাউচারের চেক প্রিন্ট হয়নি। পারচেজ → পেমেন্ট → 🖨️ ভেন্ডর চেক থেকে শুরু করুন।":"No vendor voucher cheques printed yet. Start from Purchase → Payments → 🖨️ Vendor Cheque."}</div>
+              ? <div style={{ fontSize:12, color:th.txtMuted, padding:"12px 0" }}>{bn?"এখনো কোনো ভেন্ডর ভাউচারের চেক প্রিন্ট হয়নি। পারচেজ → পেমেন্ট →  ভেন্ডর চেক থেকে শুরু করুন।":"No vendor voucher cheques printed yet. Start from Purchase → Payments →  Vendor Cheque."}</div>
               : <div style={{ display:"grid", gridTemplateColumns:isDesktop?"repeat(auto-fill,minmax(220px,1fr))":"1fr", gap:8 }}>
                   {list.map(f=>(
                     <button key={f.key} onClick={()=>setOpenFolder(f.key)} style={{ textAlign:"left", padding:"10px 12px", borderRadius:10, border:`1px solid ${th.border}`, background:th.bgInp, cursor:"pointer", fontFamily:"inherit" }}>
-                      <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>📁 {f.name}</div>
+                      <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}> {f.name}</div>
                       <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>{f.items.length} {bn?"টি চেক":"cheques"} · {cur} {f.total.toFixed(2)}</div>
                     </button>
                   ))}
@@ -984,19 +984,19 @@ html,body{margin:0;padding:0;background:transparent}
                 {open.items.map(v=>(
                   <div key={v.id} style={{ padding:"10px 12px", borderRadius:10, border:`1px solid ${th.border}`, background:th.bgInp }}>
                     <div style={{ display:"flex", justifyContent:"space-between", gap:8, flexWrap:"wrap" }}>
-                      <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>{v.paymentNo} · 📃 {v.chequeNo||"—"}</div>
+                      <div style={{ fontSize:13, fontWeight:800, color:th.txtPrimary }}>{v.paymentNo} ·  {v.chequeNo||"—"}</div>
                       <div style={{ fontSize:14, fontWeight:900, color:"#22c55e" }}>{cur} {chequeAmountOfVoucher(v).toFixed(2)}</div>
                     </div>
                     <div style={{ fontSize:11, color:th.txtMuted, marginTop:2 }}>
-                      🏦 {v.chequeBank||"—"} · 📅 {v.chequeDate||"—"} · 🖨️ {String(v.chequePrintedAt).slice(0,10)}{v.chequePrintCount>1?` ×${v.chequePrintCount}`:""}
-                      {v.handover?.receiverName?` · 🪪 ${v.handover.receiverName}`:""}
+                       {v.chequeBank||"—"} ·  {v.chequeDate||"—"} ·  {String(v.chequePrintedAt).slice(0,10)}{v.chequePrintCount>1?` ×${v.chequePrintCount}`:""}
+                      {v.handover?.receiverName?` ·  ${v.handover.receiverName}`:""}
                     </div>
                     <div style={{ display:"flex", gap:6, flexWrap:"wrap", marginTop:8 }}>
-                      <button onClick={()=>{ loadVoucherIntoForm(v); window.scrollTo?.({ top:0, behavior:"smooth" }); }} style={btn("linear-gradient(135deg,#f97316,#ea580c)", "#fff")}>🖨️ {bn?"আবার প্রিন্ট":"Reprint"}</button>
-                      <button onClick={()=>printWithSettings(chequeVoucherHtml(v, shop, chequeDocOpts(v)), { lang })} style={btn("rgba(59,130,246,0.08)", "#3b82f6", "1px solid #3b82f6")}>📄 {bn?"ভাউচার":"Voucher"}</button>
+                      <button onClick={()=>{ loadVoucherIntoForm(v); window.scrollTo?.({ top:0, behavior:"smooth" }); }} style={btn("linear-gradient(135deg,#f97316,#ea580c)", "#fff")}> {bn?"আবার প্রিন্ট":"Reprint"}</button>
+                      <button onClick={()=>printWithSettings(chequeVoucherHtml(v, shop, chequeDocOpts(v)), { lang })} style={btn("rgba(59,130,246,0.08)", "#3b82f6", "1px solid #3b82f6")}> {bn?"ভাউচার":"Voucher"}</button>
                       {v.handover
-                        ? <button onClick={async ()=>printWithSettings(chequeHandoverHtml(v, shop, await loadHandoverDocs(v), chequeDocOpts(v)), { lang })} style={btn("rgba(34,197,94,0.08)", "#22c55e", "1px solid #22c55e")}>🪪 {bn?"হস্তান্তর প্রিন্ট":"Print Handover"}</button>
-                        : onOpenHandover&&<button onClick={()=>onOpenHandover(v)} style={btn("rgba(34,197,94,0.08)", "#22c55e", "1px solid #22c55e")}>🪪 {bn?"হস্তান্তর ডকুমেন্ট":"Handover"}</button>}
+                        ? <button onClick={async ()=>printWithSettings(chequeHandoverHtml(v, shop, await loadHandoverDocs(v), chequeDocOpts(v)), { lang })} style={btn("rgba(34,197,94,0.08)", "#22c55e", "1px solid #22c55e")}> {bn?"হস্তান্তর প্রিন্ট":"Print Handover"}</button>
+                        : onOpenHandover&&<button onClick={()=>onOpenHandover(v)} style={btn("rgba(34,197,94,0.08)", "#22c55e", "1px solid #22c55e")}> {bn?"হস্তান্তর ডকুমেন্ট":"Handover"}</button>}
                     </div>
                   </div>
                 ))}

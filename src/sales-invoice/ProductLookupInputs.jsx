@@ -21,11 +21,13 @@ function rank(text, q, key) {
 const specRank = (p, q, key) => (q.length >= 2 ? rank(specValues(p), q, key) : 0);
 
 function useListKeys(items, open, setOpen) {
-  const [active, setActive] = useState(0);
+  // -1 = nothing chosen yet; never auto-highlight the first row (that caused wrong product entry).
+  const [active, setActive] = useState(-1);
+  const navigatedRef = useRef(false);
   const listRef = useRef(null);
-  useEffect(() => { setActive(0); }, [items]);
+  useEffect(() => { setActive(-1); navigatedRef.current = false; }, [items]);
   useEffect(() => {
-    if (open) listRef.current?.children[active]?.scrollIntoView({ block: "nearest" });
+    if (open && active >= 0) listRef.current?.children[active]?.scrollIntoView({ block: "nearest" });
   }, [active, open]);
   const move = (e) => {
     const step = { ArrowDown: 1, ArrowUp: -1, PageDown: VISIBLE_ROWS, PageUp: -VISIBLE_ROWS }[e.key];
@@ -33,10 +35,14 @@ function useListKeys(items, open, setOpen) {
     e.preventDefault();
     if (!open) { setOpen(true); return true; }
     if (!items.length) return true;
-    setActive((i) => Math.min(Math.max(i + step, 0), items.length - 1));
+    navigatedRef.current = true;
+    setActive((i) => {
+      if (i < 0) return step > 0 ? 0 : items.length - 1;
+      return Math.min(Math.max(i + step, 0), items.length - 1);
+    });
     return true;
   };
-  return { active, setActive, listRef, move };
+  return { active, setActive, listRef, move, navigatedRef };
 }
 
 function DropList({ children, footer, listRef, width }) {
@@ -72,7 +78,8 @@ export function ProductNameLookup({ products, value, onChange, onPickName, input
   const q = normName(value);
   const items = useMemo(() => {
     if (!open) return [];
-    if (!q) return groups.slice(0, MAX_ROWS);
+    // Require typing — empty click must not dump the full catalog with row 0 pre-armed.
+    if (!q) return [];
     const key = nsq(q);
     return groups
       .map((g) => ({ g, s: rank(g.name, q, key) || (g.items.some((p) => specRank(p, q, key)) ? 0.5 : 0) }))
@@ -82,7 +89,7 @@ export function ProductNameLookup({ products, value, onChange, onPickName, input
       .map((r) => r.g);
   }, [groups, q, open]);
 
-  const { active, setActive, listRef, move } = useListKeys(items, open, setOpen);
+  const { active, setActive, listRef, move, navigatedRef } = useListKeys(items, open, setOpen);
 
   useEffect(() => { if (openSignal) setOpen(true); }, [openSignal]);
   useEffect(() => {
@@ -91,27 +98,38 @@ export function ProductNameLookup({ products, value, onChange, onPickName, input
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  const pick = (g) => { setOpen(false); onPickName(g.name, g.items); };
+  const pick = (g) => { setOpen(false); navigatedRef.current = false; onPickName(g.name, g.items); };
+  const exactGroup = q ? groups.find((g) => normName(g.name) === q) : null;
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       <input ref={inputRef} style={style} value={value} autoComplete="off"
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => { if (q) setOpen(true); }}
         onKeyDown={(e) => {
           if (move(e)) return;
           if (e.key === "Enter") {
             e.preventDefault();
-            if (open && items.length) pick(items[active] || items[0]);
-            else onEnterClosed?.();
+            // Only commit when the user arrowed to a row, or typed an exact product name.
+            if (open && items.length && navigatedRef.current && active >= 0) {
+              pick(items[active]);
+              return;
+            }
+            if (exactGroup) {
+              pick(exactGroup);
+              return;
+            }
+            setOpen(false);
+            onEnterClosed?.();
           } else if (e.key === "Escape") setOpen(false);
         }} />
-      {open && (
-        <DropList listRef={listRef} footer="Double click or Press Enter to select" width="calc(100% + 0px)">
+      {open && q && (
+        <DropList listRef={listRef} footer="Arrow + Enter, or double-click to select" width="calc(100% + 0px)">
           {items.length === 0
             ? <div style={{ ...rowStyle(false), color: "#64748b", textTransform: "none" }}>No matching product</div>
             : items.map((g, i) => (
               <div key={g.name} style={rowStyle(i === active)} title={g.items.length > 1 ? `${g.items.length} codes` : undefined}
-                onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
+                onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => { navigatedRef.current = true; setActive(i); })}
                 onDoubleClick={() => pick(g)}>
                 {g.name}{g.items.length > 1 ? <span style={{ opacity: 0.6, fontWeight: 400 }}> ({g.items.length})</span> : null}
               </div>
@@ -150,7 +168,7 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
       .map((r) => r.p);
   }, [products, choices, q, open]);
 
-  const { active, setActive, listRef, move } = useListKeys(items, open, setOpen);
+  const { active, setActive, listRef, move, navigatedRef } = useListKeys(items, open, setOpen);
 
   useEffect(() => { if (openSignal) setOpen(true); }, [openSignal]);
   useEffect(() => {
@@ -159,8 +177,8 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
     return () => document.removeEventListener("mousedown", onDown);
   }, []);
 
-  const pick = (p) => { setOpen(false); setBrowsing(false); onPick(p); };
-  const highlighted = items[active];
+  const pick = (p) => { setOpen(false); setBrowsing(false); navigatedRef.current = false; onPick(p); };
+  const highlighted = active >= 0 ? items[active] : null;
   const listShown = open && items.length > 0;
   // Like the old ERP: while arrowing through the list the box shows the full line; once picked it shows the product's full code line.
   const shown = listShown && browsing && highlighted
@@ -171,25 +189,25 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
     <div ref={wrapRef} style={{ position: "relative" }}>
       <input ref={inputRef} style={style} value={shown} placeholder={placeholder} autoComplete="off" title={shown}
         onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setBrowsing(false); }}
-        onChange={(e) => { setBrowsing(false); onChange(e.target.value); setOpen(true); }}
+        onChange={(e) => { setBrowsing(false); navigatedRef.current = false; onChange(e.target.value); setOpen(true); }}
         onKeyDown={(e) => {
           if (move(e)) { setBrowsing(true); return; }
           if (e.key === "Enter") {
             e.preventDefault();
-            if (listShown && browsing) { pick(highlighted || items[0]); return; }
+            // Arrow-navigated choice only — never the top fuzzy hit from a typo.
+            if (listShown && browsing && navigatedRef.current && highlighted) { pick(highlighted); return; }
             if (selectedProduct && value === (selectedProduct.code || selectedProduct.barcode || "")) { setOpen(false); onEnterEmpty?.(); return; }
             if (q && onExactLookup()) { setOpen(false); return; }
-            if (listShown) pick(highlighted || items[0]);
-            else if (q) onNotFound?.();
+            if (q) onNotFound?.();
             else onEnterEmpty?.();
           } else if (e.key === "Escape") { setOpen(false); setBrowsing(false); }
         }} />
       {listShown && (
         <DropList listRef={listRef} width="max(100%, 470px)"
-          footer={<span style={{ color: "#b91c1c", textTransform: "uppercase" }}>{highlighted?.name || ""}</span>}>
+          footer={<span style={{ color: "#b91c1c", textTransform: "uppercase" }}>{highlighted?.name || "Arrow + Enter or double-click"}</span>}>
           {items.map((p, i) => (
             <div key={p.id} style={rowStyle(i === active)} title={codeLine(p)}
-              onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
+              onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => { navigatedRef.current = true; setActive(i); setBrowsing(true); })}
               onDoubleClick={() => pick(p)}>
               {codeLine(p)}
             </div>

@@ -38,7 +38,7 @@ export function PartySelect({ parties, value, onPick, disabled, inputRef, placeh
             else if (e.key === "Enter") { e.preventDefault(); if (open && list[active]) pick(list[active]); else onEnter?.(); }
             else if (e.key === "Escape") setOpen(false);
           }} />
-        <button type="button" disabled={disabled} tabIndex={-1} onClick={() => { setOpen((o) => !o); inputRef?.current?.focus(); }}
+        <button type="button"disabled={disabled} tabIndex={-1} onClick={() => { setOpen((o) => !o); inputRef?.current?.focus(); }}
           style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11 })}>▼</button>
       </div>
       {open && !disabled && (
@@ -83,7 +83,7 @@ export function InvoiceSelect({ invoices, value, onPick, disabled, inputRef, onE
   return (
     <div ref={wrapRef} style={{ position: "relative", minWidth: 0 }}>
       <div style={{ display: "flex" }}>
-        <input ref={inputRef} disabled={disabled} style={inp({ fontWeight: 700 })} placeholder={disabled ? "" : "🔍"}
+        <input ref={inputRef} disabled={disabled} style={inp({ fontWeight: 700 })} placeholder={disabled ? "" : ""}
           value={open ? q : (value ? labelOf(value) : "")} autoComplete="off"
           onFocus={() => { setQ(""); setOpen(true); }}
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
@@ -93,7 +93,7 @@ export function InvoiceSelect({ invoices, value, onPick, disabled, inputRef, onE
             else if (e.key === "Enter") { e.preventDefault(); if (open && list[active]) pick(list[active]); else onEnter?.(); }
             else if (e.key === "Escape") setOpen(false);
           }} />
-        <button type="button" disabled={disabled} tabIndex={-1} onClick={() => { setOpen((o) => !o); inputRef?.current?.focus(); }}
+        <button type="button"disabled={disabled} tabIndex={-1} onClick={() => { setOpen((o) => !o); inputRef?.current?.focus(); }}
           style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11 })}>▼</button>
       </div>
       {open && !disabled && (
@@ -151,6 +151,7 @@ export default function AgainstInvoiceVoucherWindow({
   const [summaryPrint, setSummaryPrint] = useState(false);
   const [viewingId, setViewingId] = useState(initialViewId);
   const [viewSnapshot, setViewSnapshot] = useState(null);
+  const [editing, setEditing] = useState(null); // active voucher being edited in-place (not cancelled)
   const [showFind, setShowFind] = useState(false);
   const win = useWindowState({ maximized: true });
   useEscapeKey(() => onClose?.(), { enabled: !win.min && !showFind, level: 2 });
@@ -169,9 +170,8 @@ export default function AgainstInvoiceVoucherWindow({
 
   const viewing = viewingId ? (vouchers.find((v) => v.id === viewingId) || viewSnapshot) : null;
 
-  // Refills the new-entry form from a cancelled voucher's full data (party, method, cheque/ref
-  // details, note and every allocation row) — used for both the initial `prefill` prop and the
-  // "Cancel & Edit" action on a voucher already being viewed.
+  // Refills the entry form from a voucher snapshot (party, method, cheque/ref, note, allocations)
+  // — used for `prefill`and for in-place Edit without cancelling first.
   const applyVoucherSnapshot = (snap) => {
     const partyId = snap.raw?.vendorId || snap.raw?.customerId || snap.partyId || null;
     const p = parties.find((x) => (partyId && x.id === partyId) || (!partyId && x.name === snap.partyName))
@@ -219,7 +219,31 @@ export default function AgainstInvoiceVoucherWindow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [party?.id, party?.name, isReceipt]);
 
-  const openInvoices = useMemo(() => (party ? getOpenInvoices(party) || [] : []), [party, getOpenInvoices, prepKey]);
+  const openInvoices = useMemo(() => {
+    const base = party ? (getOpenInvoices(party) || []) : [];
+    if (!editing) return base;
+    // While editing, put this voucher's allocated amounts back on each bill so the user can keep
+    // or reshuffle the same lines without cancelling first.
+    const byId = new Map(base.map((inv) => [inv.id, { ...inv }]));
+    for (const a of editing.allocations || []) {
+      const credit = n2(a.amount);
+      if (!a.invoiceId || credit <= 0) continue;
+      if (byId.has(a.invoiceId)) {
+        const inv = byId.get(a.invoiceId);
+        byId.set(a.invoiceId, { ...inv, balanceDue: n2(inv.balanceDue) + credit });
+      } else {
+        byId.set(a.invoiceId, {
+          id: a.invoiceId,
+          invoiceNo: a.invoiceNo,
+          supplierInvoiceNo: a.supplierInvoiceNo || "",
+          invoiceDate: a.invoiceDate || "",
+          grandTotal: n2(a.invoiceAmount) || credit,
+          balanceDue: credit,
+        });
+      }
+    }
+    return [...byId.values()];
+  }, [party, getOpenInvoices, prepKey, editing]);
   const pendingTotal = openInvoices.reduce((a, i) => a + n2(i.balanceDue), 0);
   const choosable = openInvoices.filter((i) => !rows.some((r) => r.invoiceId === i.id));
   const selInv = openInvoices.find((i) => i.id === selInvId) || null;
@@ -227,13 +251,25 @@ export default function AgainstInvoiceVoucherWindow({
   const total = rows.reduce((a, r) => a + n2(r.amount), 0);
 
   const resetNew = () => {
-    setViewingId(null); setViewSnapshot(null);
+    setViewingId(null); setViewSnapshot(null); setEditing(null);
     setDate(todayIso()); setParty(null); setCollector(""); setRows([]); setSelInvId(""); setCurAmt("");
     setMethod("cash"); setChequeNo(""); setChequeDate(todayIso()); setChequeBank(""); setNote("");
     setChequeReceivedBy(""); setVendorReceiptNo(""); setChequeMonth("");
     setRefNo(""); setRefBank(""); setRefDate(todayIso());
     setDiscount(""); setSummaryPrint(false);
     setTimeout(() => partyRef.current?.focus(), 60);
+  };
+
+  const startEdit = () => {
+    if (!viewing || viewing.status === "cancelled") return;
+    if (viewing.method === "cheque" && viewing.chequeStatus === "cleared") {
+      alert(bn ? "ক্লিয়ার হওয়া চেক এডিট করা যাবে না — আগে বাতিল করুন।" : "A cleared cheque cannot be edited — cancel it first.");
+      return;
+    }
+    applyVoucherSnapshot(viewing);
+    setEditing(viewing);
+    setViewingId(null);
+    setViewSnapshot(null);
   };
 
   const pickParty = (p) => {
@@ -267,21 +303,22 @@ export default function AgainstInvoiceVoucherWindow({
     if (n2(discount) > total + 0.001) { alert(bn ? "ছাড় মোট টাকার চেয়ে বেশি হতে পারবে না" : "Discount cannot exceed the total"); return; }
     const sm = salesmen.find((m) => m.id === collector);
     const created = await onSave({
+      editId: editing?.id || null,
       partyId: party.id || null, partyName: party.name, partyMobile: party.mobile || "",
       date, method, note: note.trim(),
       chequeNo: method === "cheque" ? chequeNo.trim() : "", chequeBank: method === "cheque" ? chequeBank : "", chequeDate: method === "cheque" ? chequeDate : "",
       refNo: hasRef ? refNo.trim() : "", refBank: hasRef ? refBank : "", refDate: hasRef ? refDate : "",
-      ...(n2(discount) > 0 ? { discountAmount: n2(discount) } : {}),
+      ...(n2(discount) > 0 ? { discountAmount: n2(discount) } : { discountAmount: 0 }),
       ...(isReceipt ? {} : { chequeReceivedBy: method === "cheque" ? chequeReceivedBy.trim() : "", vendorReceiptNo: vendorReceiptNo.trim(), chequeMonth }),
       collectedById: isReceipt ? (collector || "") : "", collectedByName: isReceipt ? (sm?.name || "") : "",
-      allocations: rows.map((r) => ({ invoiceId: r.invoiceId, invoiceNo: r.invoiceNo, ...(isReceipt ? {} : { supplierInvoiceNo: r.supplierInvoiceNo || "" }), invoiceDate: r.invoiceDate, amount: parseFloat(f2(r.amount)) })),
+      allocations: rows.map((r) => ({ invoiceId: r.invoiceId, invoiceNo: r.invoiceNo, ...(isReceipt ? {} : { supplierInvoiceNo: r.supplierInvoiceNo || "" }), invoiceDate: r.invoiceDate, invoiceAmount: r.invoiceAmount, amount: parseFloat(f2(r.amount)) })),
     });
     if (!created) return;
     if (printDetails) onPrint?.(created, { summaryOnly: summaryPrint });
     resetNew();
   };
 
-  const openVoucher = (v) => { setShowFind(false); setViewSnapshot(v); setViewingId(v.id); };
+  const openVoucher = (v) => { setShowFind(false); setEditing(null); setViewSnapshot(v); setViewingId(v.id); };
 
   const ro = !!viewing;
   const shownParty = ro ? { name: viewing.partyName } : party;
@@ -301,7 +338,7 @@ export default function AgainstInvoiceVoucherWindow({
   return (
     <>
     {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} slot={1} />}
-    <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
+    <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
       <div style={{ width: "100%", maxWidth: win.max ? "none" : 720, height: win.max ? "100%" : undefined, maxHeight: "100%", overflow: "hidden", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
         <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none" }}>
           <span>{winTitle}</span>
@@ -313,18 +350,19 @@ export default function AgainstInvoiceVoucherWindow({
           <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 140px", gap: 8, alignItems: "stretch" }}>
             <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff", textAlign: "center" }}>
               <div style={{ background: C.head, color: "#fff", fontSize: 12, fontWeight: 800, padding: "1px 0" }}>Voucher No.</div>
-              <div style={{ fontSize: 15, fontWeight: 900, padding: "3px 0", color: "#111" }}>{ro ? viewing.no : voucherNo}</div>
+              <div style={{ fontSize: 15, fontWeight: 900, padding: "3px 0", color: "#111" }}>{ro ? viewing.no : (editing?.no || voucherNo)}</div>
             </div>
             <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: 6, color: "#111" }}>{isReceipt ? "RECEIPTS" : "PAYMENTS"}</span>
               {cancelled && <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: C.red, color: "#fff" }}>CANCELLED</span>}
+              {!ro && editing && <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: "#b45309", color: "#fff" }}>{bn ? "এডিট" : "EDITING"}</span>}
               {ro && !cancelled && viewing.method === "cheque" && viewing.chequeStatus && (
                 <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: viewing.chequeStatus === "cleared" ? C.green : viewing.chequeStatus === "bounced" ? C.red : "#b45309", color: "#fff", textTransform: "uppercase" }}>{viewing.chequeStatus}</span>
               )}
             </div>
             <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
               <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12, fontWeight: 800, padding: "1px 0" }}>Date</div>
-              <input type="date" disabled={ro} style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={ro ? viewing.date : date} onChange={(e) => setDate(e.target.value)} />
+              <input type="date"disabled={ro} style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={ro ? viewing.date : date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
 
@@ -375,12 +413,12 @@ export default function AgainstInvoiceVoucherWindow({
               {box("Balance", selInv ? f2(selInv.balanceDue) : "", { right: true })}
               <div>
                 <div style={lbl}>{isReceipt ? "Current Receipt" : "Current Payment"}</div>
-                <input ref={amtRef} style={inp({ textAlign: "right", fontWeight: 800 })} inputMode="decimal" value={curAmt} disabled={!selInv}
+                <input ref={amtRef} style={inp({ textAlign: "right", fontWeight: 800 })} inputMode="decimal"value={curAmt} disabled={!selInv}
                   onChange={(e) => setCurAmt(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRow(); } }} />
               </div>
               {narrow && (
-                <button type="button" onClick={addRow} disabled={!selInv} style={{ alignSelf: "stretch", minHeight: 34, border: `1px solid ${C.border}`, borderRadius: 6, background: selInv ? "#2563eb" : "#e2e8f0", color: selInv ? "#fff" : "#94a3b8", fontWeight: 800, fontSize: 13 }}>
+                <button type="button"onClick={addRow} disabled={!selInv} style={{ alignSelf: "stretch", minHeight: 34, border: `1px solid ${C.border}`, borderRadius: 6, background: selInv ? "#2563eb" : "#e2e8f0", color: selInv ? "#fff" : "#94a3b8", fontWeight: 800, fontSize: 13 }}>
                   + {bn ? "যোগ" : "Add"}
                 </button>
               )}
@@ -415,7 +453,7 @@ export default function AgainstInvoiceVoucherWindow({
                     <td style={{ ...td, fontWeight: 800 }}>{f2(r.amount)}</td>
                     {!ro && (
                       <td style={{ ...td, textAlign: "center" }}>
-                        <button type="button" onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
+                        <button type="button"onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
                           style={{ background: "none", border: "none", color: C.red, fontWeight: 900, cursor: "pointer", fontSize: 14 }}>×</button>
                       </td>
                     )}
@@ -428,7 +466,7 @@ export default function AgainstInvoiceVoucherWindow({
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
               <span style={{ ...lbl, color: "#64748b", fontWeight: 600 }}>Discount</span>
               <input style={inp({ width: 110, flex: "0 0 110px", textAlign: "right", ...(ro ? { background: "#f4f7fc" } : {}) })} readOnly={ro} disabled={ro}
-                inputMode="decimal" placeholder="0.00"
+                inputMode="decimal"placeholder="0.00"
                 value={ro ? f2(viewing.discountAmount || 0) : discount}
                 onChange={(e) => setDiscount(e.target.value)} />
             </div>
@@ -451,7 +489,7 @@ export default function AgainstInvoiceVoucherWindow({
               <div style={narrow ? { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 10px" } : undefined}>
                 {METHODS.map(([m, label]) => (
                   <label key={m} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700, marginTop: 2, cursor: ro ? "default" : "pointer" }}>
-                    <input type="radio" disabled={ro} checked={shownMethod === m} onChange={() => setMethod(m)} />
+                    <input type="radio"disabled={ro} checked={shownMethod === m} onChange={() => setMethod(m)} />
                     {label}
                   </label>
                 ))}
@@ -467,7 +505,7 @@ export default function AgainstInvoiceVoucherWindow({
                   </div>
                   <div>
                     <div style={lbl}>{shownMethod === "card" ? "Swipe Date" : "Transfer Date"}</div>
-                    <input type="date" style={inp()} disabled={ro} value={ro ? (viewing.refDate || "") : refDate} onChange={(e) => setRefDate(e.target.value)} />
+                    <input type="date"style={inp()} disabled={ro} value={ro ? (viewing.refDate || "") : refDate} onChange={(e) => setRefDate(e.target.value)} />
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
@@ -492,7 +530,7 @@ export default function AgainstInvoiceVoucherWindow({
                 </div>
                 <div>
                   <div style={lbl}>Dated</div>
-                  <input type="date" style={inp()} disabled={ro || shownMethod !== "cheque"} value={ro ? (viewing.chequeDate || "") : chequeDate} onChange={(e) => setChequeDate(e.target.value)} />
+                  <input type="date"style={inp()} disabled={ro || shownMethod !== "cheque"} value={ro ? (viewing.chequeDate || "") : chequeDate} onChange={(e) => setChequeDate(e.target.value)} />
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
@@ -517,8 +555,8 @@ export default function AgainstInvoiceVoucherWindow({
 
           {ro && !isReceipt && shownMethod === "cheque" && (viewing.raw?.chequePrintedAt || viewing.raw?.handover?.receiverName) && (
             <div style={{ fontSize: 11.5, color: "#4b5f86", display: "flex", flexDirection: "column", gap: 2 }}>
-              {viewing.raw?.chequePrintedAt && <span>✅ Cheque printed: {String(viewing.raw.chequePrintedAt).slice(0, 10)}{viewing.raw.chequePrintCount > 1 ? ` (×${viewing.raw.chequePrintCount})` : ""}</span>}
-              {viewing.raw?.handover?.receiverName && <span>🪪 Handed over to: {viewing.raw.handover.receiverName}{viewing.raw.handover.receivedAt ? ` · ${viewing.raw.handover.receivedAt}` : ""}</span>}
+              {viewing.raw?.chequePrintedAt && <span> Cheque printed: {String(viewing.raw.chequePrintedAt).slice(0, 10)}{viewing.raw.chequePrintCount > 1 ? ` (×${viewing.raw.chequePrintCount})` : ""}</span>}
+              {viewing.raw?.handover?.receiverName && <span> Handed over to: {viewing.raw.handover.receiverName}{viewing.raw.handover.receivedAt ? ` · ${viewing.raw.handover.receivedAt}` : ""}</span>}
             </div>
           )}
 
@@ -531,7 +569,7 @@ export default function AgainstInvoiceVoucherWindow({
           {!isReceipt && (
             <div style={{ flex: "0 0 130px" }}>
               <div style={{ ...lbl, fontSize: 10.5, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>{bn ? "কোন মাসের" : "For Month"}</div>
-              <input type="month" style={inp(ro ? { background: "#f4f7fc" } : {})} readOnly={ro} value={ro ? (viewing.chequeMonth || "") : chequeMonth} onChange={(e) => setChequeMonth(e.target.value)} />
+              <input type="month"style={inp(ro ? { background: "#f4f7fc" } : {})} readOnly={ro} value={ro ? (viewing.chequeMonth || "") : chequeMonth} onChange={(e) => setChequeMonth(e.target.value)} />
             </div>
           )}
 
@@ -546,59 +584,51 @@ export default function AgainstInvoiceVoucherWindow({
             {!ro ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 2, marginRight: narrow ? 0 : "auto", order: narrow ? 2 : 0 }}>
                 <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                  <input type="checkbox" checked={printDetails} onChange={(e) => setPrintDetails(e.target.checked)} />
+                  <input type="checkbox"checked={printDetails} onChange={(e) => setPrintDetails(e.target.checked)} />
                   Print {isReceipt ? "Receipt " : ""}Voucher After Saving
                 </label>
                 {printDetails && (
                   <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                    <input type="checkbox" checked={summaryPrint} onChange={(e) => setSummaryPrint(e.target.checked)} />
+                    <input type="checkbox"checked={summaryPrint} onChange={(e) => setSummaryPrint(e.target.checked)} />
                     Summary only (hide {docLabel.toLowerCase()} list — for many {docLabel.toLowerCase()}s)
                   </label>
                 )}
               </div>
             ) : (
               <div style={{ display: "flex", gap: 6, marginRight: narrow ? 0 : "auto", flexWrap: "wrap", order: narrow ? 2 : 0 }}>
-                {onPrint && <button type="button" onClick={() => onPrint(viewing)} style={btn()}>🖨️ Print</button>}
-                {onPrint && <button type="button" onClick={() => onPrint(viewing, { summaryOnly: true })} style={btn()}>🖨️ Print (Summary)</button>}
+                {onPrint && <button type="button"onClick={() => onPrint(viewing)} style={btn()}> Print</button>}
+                {onPrint && <button type="button"onClick={() => onPrint(viewing, { summaryOnly: true })} style={btn()}> Print (Summary)</button>}
                 {!cancelled && viewing.method === "cheque" && onPrintCheque && (
-                  <button type="button" onClick={() => onPrintCheque(viewing)} style={btn()}>🖨️ Print Cheque</button>
+                  <button type="button"onClick={() => onPrintCheque(viewing)} style={btn()}> Print Cheque</button>
                 )}
                 {!cancelled && viewing.method === "cheque" && onPrintChequeVoucher && (
-                  <button type="button" onClick={() => onPrintChequeVoucher(viewing)} style={btn()}>📄 Cheque Payment Voucher</button>
+                  <button type="button"onClick={() => onPrintChequeVoucher(viewing)} style={btn()}> Cheque Payment Voucher</button>
                 )}
                 {!cancelled && viewing.method === "cheque" && onHandover && (
-                  <button type="button" onClick={() => onHandover(viewing)} style={btn("#dcfce7", C.green)}>🪪 {viewing.raw?.handover ? "View Handover" : "Handover Document"}</button>
+                  <button type="button"onClick={() => onHandover(viewing)} style={btn("#dcfce7", C.green)}> {viewing.raw?.handover ? "View Handover" : "Handover Document"}</button>
                 )}
                 {!cancelled && viewing.method === "cheque" && viewing.chequeStatus === "pending" && onSetChequeStatus && (
                   <>
-                    <button type="button" onClick={async () => { const u = await onSetChequeStatus(viewing, "cleared"); if (u) setViewSnapshot(u); }} style={btn("#dcfce7", C.green)}>✅ Cleared</button>
-                    <button type="button" onClick={async () => { const u = await onSetChequeStatus(viewing, "bounced"); if (u) setViewSnapshot(u); }} style={btn("#fee2e2", C.red)}>❌ Bounced</button>
+                    <button type="button"onClick={async () => { const u = await onSetChequeStatus(viewing, "cleared"); if (u) setViewSnapshot(u); }} style={btn("#dcfce7", C.green)}> Cleared</button>
+                    <button type="button"onClick={async () => { const u = await onSetChequeStatus(viewing, "bounced"); if (u) setViewSnapshot(u); }} style={btn("#fee2e2", C.red)}> Bounced</button>
                   </>
                 )}
                 {!cancelled && onCancelVoucher && (
-                  <button type="button" onClick={async () => { const u = await onCancelVoucher(viewing); if (u) setViewSnapshot(u); }} style={btn("#fee2e2", C.red)}>⛔ {bn ? "ভাউচার বাতিল" : "Cancel Voucher"}</button>
+                  <button type="button"onClick={async () => { const u = await onCancelVoucher(viewing); if (u) setViewSnapshot(u); }} style={btn("#fee2e2", C.red)}> {bn ? "ভাউচার বাতিল" : "Cancel Voucher"}</button>
                 )}
                 {!cancelled && onCancelVoucher && (
-                  <button type="button" onClick={async () => {
-                    const snap = viewing;
-                    const u = await onCancelVoucher(snap);
-                    if (!u) return;
-                    // The old voucher is now cancelled (allocations reversed, audit logged); refill the
-                    // new-entry form with its data so the user corrects and re-saves instead of retyping.
-                    applyVoucherSnapshot(snap);
-                    setViewingId(null); setViewSnapshot(null);
-                  }} style={btn("#fef3c7", "#92400e")}>✏️ {bn ? "বাতিল করে এডিট করুন" : "Cancel & Edit"}</button>
+                  <button type="button"onClick={startEdit} style={btn("#fef3c7", "#92400e")}> {bn ? "এডিট" : "Edit"}</button>
                 )}
                 {cancelled && onDeleteVoucher && (
-                  <button type="button" onClick={async () => { if (await onDeleteVoucher(viewing)) resetNew(); }} style={btn("#7f1d1d", "#fff")}>🗑️ {bn ? "ভাউচার মুছুন" : "Delete Voucher"}</button>
+                  <button type="button"onClick={async () => { if (await onDeleteVoucher(viewing)) resetNew(); }} style={btn("#7f1d1d", "#fff")}> {bn ? "ভাউচার মুছুন" : "Delete Voucher"}</button>
                 )}
               </div>
             )}
             <div style={{ display: "flex", gap: 6, order: narrow ? 1 : 0 }}>
-              <button type="button" onClick={resetNew} disabled={saving} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>N</u>ew</button>
-              {!ro && <button type="button" onClick={save} disabled={saving} style={btn("#15803d", "#fff", { width: 80, flex: narrow ? 1 : undefined })}>{saving ? "…" : <><u>S</u>ave</>}</button>}
-              <button type="button" onClick={() => setShowFind(true)} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>F</u>ind</button>
-              <button type="button" onClick={onClose} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>C</u>lose</button>
+              <button type="button"onClick={resetNew} disabled={saving} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>N</u>ew</button>
+              {!ro && <button type="button"onClick={save} disabled={saving} style={btn("#15803d", "#fff", { width: 80, flex: narrow ? 1 : undefined })}>{saving ? "…" : <><u>S</u>ave</>}</button>}
+              <button type="button"onClick={() => setShowFind(true)} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>F</u>ind</button>
+              <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>C</u>lose</button>
             </div>
           </div>
         </div>
@@ -650,9 +680,9 @@ function VoucherFindModal({ vouchers, isReceipt, lang, onClose, onPick }) {
     <Modal title={isReceipt ? "Find Receipt" : "Find Payment"} onClose={onClose} width={980}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span style={lbl}>From</span>
-        <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}>To</span>
-        <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
         {box("Voucher No", "no")}

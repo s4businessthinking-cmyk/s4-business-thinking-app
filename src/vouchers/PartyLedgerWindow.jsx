@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { C, inp, lbl, btn, GridTable, fmtDate, todayIso } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { PartySelect } from "./AgainstInvoiceVoucherWindow.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
@@ -102,6 +102,7 @@ const sumFiltered = (list, from, to, filters) => {
 export default function PartyLedgerWindow({
   lang = "en", mode = "customer", cur = "AED", shopName = "",
   invoices = [], vouchers = [], partyCodes = null, partyTrns = null, onOpenInvoice, onOpenVoucher, onNewVoucher, onClose,
+  resumePartyKey = null, onPartyKeyChange,
 }) {
   const bn = lang === "bn";
   const isCustomer = mode === "customer";
@@ -109,7 +110,14 @@ export default function PartyLedgerWindow({
   const settleLabel = isCustomer ? "Receipt" : "Payment";
 
   const savedOpts = useMemo(() => loadLedgerOpts(mode), [mode]);
-  const [partyKey, setPartyKey] = useState(null);
+  const [partyKey, setPartyKey] = useState(resumePartyKey || null);
+  useEffect(() => {
+    if (resumePartyKey) setPartyKey(resumePartyKey);
+  }, [resumePartyKey]);
+  const pickPartyKey = (key) => {
+    setPartyKey(key);
+    onPartyKeyChange?.(key || null);
+  };
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [onlyDue, setOnlyDue] = useState(false);
@@ -250,7 +258,7 @@ export default function PartyLedgerWindow({
       });
       list.forEach((e) => {
         if (!e.key.startsWith("i-")) return;
-        if (seen.get(`n:${norm(e.no)}`) > 1 || (e.ref && seen.get(`r:${norm(e.ref)}`) > 1)) { e.dup = true; e.particulars = `⚠ Duplicate? · ${e.particulars}`; }
+        if (seen.get(`n:${norm(e.no)}`) > 1 || (e.ref && seen.get(`r:${norm(e.ref)}`) > 1)) { e.dup = true; e.particulars = `Duplicate? · ${e.particulars}`; }
       });
     });
     out.forEach((list) => list.sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.seq - b.seq || String(a.no).localeCompare(String(b.no))));
@@ -554,7 +562,7 @@ export default function PartyLedgerWindow({
   return (
     <>
     {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
-    <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
+    <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
       <div style={{ width: "100%", maxWidth: win.max ? "none" : 1040, height: win.max ? "100%" : undefined, maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
         <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none" }}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{winTitle}</span>
@@ -565,18 +573,18 @@ export default function PartyLedgerWindow({
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ ...lbl, width: 70 }}>{partyLabel}</span>
             <div style={{ flex: "1 1 260px", minWidth: 220, display: "flex" }}>
-              <PartySelect parties={partyOptions} value={party} onPick={(p) => setPartyKey(p.key)}
+              <PartySelect parties={partyOptions} value={party} onPick={(p) => pickPartyKey(p.key)}
                 placeholder={bn ? `সব ${isCustomer ? "কাস্টমার" : "সাপ্লায়ার"} — নাম লিখে খুঁজুন` : `All ${partyLabel.toLowerCase()}s — type to search`} />
             </div>
-            {party && <button type="button" onClick={() => setPartyKey(null)} style={btn()}>{bn ? "← সবাই" : "← All"}</button>}
+            {party && <button type="button"onClick={() => pickPartyKey(null)} style={btn()}>{bn ? "← সবাই" : "← All"}</button>}
             <span style={lbl}>From</span>
-            <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
             <span style={lbl}>To</span>
-            <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
-            {(from || to) && <button type="button" onClick={() => { setFrom(""); setTo(""); }} style={btn()}>Clear</button>}
+            <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+            {(from || to) && <button type="button"onClick={() => { setFrom(""); setTo(""); }} style={btn()}>Clear</button>}
             {!party && (
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={onlyDue} onChange={(e) => setOnlyDue(e.target.checked)} /> {bn ? "শুধু বাকি আছে" : "Only with balance"}
+                <input type="checkbox"checked={onlyDue} onChange={(e) => setOnlyDue(e.target.checked)} /> {bn ? "শুধু বাকি আছে" : "Only with balance"}
               </label>
             )}
           </div>
@@ -589,7 +597,7 @@ export default function PartyLedgerWindow({
                 ["outstanding", bn ? "বাকি বিল (Statement of Account)" : "Outstanding bills (Statement of Account)"],
               ].map(([id, label]) => (
                 <label key={id} style={{ ...lbl, fontWeight: stmtType === id ? 800 : 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                  <input type="radio" name={`stmt-type-${mode}`} checked={stmtType === id} onChange={() => setStmtType(id)} /> {label}
+                  <input type="radio"name={`stmt-type-${mode}`} checked={stmtType === id} onChange={() => setStmtType(id)} /> {label}
                 </label>
               ))}
             </div>
@@ -607,10 +615,10 @@ export default function PartyLedgerWindow({
                 ["ageing", bn ? "দিন অনুযায়ী সারাংশ" : "Ageing summary"],
               ].map(([k, label]) => (
                 <label key={k} style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                  <input type="checkbox" checked={!!osOpts[k]} onChange={(e) => setOsOpt(k, e.target.checked)} /> {label}
+                  <input type="checkbox"checked={!!osOpts[k]} onChange={(e) => setOsOpt(k, e.target.checked)} /> {label}
                 </label>
               ))}
-              <button type="button" onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "সেভ" : "Save choice"}</button>
+              <button type="button"onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "সেভ" : "Save choice"}</button>
             </div>
           )}
           {party && !isOutstanding && (
@@ -620,61 +628,61 @@ export default function PartyLedgerWindow({
                 {voucherFilterOptions(isCustomer, bn).map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={includePdc} onChange={(e) => setIncludePdc(e.target.checked)} />
+                <input type="checkbox"checked={includePdc} onChange={(e) => setIncludePdc(e.target.checked)} />
                 {bn ? "পোস্ট-ডেটেড চেক" : "Include post-dated cheques"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
+                <input type="checkbox"checked={monthly} onChange={(e) => setMonthly(e.target.checked)} />
                 {bn ? "মাসিক" : "Monthly"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: monthly ? "not-allowed" : "pointer", opacity: monthly ? 0.45 : 1 }}>
-                <input type="checkbox" checked={showNarration} disabled={monthly} onChange={(e) => setShowNarration(e.target.checked)} />
+                <input type="checkbox"checked={showNarration} disabled={monthly} onChange={(e) => setShowNarration(e.target.checked)} />
                 {bn ? "ন্যারেশন" : "Show Narration"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showBalanceInPrint} onChange={(e) => setShowBalanceInPrint(e.target.checked)} />
+                <input type="checkbox"checked={showBalanceInPrint} onChange={(e) => setShowBalanceInPrint(e.target.checked)} />
                 {bn ? "প্রিন্টে ব্যালান্স" : "Show Balance in Print"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: monthly ? "not-allowed" : "pointer", opacity: monthly ? 0.45 : 1 }}>
-                <input type="checkbox" checked={mergeEntries} disabled={monthly} onChange={(e) => setMergeEntries(e.target.checked)} />
+                <input type="checkbox"checked={mergeEntries} disabled={monthly} onChange={(e) => setMergeEntries(e.target.checked)} />
                 {bn ? "একত্রিত এন্ট্রি" : "Merge Multiple Entries"}
               </label>
-              <button type="button" onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "দেখুন" : "View"}</button>
+              <button type="button"onClick={persistLedgerOpts} style={btn("#dbeafe", "#1e40af")}>{bn ? "দেখুন" : "View"}</button>
             </div>
           )}
           {party && !isOutstanding && !monthly && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", padding: "6px 10px", background: "#f8fafc", border: `1px solid ${C.border}`, borderRadius: 3 }}>
               <span style={{ ...lbl, fontWeight: 800, width: "100%", marginBottom: 2 }}>{bn ? "স্টেটমেন্টে দেখাবেন" : "Show on statement"}</span>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showDrCr} onChange={(e) => setShowDrCr(e.target.checked)} /> {bn ? "ডেবিট / ক্রেডিট" : "Debit / Credit"}
+                <input type="checkbox"checked={showDrCr} onChange={(e) => setShowDrCr(e.target.checked)} /> {bn ? "ডেবিট / ক্রেডিট" : "Debit / Credit"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showBalance} onChange={(e) => setShowBalance(e.target.checked)} /> {bn ? "ব্যালান্স" : "Balance"}
+                <input type="checkbox"checked={showBalance} onChange={(e) => setShowBalance(e.target.checked)} /> {bn ? "ব্যালান্স" : "Balance"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showNarration} onChange={(e) => setShowNarration(e.target.checked)} /> {bn ? "ন্যারেশন (VAT)" : "Narration (VAT)"}
+                <input type="checkbox"checked={showNarration} onChange={(e) => setShowNarration(e.target.checked)} /> {bn ? "ন্যারেশন (VAT)" : "Narration (VAT)"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showDn} onChange={(e) => setShowDn(e.target.checked)} />
+                <input type="checkbox"checked={showDn} onChange={(e) => setShowDn(e.target.checked)} />
                 {isCustomer ? (bn ? "ডেলিভারি নোট" : "Delivery Note") : (bn ? "সাপ্লায়ার Inv" : "Supplier Inv")}
               </label>
               {isCustomer && (
                 <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                  <input type="checkbox" checked={showVehicle} onChange={(e) => setShowVehicle(e.target.checked)} /> {bn ? "গাড়ি নং" : "Vehicle No"}
+                  <input type="checkbox"checked={showVehicle} onChange={(e) => setShowVehicle(e.target.checked)} /> {bn ? "গাড়ি নং" : "Vehicle No"}
                 </label>
               )}
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showVendorRef} onChange={(e) => setShowVendorRef(e.target.checked)} />
+                <input type="checkbox"checked={showVendorRef} onChange={(e) => setShowVendorRef(e.target.checked)} />
                 {isCustomer ? (bn ? "রেফারেন্স নং" : "Ref No") : (bn ? "আমাদের Ref" : "Our Ref No")}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showTrn} onChange={(e) => setShowTrn(e.target.checked)} /> TRN
+                <input type="checkbox"checked={showTrn} onChange={(e) => setShowTrn(e.target.checked)} /> TRN
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showNote} onChange={(e) => setShowNote(e.target.checked)} /> {bn ? "নোট / চেক" : "Note / Cheque"}
+                <input type="checkbox"checked={showNote} onChange={(e) => setShowNote(e.target.checked)} /> {bn ? "নোট / চেক" : "Note / Cheque"}
               </label>
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-                <input type="checkbox" checked={showSettledInvoices} onChange={(e) => setShowSettledInvoices(e.target.checked)} />
+                <input type="checkbox"checked={showSettledInvoices} onChange={(e) => setShowSettledInvoices(e.target.checked)} />
                 {isCustomer ? (bn ? "রসিদের বিল নং" : "Bill nos on receipts") : (bn ? "পেমেন্টের বিল নং" : "Bill nos on payments")}
               </label>
             </div>
@@ -685,7 +693,7 @@ export default function PartyLedgerWindow({
               <div style={{ flex: 1, minWidth: 180, background: "#fdf2f2", border: `1px solid ${C.border}`, padding: "4px 10px", fontSize: 12.5, fontWeight: 800, color: C.red, textAlign: "center" }}>
                 {isCustomer ? "Customer owes" : "We owe"}: {cur} {balText(statement.closing)}
               </div>
-              {party.mobile && <div style={{ background: "#fff", border: `1px solid ${C.border}`, padding: "4px 10px", fontSize: 12.5, fontWeight: 700 }}>📱 {party.mobile}</div>}
+              {party.mobile && <div style={{ background: "#fff", border: `1px solid ${C.border}`, padding: "4px 10px", fontSize: 12.5, fontWeight: 700 }}> {party.mobile}</div>}
               {showTrn && party.trn && <div style={{ background: "#fff", border: `1px solid ${C.border}`, padding: "4px 10px", fontSize: 12.5, fontWeight: 700 }}>TRN: {party.trn}</div>}
             </div>
           )}
@@ -700,7 +708,7 @@ export default function PartyLedgerWindow({
                   onRowDoubleClick={(e) => e.open?.()}
                   emptyText={bn ? "এই সময়ে কোনো লেনদেন নেই" : "No transactions in this period"} />
               : <GridTable columns={summaryCols} rows={summary} rowKey={(r) => r.key} minRows={14}
-                  onRowDoubleClick={(r) => setPartyKey(r.key)}
+                  onRowDoubleClick={(r) => pickPartyKey(r.key)}
                   emptyText={bn ? "কোনো রেকর্ড নেই" : "No records"} />}
           </div>
 
@@ -737,12 +745,12 @@ export default function PartyLedgerWindow({
 
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
             {party && onNewVoucher && (
-              <button type="button" onClick={() => onNewVoucher(party)} style={btn("#dcfce7", C.green)}>
-                💰 {isCustomer ? (bn ? "টাকা গ্রহণ" : "Receive Payment") : (bn ? "পেমেন্ট দিন" : "Make Payment")}
+              <button type="button"onClick={() => onNewVoucher(party)} style={btn("#dcfce7", C.green)}>
+                 {isCustomer ? (bn ? "টাকা গ্রহণ" : "Receive Payment") : (bn ? "পেমেন্ট দিন" : "Make Payment")}
               </button>
             )}
-            <button type="button" onClick={printLedger} disabled={party ? (isOutstanding ? !outstanding?.rows.length : !stmtRows.length) : !summary.length} style={btn()}>🖨 Print</button>
-            <button type="button" onClick={onClose} style={btn()}>Close</button>
+            <button type="button"onClick={printLedger} disabled={party ? (isOutstanding ? !outstanding?.rows.length : !stmtRows.length) : !summary.length} style={btn()}> Print</button>
+            <button type="button"onClick={onClose} style={btn()}>Close</button>
           </div>
         </div>
       </div>

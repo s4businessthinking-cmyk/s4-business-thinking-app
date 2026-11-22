@@ -36,7 +36,7 @@ export function BranchStockView({ lang, mobile, stockRows, shopStock, branches, 
     <>
       {overCount > 0 && (
         <div style={{ margin: "4px 0", padding: "8px 10px", border: "1px solid #fca5a5", background: "#fef2f2", color: "#991b1b", borderRadius: 6, fontSize: 12, lineHeight: 1.5 }}>
-          ⚠️ {L(
+           {L(
             `${overCount}টা পণ্যের Branch স্টক দোকানের মোট স্টকের চেয়ে বেশি দেখাচ্ছে। সাধারণত পণ্য Branch-এ পাঠানোর পর তার Purchase delete করলে এমন হয়। Purchase ভুল করে delete হলে আবার এন্ট্রি দিন, আর পণ্য সত্যিই না থাকলে Branch-এ যাওয়া Transfer-টা দেখুন।`,
             `${overCount} product(s) show more stock at the branch than the shop's total. This usually means the purchase was deleted after the goods were sent to the branch. If it was deleted by mistake, enter it again; if the goods really are not there, check the transfer that sent them.`
           )}
@@ -49,20 +49,20 @@ export function BranchStockView({ lang, mobile, stockRows, shopStock, branches, 
     </div>
       <div className="si-filters">
         <div className="si-search">
-          <input className="pm-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={L("পণ্য, কোড বা Branch…", "Product, code or branch…")} />
-          {query && <button type="button" onClick={() => setQuery("")}>✕</button>}
+          <input className="pm-input"value={query} onChange={(e) => setQuery(e.target.value)} placeholder={L("পণ্য, কোড বা Branch…", "Product, code or branch…")} />
+          {query && <button type="button"onClick={() => setQuery("")}>✕</button>}
         </div>
-        <select className="pm-input" style={{ width: mobile ? "100%" : 180 }} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
+        <select className="pm-input"style={{ width: mobile ? "100%" : 180 }} value={branchFilter} onChange={(e) => setBranchFilter(e.target.value)}>
           <option value="">{L("সব Branch", "All branches")}</option>
           {visibleBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select>
-        {loading && <span className="si-hint">⏳ {L("বিক্রি হিসাব হচ্ছে…", "Counting sales…")}</span>}
+        {loading && <span className="si-hint"> {L("বিক্রি হিসাব হচ্ছে…", "Counting sales…")}</span>}
       </div>
       <div className="si-main is-all">
         <div className="si-box">
           {mobile ? rows.map((row) => (
-            <div key={row.id} className="si-mrow" style={{ cursor: "default" }}>
-              <div className="si-mrow-top"><span>{row.productName}</span><b title={overShop(row) ? overTitle(row) : undefined} style={{ color: row.current < 0 || overShop(row) ? "#b91c1c" : "#15803d" }}>{overShop(row) ? "⚠️ " : ""}{fq(row.current)} {row.unit || "Pcs"}</b></div>
+            <div key={row.id} className="si-mrow"style={{ cursor: "default" }}>
+              <div className="si-mrow-top"><span>{row.productName}</span><b title={overShop(row) ? overTitle(row) : undefined} style={{ color: row.current < 0 || overShop(row) ? "#b91c1c" : "#15803d" }}>{overShop(row) ? " " : ""}{fq(row.current)} {row.unit || "Pcs"}</b></div>
               <div className="si-mrow-sub"><span>{row.branchName} · {row.productCode || "—"}</span><span>{L("এসেছে", "In")} {fq(row.received)} · {L("বিক্রি", "Sold")} {fq(row.sold)}</span></div>
             </div>
           )) : rows.length > 0 && (
@@ -80,11 +80,11 @@ export function BranchStockView({ lang, mobile, stockRows, shopStock, branches, 
                 {rows.map((row) => (
                   <tr key={row.id}>
                     <td>{row.branchName}</td>
-                    <td className="si-strong" title={row.productName}>{row.productName}</td>
+                    <td className="si-strong"title={row.productName}>{row.productName}</td>
                     <td>{row.productCode || ""}</td>
                     <td className="si-num">{fq(row.received)}</td>
                     <td className="si-num">{fq(row.sold)}</td>
-                    <td className="si-num si-strong" title={overShop(row) ? overTitle(row) : undefined} style={{ color: row.current < 0 || overShop(row) ? "#b91c1c" : "#15803d" }}>{overShop(row) ? "⚠️ " : ""}{fq(row.current)}</td>
+                    <td className="si-num si-strong"title={overShop(row) ? overTitle(row) : undefined} style={{ color: row.current < 0 || overShop(row) ? "#b91c1c" : "#15803d" }}>{overShop(row) ? " " : ""}{fq(row.current)}</td>
                     <td>{row.unit || "Pcs"}</td>
                   </tr>
                 ))}

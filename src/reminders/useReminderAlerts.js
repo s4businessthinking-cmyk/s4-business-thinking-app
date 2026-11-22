@@ -15,7 +15,7 @@ export function systemNotify(title, body, onClick, tag = "s4-reminders") {
     return;
   }
   try {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (typeof window === "undefined" || !("Notification"in window)) return;
     const show = () => { const n = new Notification(title, { body, tag }); n.onclick = () => { window.focus(); onClick?.(); n.close(); }; };
     if (Notification.permission === "granted") show();
     else if (Notification.permission === "default") Notification.requestPermission().then((p) => p === "granted" && show()).catch(() => {});
@@ -58,7 +58,7 @@ export function useReminderAlerts({ shopId, uid, isOwner, enabled = true, lang =
     writeJson(storeKey, sent);
     const bn = lang === "bn";
     const first = reminderAlertText(fresh[0], bn);
-    const title = fresh.length === 1 ? `${first.icon} ${first.title}` : bn ? `🔔 ${fresh.length}টি রিমাইন্ডার` : `🔔 ${fresh.length} reminders`;
+    const title = fresh.length === 1 ? `${first.icon} ${first.title}` : bn ? ` ${fresh.length}টি রিমাইন্ডার` : ` ${fresh.length} reminders`;
     const body = fresh.length === 1 ? first.sub : fresh.slice(0, 3).map((a) => a.title).join("\n") + (fresh.length > 3 ? (bn ? `\n…আরও ${fresh.length - 3}টি` : `\n…and ${fresh.length - 3} more`) : "");
     latest.current.toast?.(`${title}\n${body}`);
     systemNotify(title, body, latest.current.onOpen);

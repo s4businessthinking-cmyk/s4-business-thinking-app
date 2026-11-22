@@ -7,7 +7,7 @@ import { printWithSettings } from "../print/printSettings.js";
 const n2 = (v) => parseFloat(v) || 0;
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
 const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-// Full timestamps are shown on the local calendar day; "YYYY-MM-DDT00:00:00.000Z" values already carry the chosen day.
+// Full timestamps are shown on the local calendar day; "YYYY-MM-DDT00:00:00.000Z"values already carry the chosen day.
 const day = (v) => {
   const str = String(v || "");
   if (str.length <= 10 || str.endsWith("T00:00:00.000Z")) return str.slice(0, 10);
@@ -33,7 +33,7 @@ const toRow = (type, v) => {
 };
 const fmtMonth = (ym) => (/^\d{4}-\d{2}$/.test(ym || "") ? new Date(`${ym}-01T00:00:00`).toLocaleString("en-GB", { month: "short", year: "numeric" }) : "");
 
-// A bounced cheque cancels its voucher and gives the allocated amounts back to the bills' balances.
+// A bounced cheque cancels its voucher and gives the allocated amounts back to the bills'balances.
 export async function bounceVoucher(type, voucher, uid) {
   const m = TYPES[type];
   const nowIso = new Date().toISOString();
@@ -69,7 +69,7 @@ export async function postponeCheque(type, voucher, newChequeDate, uid) {
   }, voucher);
 }
 
-// Old-ERP "Post Dated Cheques" register for both supplier payments (issued) and customer receipts (received).
+// Old-ERP "Post Dated Cheques"register for both supplier payments (issued) and customer receipts (received).
 export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "", shopName = "", inline = false, onOpenVoucher, onClose, canPrint = false, canDelete = false }) {
   const bn = lang === "bn";
   const [type, setType] = useState("received");
@@ -123,7 +123,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
     const bounces = changed.filter((r) => edits[r.id].status === "bounced");
     if (bounces.length && !window.confirm(bn
       ? `${bounces.map((r) => r.chequeNo || r.no).join(", ")} — চেক বাউন্স?\nভাউচার বাতিল হবে আর বিলের বাকি আবার ফিরে আসবে।`
-      : `Cheque ${bounces.map((r) => r.chequeNo || r.no).join(", ")} bounced?\nThe voucher is cancelled and the bills' balances restored.`)) return;
+      : `Cheque ${bounces.map((r) => r.chequeNo || r.no).join(", ")} bounced?\nThe voucher is cancelled and the bills'balances restored.`)) return;
     setSaving(true);
     let cleared = 0, bounced = 0;
     const failed = [];
@@ -142,9 +142,9 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
     setSaving(false);
     setReloadTick((n) => n + 1);
     alert([
-      cleared ? (bn ? `✅ ${cleared}টি চেক ক্লিয়ার` : `✅ ${cleared} cheque(s) cleared`) : "",
-      bounced ? (bn ? `❌ ${bounced}টি চেক বাউন্স` : `❌ ${bounced} cheque(s) bounced`) : "",
-      failed.length ? (bn ? `⚠️ হয়নি: ${failed.join(", ")}` : `⚠️ Failed: ${failed.join(", ")}`) : "",
+      cleared ? (bn ? ` ${cleared}টি চেক ক্লিয়ার` : ` ${cleared} cheque(s) cleared`) : "",
+      bounced ? (bn ? ` ${bounced}টি চেক বাউন্স` : ` ${bounced} cheque(s) bounced`) : "",
+      failed.length ? (bn ? `হয়নি: ${failed.join(", ")}` : `Failed: ${failed.join(", ")}`) : "",
     ].filter(Boolean).join("\n"));
   };
 
@@ -177,7 +177,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
     printWithSettings(`<html><head><meta charset="UTF-8"><title>${esc(m.label)}</title><style>body{font-family:Segoe UI,Arial;font-size:12px;padding:18px}h2{margin:0;font-size:16px}h3{margin:4px 0 2px;font-size:13px}p{margin:2px 0 10px;color:#555}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 6px}th{background:#e5eaf3;text-align:left}tfoot td{font-weight:800;background:#f1f5f9}</style></head><body>
 <h2>${esc(shopName)}</h2><h3>POST DATED CHEQUES — ${esc(m.label.toUpperCase())}${bank ? ` — ${esc(bank)}` : ""}</h3><p>${esc(period)}</p>
 <table><thead><tr><th>Sl</th><th>Vchr No</th><th>Voucher Date</th><th>${esc(m.partyHead)}</th>${extraCols ? "<th>Month</th><th>Vendor Rcpt No</th>" : ""}<th>Bank</th><th>Cheque No</th><th>Cheque Date</th><th style="text-align:right">Amount</th><th>Post Date</th><th>Status</th></tr></thead>
-<tbody>${body}</tbody><tfoot><tr><td colspan="${extraCols ? 9 : 7}" style="text-align:right">TOTAL</td><td style="text-align:right">${f2(total)}</td><td colspan="2"></td></tr></tfoot></table></body></html>`);
+<tbody>${body}</tbody><tfoot><tr><td colspan="${extraCols ? 9 : 7}"style="text-align:right">TOTAL</td><td style="text-align:right">${f2(total)}</td><td colspan="2"></td></tr></tfoot></table></body></html>`);
   };
 
   const sel = rows.find((r) => r.id === selId) || null;
@@ -187,7 +187,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
     <div style={{ width: "100%", maxWidth: inline ? 1180 : 1000, maxHeight: "100%", margin: inline ? "0 auto" : 0, display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: 4, boxShadow: inline ? "none" : "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "5px 10px", fontWeight: 800, fontSize: 13 }}>
         <span>POST DATED CHEQUES [PDC]</span>
-        {onClose && <button type="button" onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>}
+        {onClose && <button type="button"onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>}
       </div>
 
       <div style={{ padding: "10px 12px", display: "grid", gap: 8, minHeight: 0, overflow: "auto" }}>
@@ -208,26 +208,26 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
           </div>
           <div>
             <div style={lbl}>Cheque Date From</div>
-            <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div>
             <div style={lbl}>To</div>
-            <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+            <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
-            <input type="checkbox" checked={includePosted} onChange={(e) => setIncludePosted(e.target.checked)} /> Include Posted Cheques
+            <input type="checkbox"checked={includePosted} onChange={(e) => setIncludePosted(e.target.checked)} /> Include Posted Cheques
           </label>
           {type === "issued" && (
             <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
-              <input type="checkbox" checked={showMonth} onChange={(e) => toggleMonth(e.target.checked)} /> {bn ? "মাস ও ভেন্ডর রিসিট নং দেখাও" : "Show Month & Vendor Receipt No"}
+              <input type="checkbox"checked={showMonth} onChange={(e) => toggleMonth(e.target.checked)} /> {bn ? "মাস ও ভেন্ডর রিসিট নং দেখাও" : "Show Month & Vendor Receipt No"}
             </label>
           )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-            {onOpenVoucher && <button type="button" onClick={() => sel && onOpenVoucher(sel.raw)} disabled={!sel} style={btn()}><u>V</u>iew</button>}
-            <button type="button" onClick={save} disabled={saving || !changed.length} style={btn("#15803d", "#fff")}>{saving ? "…" : <><u>S</u>ave</>}</button>
-            {canPrint && <button type="button" onClick={printList} disabled={!rows.length} style={btn()}><u>P</u>rint</button>}
-            {canDelete && <button type="button" onClick={deleteSelected} disabled={!canDeleteSel} style={btn("#7f1d1d", "#fff")}>{bn ? "মুছুন" : "Delete"}</button>}
-            {onClose && <button type="button" onClick={onClose} style={btn()}><u>C</u>lose</button>}
+            {onOpenVoucher && <button type="button"onClick={() => sel && onOpenVoucher(sel.raw)} disabled={!sel} style={btn()}><u>V</u>iew</button>}
+            <button type="button"onClick={save} disabled={saving || !changed.length} style={btn("#15803d", "#fff")}>{saving ? "…" : <><u>S</u>ave</>}</button>
+            {canPrint && <button type="button"onClick={printList} disabled={!rows.length} style={btn()}><u>P</u>rint</button>}
+            {canDelete && <button type="button"onClick={deleteSelected} disabled={!canDeleteSel} style={btn("#7f1d1d", "#fff")}>{bn ? "মুছুন" : "Delete"}</button>}
+            {onClose && <button type="button"onClick={onClose} style={btn()}><u>C</u>lose</button>}
           </div>
         </div>
 
@@ -247,7 +247,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
             <tbody>
               {rows.length === 0 && (
                 <tr><td colSpan={extraCols ? 13 : 11} style={{ ...td, textAlign: "center", color: "#64748b", padding: 16 }}>
-                  {includePosted ? (bn ? "কোনো চেক নেই" : "No cheques") : (bn ? "কোনো pending চেক নেই — পোস্ট করা চেক দেখতে 'Include Posted Cheques' টিক দিন" : "No pending cheques — tick 'Include Posted Cheques' to see posted ones")}
+                  {includePosted ? (bn ? "কোনো চেক নেই" : "No cheques") : (bn ? "কোনো pending চেক নেই — পোস্ট করা চেক দেখতে 'Include Posted Cheques'টিক দিন" : "No pending cheques — tick 'Include Posted Cheques'to see posted ones")}
                 </td></tr>
               )}
               {rows.map((r, i) => {
@@ -269,12 +269,12 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
                     <td style={{ ...td, color: due ? "#b45309" : td.color, fontWeight: due ? 800 : 400 }}>{fmtDate(r.chequeDate)}</td>
                     <td style={{ ...td, textAlign: "right", fontWeight: 700 }}>{f2(r.amount)}</td>
                     <td style={{ ...td, textAlign: "center" }}>
-                      <input type="checkbox" disabled={!pending} checked={e.status === "cleared"}
+                      <input type="checkbox"disabled={!pending} checked={e.status === "cleared"}
                         onChange={(ev) => setEdit(r, { status: ev.target.checked ? "cleared" : "pending" })} onClick={(ev) => ev.stopPropagation()} />
                     </td>
                     <td style={td}>
                       {pending
-                        ? <input type="date" style={cellIn} disabled={e.status !== "cleared"} value={e.postDate} onChange={(ev) => setEdit(r, { postDate: ev.target.value })} onClick={(ev) => ev.stopPropagation()} />
+                        ? <input type="date"style={cellIn} disabled={e.status !== "cleared"} value={e.postDate} onChange={(ev) => setEdit(r, { postDate: ev.target.value })} onClick={(ev) => ev.stopPropagation()} />
                         : (r.clearedAt ? fmtDate(r.clearedAt) : "")}
                     </td>
                     <td style={td}>
@@ -298,7 +298,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span style={{ fontSize: 11.5, color: "#4b5f86", marginRight: "auto" }}>
             {bn ? "Post টিক দিন বা Status বদলান, তারপর Save চাপুন।" : "Tick Post or change Status, then press Save."}
-            {onOpenVoucher && (bn ? " ভাউচার দেখতে double click।" : " Double click to view the voucher.")}
+            {onOpenVoucher && (bn ? "ভাউচার দেখতে double click।" : "Double click to view the voucher.")}
             {changed.length > 0 && <b style={{ color: C.green }}> · {changed.length} {bn ? "টি পরিবর্তন" : "change(s)"}</b>}
           </span>
           <span style={lbl}>Pending</span>
@@ -312,7 +312,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
 
   if (inline) return <div style={{ padding: "16px 12px 40px" }}>{box}</div>;
   return (
-    <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 8, boxSizing: "border-box" }}>
+    <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 8, boxSizing: "border-box" }}>
       {box}
     </div>
   );

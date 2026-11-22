@@ -42,8 +42,8 @@ export default function PermissionMatrix({ lang = "bn", th, perms = {}, onToggle
     <div>
       {!readOnly && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", marginBottom: 8 }}>
-          <button type="button" style={chipBtn(true)} onClick={() => setAll(true)}>☑ {L("সব টিক", "Select all")}</button>
-          <button type="button" style={chipBtn(false)} onClick={() => setAll(false)}>☐ {L("সব খালি", "Clear all")}</button>
+          <button type="button"style={chipBtn(true)} onClick={() => setAll(true)}> {L("সব টিক", "Select all")}</button>
+          <button type="button"style={chipBtn(false)} onClick={() => setAll(false)}>☐ {L("সব খালি", "Clear all")}</button>
           <span style={{ fontSize: 11, color: muted }}>{countOn(perms)}/{matrixKeys().length}</span>
         </div>
       )}
@@ -79,7 +79,7 @@ export default function PermissionMatrix({ lang = "bn", th, perms = {}, onToggle
                       {(row.extras || []).map((x) => {
                         const isOn = perms[x.key] === true;
                         return (
-                          <button key={x.key} type="button" disabled={readOnly} onClick={() => toggle(x.key)}
+                          <button key={x.key} type="button"disabled={readOnly} onClick={() => toggle(x.key)}
                             style={{
                               fontSize: 11, padding: "3px 8px", borderRadius: 999, cursor: readOnly ? "default" : "pointer",
                               border: isOn ? "1px solid #ea580c" : `1px solid ${border}`,
@@ -99,7 +99,7 @@ export default function PermissionMatrix({ lang = "bn", th, perms = {}, onToggle
       <div style={{ fontSize: 11, color: muted, marginTop: 8, lineHeight: 1.5 }}>
         {L("প্রতি ঘরে টিক আছে। পাশাপাশি একই টিক হলে সেগুলো একসাথে চালু/বন্ধ হয়। টেমপ্লেটের ডিফল্ট থাকে; মালিক বাকি টিক ইচ্ছেমতো দিতে পারেন। ",
           "Every cell has a tick. Neighbouring cells that share a switch turn on together. Templates keep their defaults; the owner can grant any remaining tick. ")}
-        🔒 {OWNER_ONLY_AREAS[lang] || OWNER_ONLY_AREAS.en}
+         {OWNER_ONLY_AREAS[lang] || OWNER_ONLY_AREAS.en}
       </div>
       </div>
     </div>

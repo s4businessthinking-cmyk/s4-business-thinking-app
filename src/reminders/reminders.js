@@ -24,7 +24,7 @@ export function addDays(day, n) {
   return ymd(d);
 }
 
-// Next due date after `day` for a repeating reminder; month ends clamp (31 Jan → 28/29 Feb).
+// Next due date after `day`for a repeating reminder; month ends clamp (31 Jan → 28/29 Feb).
 export function nextDue(day, repeat) {
   const d = parse(day);
   if (!d || !repeat || repeat === "none") return "";
@@ -66,7 +66,7 @@ export function reminderAlerts(list = [], { uid, isOwner = false, today, nowTime
     .map((r) => ({ r, state: dueState(r, today, nowTime) }))
     .filter((x) => x.state === "overdue" || x.state === "today" || x.state === "soon")
     // A reminder due today with a set time shouldn't alert at midnight just because the date flipped —
-    // wait until that time actually arrives (dueState itself still shows it as "today" all day, for the list view).
+    // wait until that time actually arrives (dueState itself still shows it as "today"all day, for the list view).
     .filter((x) => !(x.state === "today" && x.r.dueTime && nowTime && nowTime < x.r.dueTime))
     .sort((a, b) => String(a.r.dueDate).localeCompare(String(b.r.dueDate)) || String(a.r.dueTime || "").localeCompare(String(b.r.dueTime || "")))
     .map(({ r, state }) => ({ key: `rem-${r.id}-${r.dueDate}`, id: r.id, state, title: r.title, note: r.note || "", dueDate: r.dueDate, dueTime: r.dueTime || "", tone: state === "overdue" ? "danger" : undefined, linkType: r.linkType || "", linkId: r.linkId || "" }));
@@ -75,11 +75,11 @@ export function reminderAlerts(list = [], { uid, isOwner = false, today, nowTime
 export function reminderAlertText(a, bn) {
   const when = `${String(a.dueDate || "").split("-").reverse().join("/")}${a.dueTime ? ` ${a.dueTime}` : ""}`;
   const label = a.state === "overdue" ? (bn ? "সময় পার হয়েছে" : "Overdue") : a.state === "today" ? (bn ? "আজ" : "Today") : (bn ? "আসছে" : "Coming up");
-  return { icon: a.state === "overdue" ? "⏰" : "🔔", title: a.title, sub: `${label} · ${when}${a.note ? ` · ${a.note}` : ""}` };
+  return { icon: a.state === "overdue" ? "" : "", title: a.title, sub: `${label} · ${when}${a.note ? ` · ${a.note}` : ""}` };
 }
 
 // Patch for marking a reminder done: repeating ones roll to the next date,
-// unless `stop` is set — that ends the series instead of rescheduling it.
+// unless `stop`is set — that ends the series instead of rescheduling it.
 export function donePatch(r, { uid = "", name = "", now = new Date(), stop = false } = {}) {
   const at = now.toISOString();
   const history = [...(Array.isArray(r.history) ? r.history.slice(-29) : []), { dueDate: r.dueDate, doneAt: at, by: name }];

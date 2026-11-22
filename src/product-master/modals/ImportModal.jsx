@@ -231,14 +231,14 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
   }
 
   return (
-    <Modal title="Import Products" onClose={closeSafely} width="xl">
+    <Modal title="Import Products"onClose={closeSafely} width="xl">
       {step === "upload" && (
         <>
           <p className="pm-hint">
             {replacementMode ? "The old Product Master is cleared and sync is locked. " : ""}
             Choose an Excel (.xls / .xlsx), CSV, TSV, or semicolon-delimited text file.
           </p>
-          <input type="file" accept=".xls,.xlsx,.csv,.tsv,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values" onChange={onFileSelected} style={{ fontSize: 12 }} />
+          <input type="file"accept=".xls,.xlsx,.csv,.tsv,.txt,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/tab-separated-values"onChange={onFileSelected} style={{ fontSize: 12 }} />
           {busy && <p className="pm-hint">Reading file...</p>}
         </>
       )}
@@ -253,9 +253,9 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
             <span>Invalid JSON values: <strong>{preview.invalidJson}</strong></span>
           </div>
           {canSkipExisting && (
-            <div className="pm-import-preview" style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
+            <div className="pm-import-preview"style={{ flexDirection: "column", alignItems: "stretch", gap: 4 }}>
               <label style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 700 }}>
-                <input type="checkbox" checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
+                <input type="checkbox"checked={onlyNew} onChange={(e) => setOnlyNew(e.target.checked)} />
                 Only add products that are not in the Product Master yet (existing products, their More Barcodes and rates stay untouched)
               </label>
               {split ? (
@@ -265,9 +265,9 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
                     {"  ·  "}Already in Product Master (skipped): <strong>{split.existing.length}</strong>
                     {split.repeated.length > 0 && <>{"  ·  "}Repeated in file: <strong>{split.repeated.length}</strong></>}
                   </span>
-                  <span className="pm-hint" style={{ margin: 0 }}>A row counts as existing when Product Name + Code/Model match, or its barcode is already used.</span>
+                  <span className="pm-hint"style={{ margin: 0 }}>A row counts as existing when Product Name + Code/Model match, or its barcode is already used.</span>
                   {split.fresh.length > 0 && (
-                    <div className="pm-table-wrap" style={{ maxHeight: 160 }}>
+                    <div className="pm-table-wrap"style={{ maxHeight: 160 }}>
                       <table className="pm-table">
                         <thead><tr><th style={{ width: 40 }}>#</th><th>New Product Name</th><th>Code / Model</th><th>Barcode</th></tr></thead>
                         <tbody>
@@ -280,11 +280,11 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
                   )}
                 </>
               ) : (
-                <span style={{ color: "#b45309", fontWeight: 700 }}>⚠ Every row will be added as a new product — products already in the master will be duplicated.</span>
+                <span style={{ color: "#b45309", fontWeight: 700 }}> Every row will be added as a new product — products already in the master will be duplicated.</span>
               )}
             </div>
           )}
-          <div className="pm-table-wrap" style={{ maxHeight: 300 }}>
+          <div className="pm-table-wrap"style={{ maxHeight: 300 }}>
             <table className="pm-table">
               <thead><tr><th>Source Column</th><th>Sample</th><th>Maps To</th></tr></thead>
               <tbody>
@@ -307,8 +307,8 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
             </table>
           </div>
           <div className="pm-window-foot">
-            <button type="button" className="pm-btn-secondary" onClick={closeSafely} disabled={busy}>Cancel</button>
-            <button type="button" className="pm-btn" onClick={commit} disabled={busy}>
+            <button type="button"className="pm-btn-secondary"onClick={closeSafely} disabled={busy}>Cancel</button>
+            <button type="button"className="pm-btn"onClick={commit} disabled={busy}>
               {busy ? "Importing..." : split ? `Import ${split.fresh.length} new products` : `Import ${rows.length} rows`}
             </button>
           </div>
@@ -323,7 +323,7 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
             {result.alreadyThere > 0 && <span style={{ color: "#475569" }}>Already in Product Master (left as is): {result.alreadyThere}</span>}
           </div>
           {result.errors?.length > 0 && (
-            <div className="pm-table-wrap" style={{ maxHeight: 240 }}>
+            <div className="pm-table-wrap"style={{ maxHeight: 240 }}>
               <table className="pm-table">
                 <thead><tr><th>Row</th><th>Reason</th></tr></thead>
                 <tbody>
@@ -335,7 +335,7 @@ export default function ImportModal({ onImport, onClose, notify, replacementMode
             </div>
           )}
           <div className="pm-window-foot">
-            <button type="button" className="pm-btn" onClick={closeSafely}>Close</button>
+            <button type="button"className="pm-btn"onClick={closeSafely}>Close</button>
           </div>
         </>
       )}

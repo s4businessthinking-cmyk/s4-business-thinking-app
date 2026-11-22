@@ -13,7 +13,7 @@ const NOTIFY_HOUR = 9;
 
 function showSystemNotification(title, body, onClick, tag = "s4-cheque-due") {
   try {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (typeof window === "undefined" || !("Notification"in window)) return;
     const show = () => {
       const n = new Notification(title, { body, tag });
       n.onclick = () => {
@@ -66,9 +66,9 @@ async function scheduleNative({ shopId, cheques, bn, cur }) {
         list.push({
           id: idFor(`${c.key}|${c.chequeDate}|${before}`),
           title: before === 0
-            ? (bn ? "🔔 আজ চেকের তারিখ — ক্লিয়ার হয়েছে কিনা দেখুন" : "🔔 Cheque date today — check if it cleared")
-            : (bn ? `⏳ ${before} দিন পর চেকের তারিখ` : `⏳ Cheque due in ${before} day(s)`),
-          body: `${describe(c, bn, cur)} · 📅 ${fmtDay(c.chequeDate)}`,
+            ? (bn ? "আজ চেকের তারিখ — ক্লিয়ার হয়েছে কিনা দেখুন" : "Cheque date today — check if it cleared")
+            : (bn ? ` ${before} দিন পর চেকের তারিখ` : `Cheque due in ${before} day(s)`),
+          body: `${describe(c, bn, cur)} ·  ${fmtDay(c.chequeDate)}`,
           schedule: { at, allowWhileIdle: true },
           extra: { chequeKey: c.key },
         });
@@ -127,7 +127,7 @@ export function useChequeDueNotifications({ shopId, enabled, cheques = [], upcom
     writeJson(storeKey, [...notified]);
 
     const total = fresh.reduce((a, c) => a + c.amount, 0);
-    const title = bn ? "🔔 চেকের তারিখ হয়েছে — ক্লিয়ার হয়েছে কিনা দেখুন" : "🔔 Cheque date reached — check if it cleared";
+    const title = bn ? "চেকের তারিখ হয়েছে — ক্লিয়ার হয়েছে কিনা দেখুন" : "Cheque date reached — check if it cleared";
     const body = fresh.length === 1
       ? describe(fresh[0], bn, cur)
       : bn ? `${fresh.length}টি চেক · মোট ${cur} ${money(total)} — ড্যাশবোর্ড থেকে ক্লিয়ার করুন` : `${fresh.length} cheques · ${cur} ${money(total)} — clear them from the dashboard`;
@@ -155,9 +155,9 @@ export function useChequeDueNotifications({ shopId, enabled, cheques = [], upcom
     if (!fresh.length) return;
 
     const soonest = Math.min(...fresh.map((c) => c.left));
-    const title = bn ? `⏳ ${soonest} দিন পর চেকের তারিখ` : `⏳ Cheque due in ${soonest} day(s)`;
+    const title = bn ? ` ${soonest} দিন পর চেকের তারিখ` : `Cheque due in ${soonest} day(s)`;
     const body = fresh.length === 1
-      ? `${describe(fresh[0], bn, cur)} · 📅 ${fmtDay(fresh[0].chequeDate)}`
+      ? `${describe(fresh[0], bn, cur)} ·  ${fmtDay(fresh[0].chequeDate)}`
       : bn
         ? `${fresh.length}টি চেক সামনে আসছে · মোট ${cur} ${money(fresh.reduce((a, c) => a + c.amount, 0))}`
         : `${fresh.length} cheques coming up · ${cur} ${money(fresh.reduce((a, c) => a + c.amount, 0))}`;

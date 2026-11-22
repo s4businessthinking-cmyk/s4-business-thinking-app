@@ -35,13 +35,13 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
             <div key={iIdx} style={s.oiCard}>
               <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary, marginBottom:6 }}>
                 {iIdx+1}. {it.name}
-                {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>📋 {it.code}</span>}
-                {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>🏷️ {it.brand}</span>}
+                {it.code&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}> {it.code}</span>}
+                {it.brand&&<span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}> {it.brand}</span>}
                 <span style={{ fontSize:11, color:"#71717a", marginLeft:6 }}>{it.qty} {it.unit}</span>
               </div>
               {it.purchaseInvoiceNo&&(
                 <div style={{ fontSize:11, color:"#22c55e", marginBottom:6 }}>
-                  🧾 {lang==="bn"?"Purchase":"Purchase"} {it.purchaseInvoiceNo}{it.supplierInvoiceNo?` · ${lang==="bn"?"সাপ্লায়ার বিল":"Supplier bill"} ${it.supplierInvoiceNo}`:""}
+                   {lang==="bn"?"Purchase":"Purchase"} {it.purchaseInvoiceNo}{it.supplierInvoiceNo?` · ${lang==="bn"?"সাপ্লায়ার বিল":"Supplier bill"} ${it.supplierInvoiceNo}`:""}
                 </div>
               )}
               {(isOwner||can("manageCompanies"))&&(
@@ -85,7 +85,7 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
                   {it.status==="out_of_stock" && !itemLocked && order.overall!=="cancelled" ? (
                     <button style={{ ...s.stBtn, flex:1, background:"#1d4ed8", color:"#fff", border:"1px solid #1d4ed8" }}
                       onClick={()=>setItemStatus(order.id,iIdx,"order_confirmed")}>
-                      🔁 {lang==="bn"?"আবার চেক":"Recheck"}
+                       {lang==="bn"?"আবার চেক":"Recheck"}
                     </button>
                   ) : canEditProc && (
                     <>
@@ -99,12 +99,12 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
               )}
               {(isSalesman&&order.createdBy===user.uid&&it.status==="out_for_branch")&&(
                 <div style={{ marginTop:8 }}>
-                  <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
+                  <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}> {t.deliver}</button>
                 </div>
               )}
               {(isSalesman&&can("markDelivery")&&order.createdBy!==user.uid&&it.status==="out_for_branch")&&(
                 <div style={{ marginTop:8 }}>
-                  <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}>🚚 {t.deliver}</button>
+                  <button style={s.delBtn} onClick={()=>deliverItem(order.id,iIdx)}> {t.deliver}</button>
                 </div>
               )}
             </div>
@@ -128,12 +128,12 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
           return (
             <div style={{ marginTop:10, marginBottom:4 }}>
               <div style={{ fontSize:10, color:"#71717a", textTransform:"uppercase", letterSpacing:0, fontWeight:700, marginBottom:6 }}>
-                {lang==="bn"?"💬 WhatsApp-এ পাঠান":"💬 Send via WhatsApp"}
+                {lang==="bn"?"WhatsApp-এ পাঠান":"Send via WhatsApp"}
               </div>
               {entries.map(({co, items})=>(
-                <a key={co.id} href={waLinkGroup(co.phone, items)} target="_blank" rel="noreferrer"
+                <a key={co.id} href={waLinkGroup(co.phone, items)} target="_blank"rel="noreferrer"
                   style={{ ...s.waBtn, display:"flex", justifyContent:"space-between", marginBottom:7, textDecoration:"none", borderRadius:10 }}>
-                  <span>💬 {co.name}</span>
+                  <span> {co.name}</span>
                   <span style={{ opacity:0.8, fontSize:11 }}>{items.length} {lang==="bn"?"টি পণ্য":"items"}</span>
                 </a>
               ))}
@@ -148,58 +148,58 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
             {order.overall==="pending"&&(
               <button style={{ ...s.flowBtn, background:"#052e16", color:"#22c55e", border:"1px solid #22c55e" }}
                 onClick={()=>setOrderStatus(order.id,"order_confirmed")}>
-                ✅ {lang==="bn"?"অর্ডার গ্রহণ করুন":"Confirm Order"}
+                 {lang==="bn"?"অর্ডার গ্রহণ করুন":"Confirm Order"}
               </button>
             )}
             {order.overall==="order_confirmed"&&(
               <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
                 onClick={()=>setOrderStatus(order.id,"ordered_supplier")}>
-                📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
+                 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
               </button>
             )}
             {order.overall==="ordered_supplier"&&(
               <button style={{ ...s.flowBtn, background:"#431407", color:"#f97316", border:"1px solid #f97316" }}
                 onClick={()=>setOrderStatus(order.id,"waiting_delivery")}>
-                ⏳ {lang==="bn"?"মাল আসার অপেক্ষায়":"Waiting for Delivery"}
+                 {lang==="bn"?"মাল আসার অপেক্ষায়":"Waiting for Delivery"}
               </button>
             )}
             {order.overall==="waiting_delivery"&&(
               <button style={{ ...s.flowBtn, background:"#2e1065", color:"#a855f7", border:"1px solid #a855f7" }}
                 onClick={()=>setOrderStatus(order.id,"arrived_main_shop")}>
-                🏪 {lang==="bn"?"মেইন শপে এসেছে":"Arrived at Main Shop"}
+                 {lang==="bn"?"মেইন শপে এসেছে":"Arrived at Main Shop"}
               </button>
             )}
             {order.overall==="arrived_main_shop"&&(
               <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4" }}
                 onClick={()=>setOrderStatus(order.id,"out_for_branch")}>
-                🚚 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Out for Branch"}
+                 {lang==="bn"?"ব্রাঞ্চে পাঠানো হচ্ছে":"Out for Branch"}
               </button>
             )}
             {order.overall==="out_for_branch"&&(
               <div style={{ fontSize:12, color:"#71717a", textAlign:"center", padding:"10px 0" }}>
                 {lang==="bn"
-                  ? "⏳ সেলসম্যান মাল বুঝে পাওয়ার পর ডেলিভারি সম্পন্ন হবে"
-                  : "⏳ Waiting for salesman to confirm receipt"}
+                  ? "সেলসম্যান মাল বুঝে পাওয়ার পর ডেলিভারি সম্পন্ন হবে"
+                  : "Waiting for salesman to confirm receipt"}
               </div>
             )}
             {order.overall==="delivered"&&order.items.some(it=>it.status==="order_confirmed")&&(
               <div style={{ background:th.accentDim, border:"1px solid #f97316", borderRadius:10, padding:"10px 12px", marginBottom:6 }}>
                 <div style={{ fontSize:12, color:"#f97316", fontWeight:700, marginBottom:8 }}>
-                  🔁 {lang==="bn"?"No Stock আইটেম Recheck করা হয়েছে — আবার অর্ডার করুন":"No-stock items rechecked — re-order below"}
+                   {lang==="bn"?"No Stock আইটেম Recheck করা হয়েছে — আবার অর্ডার করুন":"No-stock items rechecked — re-order below"}
                 </div>
                 <button style={{ ...s.flowBtn, background:"#083344", color:"#06b6d4", border:"1px solid #06b6d4", marginBottom:0 }}
                   onClick={()=>setOrderStatus(order.id,"ordered_supplier")}>
-                  📦 {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
+                   {lang==="bn"?"কোম্পানিকে জানানো হয়েছে":"Ordered to Supplier"}
                 </button>
               </div>
             )}
           </div>
         )}
         {can("printOrders")&&(
-          <button style={{ ...s.delOrderBtn, borderColor:"#1d4ed8", color:"#60a5fa" }} onClick={()=>printOrder(order)}>🖨️ {lang==="bn"?"প্রিন্ট":"Print"}</button>
+          <button style={{ ...s.delOrderBtn, borderColor:"#1d4ed8", color:"#60a5fa" }} onClick={()=>printOrder(order)}> {lang==="bn"?"প্রিন্ট":"Print"}</button>
         )}
         {can("deleteOrder")&&(
-          <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}>🗑️ {t.delOrder}</button>
+          <button style={s.delOrderBtn} onClick={()=>delOrder(order.id)}> {t.delOrder}</button>
         )}
       </>
     );
@@ -233,7 +233,7 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
         </div>
         <div style={{ fontSize:12, color:"#71717a" }}>
           {order.items.length}{t.items}
-          {showSenderName&&order.createdByName&&` · 👨‍💼 ${order.createdByName}`}
+          {showSenderName&&order.createdByName&&` ·  ${order.createdByName}`}
           {order.note&&` · ${order.note}`}
         </div>
         {order.items.map((it,x)=>(
@@ -242,9 +242,9 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
               <div style={s.iName}>{it.name}</div>
               {(it.code||it.brand)&&(
                 <div style={s.iMeta}>
-                  {it.code&&<span>📋 {it.code}</span>}
+                  {it.code&&<span> {it.code}</span>}
                   {it.code&&it.brand&&<span> · </span>}
-                  {it.brand&&<span>🏷️ {it.brand}</span>}
+                  {it.brand&&<span> {it.brand}</span>}
                 </div>
               )}
             </div>
@@ -259,14 +259,14 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
               <button
                 style={{ ...s.delOrderBtn, flex:1, borderColor:"#1d4ed8", color:"#60a5fa" }}
                 onClick={e=>{ e.stopPropagation(); startEditOrder(order); }}>
-                ✏️ {lang==="bn"?"অর্ডার এডিট করুন":"Edit Order"}
+                 {lang==="bn"?"অর্ডার এডিট করুন":"Edit Order"}
               </button>
             )}
             {canCancel&&(
               <button
                 style={{ ...s.delOrderBtn, flex:1, borderColor:"#713f12", color:"#f59e0b" }}
                 onClick={e=>{ e.stopPropagation(); cancelOrder(order.id); }}>
-                🚫 {lang==="bn"?"বাতিল করুন":"Cancel Order"}
+                 {lang==="bn"?"বাতিল করুন":"Cancel Order"}
               </button>
             )}
           </div>
@@ -290,10 +290,10 @@ export function createOrderRenderers({ can, canExpand, cancelOrder, delOrder, de
   const ownerLockedPanel = (what) => (
     <div style={isDesktop?s.desktopPanel:s.panel}>
       <div style={{ ...s.card, textAlign:"center", padding:"36px 18px" }}>
-        <div style={{ fontSize:42, marginBottom:8 }}>🔒</div>
+        <div style={{ fontSize:42, marginBottom:8 }}></div>
         <div style={{ fontSize:16, fontWeight:800, color:th.txtPrimary, marginBottom:6 }}>{what}</div>
         <div style={{ fontSize:13, color:th.txtMuted, marginBottom:16 }}>{lang==="bn"?"দেখতে মালিকের পিন দিন":"Enter the owner PIN to view"}</div>
-        <button onClick={()=>setPinModal("unlock")} style={{ padding:"11px 22px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#2563eb,#1d4ed8)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"inherit" }}>🔓 {lang==="bn"?"পিন দিয়ে খুলুন":"Unlock with PIN"}</button>
+        <button onClick={()=>setPinModal("unlock")} style={{ padding:"11px 22px", borderRadius:10, border:"none", background:"linear-gradient(135deg,#2563eb,#1d4ed8)", color:"#fff", fontSize:14, fontWeight:800, cursor:"pointer", fontFamily:"inherit" }}> {lang==="bn"?"পিন দিয়ে খুলুন":"Unlock with PIN"}</button>
       </div>
     </div>
   );

@@ -27,9 +27,9 @@ export function InviteCodeRow({ c, lang, t, onDelete, th }) {
     <div style={{ display:"flex", alignItems:"center", gap:8, padding:"8px 0", borderTop:`1px solid ${th.border}` }}>
       <span style={{ fontSize:16, fontWeight:800, color:"#f97316", fontFamily:"monospace", flex:1, letterSpacing:2 }}>{c.code}</span>
       <button style={{ padding:"6px 12px", borderRadius:8, border:"none", background:"#1d4ed8", color:"#fff", cursor:"pointer", fontSize:12, fontWeight:700 }}
-        onClick={copy}>{copied?(lang==="bn"?"✅ কপি":"✅ Copied"):(lang==="bn"?"📋 কপি":"📋 Copy")}</button>
+        onClick={copy}>{copied?(lang==="bn"?"কপি":"Copied"):(lang==="bn"?"কপি":"Copy")}</button>
       <button style={{ padding:"6px 8px", borderRadius:8, border:"1px solid #450a0a", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:12 }}
-        onClick={()=>onDelete(c.code)}>🗑️</button>
+        onClick={()=>onDelete(c.code)}></button>
     </div>
   );
 }

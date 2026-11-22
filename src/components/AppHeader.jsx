@@ -29,25 +29,25 @@ export function Header({ t, lang, setLang, children, isDesktop, s, theme, setThe
       `}</style>
       <div style={{ ..._s.hLeft, ...(shopName ? { minWidth:0, flex:"1 1 auto" } : {}) }}>
         {onBack && (
-          <button type="button" onClick={onBack} title={lang==="bn"?"পেছনে":"Back"}
+          <button type="button"onClick={onBack} title={lang==="bn"?"পেছনে":"Back"}
             style={{ height:38, padding:"0 10px", borderRadius:10, border:`1px solid ${theme==="dark"?"#3f3f46":"#cbd5e1"}`, background:theme==="dark"?"#27272a":"#f1f5f9", color:theme==="dark"?"#f4f4f5":"#0f172a", fontSize:15, fontWeight:900, cursor:"pointer", flexShrink:0, fontFamily:"inherit" }}>
             ← {lang==="bn"?"পেছনে":"Back"}
           </button>
         )}
-        <img src={LOGO_URL} alt="S4" style={_s.headerLogo} />
+        <img src={LOGO_URL} alt="S4"style={_s.headerLogo} />
         {shopName ? (
           <div style={{ minWidth:0 }}>
             <div style={{ fontSize:isDesktop?20:15, fontWeight:900, lineHeight:1.15, letterSpacing:-0.3, color:theme==="dark"?"#f8fafc":"#0f172a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-              🏪 {shopName}
+               {shopName}
             </div>
             <div style={{ ..._s.sub, marginTop:2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-              {personName && <span style={{ color:"#3b82f6", fontWeight:800 }}>👤 {personName.toUpperCase()}</span>}
+              {personName && <span style={{ color:"#3b82f6", fontWeight:800 }}> {personName.toUpperCase()}</span>}
               {personName && " · "}{APP_NAME}
             </div>
           </div>
         ) : (
           <div>
-            <div className="s4-live-3d-title" style={titleStyle}>{APP_NAME}</div>
+            <div className="s4-live-3d-title"style={titleStyle}>{APP_NAME}</div>
             <div style={_s.sub}>{t.appSub}</div>
           </div>
         )}
@@ -66,7 +66,7 @@ export function Header({ t, lang, setLang, children, isDesktop, s, theme, setThe
               alignItems:"center", justifyContent:"center",
               flexShrink:0, transition:"all 0.2s",
             }}>
-            {theme==="dark" ? "☀️" : "🌙"}
+            {theme==="dark" ? "" : ""}
           </button>
         )}
         {!rightSlot && (

@@ -22,11 +22,11 @@ function productHay(p) {
 }
 
 const KIND_META = {
-  product: { icon: "📦", bn: "পণ্য", en: "Product" },
-  customer: { icon: "👤", bn: "কাস্টমার", en: "Customer" },
-  vendor: { icon: "🏭", bn: "সাপ্লায়ার", en: "Vendor" },
-  salesInvoice: { icon: "🧾", bn: "বিক্রি বিল", en: "Sales bill" },
-  purchaseInvoice: { icon: "📥", bn: "ক্রয় বিল", en: "Purchase bill" },
+  product: { icon: "", bn: "পণ্য", en: "Product" },
+  customer: { icon: "", bn: "কাস্টমার", en: "Customer" },
+  vendor: { icon: "", bn: "সাপ্লায়ার", en: "Vendor" },
+  salesInvoice: { icon: "", bn: "বিক্রি বিল", en: "Sales bill" },
+  purchaseInvoice: { icon: "", bn: "ক্রয় বিল", en: "Purchase bill" },
 };
 
 function ResultsList({ results, bn, th, onPick }) {
@@ -292,7 +292,7 @@ export default function AppGlobalSearch({
             fontFamily: "inherit", textAlign: "left", cursor: "pointer",
           }}
         >
-          <span style={{ fontSize: 18 }}>🔎</span>
+          <span style={{ fontSize: 18 }}></span>
           <span style={{ flex: 1 }}>{bn ? "সব জিনিস খুঁজুন…" : "Search everything…"}</span>
         </button>
       </div>
@@ -313,7 +313,7 @@ export default function AppGlobalSearch({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderBottom: `1px solid ${th.border}` }}>
-          <button type="button" onClick={closeSheet} style={{
+          <button type="button"onClick={closeSheet} style={{
             border: "none", background: th.bgInp, color: th.txtPrimary, borderRadius: 8,
             padding: "8px 12px", fontSize: 14, fontWeight: 800, fontFamily: "inherit",
           }}>
@@ -352,7 +352,7 @@ export default function AppGlobalSearch({
   return (
     <div ref={wrapRef} style={{ ...glassCard, borderRadius: 14, padding: "10px 12px", marginTop: 6, marginBottom: 6, position: "relative", zIndex: 30 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={{ fontSize: 18 }}>🔎</span>
+        <span style={{ fontSize: 18 }}></span>
         <input
           ref={inputRef}
           value={q}

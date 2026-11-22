@@ -271,7 +271,7 @@ export default function VendorMasterScreen({
   // The opening balance lives as one credit purchase bill per vendor, so the ledger shows it and payments can settle it.
   const syncOpeningBill = async (vendorId, saved) => {
     if (!canPurchase) {
-      if (num(saved.openingBalance) > 0) toast(L("Opening balance লেজারে নিতে 'ক্রয় ইনভয়েস ম্যানেজ' permission লাগবে", "Putting the opening balance in the ledger needs the Manage Purchase permission"), "err");
+      if (num(saved.openingBalance) > 0) toast(L("Opening balance লেজারে নিতে 'ক্রয় ইনভয়েস ম্যানেজ'permission লাগবে", "Putting the opening balance in the ledger needs the Manage Purchase permission"), "err");
       return;
     }
     await syncPartyOpeningBill({ kind: "vendors", partyId: vendorId, party: saved, shopId, uid: user.uid, actorName, bn });
@@ -284,7 +284,7 @@ export default function VendorMasterScreen({
     if (!selectedId && !form.mobileNumber.trim()) { toast(t.vm_errMobile, "err"); if (isMobile) setMobileTab("details"); return; }
     const sameName = vendors.find((v) => v.id !== selectedId && String(v.vendorName || "").trim().toLowerCase() === name.toLowerCase());
     if (sameName && !window.confirm(L(
-      `"${sameName.vendorName}" নামে আরেকটা ভেন্ডর আছে। তবুও সেভ করবেন?`,
+      `"${sameName.vendorName}"নামে আরেকটা ভেন্ডর আছে। তবুও সেভ করবেন?`,
       `Another vendor is already named "${sameName.vendorName}". Save anyway?`
     ))) return;
 
@@ -353,7 +353,7 @@ export default function VendorMasterScreen({
         .some((r) => r.data?.shopId === shopId && r.data?.vendorId === selectedId && r.data?.status !== "cancelled");
       if (used) {
         window.alert(L(
-          "এই ভেন্ডরের ক্রয় বিল বা পেমেন্ট আছে, তাই মোছা যাবে না — লেজার ঠিক রাখতে Status 'নিষ্ক্রিয়' বা 'ব্লক' করে দিন।",
+          "এই ভেন্ডরের ক্রয় বিল বা পেমেন্ট আছে, তাই মোছা যাবে না — লেজার ঠিক রাখতে Status 'নিষ্ক্রিয়'বা 'ব্লক'করে দিন।",
           "This vendor has purchase bills or payments, so it cannot be deleted — set its Status to Inactive or Blocked to keep the ledger correct."
         ));
         return;
@@ -394,8 +394,8 @@ export default function VendorMasterScreen({
     <div className="pm-form-row">
       <label className="pm-label">{label}{opts.required && <span className="vm-req"> *</span>}</label>
       {opts.multiline
-        ? <textarea className="pm-input" value={form[key]} onChange={(e) => upd(key, e.target.value)} />
-        : <input className="pm-input" value={form[key]} inputMode={opts.inputMode} placeholder={opts.placeholder || ""}
+        ? <textarea className="pm-input"value={form[key]} onChange={(e) => upd(key, e.target.value)} />
+        : <input className="pm-input"value={form[key]} inputMode={opts.inputMode} placeholder={opts.placeholder || ""}
             readOnly={opts.readOnly} tabIndex={opts.readOnly ? -1 : undefined}
             style={{ ...(opts.mono ? { fontFamily: "Consolas, monospace" } : {}), ...(opts.readOnly ? { background: "#eef1f6", cursor: "not-allowed" } : {}) }}
             onChange={opts.readOnly ? undefined : (e) => upd(key, e.target.value)} />}
@@ -438,7 +438,7 @@ export default function VendorMasterScreen({
   };
 
   return (
-    <div ref={rootRef} className="vm-root" style={fitHeight ? { height: fitHeight } : undefined}>
+    <div ref={rootRef} className="vm-root"style={fitHeight ? { height: fitHeight } : undefined}>
       <style>{PM_CSS}</style>
       <style>{VM_CSS}</style>
 
@@ -452,15 +452,15 @@ export default function VendorMasterScreen({
       </div>
 
       <div className="pm-quick-bar">
-        <button type="button" className="pm-btn" onClick={startNew} disabled={!canEdit}>{L("নতুন", "New")}</button>
-        <button type="button" className="pm-btn" onClick={save} disabled={!canEdit || saving}>{saving ? "..." : L("সেভ", "Save")}</button>
-        <button type="button" className="pm-btn-secondary" onClick={close}>{L("বন্ধ", "Close")}</button>
+        <button type="button"className="pm-btn"onClick={startNew} disabled={!canEdit}>{L("নতুন", "New")}</button>
+        <button type="button"className="pm-btn"onClick={save} disabled={!canEdit || saving}>{saving ? "..." : L("সেভ", "Save")}</button>
+        <button type="button"className="pm-btn-secondary"onClick={close}>{L("বন্ধ", "Close")}</button>
       </div>
 
       {isMobile && (
-        <div className="vm-mtabs" role="tablist">
+        <div className="vm-mtabs"role="tablist">
           {[["list", L("তালিকা", "List")], ["details", L("বিস্তারিত", "Details")], ["more", L("ঠিকানা ও ব্যাংক", "Address & Bank")]].map(([key, label]) => (
-            <button key={key} type="button" role="tab" aria-selected={mobileTab === key}
+            <button key={key} type="button"role="tab"aria-selected={mobileTab === key}
               className={mobileTab === key ? "is-active" : ""} onClick={() => setMobileTab(key)}>
               {label}
             </button>
@@ -468,30 +468,30 @@ export default function VendorMasterScreen({
         </div>
       )}
 
-      <div className={`vm-grid${isMobile ? ` vm-tab-${mobileTab}` : ""}`}>
-        <fieldset className="pm-readonly-wrap" disabled={!canEdit}>
+      <div className={`vm-grid${isMobile ? `vm-tab-${mobileTab}` : ""}`}>
+        <fieldset className="pm-readonly-wrap"disabled={!canEdit}>
           <div className="vm-col vm-col-details">
             {panel(L("ভেন্ডর তথ্য", "Vendor Details"), <>
               {row(L("ভেন্ডরের নাম", "Vendor Name"), "vendorName", { required: true })}
               {row(L("ভেন্ডর কোড", "Vendor Code"), "vendorCode", { placeholder: L("সেভ করলে নিজে বসবে", "Auto on save"), readOnly: true, mono: true })}
-              <label className="pm-form-row" style={{ alignItems: "center" }}>
+              <label className="pm-form-row"style={{ alignItems: "center" }}>
                 <span className="pm-label">{L("দুই দিকে", "Both sides")}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700 }}>
-                  <input type="checkbox" checked={!!form.alsoCustomer} onChange={(e) => upd("alsoCustomer", e.target.checked)} />
+                  <input type="checkbox"checked={!!form.alsoCustomer} onChange={(e) => upd("alsoCustomer", e.target.checked)} />
                   {L("কাস্টমার হিসেবেও রাখুন", "Also keep as customer")}
                   {form.alsoCustomer && form.linkedCustomerId ? ` · ${customers.find((c) => c.id === form.linkedCustomerId)?.customerCode || ""}` : ""}
                 </span>
               </label>
               <div className="pm-form-row">
                 <label className="pm-label">{L("ক্যাটাগরি", "Category")}</label>
-                <select className="pm-input" value={form.category} onChange={(e) => upd("category", e.target.value)}>
+                <select className="pm-input"value={form.category} onChange={(e) => upd("category", e.target.value)}>
                   <option value="">—</option>
                   {[...new Set([...(t.vm_categories || []), form.category].filter(Boolean))].map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div className="pm-form-row">
                 <label className="pm-label">{L("স্ট্যাটাস", "Status")}</label>
-                <select className="pm-input" value={form.status} onChange={(e) => upd("status", e.target.value)}>
+                <select className="pm-input"value={form.status} onChange={(e) => upd("status", e.target.value)}>
                   {Object.keys(STATUS).map((st) => <option key={st} value={st}>{statusLabel(st)}</option>)}
                 </select>
               </div>
@@ -505,7 +505,7 @@ export default function VendorMasterScreen({
             {panel(L("ক্রেডিট ও নোট", "Credit & Notes"), <>
               <div className="pm-form-row">
                 <label className="pm-label">{L("পেমেন্ট ধরন", "Payment Type")}</label>
-                <select className="pm-input" value={form.paymentType || "cash"} onChange={(e) => upd("paymentType", e.target.value)}>
+                <select className="pm-input"value={form.paymentType || "cash"} onChange={(e) => upd("paymentType", e.target.value)}>
                   {Object.keys(PAY).map((p) => <option key={p} value={p}>{L(PAY[p].bn, PAY[p].en)}</option>)}
                 </select>
               </div>
@@ -541,11 +541,11 @@ export default function VendorMasterScreen({
               {row("SWIFT", "swiftCode", { mono: true })}
             </>)}
             {selectedId && onGoToSecurityCheques && panel(L("সিকিউরিটি চেক", "Security Cheques"), (
-              <div className="pm-form-row" style={{ alignItems: "center" }}>
+              <div className="pm-form-row"style={{ alignItems: "center" }}>
                 <span style={{ fontSize: 13 }}>
                   {L(`জমা আছে: ${scSummary.count}টি · মোট ${cur} ${scSummary.total.toFixed(2)}`, `Held: ${scSummary.count} · Total ${cur} ${scSummary.total.toFixed(2)}`)}
                 </span>
-                <button type="button" className="pm-btn-secondary" onClick={() => onGoToSecurityCheques(selectedVendor)}>{L("দেখুন", "View")}</button>
+                <button type="button"className="pm-btn-secondary"onClick={() => onGoToSecurityCheques(selectedVendor)}>{L("দেখুন", "View")}</button>
               </div>
             ))}
           </div>
@@ -553,11 +553,11 @@ export default function VendorMasterScreen({
 
         <div className="vm-col vm-col-list">
           <div className="pm-list">
-            <input className="pm-input" style={{ marginBottom: 4 }} placeholder={t.vm_searchPh}
+            <input className="pm-input"style={{ marginBottom: 4 }} placeholder={t.vm_searchPh}
               value={search} onChange={(e) => setSearch(e.target.value)} />
             <div className="vm-pills">
               {["ALL", "active", "inactive", "blocked"].map((st) => (
-                <button key={st} type="button" className={`pm-btn-secondary${statusFilter === st ? " is-active" : ""}`}
+                <button key={st} type="button"className={`pm-btn-secondary${statusFilter === st ? "is-active" : ""}`}
                   onClick={() => setStatusFilter(st)}>
                   {st === "ALL" ? L("সব", "All") : statusLabel(st)}
                 </button>
@@ -577,7 +577,7 @@ export default function VendorMasterScreen({
                   {filtered.map((v) => {
                     const st = v.status || "active";
                     return (
-                      <tr key={v.id} className={`pm-clickable${selectedId === v.id ? " pm-selected" : ""}`} onClick={() => pick(v)}>
+                      <tr key={v.id} className={`pm-clickable${selectedId === v.id ? "pm-selected" : ""}`} onClick={() => pick(v)}>
                         <td title={v.vendorName} style={st !== "active" ? { color: STATUS[st]?.color } : undefined}>
                           {v.vendorName}{st !== "active" ? ` (${statusLabel(st)})` : ""}
                         </td>
@@ -593,31 +593,31 @@ export default function VendorMasterScreen({
       </div>
 
       <div className="vm-actions">
-        <button type="button" className="pm-btn" onClick={startNew} disabled={!canEdit}>{L("নতুন", "New")}</button>
-        <button type="button" className="pm-btn pm-btn--primary" onClick={save} disabled={!canEdit || saving}>
+        <button type="button"className="pm-btn"onClick={startNew} disabled={!canEdit}>{L("নতুন", "New")}</button>
+        <button type="button"className="pm-btn pm-btn--primary"onClick={save} disabled={!canEdit || saving}>
           {saving ? "..." : L("সেভ", "Save")}{!isMobile && !saving ? " (Ctrl+S)" : ""}
         </button>
         {canDelete && (
-          <button type="button" className="pm-btn pm-btn--danger" onClick={remove} disabled={!selectedId}>{L("মুছুন", "Delete")}</button>
+          <button type="button"className="pm-btn pm-btn--danger"onClick={remove} disabled={!selectedId}>{L("মুছুন", "Delete")}</button>
         )}
         {canPrint && (
-          <button type="button" className="pm-btn-secondary" onClick={printProfile} disabled={!selectedId}>🖨️ {L("প্রোফাইল", "Profile")}</button>
+          <button type="button"className="pm-btn-secondary"onClick={printProfile} disabled={!selectedId}> {L("প্রোফাইল", "Profile")}</button>
         )}
         {canPrint && (
-          <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!filtered.length}>🖨️ {L("তালিকা", "List")}</button>
+          <button type="button"className="pm-btn-secondary"onClick={printList} disabled={!filtered.length}> {L("তালিকা", "List")}</button>
         )}
         {canDelete && renderImport && (
-          <button type="button" className="pm-btn-secondary" onClick={() => setShowImport(true)}>{L("ইমপোর্ট", "Import")}</button>
+          <button type="button"className="pm-btn-secondary"onClick={() => setShowImport(true)}>{L("ইমপোর্ট", "Import")}</button>
         )}
         {onGoToPurchase && (
-          <button type="button" className="pm-btn-secondary"
+          <button type="button"className="pm-btn-secondary"
             disabled={!selectedVendor || ["inactive", "blocked"].includes(selectedVendor.status || "active")}
             title={selectedVendor && selectedVendor.status && selectedVendor.status !== "active" ? L("নিষ্ক্রিয়/ব্লক ভেন্ডরের বিল করা যায় না", "Inactive/blocked vendors cannot be billed") : ""}
             onClick={() => onGoToPurchase(selectedVendor)}>
             {L("ক্রয় ইনভয়েস", "Purchase Invoice")}
           </button>
         )}
-        <button type="button" className="pm-btn-secondary" onClick={close}>{L("বন্ধ", "Close")}</button>
+        <button type="button"className="pm-btn-secondary"onClick={close}>{L("বন্ধ", "Close")}</button>
         <span className="vm-info">
           {dirty && <span className="vm-dirty">{L("● সেভ হয়নি", "● Unsaved")} · </span>}
           {selectedId ? `${L("এডিট", "Editing")}: ${form.vendorName || "-"}` : L("নতুন ভেন্ডর", "New vendor")}        </span>

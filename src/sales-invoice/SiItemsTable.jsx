@@ -11,7 +11,7 @@ export function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th,
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
         <span style={{ fontSize:12, fontWeight:800, color:isDelivery?"#a855f7":"#22c55e" }}>#{idx+1}</span>
         <div style={{ display:"flex", gap:6 }}>
-          <button onClick={()=>onPick(idx)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:11, fontWeight:700 }}>📦</button>
+          <button onClick={()=>onPick(idx)} style={{ padding:"4px 10px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:11, fontWeight:700 }}></button>
           <button onClick={()=>onDelete(item.id)} style={{ width:28, height:28, borderRadius:6, border:"none", background:"#450a0a", color:"#ef4444", cursor:"pointer", fontSize:13 }}>✕</button>
         </div>
       </div>
@@ -21,14 +21,14 @@ export function SiLineItemMobile({ item, idx, onUpdate, onDelete, onPick, t, th,
         <input style={inp()} placeholder={t.si_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
       </div>
       <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:6, marginBottom:6 }}>
-        <div><div style={lbl}>{t.si_qty}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></div>
+        <div><div style={lbl}>{t.si_qty}</div><input style={inp()} inputMode="decimal"placeholder="0"value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></div>
         <div><div style={lbl}>{t.si_unit}</div><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
-        <div><div style={lbl}>{t.si_unitPrice}</div><input style={inp()} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>
+        <div><div style={lbl}>{t.si_unitPrice}</div><input style={inp()} inputMode="decimal"placeholder="0.00"value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></div>
       </div>
       {!isDelivery&&(
         <div style={{ display:"grid", gridTemplateColumns:isTax?"1fr 1fr":"1fr", gap:6 }}>
-          <div><div style={lbl}>{t.si_discPerc}</div><input style={inp()} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
-          {isTax&&<div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>}
+          <div><div style={lbl}>{t.si_discPerc}</div><input style={inp()} inputMode="decimal"placeholder="0"value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></div>
+          {isTax&&<div><div style={lbl}>VAT %</div><input style={inp()} inputMode="decimal"placeholder="5"value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></div>}
         </div>
       )}
       <div style={{ marginTop:8, padding:"8px 10px", background:isDelivery?"rgba(168,85,247,0.08)":"rgba(34,197,94,0.08)", borderRadius:8, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -50,18 +50,18 @@ export function SiLineItemDesktop({ item, idx, onUpdate, onDelete, onPick, t, th
       <td style={{ padding:"8px 6px" }}>
         <div style={{ display:"flex", gap:4, marginBottom:4 }}>
           <input style={{ ...inp(), flex:2 }} placeholder={t.si_itemName} value={item.name} onChange={e=>onUpdate(item.id,"name",e.target.value)} />
-          <button onClick={()=>onPick(idx)} style={{ padding:"0 8px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:13, flexShrink:0 }}>📦</button>
+          <button onClick={()=>onPick(idx)} style={{ padding:"0 8px", borderRadius:6, border:"1px solid #6366f1", background:"rgba(99,102,241,0.08)", color:"#818cf8", cursor:"pointer", fontSize:13, flexShrink:0 }}></button>
         </div>
         <div style={{ display:"flex", gap:4 }}>
           <input style={{ ...inp(), flex:1 }} placeholder={t.si_code} value={item.code} onChange={e=>onUpdate(item.id,"code",e.target.value)} />
           <input style={{ ...inp(), flex:1 }} placeholder={t.si_brand} value={item.brand} onChange={e=>onUpdate(item.id,"brand",e.target.value)} />
         </div>
       </td>
-      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></td>
+      <td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal"placeholder="0"value={item.qty} onChange={e=>onUpdate(item.id,"qty",e.target.value)} /></td>
       <td style={{ padding:"8px 6px", width:80 }}><select style={{ ...inp(), background:th.bgCard }} value={item.unit} onChange={e=>onUpdate(item.id,"unit",e.target.value)}>{SI_UNITS.map(u=><option key={u} value={u}>{u}</option>)}</select></td>
-      <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal" placeholder="0.00" value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></td>
-      {!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="0" value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>}
-      {isTax&&!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal" placeholder="5" value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>}
+      <td style={{ padding:"8px 6px", width:110 }}><input style={inp({ textAlign:"right" })} inputMode="decimal"placeholder="0.00"value={item.unitPrice} onChange={e=>onUpdate(item.id,"unitPrice",e.target.value)} /></td>
+      {!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal"placeholder="0"value={item.discountPerc} onChange={e=>onUpdate(item.id,"discountPerc",e.target.value)} /></td>}
+      {isTax&&!isDelivery&&<td style={{ padding:"8px 6px", width:70 }}><input style={inp({ textAlign:"center" })} inputMode="decimal"placeholder="5"value={item.vatPerc} onChange={e=>onUpdate(item.id,"vatPerc",e.target.value)} /></td>}
       <td style={{ padding:"8px 6px", width:110, textAlign:"right" }}>
         <span style={{ fontSize:13, fontWeight:700, color:total>0?"#22c55e":th.txtFaint }}>{t.cur} {siFmt2(total)}</span>
         {effectiveTax&&siN2(item.discountPerc)>0&&<div style={{ fontSize:9, color:th.txtMuted, marginTop:2 }}>{siN2(item.discountPerc)>0&&<span style={{ color:"#ef4444" }}>-{siFmt2(disc)} </span>}{siN2(item.vatPerc)>0&&<span style={{ color:"#06b6d4" }}>+{siFmt2(vat)}</span>}</div>}
@@ -91,7 +91,7 @@ export function SiItemsTable({ items, lang, isTax, showDisc=true, onEdit, onDele
             const active = editId && editId===it.id;
             return (
               <tr key={it.id||i} className={active?"is-editing":""}>
-                <td className="si-center si-strong" style={{ verticalAlign:"top" }}>{i+1}</td>
+                <td className="si-center si-strong"style={{ verticalAlign:"top" }}>{i+1}</td>
                 <td className="si-wrap">
                   <div className="si-strong">{it.name}{it.batchNo&&<span style={{ marginLeft:6, fontSize:11, color:"#7c3aed" }}>[{it.batchNo}]</span>}</div>
                   {(it.code||it.brand)&&<div className="si-muted">{[it.code,it.brand].filter(Boolean).join(" · ")}</div>}
@@ -103,14 +103,14 @@ export function SiItemsTable({ items, lang, isTax, showDisc=true, onEdit, onDele
                   )}
                   {(onEdit||onDelete)&&(
                     <div className="si-line-tools">
-                      {onEdit&&<button type="button" className="pm-btn-secondary" onClick={()=>onEdit(it)}>✏️ {bn?"এডিট":"Edit"}</button>}
-                      {onDelete&&<button type="button" className="pm-btn-secondary" style={{ color:"#b91c1c" }} onClick={()=>onDelete(it)}>✕ {bn?"মুছুন":"Delete"}</button>}
+                      {onEdit&&<button type="button"className="pm-btn-secondary"onClick={()=>onEdit(it)}> {bn?"এডিট":"Edit"}</button>}
+                      {onDelete&&<button type="button"className="pm-btn-secondary"style={{ color:"#b91c1c" }} onClick={()=>onDelete(it)}>✕ {bn?"মুছুন":"Delete"}</button>}
                     </div>
                   )}
                 </td>
-                <td className="si-num si-wrap" style={{ verticalAlign:"top" }}>{it.qty} <span className="si-muted">{it.unit}</span></td>
-                <td className="si-num" style={{ verticalAlign:"top" }}>{siFmt2(it.unitPrice)}</td>
-                <td className="si-num si-strong" style={{ verticalAlign:"top" }}>{siFmt2(total)}</td>
+                <td className="si-num si-wrap"style={{ verticalAlign:"top" }}>{it.qty} <span className="si-muted">{it.unit}</span></td>
+                <td className="si-num"style={{ verticalAlign:"top" }}>{siFmt2(it.unitPrice)}</td>
+                <td className="si-num si-strong"style={{ verticalAlign:"top" }}>{siFmt2(total)}</td>
               </tr>
             );
           })}

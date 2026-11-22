@@ -146,14 +146,22 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
   };
   const piLeaveUnsavedOk = () =>
     !piIsDirty() || window.confirm(lang==="bn"?"এই বিলের পরিবর্তন সেভ হয়নি। তবুও চলে যাবেন?":"This bill has unsaved changes. Leave anyway?");
+  const piRestoreLedgerIfNeeded = () => {
+    if (piNavReturn !== "ledger") return;
+    setPiSubTab("ledger");
+    setPiLedgerHidden(false);
+    setPiNavReturn(null);
+  };
   const piLeaveDetail = () => {
     setSelInvoice(null);
     setPiView("list");
-    if (piNavReturn === "ledger") {
-      setPiSubTab("ledger");
-      setPiLedgerHidden(false);
-      setPiNavReturn(null);
-    }
+    piRestoreLedgerIfNeeded();
+  };
+  const piLeaveFormToList = () => {
+    if (!piLeaveUnsavedOk()) return false;
+    setPiView("list");
+    piRestoreLedgerIfNeeded();
+    return true;
   };
   const piApplyVendorPayment = (vendor) => {
     const pm = (vendor?.paymentType || "cash") === "credit" ? "credit" : "cash";
@@ -167,15 +175,11 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
     const guard = {
       leave: () => piView!=="form" || piLeaveUnsavedOk(),
       back: () => {
-        if (piView==="form") { if (piLeaveUnsavedOk()) setPiView("list"); }
+        if (piView==="form") { piLeaveFormToList(); }
         else if (piView==="detail") { piLeaveDetail(); }
         else if (inPayment) {
           setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null);
-          if (piNavReturn === "ledger") {
-            setPiSubTab("ledger");
-            setPiLedgerHidden(false);
-            setPiNavReturn(null);
-          }
+          piRestoreLedgerIfNeeded();
         } else setPiOpenParty(null);
         return true;
       },
@@ -212,9 +216,12 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
     return true;
   };
   useEscapeKey(() => {
-    if (piView==="form") { if (piLeaveUnsavedOk()) setPiView("list"); }
+    if (piView==="form") { piLeaveFormToList(); }
     else if (piView==="detail") { piLeaveDetail(); }
-    else { setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null); }
+    else {
+      setPmtView("list"); setSelVoucher(null); setPmtPrefillVendorId(null);
+      piRestoreLedgerIfNeeded();
+    }
   }, {
     enabled: !piWin.min && (piView!=="list" || (piSubTab==="payments" && pmtView!=="list")),
     level: piView==="form" ? 2 : 1,
@@ -281,5 +288,5 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
       ||(v.mobileNumber||"").includes(q)
       ||(v.city||"").toLowerCase().includes(q);
   });
-  return { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource };
+  return { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource };
 }

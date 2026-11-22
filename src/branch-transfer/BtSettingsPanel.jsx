@@ -43,7 +43,7 @@ export function BranchForm({ lang, s, th, team, onSave, busy }) {
 
   return (
     <div style={{ ...s.card, marginBottom: 12 }}>
-      <div style={s.settingsLbl}>➕ {t.saveBranch}</div>
+      <div style={s.settingsLbl}> {t.saveBranch}</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 8 }}>
         <input style={s.inp} placeholder={t.branchName} value={form.name} onChange={(e) => update("name", e.target.value)} />
         <input style={s.inp} placeholder={t.branchCode} value={form.code} onChange={(e) => update("code", e.target.value)} />
@@ -57,7 +57,7 @@ export function BranchForm({ lang, s, th, team, onSave, busy }) {
           })}
         </select>
       </div>
-      <NativeButton s={s} tone="primary" disabled={busy} onClick={submit} style={{ marginTop: 10 }}>{t.saveBranch}</NativeButton>
+      <NativeButton s={s} tone="primary"disabled={busy} onClick={submit} style={{ marginTop: 10 }}>{t.saveBranch}</NativeButton>
     </div>
   );
 }
@@ -75,7 +75,7 @@ export function BranchList({ lang, s, th, branches, onDisable, busy }) {
               {[branch.code, branch.location, branch.receiverName].filter(Boolean).join(" · ") || "—"}
             </div>
           </div>
-          <NativeButton s={s} tone="danger" disabled={busy || branch.active === false} onClick={() => onDisable(branch)}>
+          <NativeButton s={s} tone="danger"disabled={busy || branch.active === false} onClick={() => onDisable(branch)}>
             {branch.active === false ? t.disable : t.disable}
           </NativeButton>
         </div>
@@ -120,11 +120,11 @@ export function SettingsPanel({ lang, s, th, shopId, user, profile, team, settin
   return (
     <>
       <div style={s.card}>
-        <div style={s.settingsLbl}>🚚 {t.settingsTitle}</div>
+        <div style={s.settingsLbl}> {t.settingsTitle}</div>
         <ToggleRow th={th} label={t.enable} help={t.enableHelp} checked={draft.enabled === true} onChange={(value) => setDraft((prev) => ({ ...prev, enabled: value }))} />
         <ToggleRow th={th} label={t.autoInvoice} help={t.autoHelp} checked={draft.autoCreatePurchaseInvoiceOnReceive === true} onChange={(value) => setDraft((prev) => ({ ...prev, autoCreatePurchaseInvoiceOnReceive: value }))} />
         <ToggleRow th={th} label={t.partial} checked={draft.allowPartialReceive === true} onChange={(value) => setDraft((prev) => ({ ...prev, allowPartialReceive: value }))} />
-        <NativeButton s={s} tone="primary" disabled={busy} onClick={saveSettings} style={{ marginTop: 14 }}>{t.saveSettings}</NativeButton>
+        <NativeButton s={s} tone="primary"disabled={busy} onClick={saveSettings} style={{ marginTop: 14 }}>{t.saveSettings}</NativeButton>
       </div>
 
       {draft.enabled && (

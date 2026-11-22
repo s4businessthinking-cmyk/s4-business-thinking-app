@@ -20,7 +20,7 @@ export const LABEL_FIELDS = [
   { key: "price", bn: "বিক্রয় দাম", en: "Sale price" },
   { key: "mrp", bn: "MRP", en: "MRP" },
   { key: "unit", bn: "একক", en: "Unit" },
-  { key: "rack", bn: "র‍্যাক", en: "Rack" },
+  { key: "rack", bn: "র্যাক", en: "Rack" },
 ];
 
 export const DEFAULT_LABEL_SETTINGS = {
@@ -95,7 +95,7 @@ function labelHtml(p, s, shopName) {
   const code = productBarcode(p, s);
   const svg = code ? code128SvgMarkup(code, { moduleWidth: 2, height: 50, fontSize: 0 }) : "";
   const bars = svg
-    ? svg.replace("<svg ", `<svg preserveAspectRatio="none" style="width:100%;height:${clamp(s.barHeight, 4, 30)}mm;display:block" `)
+    ? svg.replace("<svg ", `<svg preserveAspectRatio="none"style="width:100%;height:${clamp(s.barHeight, 4, 30)}mm;display:block" `)
     : `<div class="nobar">NO BARCODE</div>`;
   const price = productPrice(p);
   const mrp = productMrp(p);

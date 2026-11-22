@@ -113,24 +113,24 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
   const valColor = (value, color) => color || (value < 0 ? "#b91c1c" : undefined);
 
   return (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title">
-        <strong>📊 {L("হিসাব নিকাশ", "Accounts Summary")}</strong>
+        <strong> {L("হিসাব নিকাশ", "Accounts Summary")}</strong>
         <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
       <div className="si-toolbar">
-        {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!report || badRange}>🖨️ {L("প্রিন্ট", "Print")}</button>}
-        <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}>🔄 {L("রিফ্রেশ", "Refresh")}</button>
+        {canPrint && <button type="button"className="pm-btn pm-btn--primary"onClick={print} disabled={!report || badRange}> {L("প্রিন্ট", "Print")}</button>}
+        <button type="button"className="pm-btn-secondary"onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (
-            <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
+            <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       {report && (
         <div className="si-kpis">
@@ -148,11 +148,11 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
           <>
             <div className={mobile ? "" : "si-cols"} style={mobile ? { display: "flex", flexDirection: "column", gap: 4 } : { alignItems: "start" }}>
               {sections.map(([title, lines]) => (
-                <fieldset key={title} className="pm-panel" style={{ margin: 0 }}>
+                <fieldset key={title} className="pm-panel"style={{ margin: 0 }}>
                   <legend className="pm-panel-legend">{title}</legend>
                   <div className="si-panel-body">
                     {lines.map(([label, value, strong, color]) => (
-                      <div key={label} className={`si-total-row${strong ? " is-grand" : ""}`} style={strong ? { fontSize: mobile ? 15 : 12 } : undefined}>
+                      <div key={label} className={`si-total-row${strong ? "is-grand" : ""}`} style={strong ? { fontSize: mobile ? 15 : 12 } : undefined}>
                         <span style={{ whiteSpace: "pre-wrap", color: strong ? undefined : "#1f2937" }}>{label}</span>
                         <b style={{ whiteSpace: "nowrap", color: valColor(value, color) }}>{cur} {money(value)}</b>
                       </div>
@@ -163,10 +163,10 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
             </div>
             <div className="si-note">
               {L(
-                "মোট লাভ = নিট বিক্রি − বিক্রি হওয়া মালের গড় ক্রয়মূল্য (opening stock আর confirmed পারচেজ থেকে, VAT বাদে)। নিট লাভ = মোট লাভ − 💸 খরচ পেজে লেখা দোকানের খরচ (খরচের বিলের VAT বাদে, কারণ সেটা VAT রিটার্নে ফেরত পাওয়া যায়)। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর পার্টির Opening Balance বিল বিক্রি/ক্রয়ে ধরা হয়নি (তবে বাকিতে ধরা আছে)। বাউন্স হওয়া খরচের চেক টাকা-যাওয়াতে ধরা হয়নি।",
-                "Gross profit = net sales − average purchase cost of goods sold (from opening stock and confirmed purchases, VAT excluded). Net profit = gross profit − shop expenses entered on the 💸 Expenses page (without the VAT on expense bills, which is claimed back in the VAT return). Drafts, cancelled bills, quotations, delivery notes and party opening-balance bills are not counted as sales/purchases (they are in the dues). Bounced expense cheques are not counted as money out."
+                "মোট লাভ = নিট বিক্রি − বিক্রি হওয়া মালের গড় ক্রয়মূল্য (opening stock আর confirmed পারচেজ থেকে, VAT বাদে)। নিট লাভ = মোট লাভ −  খরচ পেজে লেখা দোকানের খরচ (খরচের বিলের VAT বাদে, কারণ সেটা VAT রিটার্নে ফেরত পাওয়া যায়)। Draft, বাতিল, কোটেশন, ডেলিভারি নোট আর পার্টির Opening Balance বিল বিক্রি/ক্রয়ে ধরা হয়নি (তবে বাকিতে ধরা আছে)। বাউন্স হওয়া খরচের চেক টাকা-যাওয়াতে ধরা হয়নি।",
+                "Gross profit = net sales − average purchase cost of goods sold (from opening stock and confirmed purchases, VAT excluded). Net profit = gross profit − shop expenses entered on the  Expenses page (without the VAT on expense bills, which is claimed back in the VAT return). Drafts, cancelled bills, quotations, delivery notes and party opening-balance bills are not counted as sales/purchases (they are in the dues). Bounced expense cheques are not counted as money out."
               )}
-              {report.unpriced > 0 && <div style={{ color: "#b45309", fontWeight: 700, marginTop: 3 }}>⚠ {L(`${report.unpriced}টি বিক্রির লাইনে প্রোডাক্টের ক্রয়মূল্য নেই, তাই সেগুলোর খরচ 0 ধরা হয়েছে।`, `${report.unpriced} sold line(s) have no purchase cost, so their cost is counted as 0.`)}</div>}
+              {report.unpriced > 0 && <div style={{ color: "#b45309", fontWeight: 700, marginTop: 3 }}> {L(`${report.unpriced}টি বিক্রির লাইনে প্রোডাক্টের ক্রয়মূল্য নেই, তাই সেগুলোর খরচ 0 ধরা হয়েছে।`, `${report.unpriced} sold line(s) have no purchase cost, so their cost is counted as 0.`)}</div>}
             </div>
           </>
         )}

@@ -92,11 +92,7 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
   }, [siMobile, siView]);
-  useEscapeKey(() => {
-    if (siView==="form") { if (siLeaveUnsavedOk()) setSiView("list"); }
-    else { setSiView("list"); setSelInv(null); }
-  }, { enabled: siView!=="list" && !siWin.min, level: siView==="form" ? 2 : 1 });
-  const { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiPrintModal, setSiPrintPayAsk, setSiSaving, setSiSearch, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siPrintModal, siPrintPayAsk, siQtyRef, siSaveLockRef, siSaving, siSearch, siSnapRef, siStatusF } = useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, isOwner, kind, setDnMigrateTick, setInvoices, setSiLoading, shopId, syncRefreshKey, user, viewAllInvoices: canViewAllInvoices });
+  const { billReturns, cashRcptSaving, cashReceiptWin, editInvId, ledgerWin, rcptSaving, receiptWin, receipts, selInv, setCashRcptSaving, setCashReceiptWin, setEditInvId, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiLedgerPartyKey, setSiPrintModal, setSiPrintPayAsk, setSiSaving, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, showCustPicker, siBatchAsk, siCurrent, siEditLineId, siEmptyCurrent, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siNameRef, siNavReturn, siLedgerPartyKey, siPrintModal, siPrintPayAsk, siQtyRef, siSaveLockRef, siSaving, siSearch, siVehicleQ, siRefQ, siSnapRef, siStatusF } = useSiData({ COL, authSyncReady, dnMigrateTick, invoices, isDN, isOwner, kind, setDnMigrateTick, setInvoices, setSiLoading, shopId, syncRefreshKey, user, viewAllInvoices: canViewAllInvoices });
 
   const { bumpShopSiSerial, reserveSiInvoiceNo, siLoadDoc, siOpenEdit, siOpenNew, siPreviewNextInvoiceNo } = createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, isDN, isOwner, isQuote, isSO, kind, lang, profile, serialField, serialRe, setEditInvId, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiView, setSourceQuote, shop, shopId, siEmptyCurrent, siInvoiceNo, siLoadedPaidRef, siSnapRef, team, toast, user });
   useEffect(()=>{
@@ -146,7 +142,12 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
 
   const { siAddCurrentItem, siAutoDisc, siChangeCurrentUnit, siDelLine, siFindProduct, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siUpd } = createSiLineActions({ canManageCustomers, customers, isDN, isQuote, kind, lang, onCustomerCreated, products, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiLines, shopId, siCurrent, siEditLineId, siEmptyCurrent, siForm, siLines, siNameRef, siQtyRef, t, toast, user });
 
-  const { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint } = useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, editInvId, invoices, isDN, isOwner, isQuote, kind, lang, productFromMaster, receipts, setEditInvId, setLedgerWin, setSelInv, setShowCustPicker, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiOpenParty, setSiSearch, setSiView, setSourceQuote, shop, siColorPrint, siCurrent, siEmptyCurrent, siForm, siLines, siMobile, siNavReturn, siOpenEdit, siOpenParty, siPerm, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siShowCode, siSnapRef, siView, siWin, t, user });
+  const { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint } = useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, editInvId, invoices, isDN, isOwner, isQuote, kind, lang, productFromMaster, receipts, setEditInvId, setLedgerWin, setSelInv, setShowCustPicker, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiOpenParty, setSiSearch, setSiView, setSourceQuote, shop, siColorPrint, siCurrent, siEmptyCurrent, siForm, siLines, siMobile, siNavReturn, siOpenEdit, siOpenParty, siPerm, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siShowCode, siSnapRef, siView, siWin, t, user });
+
+  useEscapeKey(() => {
+    if (siView==="form") siLeaveFormToList();
+    else if (siView==="detail") siLeaveDetail();
+  }, { enabled: siView!=="list" && !siWin.min, level: siView==="form" ? 2 : 1 });
 
   const { siConfirm, siSaveDraft } = createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user });
 
@@ -179,17 +180,22 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     siConfirm({ print: "direct", paymentMethod: method, cashPartial: false, ...(switchingToCredit ? { forceAmountPaid: 0 } : {}) });
   };
 
-  const { cashReceiptWindow, ledgerWindow, receiptWindow, siCancel, siDelete } = createSiReceiptActions({ COL, billReturns, canCancelInv, canPrintInv, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiView, shop, shopId, siNavReturn, t, team, toast, user });
+  const { cashReceiptWindow, ledgerWindow, receiptWindow, siCancel, siDelete } = createSiReceiptActions({ COL, billReturns, canCancelInv, canPrintInv, cashRcptSaving, cashReceiptWin, customers, invoices, isDN, isOwner, isQuote, kind, lang, ledgerWin, profile, rcptSaving, receiptWin, receipts, setCashReceiptWin, setCashRcptSaving, setInvoices, setLedgerWin, setRcptSaving, setReceiptWin, setReceipts, setSelInv, setSiNavReturn, setSiLedgerPartyKey, siLedgerPartyKey, setSiView, shop, shopId, siNavReturn, t, team, toast, user });
 
   // Memoized: invoices can be thousands of rows, and this component re-renders on
   // every keystroke anywhere in the form, not just the search box.
   const siFiltered=useMemo(() => invoices.filter(inv=>{
     const matchSt=siStatusF==="ALL"||inv.status===siStatusF;
+    if (!matchSt) return false;
+    const vq=siVehicleQ.trim();
+    if (vq && !nsmatch(inv.vehicleNo||"", vq)) return false;
+    const rq=siRefQ.trim();
+    if (rq && !nsmatch(inv.refNo||"", rq)) return false;
     const q=siSearch.trim();
-    if (!q) return matchSt;
-    const hay=[inv.invoiceNo,inv.customerName,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
-    return matchSt&&nsmatch(hay,q);
-  }), [invoices, siStatusF, siSearch]);
+    if (!q) return true;
+    const hay=[inv.invoiceNo,inv.customerName,inv.createdByName,inv.vehicleNo,inv.refNo,...(inv.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
+    return nsmatch(hay,q);
+  }), [invoices, siStatusF, siSearch, siVehicleQ, siRefQ]);
   const siKPIs=useMemo(() => invoices.reduce((a,inv)=>{ a.total++; if (inv.status!=="cancelled"&&inv.status!=="draft") { if (!isOpeningBill(inv)) a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; } if (inv.status==="open") a.open++; if (inv.status==="converted") a.converted++; if (inv.status==="confirmed") a.delivered++; if (inv.status==="invoiced") a.invoiced++; if (inv.status==="delivered") a.soDelivered++; return a; },{total:0,amount:0,paid:0,due:0,open:0,converted:0,delivered:0,invoiced:0,soDelivered:0}), [invoices]);
   const kpiCards = isSO
     ? [{l:lang==="bn"?"মোট সেলস অর্ডার":"Sales Orders",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#0e7490",pre:t.cur+" "},{l:SO_STATUSES.open[lang],v:siKPIs.open,c:"#06b6d4",pre:""},{l:lang==="bn"?"ডেলিভারি / ইনভয়েস হয়েছে":"Delivered / Invoiced",v:siKPIs.soDelivered+siKPIs.invoiced,c:"#22c55e",pre:""}]
@@ -201,9 +207,9 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
 
   const formIsDelivery = isDN || (kind==="sales" && siForm.invoiceType==="delivery");
   const mobileTypeOptions = (isDN||isQuote) ? [] : [
-    ...(siForm.invoiceType==="regular" ? [["regular","🧾",t.si_regular,t.si_regularDesc,"#22c55e"]] : []),
-    ["tax","🏛️",t.si_tax,t.si_taxDesc,"#1d4ed8"],
-    ...((kind==="sales"&&siForm.invoiceType==="delivery") ? [["delivery","🚚",t.si_delivery,t.si_deliveryDesc,"#a855f7"]] : []),
+    ...(siForm.invoiceType==="regular" ? [["regular","",t.si_regular,t.si_regularDesc,"#22c55e"]] : []),
+    ["tax","",t.si_tax,t.si_taxDesc,"#1d4ed8"],
+    ...((kind==="sales"&&siForm.invoiceType==="delivery") ? [["delivery","",t.si_delivery,t.si_deliveryDesc,"#a855f7"]] : []),
   ];
   const formIsTax      = siForm.invoiceType==="tax";
   const formIsCash     = siForm.paymentMethod==="cash";
@@ -217,8 +223,8 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   const bnL = lang==="bn";
   const siAccent = isSO ? "#0e7490" : isQuote ? "#b45309" : isDN ? "#7e22ce" : "#15803d";
   const siLightC = { "#a1a1aa":"#07101c", "#22c55e":"#15803d", "#06b6d4":"#0e7490", "#ef4444":"#b91c1c", "#a855f7":"#7e22ce", "#f59e0b":"#b45309" };
-  const siBadge = (st) => <span className="si-badge" style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{STATUSES[st]?.[lang]||st}</span>;
-  const siExpiredBadge = (inv) => isQuote && !isSO && qtIsExpired(inv) ? <span className="si-badge" style={{ color:"#b91c1c", marginRight:3 }}>{bnL?"মেয়াদ শেষ":"Expired"}</span> : null;
+  const siBadge = (st) => <span className="si-badge"style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{STATUSES[st]?.[lang]||st}</span>;
+  const siExpiredBadge = (inv) => isQuote && !isSO && qtIsExpired(inv) ? <span className="si-badge"style={{ color:"#b91c1c", marginRight:3 }}>{bnL?"মেয়াদ শেষ":"Expired"}</span> : null;
   const siRowDue = (inv) => (isQuote || isDN || ["cancelled","draft"].includes(inv.status)) ? 0 : Math.max(0, siN2(inv.grandTotal) - siN2(inv.amountPaid));
   const siMatchedLines = (inv) => {
     const q = siSearch.trim();
@@ -232,8 +238,8 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   const siOpenInvoice = (inv) => { if (!siLeaveMinOk()) return; setSelInv(inv); setSiView("detail"); };
   useEffect(() => {
     // openInvoiceId is shared across sales/quotation/delivery/salesOrder (same shared tab, different `kind`) —
-    // the id is only ever meaningful within the kind it was set for, so no extra `kind` check is needed here.
-    // On a fresh tab switch `invoices` starts empty and loads a moment later (see useSiData), so the id must
+    // the id is only ever meaningful within the kind it was set for, so no extra `kind`check is needed here.
+    // On a fresh tab switch `invoices`starts empty and loads a moment later (see useSiData), so the id must
     // stay pending (not consumed yet) until either it's actually found, or the list has loaded and still
     // doesn't have it — clearing it on the very first, still-empty render would drop the open request.
     if (!openInvoiceId) return;
@@ -244,14 +250,14 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   }, [openInvoiceId, invoices, kind]);
   const siDocTitle = isSO ? (bnL?"সেলস অর্ডার":"SALES ORDER") : isQuote ? (bnL?"কোটেশন":"QUOTATION") : isDN ? (bnL?"ডেলিভারি নোট":"DELIVERY NOTE") : (bnL?"সেলস ইনভয়েস":"SALES INVOICE");
 
-  // Reminder on this document — a plain "reminders" collection record carrying linkType/linkId/linkLabel
+  // Reminder on this document — a plain "reminders"collection record carrying linkType/linkId/linkLabel
   // so the bell/Reminders tab can jump straight back to this invoice/quotation/delivery note.
   const [siReminderForm, setSiReminderForm] = useState(null);
   const siOpenReminderForm = (inv) => setSiReminderForm({ invoiceId: inv.id, invoiceNo: inv.invoiceNo || "", customerName: inv.customerName || "", date: siToday(), time: "", note: "" });
   const siSaveReminder = async () => {
     if (!siReminderForm?.date) return;
     if (!shopId || !user?.uid) {
-      toast?.(bnL ? "❌ লগইন ছাড়া রিমাইন্ডার সেভ হবে না" : "❌ Sign in to save a reminder", "err");
+      toast?.(bnL ? "লগইন ছাড়া রিমাইন্ডার সেভ হবে না" : "Sign in to save a reminder", "err");
       return;
     }
     try {
@@ -265,7 +271,7 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
         linkType: kind, linkId: siReminderForm.invoiceId, linkLabel: siReminderForm.invoiceNo,
       });
       setSiReminderForm(null);
-      toast?.(bnL ? "✅ রিমাইন্ডার সেট হয়েছে" : "✅ Reminder set");
+      toast?.(bnL ? "রিমাইন্ডার সেট হয়েছে" : "Reminder set");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
       toast?.(e.message || String(e), "err");
@@ -273,5 +279,5 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   };
   const siRootStyle = siFitH && !siMobile ? { height:siFitH } : undefined;
 
-  return renderSiScreens({ onStartReturn, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, canViewAllInvoices: isOwner || canViewAllInvoices, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop });
+  return renderSiScreens({ onStartReturn, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, canViewAllInvoices: isOwner || canViewAllInvoices, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop });
 }

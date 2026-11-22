@@ -262,23 +262,23 @@ export const ERP_MOBILE_CSS = `
 export const WA_STYLES = [
   {
     id:"1", labelBn:"বুলেট", labelEn:"Bullet",
-    previewBn:"▪️ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n▪️ *Air Filter* | AF-456 | Honda | 1 Set",
-    previewEn:"▪️ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n▪️ *Air Filter* | AF-456 | Honda | 1 Set",
+    previewBn:" *Brake Pad* | BP-123 | Toyota | 2 Pcs\n *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:" *Brake Pad* | BP-123 | Toyota | 2 Pcs\n *Air Filter* | AF-456 | Honda | 1 Set",
   },
   {
     id:"2", labelBn:"নম্বর", labelEn:"Numbered",
-    previewBn:"1️⃣ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2️⃣ *Air Filter* | AF-456 | Honda | 1 Set",
-    previewEn:"1️⃣ *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2️⃣ *Air Filter* | AF-456 | Honda | 1 Set",
+    previewBn:"1 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2 *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:"1 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n2 *Air Filter* | AF-456 | Honda | 1 Set",
   },
   {
     id:"3", labelBn:"ডায়মন্ড", labelEn:"Diamond",
-    previewBn:"🔸 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n🔸 *Air Filter* | AF-456 | Honda | 1 Set",
-    previewEn:"🔸 *Brake Pad* | BP-123 | Toyota | 2 Pcs\n🔸 *Air Filter* | AF-456 | Honda | 1 Set",
+    previewBn:" *Brake Pad* | BP-123 | Toyota | 2 Pcs\n *Air Filter* | AF-456 | Honda | 1 Set",
+    previewEn:" *Brake Pad* | BP-123 | Toyota | 2 Pcs\n *Air Filter* | AF-456 | Honda | 1 Set",
   },
   {
     id:"4", labelBn:"লাইন", labelEn:"Lined",
-    previewBn:"──────────────\n▪️ *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n▪️ *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
-    previewEn:"──────────────\n▪️ *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n▪️ *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
+    previewBn:"──────────────\n *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
+    previewEn:"──────────────\n *Brake Pad*\n   BP-123 | Toyota | 2 Pcs\n──────────────\n *Air Filter*\n   AF-456 | Honda | 1 Set\n──────────────",
   },
 ];
 

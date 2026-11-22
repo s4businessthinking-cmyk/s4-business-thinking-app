@@ -1,9 +1,9 @@
 // ============================================================
-// 🩺 AUTH/FIRESTORE DIAGNOSTICS
+//  AUTH/FIRESTORE DIAGNOSTICS
 // ------------------------------------------------------------
-// When a Firestore read comes back "permission-denied" right after a
+// When a Firestore read comes back "permission-denied"right after a
 // successful Firebase Auth sign-in, the failure is happening somewhere
-// between "we have a signed-in user" and "Firestore's security rules
+// between "we have a signed-in user"and "Firestore's security rules
 // accepted the credential attached to the request". That gap has three
 // distinct, independently-checkable causes:
 //   1. The device's ID token really does belong to a different uid than
@@ -14,7 +14,7 @@
 //      mismatch) — e.g. a leftover session from a different app/config.
 // This module inspects the *actual* token Firestore would use and
 // reports which (if any) of these is true, instead of guessing from the
-// generic "permission-denied" error alone.
+// generic "permission-denied"error alone.
 // ============================================================
 const DEBUG_LOG_KEY = "s4-auth-debug-log-v1";
 const DEBUG_LOG_MAX_ENTRIES = 20;

@@ -1,3 +1,19 @@
+/** PartyLedgerWindow party map key — keep in sync with that window's keyOf(). */
+export function partyLedgerKey({ partyId = null, partyName = "" } = {}) {
+  if (partyId) return `i:${partyId}`;
+  const name = String(partyName ?? "").trim().toLowerCase();
+  return `n:${name || "—"}`;
+}
+
+export function partyLedgerKeyFromInvoice(inv, mode = "customer") {
+  if (!inv) return null;
+  const supplier = mode === "supplier" || mode === "vendor";
+  return partyLedgerKey({
+    partyId: supplier ? (inv.vendorId || null) : (inv.customerId || null),
+    partyName: supplier ? (inv.vendorName || "") : (inv.customerName || ""),
+  });
+}
+
 export function invMeta(inv, isCustomer) {
   const raw = inv?.raw || inv;
   if (!raw) return { dn: "", vehicle: "", trn: "", note: "", refNo: "" };

@@ -62,8 +62,8 @@ function protectedChange(collection, before, after) {
   return "";
 }
 
-// op: "create" | "update" | "delete". `after` is the whole record after the write.
-// Returns "" when allowed, otherwise the locked day that blocks it.
+// op: "create" | "update" | "delete". `after`is the whole record after the write.
+// Returns ""when allowed, otherwise the locked day that blocks it.
 export function periodLockBlock({ collection, op, before = null, after = null, lockDate }) {
   if (!lockDate || !LOCKED_COLLECTIONS[collection]) return "";
   const beforeDay = recordDay(collection, before);
@@ -75,7 +75,7 @@ export function periodLockBlock({ collection, op, before = null, after = null, l
 }
 
 export function periodLockMessage(lockDate) {
-  return `🔒 ${lockDate} পর্যন্ত হিসাব বন্ধ (লক) করা আছে — এই তারিখের এন্ট্রি যোগ / এডিট / বাতিল করা যাবে না। মালিক সেটিংস → হিসাব বছর বন্ধ থেকে তারিখ বদলাতে পারেন। (Books are locked up to ${lockDate}.)`;
+  return ` ${lockDate} পর্যন্ত হিসাব বন্ধ (লক) করা আছে — এই তারিখের এন্ট্রি যোগ / এডিট / বাতিল করা যাবে না। মালিক সেটিংস → হিসাব বছর বন্ধ থেকে তারিখ বদলাতে পারেন। (Books are locked up to ${lockDate}.)`;
 }
 
 let activeLockDate = "";

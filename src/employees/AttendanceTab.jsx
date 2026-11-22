@@ -94,10 +94,10 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
         const res = await offlineCreate("attendance", payload);
         setDocs((list) => [...list, { ...payload, id: res.documentId }]);
       }
-      toast?.(L(`✅ ${fmtDay(date)} এর হাজিরা সেভ হয়েছে`, `✅ Attendance for ${fmtDay(date)} saved`));
+      toast?.(L(` ${fmtDay(date)} এর হাজিরা সেভ হয়েছে`, `Attendance for ${fmtDay(date)} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -148,7 +148,7 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
       {ATTENDANCE_STATUSES.map((s) => {
         const on = draft[e.id]?.s === s.key;
         return (
-          <button key={s.key} type="button" disabled={!canManage} title={bn ? s.bn : s.en} onClick={() => setMark(e.id, { s: on ? "" : s.key })}
+          <button key={s.key} type="button"disabled={!canManage} title={bn ? s.bn : s.en} onClick={() => setMark(e.id, { s: on ? "" : s.key })}
             style={{ minWidth: 34, padding: "3px 6px", borderRadius: 6, fontWeight: 800, fontSize: 12, cursor: canManage ? "pointer" : "default", border: `1px solid ${s.color}`, background: on ? s.color : "#fff", color: on ? "#fff" : s.color }}>
             {s.key}
           </button>
@@ -160,15 +160,15 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
   const dayView = (
     <>
       <div className="si-toolbar">
-        <button type="button" className="pm-btn-secondary" onClick={() => shiftDate(-1)}>◀</button>
-        <input type="date" className="pm-input" style={{ width: 140 }} value={date} onChange={(e) => pickDate(e.target.value)} />
-        <button type="button" className="pm-btn-secondary" onClick={() => shiftDate(1)}>▶</button>
-        <button type="button" className="pm-btn-secondary" onClick={() => pickDate(localDay())}>{L("আজ", "Today")}</button>
+        <button type="button"className="pm-btn-secondary"onClick={() => shiftDate(-1)}></button>
+        <input type="date"className="pm-input"style={{ width: 140 }} value={date} onChange={(e) => pickDate(e.target.value)} />
+        <button type="button"className="pm-btn-secondary"onClick={() => shiftDate(1)}></button>
+        <button type="button"className="pm-btn-secondary"onClick={() => pickDate(localDay())}>{L("আজ", "Today")}</button>
         <span className="si-toolbar-gap" />
-        {canManage && <button type="button" className="pm-btn-secondary" onClick={() => markAll("P")}>✔ {L("বাকি সবাই উপস্থিত", "Rest all present")}</button>}
-        {canManage && <button type="button" className="pm-btn-secondary" onClick={() => markAll("H")}>🏖️ {L("আজ সবার ছুটি", "Holiday for all")}</button>}
-        <button type="button" className="pm-btn-secondary" onClick={printDay} disabled={!dayStaff.length}>🖨️ {L("প্রিন্ট", "Print")}</button>
-        {canManage && <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !dirty} onClick={saveDay}>{saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("হাজিরা সেভ", "Save attendance")}`}</button>}
+        {canManage && <button type="button"className="pm-btn-secondary"onClick={() => markAll("P")}> {L("বাকি সবাই উপস্থিত", "Rest all present")}</button>}
+        {canManage && <button type="button"className="pm-btn-secondary"onClick={() => markAll("H")}> {L("আজ সবার ছুটি", "Holiday for all")}</button>}
+        <button type="button"className="pm-btn-secondary"onClick={printDay} disabled={!dayStaff.length}> {L("প্রিন্ট", "Print")}</button>
+        {canManage && <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !dirty} onClick={saveDay}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("হাজিরা সেভ", "Save attendance")}`}</button>}
       </div>
       <div className="si-kpis">
         {counts.map(([s, c]) => <div key={s.key} className="si-kpi"><span>{bn ? s.bn : s.en}</span><b style={{ color: s.color }}>{c}</b></div>)}
@@ -181,13 +181,13 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
           ) : mobile ? dayStaff.map((e) => {
             const m = draft[e.id] || {};
             return (
-              <div key={e.id} className="si-mrow" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <div className="si-mrow-top"><span>👷 {e.name}</span><span style={{ color: statusInfo(m.s)?.color }}>{statusInfo(m.s) ? (bn ? statusInfo(m.s).bn : statusInfo(m.s).en) : "—"}</span></div>
+              <div key={e.id} className="si-mrow"style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <div className="si-mrow-top"><span> {e.name}</span><span style={{ color: statusInfo(m.s)?.color }}>{statusInfo(m.s) ? (bn ? statusInfo(m.s).bn : statusInfo(m.s).en) : "—"}</span></div>
                 {statusButtons(e)}
                 <div style={{ display: "flex", gap: 4 }}>
-                  <input type="time" className="pm-input" disabled={!canManage} value={m.in || ""} onChange={(ev) => setMark(e.id, { in: ev.target.value })} />
-                  <input type="time" className="pm-input" disabled={!canManage} value={m.out || ""} onChange={(ev) => setMark(e.id, { out: ev.target.value })} />
-                  <input className="pm-input" inputMode="decimal" disabled={!canManage} placeholder="OT h" value={m.ot ?? ""} onChange={(ev) => setMark(e.id, { ot: ev.target.value })} style={{ width: 64 }} />
+                  <input type="time"className="pm-input"disabled={!canManage} value={m.in || ""} onChange={(ev) => setMark(e.id, { in: ev.target.value })} />
+                  <input type="time"className="pm-input"disabled={!canManage} value={m.out || ""} onChange={(ev) => setMark(e.id, { out: ev.target.value })} />
+                  <input className="pm-input"inputMode="decimal"disabled={!canManage} placeholder="OT h"value={m.ot ?? ""} onChange={(ev) => setMark(e.id, { ot: ev.target.value })} style={{ width: 64 }} />
                 </div>
               </div>
             );
@@ -210,11 +210,11 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
                     <tr key={e.id}>
                       <td className="si-strong">{e.name}{e.designation ? <span style={{ color: "#64748b", fontWeight: 400 }}> · {e.designation}</span> : null}</td>
                       <td>{statusButtons(e)}</td>
-                      <td><input type="time" className="pm-input" disabled={!canManage} value={m.in || ""} onChange={(ev) => setMark(e.id, { in: ev.target.value })} /></td>
-                      <td><input type="time" className="pm-input" disabled={!canManage} value={m.out || ""} onChange={(ev) => setMark(e.id, { out: ev.target.value })} /></td>
+                      <td><input type="time"className="pm-input"disabled={!canManage} value={m.in || ""} onChange={(ev) => setMark(e.id, { in: ev.target.value })} /></td>
+                      <td><input type="time"className="pm-input"disabled={!canManage} value={m.out || ""} onChange={(ev) => setMark(e.id, { out: ev.target.value })} /></td>
                       <td className="si-num">{hrs || ""}</td>
-                      <td><input className="pm-input" inputMode="decimal" disabled={!canManage} value={m.ot ?? ""} onChange={(ev) => setMark(e.id, { ot: ev.target.value })} style={{ textAlign: "right" }} /></td>
-                      <td><input className="pm-input" disabled={!canManage} value={m.note || ""} onChange={(ev) => setMark(e.id, { note: ev.target.value })} /></td>
+                      <td><input className="pm-input"inputMode="decimal"disabled={!canManage} value={m.ot ?? ""} onChange={(ev) => setMark(e.id, { ot: ev.target.value })} style={{ textAlign: "right" }} /></td>
+                      <td><input className="pm-input"disabled={!canManage} value={m.note || ""} onChange={(ev) => setMark(e.id, { note: ev.target.value })} /></td>
                     </tr>
                   );
                 })}
@@ -230,18 +230,18 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
   const monthView = (
     <>
       <div className="si-toolbar">
-        <input type="month" className="pm-input" style={{ width: 150 }} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+        <input type="month"className="pm-input"style={{ width: 150 }} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
         <span className="si-toolbar-gap" />
-        <button type="button" className="pm-btn-secondary" onClick={printMonth} disabled={!monthRows.length}>🖨️ {L("রেজিস্টার প্রিন্ট", "Print register")}</button>
+        <button type="button"className="pm-btn-secondary"onClick={printMonth} disabled={!monthRows.length}> {L("রেজিস্টার প্রিন্ট", "Print register")}</button>
       </div>
-      <div className="si-hint" style={{ margin: "2px 4px" }}>
+      <div className="si-hint"style={{ margin: "2px 4px" }}>
         {ATTENDANCE_STATUSES.map((s) => <span key={s.key} style={{ marginRight: 10 }}><b style={{ color: s.color }}>{s.key}</b> = {bn ? s.bn : s.en}</span>)}
         · {L("কোনো ঘরে চাপ দিলে সেই দিনের হাজিরা খুলবে", "Click a cell to open that day")}
       </div>
       <div className="si-main is-all">
-        <div className="si-box" style={{ overflow: "auto" }}>
+        <div className="si-box"style={{ overflow: "auto" }}>
           {!monthRows.length ? <div className="si-empty">{L("এই মাসে কোনো কর্মচারী নেই", "No employees in this month")}</div> : (
-            <table className="pm-table" style={{ minWidth: 900 }}>
+            <table className="pm-table"style={{ minWidth: 900 }}>
               <thead><tr>
                 <th style={{ position: "sticky", left: 0, background: "#f8fafc", minWidth: 130 }}>{L("কর্মচারী", "Employee")}</th>
                 {dates.map((d) => <th key={d} style={{ width: 24, textAlign: "center", padding: "2px 1px", color: new Date(`${d}T12:00:00`).getDay() === 5 ? "#b91c1c" : undefined }}>{Number(d.slice(8))}</th>)}
@@ -254,7 +254,7 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
               <tbody>
                 {monthRows.map(({ e, sum, pay, paid, due }) => (
                   <tr key={e.id}>
-                    <td className="si-strong" style={{ position: "sticky", left: 0, background: "#fff" }}>{e.name}</td>
+                    <td className="si-strong"style={{ position: "sticky", left: 0, background: "#fff" }}>{e.name}</td>
                     {dates.map((d) => {
                       const s = statusInfo(byDate.get(d)?.marks?.[e.id]?.s);
                       const out = (e.joinDate && d < e.joinDate) || (e.status === "inactive" && e.leftDate && d > e.leftDate);
@@ -267,9 +267,9 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
                     })}
                     <td className="si-num">{sum.paidDays}</td>
                     <td className="si-num">{sum.otHours || ""}</td>
-                    <td className="si-num" title={`${L("বেসিক", "Basic")} ${money(pay.basic)} + OT ${money(pay.ot)}`}>{money(pay.total)}</td>
+                    <td className="si-num"title={`${L("বেসিক", "Basic")} ${money(pay.basic)} + OT ${money(pay.ot)}`}>{money(pay.total)}</td>
                     <td className="si-num">{paid ? money(paid) : ""}</td>
-                    <td className="si-num si-strong" style={{ color: due > 0 ? "#b91c1c" : "#15803d" }}>{money(due)}</td>
+                    <td className="si-num si-strong"style={{ color: due > 0 ? "#b91c1c" : "#15803d" }}>{money(due)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -277,23 +277,23 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
           )}
         </div>
       </div>
-      <div className="si-hint" style={{ margin: "2px 4px" }}>
-        {L("পাওনা = মাসিক বেতন ÷ মাসের দিন × কাজের দিন + ওভারটাইম ঘণ্টা × রেট। \"দেওয়া\" আসে কর্মচারীর খরচ (Employee Expense) থেকে।", "Payable = monthly salary ÷ days in month × paid days + OT hours × rate. \"Paid\" comes from Employee Expenses for this month.")}
+      <div className="si-hint"style={{ margin: "2px 4px" }}>
+        {L("পাওনা = মাসিক বেতন ÷ মাসের দিন × কাজের দিন + ওভারটাইম ঘণ্টা × রেট। \"দেওয়া\"আসে কর্মচারীর খরচ (Employee Expense) থেকে।", "Payable = monthly salary ÷ days in month × paid days + OT hours × rate. \"Paid\"comes from Employee Expenses for this month.")}
       </div>
     </>
   );
 
   return (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title">
-        <strong>🗓️ {L("হাজিরা খাতা", "Attendance Register")}</strong>
+        <strong> {L("হাজিরা খাতা", "Attendance Register")}</strong>
         <span>{view === "day" ? fmtDay(date) : month}</span>
       </div>
-      <div className="si-pills" style={{ margin: "4px 0" }}>
-        <button type="button" className={`pm-btn-secondary${view === "day" ? " is-active" : ""}`} onClick={() => setView("day")}>📝 {L("দৈনিক হাজিরা", "Daily marking")}</button>
-        <button type="button" className={`pm-btn-secondary${view === "month" ? " is-active" : ""}`} onClick={() => { if (dirty && !window.confirm(L("হাজিরা সেভ করা হয়নি। চলে যাবেন?", "Attendance is not saved. Leave anyway?"))) return; setDraft(saved); setView("month"); }}>📅 {L("মাসিক রেজিস্টার", "Monthly register")}</button>
+      <div className="si-pills"style={{ margin: "4px 0" }}>
+        <button type="button"className={`pm-btn-secondary${view === "day" ? "is-active" : ""}`} onClick={() => setView("day")}> {L("দৈনিক হাজিরা", "Daily marking")}</button>
+        <button type="button"className={`pm-btn-secondary${view === "month" ? "is-active" : ""}`} onClick={() => { if (dirty && !window.confirm(L("হাজিরা সেভ করা হয়নি। চলে যাবেন?", "Attendance is not saved. Leave anyway?"))) return; setDraft(saved); setView("month"); }}> {L("মাসিক রেজিস্টার", "Monthly register")}</button>
       </div>
       {view === "day" ? dayView : monthView}
     </div>

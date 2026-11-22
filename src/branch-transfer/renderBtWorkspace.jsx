@@ -36,18 +36,18 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
   return (
     <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={shellTitle} titleRight={section === "stock" ? t.stock : `${filtered.length} ${L("টি", "transfers")}`}>
       <div className="si-toolbar">
-        {canSendTransfer && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {t.newTransfer}</button>}
+        {canSendTransfer && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {t.newTransfer}</button>}
         <div className="si-pills">
-          <button type="button" className={`pm-btn-secondary${section === "all" ? " is-active" : ""}`} onClick={() => setSection("all")}>{canSendTransfer ? L("সব ট্রান্সফার", "All transfers") : L("আমার ট্রান্সফার", "My transfers")}</button>
+          <button type="button"className={`pm-btn-secondary${section === "all" ? "is-active" : ""}`} onClick={() => setSection("all")}>{canSendTransfer ? L("সব ট্রান্সফার", "All transfers") : L("আমার ট্রান্সফার", "My transfers")}</button>
           {canReceiveTransfer && (
-            <button type="button" className={`pm-btn-secondary${section === "incoming" ? " is-active" : ""}`} onClick={() => setSection("incoming")}>
-              📥 {t.incoming}{incomingList.length ? ` (${incomingList.length})` : ""}
+            <button type="button"className={`pm-btn-secondary${section === "incoming" ? "is-active" : ""}`} onClick={() => setSection("incoming")}>
+               {t.incoming}{incomingList.length ? ` (${incomingList.length})` : ""}
             </button>
           )}
-          <button type="button" className={`pm-btn-secondary${section === "stock" ? " is-active" : ""}`} onClick={() => setSection("stock")}>📦 {t.stock}</button>
+          <button type="button"className={`pm-btn-secondary${section === "stock" ? "is-active" : ""}`} onClick={() => setSection("stock")}> {t.stock}</button>
         </div>
         <span className="si-toolbar-gap" />
-        <button type="button" className="pm-btn-secondary" disabled={busy} onClick={reload}>🔄 {t.refresh}</button>
+        <button type="button"className="pm-btn-secondary"disabled={busy} onClick={reload}> {t.refresh}</button>
       </div>
 
       {section === "stock" ? (
@@ -63,20 +63,20 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
       </div>
           <div className="si-filters">
             <div className="si-search">
-              <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} />
-              {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+              <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t.searchPlaceholder} />
+              {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
           </div>
-            <select className="pm-input" style={{ width: mobile ? "100%" : 170 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select className="pm-input"style={{ width: mobile ? "100%" : 170 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               {statusOptions.map(([key, label]) => <option key={key || "all"} value={key}>{label}</option>)}
             </select>
-            <input type="date" className="pm-input" title={t.fromDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-            <input type="date" className="pm-input" title={t.toDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
-            {(search || statusFilter || from || to) && <button type="button" className="pm-btn-secondary" onClick={() => { setSearch(""); setStatusFilter(""); setFrom(""); setTo(""); }}>{t.clearFilter}</button>}
+            <input type="date"className="pm-input"title={t.fromDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date"className="pm-input"title={t.toDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+            {(search || statusFilter || from || to) && <button type="button"className="pm-btn-secondary"onClick={() => { setSearch(""); setStatusFilter(""); setFrom(""); setTo(""); }}>{t.clearFilter}</button>}
         </div>
           <div className="si-main is-all">
             <div className="si-box">
               {mobile ? filtered.map((transfer) => (
-                <button key={transfer.id} type="button" className="si-mrow" onClick={() => openDetail(transfer)} style={transfer.status === "cancelled" ? { opacity: 0.6 } : undefined}>
+                <button key={transfer.id} type="button"className="si-mrow"onClick={() => openDetail(transfer)} style={transfer.status === "cancelled" ? { opacity: 0.6 } : undefined}>
                   <div className="si-mrow-top"><span style={{ color: BT_ACCENT }}>{transfer.transferNo}</span><StatusBadge status={transfer.status} lang={lang} /></div>
                   <div className="si-mrow-sub"><span>{fmtDay(transferSentDate(transfer))} · {transfer.branchName}</span><b>{f2(transferTotalValue(transfer))}</b></div>
                   <div className="si-mrow-sub">
@@ -103,19 +103,19 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
                     {filtered.map((transfer) => {
                       const left = TransferRemaining(transfer);
                       return (
-                        <tr key={transfer.id} className="pm-clickable" onClick={() => openDetail(transfer)} style={transfer.status === "cancelled" ? { color: "#6b7280" } : undefined} title={transfer.note || ""}>
+                        <tr key={transfer.id} className="pm-clickable"onClick={() => openDetail(transfer)} style={transfer.status === "cancelled" ? { color: "#6b7280" } : undefined} title={transfer.note || ""}>
                           <td>{fmtDay(transferSentDate(transfer))}</td>
-                          <td className="si-strong" style={{ color: transfer.status === "cancelled" ? undefined : BT_ACCENT }}>{transfer.transferNo}</td>
+                          <td className="si-strong"style={{ color: transfer.status === "cancelled" ? undefined : BT_ACCENT }}>{transfer.transferNo}</td>
                           <td title={transfer.branchName || ""}>{transfer.branchName}</td>
                           <td title={transfer.receiverName || ""}>{transfer.receiverName || "—"}</td>
                           <td title={itemSummary(transfer)}>{itemSummary(transfer)}</td>
                           <td className="si-num">{fq(sentQty(transfer))}</td>
-                          <td className="si-num" style={{ color: "#15803d" }}>{fq(acceptedQty(transfer))}</td>
-                          <td className="si-num si-strong" style={left > 0 && transfer.status !== "cancelled" ? { color: "#d97706" } : undefined}>{fq(left)}</td>
+                          <td className="si-num"style={{ color: "#15803d" }}>{fq(acceptedQty(transfer))}</td>
+                          <td className="si-num si-strong"style={left > 0 && transfer.status !== "cancelled" ? { color: "#d97706" } : undefined}>{fq(left)}</td>
                           <td className="si-num">{f2(transferTotalValue(transfer))}</td>
                           <td className="si-center"><StatusBadge status={transfer.status} lang={lang} /></td>
-                          <td className="si-center" style={{ padding: "1px 2px" }}>
-                            {canReceiveRow(transfer) && <button type="button" className="pm-btn-secondary" style={{ minHeight: 17, padding: "0 6px" }} disabled={busy} onClick={(e) => { e.stopPropagation(); setReceiving(transfer); }}>📥 {t.receive}</button>}
+                          <td className="si-center"style={{ padding: "1px 2px" }}>
+                            {canReceiveRow(transfer) && <button type="button"className="pm-btn-secondary"style={{ minHeight: 17, padding: "0 6px" }} disabled={busy} onClick={(e) => { e.stopPropagation(); setReceiving(transfer); }}> {t.receive}</button>}
                           </td>
                         </tr>
                       );

@@ -41,7 +41,7 @@ export function useOrderTeamActions({ can, cos, currentItem, editNm, editPh, edi
     if (e.key === "Enter") { e.preventDefault(); addItToInvoice(); }
   };
 
-  // ✅ নতুন কোড
+  //  নতুন কোড
 const startEditOrder = (order) => {
   setItems(order.items.map(it=>({
     id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`, // ← এটা যোগ করুন
@@ -127,7 +127,7 @@ const startEditOrder = (order) => {
         setItems([]);
         setCurrentItem(newItem());
         setNote("");
-        toast(lang==="bn"?"✅ অর্ডার আপডেট হয়েছে!":"✅ Order updated!");
+        toast(lang==="bn"?"অর্ডার আপডেট হয়েছে!":"Order updated!");
 
         if (navigator.onLine) {
           pushOrdersNow();
@@ -281,14 +281,14 @@ const startEditOrder = (order) => {
     const rc = orderReceive; if (!rc || orderReceiveSaving) return;
     const order = orders.find(o=>o.id===rc.orderId); if (!order) { setOrderReceive(null); return; }
     const bn = lang==="bn";
-    if (!rc.vendorName.trim()) { toast(bn?"❌ Vendor-এর নাম দিন":"❌ Enter the vendor name","err"); return; }
-    if (!rc.supplierInvoiceNo.trim()) { toast(bn?"❌ সাপ্লায়ারের Invoice No দিন":"❌ Enter the supplier's invoice no","err"); return; }
+    if (!rc.vendorName.trim()) { toast(bn?"Vendor-এর নাম দিন":"Enter the vendor name","err"); return; }
+    if (!rc.supplierInvoiceNo.trim()) { toast(bn?"সাপ্লায়ারের Invoice No দিন":"Enter the supplier's invoice no","err"); return; }
     const picked = rc.lines.filter(l => l.checked && order.items[l.iIdx]?.status==="out_for_branch");
-    if (!picked.length) { toast(bn?"❌ অন্তত একটা আইটেম বেছে নিন":"❌ Select at least one item","err"); return; }
+    if (!picked.length) { toast(bn?"অন্তত একটা আইটেম বেছে নিন":"Select at least one item","err"); return; }
     for (const l of picked) {
       const it = order.items[l.iIdx];
-      if (!(Number(l.qty) > 0)) { toast(bn?`❌ "${it.name}": Qty দিন`:`❌ "${it.name}": enter the qty`,"err"); return; }
-      if (Number(l.unitCost) < 0 || l.unitCost==="" || !Number.isFinite(Number(l.unitCost))) { toast(bn?`❌ "${it.name}": দাম দিন`:`❌ "${it.name}": enter the cost`,"err"); return; }
+      if (!(Number(l.qty) > 0)) { toast(bn?` "${it.name}": Qty দিন`:` "${it.name}": enter the qty`,"err"); return; }
+      if (Number(l.unitCost) < 0 || l.unitCost==="" || !Number.isFinite(Number(l.unitCost))) { toast(bn?` "${it.name}": দাম দিন`:` "${it.name}": enter the cost`,"err"); return; }
     }
     const builtItems = picked.map(l => buildOrderPurchaseLine(order.items[l.iIdx], Number(l.qty), Number(l.unitCost)));
     if (!unlinkedStockOk(builtItems, lang)) return;
@@ -363,7 +363,7 @@ const startEditOrder = (order) => {
         items:upd,
         purchaseInvoiceIds:[...new Set([...(order.purchaseInvoiceIds || []), invoiceId])],
         purchaseInvoiceCreated:allDelivered,
-      }, bn ? `✅ ডেলিভারি হয়েছে — Purchase ${invoiceNo} তৈরি হয়েছে` : `✅ Delivered — purchase ${invoiceNo} created`);
+      }, bn ? `ডেলিভারি হয়েছে — Purchase ${invoiceNo} তৈরি হয়েছে` : `Delivered — purchase ${invoiceNo} created`);
       setOrderReceive(null);
     } catch(e) { hErr(e); }
     finally { setOrderReceiveSaving(false); }
@@ -558,7 +558,7 @@ const startEditOrder = (order) => {
         extra: { defaults },
       });
       setTeam((prev) => prev.map((m) => ((m.uid || m.id) === memberId ? { ...m, defaults } : m)));
-      toast(lang==="bn"?"✅ ডিফল্ট সেভ হয়েছে — পরের নতুন বিল থেকে কাজ করবে":"✅ Defaults saved — used from the next new bill");
+      toast(lang==="bn"?"ডিফল্ট সেভ হয়েছে — পরের নতুন বিল থেকে কাজ করবে":"Defaults saved — used from the next new bill");
     } catch(e) { hErr(e); }
   };
 
@@ -632,8 +632,8 @@ const startEditOrder = (order) => {
       toast(
         member.authEmail
           ? (lang==="bn"
-            ? `✅ কর্মী যোগ হয়েছে। অন্য device-এ username "${member.username}" + password দিয়ে login করুন (প্রথমবার internet লাগবে)`
-            : `✅ Staff added. On another device login with username "${member.username}" + password (internet needed once)`)
+            ? `কর্মী যোগ হয়েছে। অন্য device-এ username "${member.username}" + password দিয়ে login করুন (প্রথমবার internet লাগবে)`
+            : `Staff added. On another device login with username "${member.username}" + password (internet needed once)`)
           : t.staffAddedOk
       );
     } catch(e) {
@@ -687,17 +687,17 @@ const startEditOrder = (order) => {
     const isBn = lang === "bn";
     const title = isBn ? "*পণ্যের তালিকা:*" : "*Product List:*";
     const footer = isBn
-      ? "_দয়া করে দাম ও স্টক জানান।_ 🙏 ধন্যবাদ"
-      : "_Please share price and stock availability._ 🙏 Thank you";
-    const nums = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"];
+      ? "_দয়া করে দাম ও স্টক জানান।_  ধন্যবাদ"
+      : "_Please share price and stock availability._  Thank you";
+    const nums = ["1","2","3","4","5","6","7","8","9",""];
     let lines = "";
     items.forEach((it, i) => {
       const name = `*${it.name}*`;
       const meta = [it.code, it.brand, `${it.qty} ${it.unit}`].filter(Boolean).join(" | ");
-      if (waStyle==="1") lines += `▪️ ${name} | ${meta}\n`;
+      if (waStyle==="1") lines += ` ${name} | ${meta}\n`;
       else if (waStyle==="2") lines += `${nums[i]||`${i+1}.`} ${name} | ${meta}\n`;
-      else if (waStyle==="3") lines += `🔸 ${name} | ${meta}\n`;
-      else if (waStyle==="4") lines += `──────────────\n▪️ ${name}\n   ${meta}\n`;
+      else if (waStyle==="3") lines += ` ${name} | ${meta}\n`;
+      else if (waStyle==="4") lines += `──────────────\n ${name}\n   ${meta}\n`;
     });
     if (waStyle==="4") lines += "──────────────";
     const msg = `${title}\n${lines}\n${footer}`;

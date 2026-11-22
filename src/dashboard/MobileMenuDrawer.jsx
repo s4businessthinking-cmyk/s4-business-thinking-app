@@ -19,16 +19,16 @@ export default function MobileMenuDrawer({
     ? { panel: "#0f1d33", border: "#2b4568", text: "#f8fafc", muted: "#b6c7df", hover: "#17304f", active: "#2563eb" }
     : { panel: "#ffffff", border: "#dbe3ee", text: "#0f172a", muted: "#475569", hover: "#eef4fd", active: "#2563eb" };
 
-  const syncText = syncState === "connected" ? "🟢 Online"
-    : syncState === "offline" ? "🔴 Offline"
-      : syncState === "reconnecting" ? "🟠 Reconnecting..." : "🟡 Connecting...";
+  const syncText = syncState === "connected" ? "Online"
+    : syncState === "offline" ? "Offline"
+      : syncState === "reconnecting" ? "Reconnecting..." : "Connecting...";
   const syncColor = syncState === "connected" ? "#22c55e" : syncState === "offline" ? "#ef4444" : "#f59e0b";
 
   return (
     <div aria-hidden={!open} style={{ position: "fixed", inset: 0, zIndex: 3000, pointerEvents: open ? "auto" : "none" }}>
       <div onClick={onClose}
         style={{ position: "absolute", inset: 0, background: "rgba(2,6,23,0.55)", opacity: open ? 1 : 0, transition: "opacity .2s" }} />
-      <aside role="dialog" aria-label={bn ? "সব অপশন" : "All options"}
+      <aside role="dialog"aria-label={bn ? "সব অপশন" : "All options"}
         style={{
           position: "absolute", top: 0, bottom: 0, left: 0, width: "min(300px, 84vw)",
           background: c.panel, borderRight: `1px solid ${c.border}`, color: c.text,
@@ -37,11 +37,11 @@ export default function MobileMenuDrawer({
           fontFamily: "inherit",
         }}>
         <div style={{ padding: "16px 14px 12px", borderBottom: `1px solid ${c.border}`, display: "flex", alignItems: "flex-start", gap: 10 }}>
-          <div style={{ fontSize: 30, lineHeight: 1 }}>🏪</div>
+          <div style={{ fontSize: 30, lineHeight: 1 }}></div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 15, fontWeight: 900, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{shopName || "S4"}</div>
             <div style={{ fontSize: 12, fontWeight: 700, color: c.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              👤 {personName}{roleLabel ? ` · ${roleLabel}` : ""}
+               {personName}{roleLabel ? ` · ${roleLabel}` : ""}
             </div>
           </div>
           <button onClick={onClose} aria-label={bn ? "বন্ধ করুন" : "Close"}
@@ -74,7 +74,7 @@ export default function MobileMenuDrawer({
           <div style={{ fontSize: 12, fontWeight: 700, color: syncColor, textAlign: "center", marginBottom: 8 }}>{syncText}</div>
           <button onClick={() => { onClose(); onLogout(); }}
             style={{ width: "100%", padding: "11px", borderRadius: 10, border: "1px solid #ef4444", background: "transparent", color: "#ef4444", fontSize: 14, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
-            🚪 {bn ? "লগআউট" : "Logout"}
+             {bn ? "লগআউট" : "Logout"}
           </button>
         </div>
       </aside>

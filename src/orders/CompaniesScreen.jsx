@@ -42,8 +42,8 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
       }}>
 
         {canPrint && (
-          <button type="button" style={s.addCoBtn} onClick={printList} disabled={!cos.length}>
-            🖨️ {lang==="bn"?"প্রিন্ট":"Print"}
+          <button type="button"style={s.addCoBtn} onClick={printList} disabled={!cos.length}>
+             {lang==="bn"?"প্রিন্ট":"Print"}
           </button>
         )}
         <button
@@ -173,7 +173,7 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
                 marginBottom:2
               }}
             >
-              📱 {v.mobileNumber || "-"}
+               {v.mobileNumber || "-"}
             </div>
 
             <div
@@ -183,7 +183,7 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
                 marginBottom:2
               }}
             >
-              ✉️ {v.email || "-"}
+               {v.email || "-"}
             </div>
 
             <div
@@ -192,7 +192,7 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
                 color:"#71717a"
               }}
             >
-              🏢 {v.address || "-"}
+               {v.address || "-"}
             </div>
 
           </div>
@@ -215,7 +215,7 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
                   padding:"6px 10px"
                 }}
               >
-                💬
+                
               </a>
 
             )}
@@ -234,7 +234,7 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
 
 
     
-          {cos.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}>🏢</div><div>{t.noCo}</div></div>}
+          {cos.length===0&&<div style={s.empty}><div style={{ fontSize:38 }}></div><div>{t.noCo}</div></div>}
           {cos.map(c=>(
             <div key={c.id} style={s.card}>
               {editId===c.id?(
@@ -249,15 +249,15 @@ export function CompaniesScreen({ addCo, cancelEdit, cos, delCo, editId, editNm,
                 </div>
               ):(
                 <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={s.coIcon}>🏢</div>
+                  <div style={s.coIcon}></div>
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{c.name}</div>
-                    <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{c.phone?`📱 +${c.phone}`:t.noPhone}</div>
+                    <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{c.phone?` +${c.phone}`:t.noPhone}</div>
                   </div>
                   <div style={{ display:"flex", gap:6 }}>
-                    {c.phone&&<a href={`https://wa.me/${c.phone}`} target="_blank" rel="noreferrer" style={{ ...s.waBtn, padding:"6px 10px" }}>💬</a>}
-                    <button style={s.edBtn} onClick={()=>startEdit(c)}>✏️</button>
-                    {canDelete && <button style={s.dlBtn} onClick={()=>delCo(c.id)}>🗑️</button>}
+                    {c.phone&&<a href={`https://wa.me/${c.phone}`} target="_blank"rel="noreferrer"style={{ ...s.waBtn, padding:"6px 10px" }}></a>}
+                    <button style={s.edBtn} onClick={()=>startEdit(c)}></button>
+                    {canDelete && <button style={s.dlBtn} onClick={()=>delCo(c.id)}></button>}
                   </div>
                 </div>
               )}

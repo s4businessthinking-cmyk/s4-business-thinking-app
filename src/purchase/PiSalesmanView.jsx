@@ -125,7 +125,7 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
 
       {/* Search */}
       <div style={{ position:"relative", marginBottom:10 }}>
-        <span style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", fontSize:16, pointerEvents:"none" }}>🔍</span>
+        <span style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", fontSize:16, pointerEvents:"none" }}></span>
         <input style={{ ...inp, paddingLeft:42 }} placeholder={t.pi_searchProduct} value={searchQ} onChange={e=>setSearchQ(e.target.value)} autoFocus />
         {searchQ&&<button onClick={()=>setSearchQ("")} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:18, lineHeight:1 }}>✕</button>}
       </div>
@@ -142,17 +142,17 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
       {/* Count */}
       {!loading&&filtered.length>0&&(
         <div style={{ fontSize:11, color:th.txtMuted, marginBottom:10, fontWeight:700 }}>
-          {filtered.length}{lang==="bn"?"টি পণ্য পাওয়া গেছে":" products found"}
+          {filtered.length}{lang==="bn"?"টি পণ্য পাওয়া গেছে":"products found"}
         </div>
       )}
 
       {/* Loading */}
-      {loading&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:40 }}>⏳</div><div style={{ marginTop:8 }}>{t.pi_loading||"Loading..."}</div></div>}
+      {loading&&<div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}><div style={{ fontSize:40 }}></div><div style={{ marginTop:8 }}>{t.pi_loading||"Loading..."}</div></div>}
 
       {/* Empty */}
       {!loading&&filtered.length===0&&(
         <div style={{ textAlign:"center", padding:"60px 20px", color:th.txtFaint }}>
-          <div style={{ fontSize:46, marginBottom:10 }}>📦</div>
+          <div style={{ fontSize:46, marginBottom:10 }}></div>
           <div>{t.pi_noItemFound}</div>
         </div>
       )}
@@ -175,10 +175,10 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
             <div style={{ marginBottom:10 }}>
               <div style={{ fontSize:17, fontWeight:900, color:th.txtPrimary, lineHeight:1.2, marginBottom:4 }}>{it.name}</div>
               <div style={{ display:"flex", flexWrap:"wrap", gap:8, alignItems:"center" }}>
-                {it.code&&<span style={{ fontSize:12, color:th.txtMuted, background:th.bgInp, padding:"2px 8px", borderRadius:6, fontFamily:"monospace" }}>📋 {it.code}</span>}
-                {it.brand&&<span style={{ fontSize:12, color:th.txtMuted, background:th.bgInp, padding:"2px 8px", borderRadius:6 }}>🏷️ {it.brand}</span>}
-                <span style={{ fontSize:12, color:"#f59e0b", fontWeight:700 }}>📅 {dateStr}</span>
-                <span style={{ fontSize:12, color:th.txtMuted }}>🏭 {it.vendorName}</span>
+                {it.code&&<span style={{ fontSize:12, color:th.txtMuted, background:th.bgInp, padding:"2px 8px", borderRadius:6, fontFamily:"monospace" }}> {it.code}</span>}
+                {it.brand&&<span style={{ fontSize:12, color:th.txtMuted, background:th.bgInp, padding:"2px 8px", borderRadius:6 }}> {it.brand}</span>}
+                <span style={{ fontSize:12, color:"#f59e0b", fontWeight:700 }}> {dateStr}</span>
+                <span style={{ fontSize:12, color:th.txtMuted }}> {it.vendorName}</span>
               </div>
             </div>
 
@@ -186,7 +186,7 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
             <div style={{ display:"grid", gridTemplateColumns:showCost?"1fr 1fr":"1fr", gap:8, marginBottom:10 }}>
               <div style={{ background:th.bgInp, borderRadius:10, padding:"10px 12px" }}>
                 <div style={{ fontSize:9, color:th.txtMuted, textTransform:"uppercase", fontWeight:700, letterSpacing:0, marginBottom:4 }}>
-                  {lang==="bn"?"📦 ক্রয় পরিমাণ":"📦 Purchased Qty"}
+                  {lang==="bn"?"ক্রয় পরিমাণ":"Purchased Qty"}
                 </div>
                 <div style={{ fontSize:20, fontWeight:900, color:"#06b6d4" }}>
                   {it.qty} <span style={{ fontSize:13, color:th.txtMuted }}>{it.unit}</span>
@@ -208,14 +208,14 @@ export function PiSalesmanView({ t, lang, th, shopId, syncRefreshKey=0, showCost
             {saleEx>0 ? (
               <div style={{ background:"linear-gradient(135deg,rgba(34,197,94,0.12),rgba(34,197,94,0.05))", border:"1.5px solid #22c55e", borderRadius:12, padding:"14px 16px" }}>
                 <div style={{ fontSize:10, color:"#22c55e", textTransform:"uppercase", fontWeight:700, letterSpacing:0, marginBottom:10 }}>
-                  💰 {lang==="bn"?"বিক্রয় মূল্য বিবরণ":"Sale Price Details"}
+                   {lang==="bn"?"বিক্রয় মূল্য বিবরণ":"Sale Price Details"}
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
                   <span style={{ fontSize:12, color:th.txtMuted }}>{t.pi_saleExVat}</span>
                   <span style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{t.cur} {piFmt2(saleEx)}</span>
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
-                  <span style={{ fontSize:12, color:"#06b6d4" }}>🧾 {t.pi_vatAmount} ({vatPerc}%)</span>
+                  <span style={{ fontSize:12, color:"#06b6d4" }}> {t.pi_vatAmount} ({vatPerc}%)</span>
                   <span style={{ fontSize:14, fontWeight:700, color:"#06b6d4" }}>+ {t.cur} {piFmt2(vatAmt)}</span>
                 </div>
                 <div style={{ height:1, background:"rgba(34,197,94,0.3)", marginBottom:8 }} />

@@ -9,7 +9,7 @@ const dayDiff = (a, b) => Math.round((new Date(`${a}T12:00:00`) - new Date(`${b}
 const shiftMonth = (ym, by) => { const [y, m] = ym.split("-").map(Number); const d = new Date(y, m - 1 + by, 1); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; };
 const dayIn = (ym, d) => `${ym}-${pad(Math.min(Math.max(d, 1), daysInMonth(ym)))}`;
 
-/** Same day-of-month `months` later; the 31st lands on the month's last day. */
+/** Same day-of-month `months`later; the 31st lands on the month's last day. */
 export function addMonths(date, months) {
   const d = day10(date);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return "";
@@ -136,11 +136,11 @@ const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"
 const monthName = (ym, bn) => { const [y, m] = String(ym).split("-").map(Number); return `${(bn ? MONTHS_BN : MONTHS_EN)[m - 1] || ym} ${y}`; };
 const when = (d, bn) => (d === 0 ? (bn ? "আজ" : "today") : d === 1 ? (bn ? "কাল" : "tomorrow") : d > 0 ? (bn ? `${d} দিন পর` : `in ${d} days`) : (bn ? `${-d} দিন আগে` : `${-d} day(s) ago`));
 
-export const ALERT_ICONS = { expiry: "🛂", salaryDue: "💰", salarySoon: "📅", attendance: "🗓️", probation: "⏱️", ticket: "✈️", birthday: "🎂", anniversary: "🎉" };
+export const ALERT_ICONS = { expiry: "", salaryDue: "", salarySoon: "", attendance: "", probation: "", ticket: "", birthday: "", anniversary: "" };
 
 /** { icon, title, sub } in the user's language for the bell, the panel and system notifications. */
 export function alertText(a, bn, cur = "AED") {
-  const icon = a.kind === "expiry" && a.daysLeft < 0 ? "⛔" : ALERT_ICONS[a.kind] || "🔔";
+  const icon = a.kind === "expiry" && a.daysLeft < 0 ? "" : ALERT_ICONS[a.kind] || "";
   switch (a.kind) {
     case "expiry": {
       const paper = bn ? a.labelBn : a.label;

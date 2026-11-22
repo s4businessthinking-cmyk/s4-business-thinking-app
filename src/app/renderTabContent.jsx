@@ -46,7 +46,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
     <>
       {pinModal&&isOwner&&(
         <OwnerPinModal lang={lang} uid={user.uid} localUserId={profile.localUserId} initialMode={pinModal}
-          onUnlocked={()=>{ setOwnerUnlocked(true); setPinModal(null); toast(lang==="bn"?"🔓 খোলা হয়েছে":"🔓 Unlocked"); }}
+          onUnlocked={()=>{ setOwnerUnlocked(true); setPinModal(null); toast(lang==="bn"?"খোলা হয়েছে":"Unlocked"); }}
           onClose={()=>setPinModal(null)} />
       )}
       {tab==="dashboard"&&(
@@ -179,10 +179,10 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           } : undefined}
           renderImport={(close)=>(
             <ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
-              type="customer" columnMap={CM_IMPORT_COLUMNS} defaultFields={{ ...EMPTY_CUSTOMER, customerType:"Customer", status:"active", country:"UAE", paymentType:"cash" }}
+              type="customer"columnMap={CM_IMPORT_COLUMNS} defaultFields={{ ...EMPTY_CUSTOMER, customerType:"Customer", status:"active", country:"UAE", paymentType:"cash" }}
               collection="customers"
               onClose={close}
-              onImported={(n)=>{ close(); toast(`✅ ${n} ${lang==="bn"?"জন কাস্টমার ইমপোর্ট হয়েছে":"customers imported!"}`); reloadCustomersFromOffline(); }} />
+              onImported={(n)=>{ close(); toast(` ${n} ${lang==="bn"?"জন কাস্টমার ইমপোর্ট হয়েছে":"customers imported!"}`); reloadCustomersFromOffline(); }} />
           )}
         />
       )}
@@ -218,10 +218,10 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           } : undefined}
           renderImport={(close)=>(
             <ExcelImportModal t={t} lang={lang} th={th} shopId={shopId} user={user}
-              type="vendor" columnMap={VM_IMPORT_COLUMNS} defaultFields={{ ...emptyVendor, status:"active", country:"UAE" }}
+              type="vendor"columnMap={VM_IMPORT_COLUMNS} defaultFields={{ ...emptyVendor, status:"active", country:"UAE" }}
               collection="vendors"
               onClose={close}
-              onImported={(n)=>{ close(); toast(`✅ ${n} ${lang==="bn"?"জন ভেন্ডর ইমপোর্ট হয়েছে":"vendors imported!"}`); reloadVendorsFromOffline(); }} />
+              onImported={(n)=>{ close(); toast(` ${n} ${lang==="bn"?"জন ভেন্ডর ইমপোর্ট হয়েছে":"vendors imported!"}`); reloadVendorsFromOffline(); }} />
           )}
         />
       )}

@@ -329,7 +329,7 @@ export function BranchTransferWorkspace({ lang, shopId, user, profile, team, pro
     <ReceiveWindow lang={lang} mobile={mobile} transfer={receiving} busy={busy} allowPartial={settings?.allowPartialReceive !== false} toast={toast}
       onClose={() => setReceiving(null)} onConfirm={(inputLines) => confirmReceive(receiving, inputLines)} />
   );
-  const shellTitle = `🚚 ${t.title}`;
+  const shellTitle = ` ${t.title}`;
 
   return renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete, canPrint, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting });
 }
@@ -369,7 +369,7 @@ export function BranchTransferPurchaseImport({ lang, th, s, shopId, user, profil
 
   return (
     <div style={{ ...s.card, marginBottom: 14, border: "1px solid #f97316" }}>
-      <div style={s.settingsLbl}>🚚 {t.pendingInvoiceTitle}</div>
+      <div style={s.settingsLbl}> {t.pendingInvoiceTitle}</div>
       <div style={{ color: th.txtMuted, fontSize: 11, marginBottom: 10 }}>{t.pendingInvoiceHelp}</div>
       <div style={{ display: "grid", gap: 7 }}>
         {pending.map(({ transfer, receipt }) => (
@@ -378,7 +378,7 @@ export function BranchTransferPurchaseImport({ lang, th, s, shopId, user, profil
               <div style={{ color: th.txtPrimary, fontWeight: 800 }}>{transfer.transferNo} · {transfer.branchName}</div>
               <div style={{ color: th.txtMuted, fontSize: 10, marginTop: 3 }}>R{receipt.sequence} · Accepted {receipt.acceptedTotal}</div>
             </div>
-            <NativeButton s={s} tone="primary" disabled={busyId === receipt.id} onClick={() => createInvoice(transfer, receipt)}>{t.createInvoice}</NativeButton>
+            <NativeButton s={s} tone="primary"disabled={busyId === receipt.id} onClick={() => createInvoice(transfer, receipt)}>{t.createInvoice}</NativeButton>
           </div>
         ))}
       </div>
@@ -387,7 +387,7 @@ export function BranchTransferPurchaseImport({ lang, th, s, shopId, user, profil
 }
 
 export function branchTransferMenuLabel(lang, waiting = 0) {
-  return `🚚 ${bt(lang).menu}${waiting > 0 ? ` (${waiting})` : ""}`;
+  return ` ${bt(lang).menu}${waiting > 0 ? ` (${waiting})` : ""}`;
 }
 
 /** Transfers this user can receive right now — the owner, or the salesman assigned to the branch. Newest first. */

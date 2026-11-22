@@ -165,7 +165,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
   const link = { background: "none", border: "none", color: "#2563eb", fontSize: 13, fontWeight: 700, cursor: "pointer", marginTop: 12, fontFamily: "inherit" };
   const errorBox = error && <div style={{ color: "#dc2626", fontSize: 13, fontWeight: 700, marginTop: 8 }}>{error}</div>;
   const pinField = (value, set, ref, auto = "off") => (
-    <input ref={ref} type="password" inputMode="numeric" autoComplete={auto} value={value} onChange={(e) => set(digits(e.target.value))} style={pinInp} placeholder="••••" />
+    <input ref={ref} type="password"inputMode="numeric"autoComplete={auto} value={value} onChange={(e) => set(digits(e.target.value))} style={pinInp} placeholder="••••" />
   );
   const newPinFields = (
     <>
@@ -175,7 +175,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
       {pinField(newPin2, setNewPin2, null, "new-password")}
     </>
   );
-  const forgotLink = <button type="button" style={link} onClick={() => setMode("forgot")}>{bn ? "পিন ভুলে গেছেন? ইমেইলে কোড নিন" : "Forgot PIN? Get a code by email"}</button>;
+  const forgotLink = <button type="button"style={link} onClick={() => setMode("forgot")}>{bn ? "পিন ভুলে গেছেন? ইমেইলে কোড নিন" : "Forgot PIN? Get a code by email"}</button>;
 
   const title = {
     unlock: bn ? "মালিকের পিন দিন" : "Enter owner PIN",
@@ -189,17 +189,17 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
       style={{ position: "fixed", inset: 0, zIndex: 10100, background: "rgba(15,23,42,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div style={{ width: "100%", maxWidth: 380, background: "#fff", borderRadius: 16, padding: 22, boxShadow: "0 24px 60px rgba(2,6,23,0.4)", color: "#0f172a" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-          <div style={{ fontSize: 17, fontWeight: 900 }}>🔒 {title}</div>
-          <button type="button" onClick={onClose} style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer", color: "#64748b" }}>✕</button>
+          <div style={{ fontSize: 17, fontWeight: 900 }}> {title}</div>
+          <button type="button"onClick={onClose} style={{ border: "none", background: "transparent", fontSize: 20, cursor: "pointer", color: "#64748b" }}>✕</button>
         </div>
-        {mode === null && <div style={{ padding: 20, textAlign: "center", color: "#64748b" }}>⏳</div>}
+        {mode === null && <div style={{ padding: 20, textAlign: "center", color: "#64748b" }}></div>}
 
         {mode === "unlock" && (
           <form onSubmit={submitUnlock}>
             <div style={hint}>{bn ? "গোপন হিসাব দেখতে আপনার ব্যক্তিগত পিন দিন।" : "Enter your personal PIN to view private figures."}</div>
             {pinField(pin, setPin, firstRef)}
             {errorBox}
-            <button type="submit" disabled={busy} style={primary}>{busy ? "…" : (bn ? "খুলুন" : "Unlock")}</button>
+            <button type="submit"disabled={busy} style={primary}>{busy ? "…" : (bn ? "খুলুন" : "Unlock")}</button>
             <div style={{ textAlign: "center" }}>{forgotLink}</div>
           </form>
         )}
@@ -208,10 +208,10 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
           <form onSubmit={submitSetup}>
             <div style={hint}>{bn ? "ড্যাশবোর্ডের টাকার হিসাব, Accounts আর চেক ফোল্ডার এই পিন ছাড়া দেখা যাবে না।" : "Dashboard money, Accounts and cheque folders will need this PIN."}</div>
             <span style={lbl}>{bn ? "লগইন পাসওয়ার্ড" : "Login password"}</span>
-            <input ref={firstRef} type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} style={inp} />
+            <input ref={firstRef} type="password"autoComplete="current-password"value={password} onChange={(e) => setPassword(e.target.value)} style={inp} />
             {newPinFields}
             {errorBox}
-            <button type="submit" disabled={busy} style={primary}>{busy ? "…" : (bn ? "পিন সেভ করে খুলুন" : "Save PIN & unlock")}</button>
+            <button type="submit"disabled={busy} style={primary}>{busy ? "…" : (bn ? "পিন সেভ করে খুলুন" : "Save PIN & unlock")}</button>
           </form>
         )}
 
@@ -222,7 +222,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
             {pinField(currentPin, setCurrentPin, firstRef)}
             {newPinFields}
             {errorBox}
-            <button type="submit" disabled={busy} style={primary}>{busy ? "…" : (bn ? "পিন পরিবর্তন করুন" : "Change PIN")}</button>
+            <button type="submit"disabled={busy} style={primary}>{busy ? "…" : (bn ? "পিন পরিবর্তন করুন" : "Change PIN")}</button>
             <div style={{ textAlign: "center" }}>{forgotLink}</div>
           </form>
         )}
@@ -231,9 +231,9 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
           <div>
             <div style={hint}>{bn ? "আপনার লগইন ইমেইলে একটা ৬ সংখ্যার কোড পাঠানো হবে। কোড দিয়ে নতুন পিন সেট করবেন।" : "A 6-digit code will be sent to your login email. Use it to set a new PIN."}</div>
             {errorBox}
-            <button type="button" disabled={busy} style={primary} onClick={sendCode}>{busy ? "…" : (bn ? "📧 ইমেইলে কোড পাঠান" : "📧 Send code to email")}</button>
+            <button type="button"disabled={busy} style={primary} onClick={sendCode}>{busy ? "…" : (bn ? "ইমেইলে কোড পাঠান" : "Send code to email")}</button>
             <div style={{ textAlign: "center" }}>
-              <button type="button" style={link} onClick={() => setMode(modeFor(hasPin))}>{bn ? "← ফিরে যান" : "← Back"}</button>
+              <button type="button"style={link} onClick={() => setMode(modeFor(hasPin))}>{bn ? "← ফিরে যান" : "← Back"}</button>
             </div>
           </div>
         )}
@@ -242,12 +242,12 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
           <form onSubmit={submitForgot}>
             <div style={hint}>{bn ? `কোড পাঠানো হয়েছে: ${sentTo} (১০ মিনিট চলবে)। Spam ফোল্ডারও দেখুন।` : `Code sent to ${sentTo} (valid 10 minutes). Check spam too.`}</div>
             <span style={lbl}>{bn ? "ইমেইলের কোড" : "Email code"}</span>
-            <input ref={firstRef} type="text" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(digits(e.target.value))} style={pinInp} placeholder="000000" />
+            <input ref={firstRef} type="text"inputMode="numeric"autoComplete="one-time-code"value={code} onChange={(e) => setCode(digits(e.target.value))} style={pinInp} placeholder="000000" />
             {newPinFields}
             {errorBox}
-            <button type="submit" disabled={busy} style={primary}>{busy ? "…" : (bn ? "পিন সেভ করে খুলুন" : "Save PIN & unlock")}</button>
+            <button type="submit"disabled={busy} style={primary}>{busy ? "…" : (bn ? "পিন সেভ করে খুলুন" : "Save PIN & unlock")}</button>
             <div style={{ textAlign: "center" }}>
-              <button type="button" style={{ ...link, opacity: resendIn > 0 ? 0.5 : 1 }} disabled={busy || resendIn > 0} onClick={sendCode}>
+              <button type="button"style={{ ...link, opacity: resendIn > 0 ? 0.5 : 1 }} disabled={busy || resendIn > 0} onClick={sendCode}>
                 {resendIn > 0 ? (bn ? `আবার কোড পাঠান (${resendIn}s)` : `Resend code (${resendIn}s)`) : (bn ? "আবার কোড পাঠান" : "Resend code")}
               </button>
             </div>

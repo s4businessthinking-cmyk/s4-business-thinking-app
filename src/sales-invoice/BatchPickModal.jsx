@@ -23,16 +23,16 @@ export default function BatchPickModal({ lang = "en", product, choices, onPick, 
   }, [choices, active, onPick, onClose]);
 
   return (
-    <div data-si-modal-open="" style={{ position: "fixed", inset: 0, background: "rgba(10,25,55,0.45)", zIndex: 10060, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}
+    <div data-si-modal-open=""style={{ position: "fixed", inset: 0, background: "rgba(10,25,55,0.45)", zIndex: 10060, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={{ width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", background: "#f4f7fc", border: "1px solid #2854ad", borderRadius: 6, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#2854ad", color: "#fff", padding: "7px 10px", fontWeight: 800, fontSize: 13.5 }}>
-          <span>📦 {bn ? "কোন ব্যাচ থেকে দেবেন?" : "Which batch?"} — {product?.name}</span>
-          <button type="button" onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
+          <span> {bn ? "কোন ব্যাচ থেকে দেবেন?" : "Which batch?"} — {product?.name}</span>
+          <button type="button"onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
         </div>
         <div style={{ overflow: "auto", padding: 8, display: "grid", gap: 6 }}>
           {choices.map((c, i) => (
-            <button key={c.batchNo || "main"} type="button" onClick={() => onPick(c)} onMouseEnter={() => setActive(i)}
+            <button key={c.batchNo || "main"} type="button"onClick={() => onPick(c)} onMouseEnter={() => setActive(i)}
               style={{ textAlign: "left", padding: "8px 10px", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", border: i === active ? "2px solid #2854ad" : "1px solid #b7c6e0", background: i === active ? "#dbe6f5" : "#fff", display: "grid", gridTemplateColumns: "24px 1fr auto", gap: 8, alignItems: "center" }}>
               <b style={{ color: "#2854ad", fontSize: 15 }}>{i + 1}</b>
               <span>

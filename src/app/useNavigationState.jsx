@@ -28,11 +28,11 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     })) : []),
     ...(isOwner ? finance.upcomingCheques.map(c => ({
       key:`chq-up-${c.key}`,
-      icon:"⏳",
+      icon:"",
       title:lang==="bn"
         ? `${-c.daysLate} দিন পর ${chequeTypeLabel(c.type,true)} · ${t.cur||"AED"} ${(Math.round(c.amount*100)/100).toLocaleString("en-US",{minimumFractionDigits:2})}`
         : `${chequeTypeLabel(c.type,false)} in ${-c.daysLate} day(s) · ${t.cur||"AED"} ${(Math.round(c.amount*100)/100).toLocaleString("en-US",{minimumFractionDigits:2})}`,
-      sub:`${c.party||"—"} · ${lang==="bn"?"চেক":"Cheque"} ${c.chequeNo||c.no} · 📅 ${c.chequeDate.split("-").reverse().join("/")}`,
+      sub:`${c.party||"—"} · ${lang==="bn"?"চেক":"Cheque"} ${c.chequeNo||c.no} ·  ${c.chequeDate.split("-").reverse().join("/")}`,
       onClick:()=>{ setSettingsPage(null); setTab("dashboard"); },
     })) : []),
     ...employeeAlertList.filter(a => a.tone!=="info" || a.daysLeft<=7).map(a => {
@@ -69,7 +69,7 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     }),
     ...taxAlertList.map(a => ({ key:a.key, icon:a.icon, tone:a.tone, title:a.title, sub:a.sub, onClick:()=>{ a.onSeen?.(); setSettingsPage(null); setTab("tax"); } })),
     ...(orderModuleEnabled && unread>0 ? [{
-      key:"orders", icon:"📋", count:unread,
+      key:"orders", icon:"", count:unread,
       title:lang==="bn"?`${unread}টি নতুন অর্ডার`:`${unread} new order(s)`,
       sub:lang==="bn"?"অর্ডার পাতায় দেখুন":"Open orders",
       onClick:()=>{ setSettingsPage(null); setTab(isOwner?"owner":"shop"); },
@@ -195,9 +195,9 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
   };
 
   const orderPageTabs = [
-    { key:"pending", label:lang==="bn"?"Pending":"Pending", icon:"⏳" },
-    { key:"delivered", label:lang==="bn"?"Delivered":"Delivered", icon:"✅" },
-    { key:"cancelled", label:lang==="bn"?"Cancelled":"Cancelled", icon:"🚫" },
+    { key:"pending", label:lang==="bn"?"Pending":"Pending", icon:"" },
+    { key:"delivered", label:lang==="bn"?"Delivered":"Delivered", icon:"" },
+    { key:"cancelled", label:lang==="bn"?"Cancelled":"Cancelled", icon:"" },
   ];
   const orderPageCounts = {
     pending: orders.filter(o => !["delivered","cancelled"].includes(o.overall)).length,
@@ -255,58 +255,58 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     return isOwner ? fmt(local + 1) : `${fmt(local + 1)}-${deviceSerialTag()}`;
   };
   const newTabLabels = {
-    salesOrder: lang==="bn"?"📝 সেলস অর্ডার":"📝 Sales Order",
-    purchaseOrder: lang==="bn"?"📋 পারচেজ অর্ডার":"📋 Purchase Order",
-    goodsReceipt: lang==="bn"?"📥 মাল গ্রহণ (DN Received)":"📥 Delivery Note (Received)",
-    employees: lang==="bn"?"👷 কর্মচারী":"👷 Employees",
-    employeeExpense: lang==="bn"?"🧑‍💼 কর্মচারীর খরচ":"🧑‍💼 Employee Expense",
-    attendance: lang==="bn"?"🗓️ হাজিরা খাতা":"🗓️ Attendance Register",
-    bankRec: lang==="bn"?"🏦 ব্যাংক মেলানো":"🏦 Bank Reconciliation",
-    globalLedger: lang==="bn"?"📒 গ্লোবাল লেজার":"📒 Global Ledger",
-    jobCard: lang==="bn"?"🔧 জব কার্ড":"🔧 Job Card",
-    partners: lang==="bn"?"🤝 পার্টনার ও লাভের ভাগ":"🤝 Partners",
-    securityCheque: lang==="bn"?"🔒 সিকিউরিটি চেক":"🔒 Security Cheques",
-    labels: lang==="bn"?"🏷️ বারকোড লেবেল":"🏷️ Barcode Labels",
-    reminders: lang==="bn"?"🔔 রিমাইন্ডার":"🔔 Reminders",
-    calculator: lang==="bn"?"🧮 ক্যালকুলেটর / মুদ্রা":"🧮 Calculator / Currency",
+    salesOrder: lang==="bn"?"সেলস অর্ডার":"Sales Order",
+    purchaseOrder: lang==="bn"?"পারচেজ অর্ডার":"Purchase Order",
+    goodsReceipt: lang==="bn"?"মাল গ্রহণ (DN Received)":"Delivery Note (Received)",
+    employees: lang==="bn"?"কর্মচারী":"Employees",
+    employeeExpense: lang==="bn"?"কর্মচারীর খরচ":"Employee Expense",
+    attendance: lang==="bn"?"হাজিরা খাতা":"Attendance Register",
+    bankRec: lang==="bn"?"ব্যাংক মেলানো":"Bank Reconciliation",
+    globalLedger: lang==="bn"?"গ্লোবাল লেজার":"Global Ledger",
+    jobCard: lang==="bn"?"জব কার্ড":"Job Card",
+    partners: lang==="bn"?"পার্টনার ও লাভের ভাগ":"Partners",
+    securityCheque: lang==="bn"?"সিকিউরিটি চেক":"Security Cheques",
+    labels: lang==="bn"?"বারকোড লেবেল":"Barcode Labels",
+    reminders: lang==="bn"?"রিমাইন্ডার":"Reminders",
+    calculator: lang==="bn"?"ক্যালকুলেটর / মুদ্রা":"Calculator / Currency",
   };
   const returnTabLabels = {
-    salesReturn: lang==="bn"?"↩️ সেলস রিটার্ন":"↩️ Sales Return",
-    purchaseReturn: lang==="bn"?"↪️ পারচেজ রিটার্ন":"↪️ Purchase Return",
-    stockAdjust: lang==="bn"?"⚖️ স্টক সমন্বয়":"⚖️ Stock Adjustment",
-    productExchange: lang==="bn"?"🔄 পণ্য বদল (Exchange)":"🔄 Product Exchange",
-    warrantyClaim: lang==="bn"?"🔋 গ্যারান্টি / চেঞ্জ ক্লেইম":"🔋 Warranty / Change Claim",
-    loosen: lang==="bn"?"📦 পণ্য খোলা (Loosening)":"📦 Product Loosening",
-    bundle: lang==="bn"?"🧰 পণ্য জোড়া / কিট":"🧰 Product Bundling",
-    auditLog: lang==="bn"?"🕵️ অডিট লগ":"🕵️ Audit Log",
+    salesReturn: lang==="bn"?"সেলস রিটার্ন":"Sales Return",
+    purchaseReturn: lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return",
+    stockAdjust: lang==="bn"?"স্টক সমন্বয়":"Stock Adjustment",
+    productExchange: lang==="bn"?"পণ্য বদল (Exchange)":"Product Exchange",
+    warrantyClaim: lang==="bn"?"গ্যারান্টি / চেঞ্জ ক্লেইম":"Warranty / Change Claim",
+    loosen: lang==="bn"?"পণ্য খোলা (Loosening)":"Product Loosening",
+    bundle: lang==="bn"?"পণ্য জোড়া / কিট":"Product Bundling",
+    auditLog: lang==="bn"?"অডিট লগ":"Audit Log",
   };
 
   const visibleTabs = useMemo(() => (isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["warrantyClaim",returnTabLabels.warrantyClaim],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["cheque",t.tabCheque],["pdc",lang==="bn"?"PDC চেক":"PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"খরচ":"Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["vouchers",lang==="bn"?"ভাউচার":"Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["warrantyClaim",returnTabLabels.warrantyClaim],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"হিসাব নিকাশ":"Accounts"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
         ...(can("viewProducts")?[["products",t.tabProducts]]:[]),
         ...(can("manageSales")?[["sales", t.tabSales],["quotation", t.tabQuotation],["salesOrder", newTabLabels.salesOrder],["delivery", t.tabDelivery]]:[]),
         ...(can("managePurchase")?[["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt]]:[]),
-        ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"📦 ক্রয় তথ্য":"📦 Purchase Info")],
+        ["purchase", canStaffSupplierArea ? t.tabPurchase : (lang==="bn"?"ক্রয় তথ্য":"Purchase Info")],
         ...(can("viewVendors")||can("manageVendors")?[["vendors",t.tabVendor]]:[]),
         ...(can("manageCustomers")?[["customers",t.tabCustomer]]:[]),
         ...(can("printCheques")?[["cheque",t.tabCheque]]:[]),
-        ...(can("managePdc")?[["pdc",lang==="bn"?"📃 PDC চেক":"📃 PDC Cheques"]]:[]),
+        ...(can("managePdc")?[["pdc",lang==="bn"?"PDC চেক":"PDC Cheques"]]:[]),
         ...(can("manageSecurityCheques")?[["securityCheque",newTabLabels.securityCheque]]:[]),
-        ...(can("manageExpenses")?[["expenses",lang==="bn"?"💸 খরচ":"💸 Expenses"],["employeeExpense",newTabLabels.employeeExpense]]:[]),
+        ...(can("manageExpenses")?[["expenses",lang==="bn"?"খরচ":"Expenses"],["employeeExpense",newTabLabels.employeeExpense]]:[]),
         ...(can("manageEmployees")?[["employees",newTabLabels.employees],["attendance",newTabLabels.attendance]]:[]),
         ...(can("bankReconcile")?[["bankRec",newTabLabels.bankRec]]:[]),
         ...(can("manageJobs")?[["jobCard",newTabLabels.jobCard]]:[]),
-        ...(canStaffVouchers?[["vouchers",lang==="bn"?"🧾 ভাউচার":"🧾 Vouchers"]]:[]),
+        ...(canStaffVouchers?[["vouchers",lang==="bn"?"ভাউচার":"Vouchers"]]:[]),
         ...(can("manageReturns")?[["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn]]:[]),
         ...(can("stockAdjust")||can("manageReturns")?[["warrantyClaim",returnTabLabels.warrantyClaim]]:[]),
         ...(can("stockAdjust")?[["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle]]:[]),
-        ...(can("viewAccounts")?[["accounts",lang==="bn"?"📊 হিসাব নিকাশ":"📊 Accounts"]]:[]),
+        ...(can("viewAccounts")?[["accounts",lang==="bn"?"হিসাব নিকাশ":"Accounts"]]:[]),
         ...(can("viewGlobalLedger")?[["globalLedger",newTabLabels.globalLedger]]:[]),
         ...(can("viewPartners")||can("managePartners")?[["partners",newTabLabels.partners]]:[]),
-        ...(can("viewTax")?[["tax",lang==="bn"?"🏛️ ট্যাক্স / VAT":"🏛️ Tax / VAT"]]:[]),
+        ...(can("viewTax")?[["tax",lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT"]]:[]),
         ...(can("viewAuditLog")?[["auditLog",returnTabLabels.auditLog]]:[]),
         ...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),
         ...(can("viewProducts")?[["labels",newTabLabels.labels]]:[]),
@@ -353,15 +353,15 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
       const missingCo = activeItems.some(it => !it.co);
       if (missingCo) return toast(
         lang==="bn"
-          ? "❌ সব আইটেমে কোম্পানি সিলেক্ট করুন, তারপর এগিয়ে যান"
-          : "❌ Select a company for every item before ordering supplier",
+          ? "সব আইটেমে কোম্পানি সিলেক্ট করুন, তারপর এগিয়ে যান"
+          : "Select a company for every item before ordering supplier",
         "err"
       );
       const missingPrice = activeItems.some(it => !String(it.price||"").trim());
       if (missingPrice) return toast(
         lang==="bn"
-          ? "❌ সব আইটেমের দাম সেট করুন, তারপর এগিয়ে যান"
-          : "❌ Set price for all items before ordering supplier",
+          ? "সব আইটেমের দাম সেট করুন, তারপর এগিয়ে যান"
+          : "Set price for all items before ordering supplier",
         "err"
       );
     }

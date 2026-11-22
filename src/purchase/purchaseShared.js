@@ -6,18 +6,18 @@ export const PMT_PREFIX      = "PMT-";
 export const PI_UNITS        = ["Pcs","Set","Nos","Kg","Ltr","Box","Cm","Mtr","Dz"];
 
 export const PI_PAY_METHODS  = {
-  cash:   { bn:"নগদ",            en:"Cash",          icon:"💵" },
-  bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"🏦" },
-  cheque: { bn:"চেক",             en:"Cheque",         icon:"📃" },
-  credit: { bn:"বাকি (ক্রেডিট)",  en:"Credit",         icon:"📅" },
+  cash:   { bn:"নগদ",            en:"Cash",          icon:"" },
+  bank:   { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer",  icon:"" },
+  cheque: { bn:"চেক",             en:"Cheque",         icon:"" },
+  credit: { bn:"বাকি (ক্রেডিট)",  en:"Credit",         icon:"" },
 };
 
 export const VOUCHER_CARD_TYPES = ["Visa", "Mastercard", "American Express", "Debit Card", "Other"];
 
 export const PI_CHEQUE_STATUSES = {
-  pending:  { bn:"⏳ অপেক্ষমান",      en:"⏳ Pending",  color:"#f59e0b", bg:"#451a03" },
-  cleared:  { bn:"✅ ক্লিয়ার হয়েছে",  en:"✅ Cleared",  color:"#22c55e", bg:"#052e16" },
-  bounced:  { bn:"❌ বাউন্স হয়েছে",   en:"❌ Bounced",  color:"#ef4444", bg:"#450a0a" },
+  pending:  { bn:"অপেক্ষমান",      en:"Pending",  color:"#f59e0b", bg:"#451a03" },
+  cleared:  { bn:"ক্লিয়ার হয়েছে",  en:"Cleared",  color:"#22c55e", bg:"#052e16" },
+  bounced:  { bn:"বাউন্স হয়েছে",   en:"Bounced",  color:"#ef4444", bg:"#450a0a" },
 };
 
 export const PI_STATUSES = {

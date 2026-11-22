@@ -36,14 +36,14 @@ export function SiCustomerPicker({ customers, onSelect, onClose, onQuickAdd, can
   };
 
   return (
-    <div data-si-modal-open="customer-picker" onMouseDown={e=>{ if (e.target===e.currentTarget) onClose(); }}
+    <div data-si-modal-open="customer-picker"onMouseDown={e=>{ if (e.target===e.currentTarget) onClose(); }}
       style={{ position:"fixed", inset:0, background:isPhone?th.bgCard:"rgba(15,23,42,0.45)", zIndex:10000, display:"flex", alignItems:"center", justifyContent:"center", padding:isPhone?0:16 }}>
-      <div role="dialog" aria-modal="true" style={isPhone
+      <div role="dialog"aria-modal="true"style={isPhone
         ? { width:"100%", height:"100dvh", background:th.bgCard, display:"flex", flexDirection:"column", paddingTop:"env(safe-area-inset-top)", paddingBottom:"env(safe-area-inset-bottom)", boxSizing:"border-box" }
         : { width:"100%", maxWidth:560, background:th.bgCard, borderRadius:14, maxHeight:"80vh", display:"flex", flexDirection:"column", border:`1px solid ${th.border}`, boxShadow:"0 20px 50px rgba(0,0,0,0.3)", overflow:"hidden" }}>
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:isPhone?"10px 12px":"14px 16px", borderBottom:`1px solid ${th.border}` }}>
-          <span style={{ fontSize:isPhone?16:14, fontWeight:700, color:th.txtPrimary }}>👥 {t.si_customer}</span>
-          <button onClick={onClose} aria-label="Close" style={{ background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:22, minWidth:44, minHeight:44 }}>✕</button>
+          <span style={{ fontSize:isPhone?16:14, fontWeight:700, color:th.txtPrimary }}> {t.si_customer}</span>
+          <button onClick={onClose} aria-label="Close"style={{ background:"none", border:"none", color:th.txtMuted, cursor:"pointer", fontSize:22, minWidth:44, minHeight:44 }}>✕</button>
         </div>
         <div style={{ padding:"10px 14px", borderBottom:`1px solid ${th.border}` }}>
           <input autoFocus={!isPhone} style={inp} placeholder={t.si_customerSearch} value={q} onChange={e=>setQ(e.target.value)} onKeyDown={onSearchKey} enterKeyHint="search" />
@@ -75,7 +75,7 @@ export function SiCustomerPicker({ customers, onSelect, onClose, onQuickAdd, can
               <div style={{ fontSize:isPhone?15:13, fontWeight:700, color:th.txtPrimary }}>{c.customerName}</div>
               <div style={{ fontSize:11, color:th.txtMuted, marginTop:2, display:"flex", gap:8 }}>
                 {c.customerCode&&<span>#{c.customerCode}</span>}
-                {c.city&&<span>📍 {c.city}</span>}
+                {c.city&&<span> {c.city}</span>}
               </div>
             </button>
           ))}

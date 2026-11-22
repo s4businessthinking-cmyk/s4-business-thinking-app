@@ -58,10 +58,10 @@ export default function CalculatorWindow({ lang = "bn", baseCurrency = "AED", in
 
   const box = { ...(inline ? { position: "relative", margin: "16px auto", maxWidth: 360 } : { position: "fixed", right: 16, bottom: 16, width: 300, zIndex: 9000 }), background: "#fff", color: "#0f172a", borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,.35)", border: "1px solid #cbd5e1", fontFamily: "inherit" };
   const tabBtn = (k, label) => (
-    <button type="button" onClick={() => setMode(k)} style={{ flex: 1, padding: "6px 0", borderTop: 0, borderLeft: 0, borderRight: 0, borderBottom: mode === k ? "2px solid #2563eb" : "2px solid transparent", background: "none", fontWeight: 700, color: mode === k ? "#2563eb" : "#475569", cursor: "pointer" }}>{label}</button>
+    <button type="button"onClick={() => setMode(k)} style={{ flex: 1, padding: "6px 0", borderTop: 0, borderLeft: 0, borderRight: 0, borderBottom: mode === k ? "2px solid #2563eb" : "2px solid transparent", background: "none", fontWeight: 700, color: mode === k ? "#2563eb" : "#475569", cursor: "pointer" }}>{label}</button>
   );
   const keyBtn = (k) => (
-    <button key={k} type="button" onClick={() => press(k)} style={{
+    <button key={k} type="button"onClick={() => press(k)} style={{
       padding: "10px 0", fontSize: 16, fontWeight: 700, borderRadius: 8, cursor: "pointer",
       border: "1px solid #e2e8f0", background: k === "=" ? "#2563eb" : /[0-9.]/.test(k) ? "#fff" : "#f1f5f9", color: k === "=" ? "#fff" : k === "C" ? "#b91c1c" : "#0f172a",
     }}>{k}</button>
@@ -69,17 +69,17 @@ export default function CalculatorWindow({ lang = "bn", baseCurrency = "AED", in
   const inp = { width: "100%", padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: 6, fontSize: 14, boxSizing: "border-box" };
 
   return (
-    <div style={box} role="dialog" aria-label="Calculator">
+    <div style={box} role="dialog"aria-label="Calculator">
       <div style={{ display: "flex", alignItems: "center", padding: "6px 8px 0" }}>
-        {tabBtn("calc", `🧮 ${L("ক্যালকুলেটর", "Calculator")}`)}
-        {tabBtn("fx", `💱 ${L("মুদ্রা", "Currency")}`)}
-        {!inline && <button type="button" onClick={onClose} title="Esc" style={{ border: 0, background: "none", fontSize: 18, cursor: "pointer", color: "#64748b", padding: "0 4px" }}>✕</button>}
+        {tabBtn("calc", ` ${L("ক্যালকুলেটর", "Calculator")}`)}
+        {tabBtn("fx", ` ${L("মুদ্রা", "Currency")}`)}
+        {!inline && <button type="button"onClick={onClose} title="Esc"style={{ border: 0, background: "none", fontSize: 18, cursor: "pointer", color: "#64748b", padding: "0 4px" }}>✕</button>}
       </div>
       {mode === "calc" ? (
         <div style={{ padding: 10 }}>
           <input ref={inputRef} value={expr} onChange={(e) => setExpr(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === "=") { e.preventDefault(); commit(); } }}
-            placeholder="0" style={{ ...inp, fontSize: 18, textAlign: "right", fontFamily: "monospace" }} />
+            placeholder="0"style={{ ...inp, fontSize: 18, textAlign: "right", fontFamily: "monospace" }} />
           <div style={{ textAlign: "right", fontSize: 22, fontWeight: 800, minHeight: 30, margin: "4px 0", color: live.ok ? "#0f172a" : "#94a3b8", cursor: "copy" }}
             title={L("কপি করতে ক্লিক করুন", "Click to copy")} onClick={() => live.ok && copy(live.value)}>
             {expr.trim() ? (live.ok ? `= ${fmt(live.value)}` : "…") : ""}
@@ -88,7 +88,7 @@ export default function CalculatorWindow({ lang = "bn", baseCurrency = "AED", in
           {history.length > 0 && (
             <div style={{ marginTop: 8, maxHeight: 110, overflowY: "auto", borderTop: "1px solid #e2e8f0", paddingTop: 4 }}>
               {history.map((h, i) => (
-                <button key={i} type="button" onClick={() => setExpr(h.expr)} style={{ display: "flex", justifyContent: "space-between", width: "100%", border: 0, background: "none", padding: "2px 0", fontSize: 12, color: "#475569", cursor: "pointer", fontFamily: "monospace" }}>
+                <button key={i} type="button"onClick={() => setExpr(h.expr)} style={{ display: "flex", justifyContent: "space-between", width: "100%", border: 0, background: "none", padding: "2px 0", fontSize: 12, color: "#475569", cursor: "pointer", fontFamily: "monospace" }}>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 170 }}>{h.expr}</span><b>{fmt(h.value)}</b>
                 </button>
               ))}
@@ -98,10 +98,10 @@ export default function CalculatorWindow({ lang = "bn", baseCurrency = "AED", in
         </div>
       ) : (
         <div style={{ padding: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={L("টাকার পরিমাণ", "Amount")} inputMode="decimal" style={{ ...inp, fontSize: 18, textAlign: "right" }} />
+          <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={L("টাকার পরিমাণ", "Amount")} inputMode="decimal"style={{ ...inp, fontSize: 18, textAlign: "right" }} />
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             <select value={from} onChange={(e) => setFrom(e.target.value)} style={inp}>{curList.map((c) => <option key={c}>{c}</option>)}</select>
-            <button type="button" onClick={() => { setFrom(to); setTo(from); }} style={{ border: "1px solid #cbd5e1", background: "#f1f5f9", borderRadius: 6, cursor: "pointer", padding: "6px 8px" }}>⇄</button>
+            <button type="button"onClick={() => { setFrom(to); setTo(from); }} style={{ border: "1px solid #cbd5e1", background: "#f1f5f9", borderRadius: 6, cursor: "pointer", padding: "6px 8px" }}>⇄</button>
             <select value={to} onChange={(e) => setTo(e.target.value)} style={inp}>{curList.map((c) => <option key={c}>{c}</option>)}</select>
           </div>
           <div style={{ textAlign: "right", fontSize: 22, fontWeight: 800, minHeight: 30, cursor: "copy" }} onClick={() => converted != null && copy(converted)}>
@@ -114,14 +114,14 @@ export default function CalculatorWindow({ lang = "bn", baseCurrency = "AED", in
             {curList.map((c) => (
               <div key={c} style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <b style={{ width: 44, fontSize: 12 }}>{c}</b>
-                <input value={rates[c]} disabled={c === baseCurrency} inputMode="decimal" onChange={(e) => saveRates({ ...rates, [c]: e.target.value })} style={{ ...inp, padding: "4px 6px", fontSize: 12 }} />
-                {c !== baseCurrency && <button type="button" onClick={() => { const { [c]: _x, ...rest } = rates; saveRates(rest); if (from === c) setFrom(baseCurrency); if (to === c) setTo(baseCurrency); }} style={{ border: 0, background: "none", color: "#b91c1c", cursor: "pointer" }}>✕</button>}
+                <input value={rates[c]} disabled={c === baseCurrency} inputMode="decimal"onChange={(e) => saveRates({ ...rates, [c]: e.target.value })} style={{ ...inp, padding: "4px 6px", fontSize: 12 }} />
+                {c !== baseCurrency && <button type="button"onClick={() => { const { [c]: _x, ...rest } = rates; saveRates(rest); if (from === c) setFrom(baseCurrency); if (to === c) setTo(baseCurrency); }} style={{ border: 0, background: "none", color: "#b91c1c", cursor: "pointer" }}>✕</button>}
               </div>
             ))}
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             <input value={newCur} onChange={(e) => setNewCur(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4))} placeholder={L("নতুন মুদ্রা (যেমন BDT)", "New currency (e.g. BDT)")} style={{ ...inp, padding: "4px 6px", fontSize: 12 }} />
-            <button type="button" disabled={!newCur || rates[newCur] !== undefined} onClick={() => { saveRates({ ...rates, [newCur]: "" }); setNewCur(""); }} style={{ border: "1px solid #2563eb", background: "#2563eb", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>＋</button>
+            <button type="button"disabled={!newCur || rates[newCur] !== undefined} onClick={() => { saveRates({ ...rates, [newCur]: "" }); setNewCur(""); }} style={{ border: "1px solid #2563eb", background: "#2563eb", color: "#fff", borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}>＋</button>
           </div>
           <div style={{ fontSize: 10, color: "#94a3b8" }}>{L("রেট এই ডিভাইসে সেভ থাকে। Shift+F12 দিয়ে সরাসরি খোলে।", "Rates stay on this device. Shift+F12 opens this directly.")}</div>
         </div>

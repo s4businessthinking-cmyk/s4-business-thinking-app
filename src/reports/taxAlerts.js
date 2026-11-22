@@ -27,7 +27,7 @@ export function taxDueAlerts({ vat, ct, tn, cur, dueDate, ctDue, today, bn }) {
         : tone === "today"
           ? (bn ? "আজ শেষ তারিখ" : "Due today")
           : (bn ? `জমার শেষ তারিখ ${fmtDay(dueDate)}` : `Due ${fmtDay(dueDate)}`);
-      alerts.push({ key: `taxdue-vat-${dueDate}`, kind: "vat", tone: tone === "overdue" ? "danger" : undefined, icon: tone === "overdue" ? "⏰" : "🧾", title, sub });
+      alerts.push({ key: `taxdue-vat-${dueDate}`, kind: "vat", tone: tone === "overdue" ? "danger" : undefined, icon: tone === "overdue" ? "" : "", title, sub });
     }
   }
 
@@ -43,7 +43,7 @@ export function taxDueAlerts({ vat, ct, tn, cur, dueDate, ctDue, today, bn }) {
         : tone === "today"
           ? (bn ? "আজ শেষ তারিখ" : "Due today")
           : (bn ? `জমার শেষ তারিখ ${fmtDay(ctDue)}` : `Due ${fmtDay(ctDue)}`);
-      alerts.push({ key: `taxdue-ct-${ctDue}`, kind: "ct", tone: tone === "overdue" ? "danger" : undefined, icon: tone === "overdue" ? "⏰" : "🏢", title, sub });
+      alerts.push({ key: `taxdue-ct-${ctDue}`, kind: "ct", tone: tone === "overdue" ? "danger" : undefined, icon: tone === "overdue" ? "" : "", title, sub });
     }
   }
 

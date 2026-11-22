@@ -3,11 +3,12 @@ description: Locked ERP build order — follow ARCHITECTURE_LOCK.md strictly
 alwaysApply: true
 ---
 
-# ERP Architecture Lock — Active Build
+# ERP Architecture Lock — Django `erp/` only
 
-Read `ARCHITECTURE_LOCK.md` before any ERP work.
+Applies when editing files under `erp/`.  
+For React shop app (`src/`) feature work (Books, Stock Hub, Analytics, Tradeasy P0, etc.), follow `AGENTS.md`, `docs/AI_COENGINEERING_PLAN_TO_PRODUCTION.md`, and workspace `S4-TRADEASY-LOCKED-ROADMAP.md` instead.
 
-## Hard Rules
+## Hard Rules (erp/ only)
 
 1. **Current STAGE only** — do not start STAGE N+1 until STAGE N checklist is complete
 2. **No sideways work** — no random features, UI polish, or unrelated refactors
@@ -15,6 +16,7 @@ Read `ARCHITECTURE_LOCK.md` before any ERP work.
 4. **Do not break** existing `spare-parts-app.jsx` user flows
 5. **Update** `ARCHITECTURE_LOCK.md` and `erp/build-state.json` when completing checklist items
 6. **Browser visibility** — backend changes must surface on `/?erp-dashboard=1`
+7. **No emoji** in UI or source strings
 
 ## Stack (Locked)
 

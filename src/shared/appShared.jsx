@@ -166,10 +166,10 @@ export const DEFAULT_PERMISSIONS = {
 
 // Methods for the Vendor Payment Voucher system — cash & cheque only, as requested
 export const PI_VOUCHER_METHODS = {
-  cash:   { bn:"নগদ", en:"Cash",   icon:"💵" },
-  cheque: { bn:"চেক",  en:"Cheque", icon:"📃" },
-  bank_transfer: { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer", icon:"🏦" },
-  card:   { bn:"কার্ড", en:"Card", icon:"💳" },
+  cash:   { bn:"নগদ", en:"Cash",   icon:"" },
+  cheque: { bn:"চেক",  en:"Cheque", icon:"" },
+  bank_transfer: { bn:"ব্যাংক ট্রান্সফার", en:"Bank Transfer", icon:"" },
+  card:   { bn:"কার্ড", en:"Card", icon:"" },
 };
 
 export const piR2       = (n) => Math.round(((parseFloat(n)||0)+Number.EPSILON)*100)/100;
@@ -235,7 +235,7 @@ export function voucherParties(masters, openInvoices, idKey, nameKey, masterName
 // ─── PI: MAIN PURCHASE INVOICE TAB ────────────────────────────
 // Takes the next shop-wide serial in one server transaction so two devices never hand out the
 // same bill number. Returns null when offline or the server does not answer in time.
-// Reserves `count` consecutive numbers and returns the first one.
+// Reserves `count`consecutive numbers and returns the first one.
 export async function reserveShopSerial(shopId, field, localMax, count = 1) {
   if (!shopId || !navigator.onLine) return null;
   const tx = runTransaction(db, async t => {

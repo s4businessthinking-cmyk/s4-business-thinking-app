@@ -126,23 +126,23 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
   const th = { padding: "5px 6px", background: C.head, color: "#fff", fontSize: 12, fontWeight: 700, position: "sticky", top: 0, textAlign: "left", whiteSpace: "nowrap" };
   const td = { padding: "4px 6px", borderBottom: `1px solid ${C.border}`, fontSize: 12.5, verticalAlign: "top" };
   const num = { ...td, textAlign: "right", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" };
-  const winTitle = `📒 ${L("গ্লোবাল লেজার", "Global Ledger")} (Ctrl+L)${selected ? ` — ${selected.name}` : ""}`;
+  const winTitle = ` ${L("গ্লোবাল লেজার", "Global Ledger")} (Ctrl+L)${selected ? ` — ${selected.name}` : ""}`;
 
   const body = (
     <>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderBottom: `1px solid ${C.border}` }}>
             <span style={lbl}>From</span>
-            <input type="date" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
             <span style={lbl}>To</span>
-            <input type="date" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
-            {(from || to !== localDay()) && <button type="button" onClick={() => { setFrom(""); setTo(localDay()); }} style={btn()}>{L("আজ পর্যন্ত সব", "All till today")}</button>}
+            <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+            {(from || to !== localDay()) && <button type="button"onClick={() => { setFrom(""); setTo(localDay()); }} style={btn()}>{L("আজ পর্যন্ত সব", "All till today")}</button>}
             <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
-              <input type="checkbox" checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} /> {L("শূন্য ব্যালেন্স লুকান", "Hide zero balances")}
+              <input type="checkbox"checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} /> {L("শূন্য ব্যালেন্স লুকান", "Hide zero balances")}
             </label>
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-              {selected && <button type="button" onClick={() => setSelKey("")} style={btn()}>⚖️ {L("ট্রায়াল ব্যালেন্স", "Trial balance")}</button>}
-              {canPrint && <button type="button" onClick={print} disabled={!ledger} style={btn("#dbeafe", "#1e40af")}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+              {selected && <button type="button"onClick={() => setSelKey("")} style={btn()}> {L("ট্রায়াল ব্যালেন্স", "Trial balance")}</button>}
+              {canPrint && <button type="button"onClick={print} disabled={!ledger} style={btn("#dbeafe", "#1e40af")}> {L("প্রিন্ট", "Print")}</button>}
             </span>
           </div>
 
@@ -155,7 +155,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
               <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...(mobile ? { maxHeight: 220, flexShrink: 0 } : {}), background: "#fff", border: `1px solid ${C.border}` }}>
                 <div style={{ padding: 6, borderBottom: `1px solid ${C.border}` }}>
                   <input ref={searchRef} style={inp()} value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={onSearchKey}
-                    placeholder={L("🔍 খাত / পার্টির নাম (↑ ↓ দিয়ে বাছুন)", "🔍 Account / party name (↑ ↓ to pick)")} />
+                    placeholder={L("খাত / পার্টির নাম (↑ ↓ দিয়ে বাছুন)", "Account / party name (↑ ↓ to pick)")} />
                 </div>
                 <div ref={listRef} style={{ overflow: "auto", flex: 1 }}>
                   {groups.map((g) => (
@@ -220,7 +220,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
                 ) : trial && (
                   <>
                     <div style={{ padding: "6px 10px", background: "#fff7e6", border: `1px solid ${C.border}`, fontSize: 13 }}>
-                      <b style={{ fontSize: 15 }}>⚖️ {L("ট্রায়াল ব্যালেন্স", "Trial balance")}</b> · {L("পর্যন্ত", "as at")} {to ? fmtDate(to) : L("আজ", "today")} · {L("বাঁ দিক থেকে যেকোনো খাত বাছুন", "pick any account on the left")}
+                      <b style={{ fontSize: 15 }}> {L("ট্রায়াল ব্যালেন্স", "Trial balance")}</b> · {L("পর্যন্ত", "as at")} {to ? fmtDate(to) : L("আজ", "today")} · {L("বাঁ দিক থেকে যেকোনো খাত বাছুন", "pick any account on the left")}
                     </div>
                     <div style={{ overflow: "auto", flex: 1, background: "#fff", border: `1px solid ${C.border}` }}>
                       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -234,7 +234,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
                           ))}
                         </tbody>
                         <tfoot><tr style={{ background: C.panel, fontWeight: 800 }}>
-                          <td style={td} colSpan={2}>{L("মোট", "Total")}{Math.abs(trial.dr - trial.cr) < 0.01 ? " ✅" : ` ⚠️ ${money(trial.dr - trial.cr)}`}</td>
+                          <td style={td} colSpan={2}>{L("মোট", "Total")}{Math.abs(trial.dr - trial.cr) < 0.01 ? " " : `  ${money(trial.dr - trial.cr)}`}</td>
                           <td style={num}>{money(trial.dr)}</td><td style={num}>{money(trial.cr)}</td>
                         </tr></tfoot>
                       </table>
@@ -265,7 +265,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
   return (
     <>
       {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
-      <div data-si-modal-open="" style={{ position: "fixed", inset: 0, zIndex: 1650, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
+      <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1650, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
         <div style={{ ...box, width: "100%", maxWidth: win.max ? "none" : 1180, height: win.max ? "100%" : "92%", borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }}>
           {titleBar(<WindowButtons win={win} onClose={onClose} lang={lang} />)}
           {body}

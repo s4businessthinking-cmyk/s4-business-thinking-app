@@ -9,17 +9,28 @@ export function createSiLineActions({ canManageCustomers, customers, isDN, isQuo
   const siUpd=(k,v)=>setSiForm(p=>({...p,[k]:v}));
   const siAddLine=()=>setSiLines(p=>[...p,siEmptyLine()]);
   const siFindProduct = (productId) => productId ? products.find(p=>p.id===productId) : null;
-  // Re-price a line for a new unit; keep a hand-typed name unless it is the product's own/alternate name.
-  const siRepriceForUnit = (item, unit, customerType = siForm.customerType) => {
+  // Re-price a line for a new unit / customer type. Hand-typed rates stay unless forceAuto.
+  // keepIfManual + prevType: only switch to the new list rate when the line still matches the old auto rate.
+  const siRepriceForUnit = (item, unit, customerType = siForm.customerType, opts = {}) => {
     const prod = siFindProduct(item.productId);
     if (!prod) return { ...item, unit };
     const rate = siResolveRate(prod, unit, customerType);
     const autoNames = new Set([prod.name, ...siProductRateRows(prod).map(r=>String(r.altName||"").trim())].filter(Boolean));
+    let nextPrice = String(rate.unitPrice || item.unitPrice || "");
+    let nextName = autoNames.has(item.name) ? rate.name : item.name;
+    if (opts.keepIfManual && !opts.forceAuto) {
+      const prevRate = siResolveRate(prod, item.unit, opts.prevType);
+      const wasAuto = Math.abs(siN2(item.unitPrice) - siN2(prevRate.unitPrice)) < 0.005;
+      if (!wasAuto) {
+        nextPrice = String(item.unitPrice ?? "");
+        nextName = item.name;
+      }
+    }
     return {
       ...item,
       unit,
-      unitPrice: String(rate.unitPrice || item.unitPrice || ""),
-      name: autoNames.has(item.name) ? rate.name : item.name,
+      unitPrice: nextPrice,
+      name: nextName,
     };
   };
   const siUpdLine=(id,f,v)=>setSiLines(p=>p.map(it=>{
@@ -129,17 +140,20 @@ export function createSiLineActions({ canManageCustomers, customers, isDN, isQuo
       return before !== after && Math.abs(siN2(it.discountPerc) - before) < 0.001 ? { ...it, discountPerc:String(after) } : it;
     };
     const newType = c.customerType||"";
-    if (normCustomerType(newType) === normCustomerType(siForm.customerType)) {
+    const prevType = siForm.customerType || "";
+    if (normCustomerType(newType) === normCustomerType(prevType)) {
       setSiLines(p=>p.map(applyDisc));
       setSiCurrent(p=>applyDisc(p));
       return;
     }
     let changed = 0;
+    let keptManual = 0;
     const reprice = (raw) => {
       const it = applyDisc(raw);
       if (!it.productId) return it;
-      const next = siRepriceForUnit(it, it.unit, newType);
+      const next = siRepriceForUnit(it, it.unit, newType, { keepIfManual: true, prevType });
       if (String(next.unitPrice) !== String(it.unitPrice) || next.name !== it.name) changed += 1;
+      else if (Math.abs(siN2(it.unitPrice) - siN2(siResolveRate(siFindProduct(it.productId), it.unit, newType).unitPrice)) >= 0.005) keptManual += 1;
       return next;
     };
     const repricedLines = siLines.map(reprice);
@@ -149,6 +163,9 @@ export function createSiLineActions({ canManageCustomers, customers, isDN, isQuo
     if (changed) toast(lang==="bn"
       ? `${changed}টি item-এর দাম নতুন customer type অনুযায়ী বদলানো হয়েছে`
       : `Prices of ${changed} item(s) updated for the new customer type`);
+    else if (keptManual) toast(lang==="bn"
+      ? "হাতে দেওয়া দাম আগের মতো রাখা হয়েছে"
+      : "Hand-entered rates were kept as typed");
   };
 
   const siQuickAddCustomer = async (customerName) => {
@@ -178,7 +195,7 @@ export function createSiLineActions({ canManageCustomers, customers, isDN, isQuo
       const created = { ...result.data, id: result.documentId, customerName: name };
       onCustomerCreated?.(created);
       siSelectCustomer(created);
-      toast(lang==="bn"?"✅ কাস্টমার যোগ হয়েছে":"✅ Customer added");
+      toast(lang==="bn"?"কাস্টমার যোগ হয়েছে":"Customer added");
 
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] customer quick-add sync failed", err));

@@ -203,7 +203,7 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
         const msg = `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`;
         const failedNames = (result.results || []).filter((r) => !r.ok).map((r) => r.collection);
         const failedNote = failedNames.length
-          ? (lang==="bn" ? ` ⚠️ আসেনি: ${failedNames.join(", ")}` : ` ⚠️ Not downloaded: ${failedNames.join(", ")}`)
+          ? (lang==="bn" ? `আসেনি: ${failedNames.join(", ")}` : `Not downloaded: ${failedNames.join(", ")}`)
           : "";
         toast(`${msg}${failedNote}`, failedNames.length ? "err" : "ok");
         if (failedNames.length) console.warn("[S4 Sync] cloud download failed for", (result.results || []).filter((r) => !r.ok));
@@ -244,7 +244,7 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
       // flag says — and re-queue it with the correct shopId. This is what
       // catches records that got silently stuck (e.g. missing a shopId tag,
       // or abandoned after repeated sync failures) before the normal
-      // "upload everything pending" pass below runs.
+      // "upload everything pending"pass below runs.
       const reconcileResult = await reconcileShopWithCloud(shopId);
       if (reconcileResult?.skipped) {
         if (reconcileResult?.reason === "FIREBASE_AUTH_REQUIRED") {
@@ -271,8 +271,8 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
       if (uploaded === 0 && repairedCount === 0 && (syncDashboard?.localRecords || 0) > 0) {
         toast(
           lang === "bn"
-            ? "⚠️ Cloud-এ upload হয়নি। Logout → email/password দিয়ে login → v1.0.12+ install করুন"
-            : "⚠️ Nothing uploaded. Logout, sign in with email/password, and use v1.0.12+",
+            ? "Cloud-এ upload হয়নি। Logout → email/password দিয়ে login → v1.0.12+ install করুন"
+            : "Nothing uploaded. Logout, sign in with email/password, and use v1.0.12+",
           "err"
         );
         return;
@@ -284,7 +284,7 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
       const msg = lang==="bn"
         ? `${t.syncUploadOk} (${uploaded} records, products: ${productCount}${repairedSuffix})`
         : `${t.syncUploadOk} (${uploaded} records, products: ${productCount}${repairedSuffix})`;
-      toast(result.failed || result.totalFailed ? `${msg} ⚠️` : msg, result.failed || result.totalFailed ? "err" : "ok");
+      toast(result.failed || result.totalFailed ? `${msg} ` : msg, result.failed || result.totalFailed ? "err" : "ok");
       await refreshSyncDashboard();
     } catch (error) {
       if (error?.code === "FIREBASE_AUTH_REQUIRED") {

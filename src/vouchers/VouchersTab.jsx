@@ -106,17 +106,17 @@ export default function VouchersTab({
   };
 
   const checkErrorText = (error, res) => ({
-    lines: L("❌ অন্তত দুটো লাইন লিখুন", "❌ Enter at least two lines"),
-    account: L("❌ প্রতিটা লাইনে খাতের (Account) নাম দিন", "❌ Every line needs an account"),
-    side: L("❌ প্রতিটা লাইনে শুধু Debit অথবা শুধু Credit লিখুন", "❌ Each line takes either a Debit or a Credit"),
-    balance: L(`❌ Debit (${money(res?.debit)}) আর Credit (${money(res?.credit)}) সমান নয়`, `❌ Debit (${money(res?.debit)}) and Credit (${money(res?.credit)}) do not match`),
-    same: L("❌ যেখান থেকে আর যেখানে — দুটো একই হতে পারবে না", "❌ From and To must be different"),
-    amount: L("❌ সঠিক টাকার পরিমাণ লিখুন", "❌ Enter a valid amount"),
-  }[error] || `❌ ${error}`);
+    lines: L("অন্তত দুটো লাইন লিখুন", "Enter at least two lines"),
+    account: L("প্রতিটা লাইনে খাতের (Account) নাম দিন", "Every line needs an account"),
+    side: L("প্রতিটা লাইনে শুধু Debit অথবা শুধু Credit লিখুন", "Each line takes either a Debit or a Credit"),
+    balance: L(`Debit (${money(res?.debit)}) আর Credit (${money(res?.credit)}) সমান নয়`, `Debit (${money(res?.debit)}) and Credit (${money(res?.credit)}) do not match`),
+    same: L("যেখান থেকে আর যেখানে — দুটো একই হতে পারবে না", "From and To must be different"),
+    amount: L("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount"),
+  }[error] || ` ${error}`);
 
   const save = async () => {
     if (saving || !form || readOnly) return;
-    if (!form.voucherDate) { toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err"); return; }
+    if (!form.voucherDate) { toast?.(L("তারিখ দিন", "Pick a date"), "err"); return; }
     const res = view === "contra" ? checkContra(form) : checkJournal(form.lines);
     if (res.error) { toast?.(checkErrorText(res.error, res), "err"); return; }
     setSaving(true);
@@ -130,20 +130,20 @@ export default function VouchersTab({
       if (editRow) {
         await offlineUpdate(COL, editRow.id, { ...editRow, ...body });
         setRows((list) => list.map((r) => (r.id === editRow.id ? { ...r, ...body } : r)));
-        toast?.(L(`✅ ${editRow.voucherNo} আপডেট হয়েছে`, `✅ ${editRow.voucherNo} updated`));
+        toast?.(L(` ${editRow.voucherNo} আপডেট হয়েছে`, ` ${editRow.voucherNo} updated`));
         logAudit({ shopId, user, profile, action: "edit", collection: COL, docId: editRow.id, docNo: editRow.voucherNo, amount: res.total, note: voucherParticulars({ ...editRow, ...body }) });
       } else {
         const voucherNo = await makeNo(type.serial, type.prefix, rows.filter((r) => r.voucherType === view).map((r) => r.voucherNo));
         const payload = { ...body, shopId, voucherType: view, voucherNo, status: "active", createdBy: user?.uid || "", createdByName: profile?.personName || "", createdAt: nowIso };
         const result = await offlineCreate(COL, payload);
         setRows((list) => [{ ...payload, id: result.documentId }, ...list]);
-        toast?.(L(`✅ ${voucherNo} সেভ হয়েছে`, `✅ ${voucherNo} saved`));
+        toast?.(L(` ${voucherNo} সেভ হয়েছে`, ` ${voucherNo} saved`));
         logAudit({ shopId, user, profile, action: "create", collection: COL, docId: result.documentId, docNo: voucherNo, amount: res.total, note: voucherParticulars(payload) });
       }
       setForm(null); setEditId(null);
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -161,7 +161,7 @@ export default function VouchersTab({
       logAudit({ shopId, user, profile, action: "cancel", collection: COL, docId: r.id, docNo: r.voucherNo, amount: r.totalAmount });
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -176,7 +176,7 @@ export default function VouchersTab({
       logAudit({ shopId, user, profile, action: "delete", collection: COL, docId: r.id, docNo: r.voucherNo, amount: r.totalAmount });
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -221,27 +221,27 @@ export default function VouchersTab({
   });
 
   const tiles = [
-    { key: "receipts", icon: "💰", label: "Receipts", hint: L("কাস্টমার থেকে টাকা পাওয়া", "Money received from customers"), onClick: onOpenReceipts },
-    { key: "payments", icon: "💸", label: "Payments", hint: L("ভেন্ডরকে টাকা দেওয়া", "Money paid to vendors"), onClick: onOpenPayments },
-    { key: "journal", icon: "📒", label: "Journal", hint: L("খাতায় সংশোধন / স্থানান্তর", "Book adjustments"), onClick: canJournal ? () => setView("journal") : null },
-    { key: "contra", icon: "🔁", label: "Contra", hint: L("ক্যাশ ⇄ ব্যাংক", "Cash ⇄ Bank"), onClick: canJournal ? () => setView("contra") : null },
-    { key: "debit", icon: "↪️", label: "Debit Note", hint: L("ভেন্ডরকে মাল ফেরত", "Purchase return"), onClick: onOpenDebitNote },
-    { key: "credit", icon: "↩️", label: "Credit Note", hint: L("কাস্টমার থেকে মাল ফেরত", "Sales return"), onClick: onOpenCreditNote },
+    { key: "receipts", icon: "", label: "Receipts", hint: L("কাস্টমার থেকে টাকা পাওয়া", "Money received from customers"), onClick: onOpenReceipts },
+    { key: "payments", icon: "", label: "Payments", hint: L("ভেন্ডরকে টাকা দেওয়া", "Money paid to vendors"), onClick: onOpenPayments },
+    { key: "journal", icon: "", label: "Journal", hint: L("খাতায় সংশোধন / স্থানান্তর", "Book adjustments"), onClick: canJournal ? () => setView("journal") : null },
+    { key: "contra", icon: "", label: "Contra", hint: L("ক্যাশ ⇄ ব্যাংক", "Cash ⇄ Bank"), onClick: canJournal ? () => setView("contra") : null },
+    { key: "debit", icon: "", label: "Debit Note", hint: L("ভেন্ডরকে মাল ফেরত", "Purchase return"), onClick: onOpenDebitNote },
+    { key: "credit", icon: "", label: "Credit Note", hint: L("কাস্টমার থেকে মাল ফেরত", "Sales return"), onClick: onOpenCreditNote },
   ];
 
   if (!type) {
     return (
-      <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+      <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
         <style>{PM_CSS}</style>
         <style>{SI_CSS}</style>
         <style>{TILE_CSS}</style>
-        <div className="pm-reference-title"><strong>🧾 {L("ভাউচার", "Vouchers")}</strong></div>
+        <div className="pm-reference-title"><strong> {L("ভাউচার", "Vouchers")}</strong></div>
         <div className="vt-menu">
           <div className="vt-card">
             <div className="vt-card-title">Select Voucher</div>
             <div className="vt-grid">
               {tiles.map((tile) => (
-                <button key={tile.key} type="button" className="vt-tile" disabled={!tile.onClick} onClick={() => tile.onClick?.()}
+                <button key={tile.key} type="button"className="vt-tile"disabled={!tile.onClick} onClick={() => tile.onClick?.()}
                   title={tile.onClick ? tile.hint : L("অনুমতি নেই", "No permission")}>
                   <span className="vt-tile-icon">{tile.icon}</span>
                   {tile.label}
@@ -266,7 +266,7 @@ export default function VouchersTab({
   const typeTitle = type.title[bn ? "bn" : "en"];
   const setF = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const setLine = (i, k, v) => setForm((f) => ({ ...f, lines: f.lines.map((l, j) => (j === i ? { ...l, [k]: v } : l)) }));
-  const fField = (label, control, extra) => (<div className="si-field" style={extra}><span className="pm-label">{label}</span>{control}</div>);
+  const fField = (label, control, extra) => (<div className="si-field"style={extra}><span className="pm-label">{label}</span>{control}</div>);
   const drTotal = form?.lines ? r2(form.lines.reduce((t, l) => t + r2(l.debit), 0)) : 0;
   const crTotal = form?.lines ? r2(form.lines.reduce((t, l) => t + r2(l.credit), 0)) : 0;
 
@@ -283,20 +283,20 @@ export default function VouchersTab({
         <tbody>
           {form.lines.map((l, i) => (
             <tr key={i}>
-              <td><input className="pm-input" list="vt-accounts" disabled={readOnly} value={l.account} onChange={(e) => setLine(i, "account", e.target.value)} autoFocus={i === 0 && !mobile && !readOnly && !editRow} /></td>
-              <td><input className="pm-input" inputMode="decimal" disabled={readOnly} value={l.debit} onChange={(e) => setLine(i, "debit", e.target.value)} style={{ textAlign: "right" }} /></td>
-              <td><input className="pm-input" inputMode="decimal" disabled={readOnly} value={l.credit} onChange={(e) => setLine(i, "credit", e.target.value)} style={{ textAlign: "right" }} /></td>
-              <td><input className="pm-input" disabled={readOnly} value={l.note} onChange={(e) => setLine(i, "note", e.target.value)} /></td>
-              {!readOnly && <td><button type="button" className="pm-btn-secondary" disabled={form.lines.length <= 2} onClick={() => setForm((f) => ({ ...f, lines: f.lines.filter((_, j) => j !== i) }))}>✕</button></td>}
+              <td><input className="pm-input"list="vt-accounts"disabled={readOnly} value={l.account} onChange={(e) => setLine(i, "account", e.target.value)} autoFocus={i === 0 && !mobile && !readOnly && !editRow} /></td>
+              <td><input className="pm-input"inputMode="decimal"disabled={readOnly} value={l.debit} onChange={(e) => setLine(i, "debit", e.target.value)} style={{ textAlign: "right" }} /></td>
+              <td><input className="pm-input"inputMode="decimal"disabled={readOnly} value={l.credit} onChange={(e) => setLine(i, "credit", e.target.value)} style={{ textAlign: "right" }} /></td>
+              <td><input className="pm-input"disabled={readOnly} value={l.note} onChange={(e) => setLine(i, "note", e.target.value)} /></td>
+              {!readOnly && <td><button type="button"className="pm-btn-secondary"disabled={form.lines.length <= 2} onClick={() => setForm((f) => ({ ...f, lines: f.lines.filter((_, j) => j !== i) }))}>✕</button></td>}
             </tr>
           ))}
         </tbody>
         <tfoot><tr>
-          <td>{!readOnly && <button type="button" className="pm-btn-secondary" onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, emptyLine()] }))}>+ {L("লাইন", "Line")}</button>}</td>
+          <td>{!readOnly && <button type="button"className="pm-btn-secondary"onClick={() => setForm((f) => ({ ...f, lines: [...f.lines, emptyLine()] }))}>+ {L("লাইন", "Line")}</button>}</td>
           <td className="si-num si-strong">{money(drTotal)}</td>
           <td className="si-num si-strong">{money(crTotal)}</td>
-          <td className="vt-diff" style={{ color: drTotal === crTotal ? "#15803d" : "#b91c1c" }}>
-            {drTotal === crTotal ? L("✔ সমান", "✔ Balanced") : `${L("পার্থক্য", "Difference")} ${money(Math.abs(drTotal - crTotal))}`}
+          <td className="vt-diff"style={{ color: drTotal === crTotal ? "#15803d" : "#b91c1c" }}>
+            {drTotal === crTotal ? L("সমান", "Balanced") : `${L("পার্থক্য", "Difference")} ${money(Math.abs(drTotal - crTotal))}`}
           </td>
           {!readOnly && <td />}
         </tr></tfoot>
@@ -307,43 +307,43 @@ export default function VouchersTab({
   const contraFields = form && view === "contra" && (
     <>
       <div className="si-grid2">
-        {fField(`${L("যেখান থেকে", "From")} *`, <input className="pm-input" list="vt-money-accounts" disabled={readOnly} value={form.fromAccount} onChange={(e) => setF("fromAccount", e.target.value)} />)}
-        {fField(`${L("যেখানে", "To")} *`, <input className="pm-input" list="vt-money-accounts" disabled={readOnly} value={form.toAccount} onChange={(e) => setF("toAccount", e.target.value)} placeholder={L("যেমন: Bank - ADCB", "e.g. Bank - ADCB")} autoFocus={!mobile && !readOnly && !editRow} />)}
+        {fField(`${L("যেখান থেকে", "From")} *`, <input className="pm-input"list="vt-money-accounts"disabled={readOnly} value={form.fromAccount} onChange={(e) => setF("fromAccount", e.target.value)} />)}
+        {fField(`${L("যেখানে", "To")} *`, <input className="pm-input"list="vt-money-accounts"disabled={readOnly} value={form.toAccount} onChange={(e) => setF("toAccount", e.target.value)} placeholder={L("যেমন: Bank - ADCB", "e.g. Bank - ADCB")} autoFocus={!mobile && !readOnly && !editRow} />)}
       </div>
-      {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input className="pm-input" inputMode="decimal" disabled={readOnly} value={form.amount} placeholder="0.00" onChange={(e) => setF("amount", e.target.value)} style={{ fontWeight: 700 }} />)}
+      {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input className="pm-input"inputMode="decimal"disabled={readOnly} value={form.amount} placeholder="0.00"onChange={(e) => setF("amount", e.target.value)} style={{ fontWeight: 700 }} />)}
     </>
   );
 
-  const formTitle = !editRow ? `${type.icon} ${L("নতুন", "New")} ${typeTitle}` : readOnly ? `🧾 ${editRow.voucherNo}` : `✏️ ${typeTitle} — ${editRow.voucherNo}`;
+  const formTitle = !editRow ? `${type.icon} ${L("নতুন", "New")} ${typeTitle}` : readOnly ? ` ${editRow.voucherNo}` : ` ${typeTitle} — ${editRow.voucherNo}`;
   const formWindow = form && (
-    <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
-      <div className="pm-window" style={{ maxWidth: mobile ? undefined : 820 }}>
+    <div className="pm-backdrop"onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
+      <div className="pm-window"style={{ maxWidth: mobile ? undefined : 820 }}>
         <div className="pm-window-title">
           <span>{formTitle}</span>
-          <button type="button" className="pm-window-close" onClick={closeForm}>✕</button>
+          <button type="button"className="pm-window-close"onClick={closeForm}>✕</button>
         </div>
         <div className="pm-window-body">
-          {readOnly && editRow?.status !== "cancelled" && <div className="si-hint" style={{ marginLeft: 0 }}>🔒 {L("শুধু দেখতে পারবেন", "View only")}</div>}
-          <div className="si-panel-body" style={{ gap: 6 }}>
+          {readOnly && editRow?.status !== "cancelled" && <div className="si-hint"style={{ marginLeft: 0 }}> {L("শুধু দেখতে পারবেন", "View only")}</div>}
+          <div className="si-panel-body"style={{ gap: 6 }}>
             <div className="si-grid2">
-              {fField(`${L("তারিখ", "Date")} *`, <input type="date" className="pm-input" disabled={readOnly} value={form.voucherDate} onChange={(e) => setF("voucherDate", e.target.value)} />)}
-              {fField(L("রেফারেন্স নং", "Ref No"), <input className="pm-input" disabled={readOnly} value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} />)}
+              {fField(`${L("তারিখ", "Date")} *`, <input type="date"className="pm-input"disabled={readOnly} value={form.voucherDate} onChange={(e) => setF("voucherDate", e.target.value)} />)}
+              {fField(L("রেফারেন্স নং", "Ref No"), <input className="pm-input"disabled={readOnly} value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} />)}
             </div>
             {view === "contra" ? contraFields : journalFields}
-            {fField(L("বিবরণ (Narration)", "Narration"), <textarea className="pm-input" disabled={readOnly} rows={2} value={form.narration} onChange={(e) => setF("narration", e.target.value)} style={{ height: mobile ? 64 : 44 }} />)}
-            <div className="si-hint" style={{ marginLeft: 0 }}>ℹ️ {L("এটা শুধু হিসাবের খাতায় লেখা থাকে — কাস্টমার/ভেন্ডরের বাকি বা স্টক বদলায় না", "This is a book record only — it does not change customer/vendor balances or stock")}</div>
-            {editRow && <div className="si-hint" style={{ marginLeft: 0 }}>{editRow.voucherNo}{editRow.createdByName ? ` · ${L("লিখেছেন", "By")} ${editRow.createdByName}` : ""}{editRow.status === "cancelled" ? ` · ${L("বাতিল করা হয়েছে", "Cancelled")}` : ""}</div>}
+            {fField(L("বিবরণ (Narration)", "Narration"), <textarea className="pm-input"disabled={readOnly} rows={2} value={form.narration} onChange={(e) => setF("narration", e.target.value)} style={{ height: mobile ? 64 : 44 }} />)}
+            <div className="si-hint"style={{ marginLeft: 0 }}> {L("এটা শুধু হিসাবের খাতায় লেখা থাকে — কাস্টমার/ভেন্ডরের বাকি বা স্টক বদলায় না", "This is a book record only — it does not change customer/vendor balances or stock")}</div>
+            {editRow && <div className="si-hint"style={{ marginLeft: 0 }}>{editRow.voucherNo}{editRow.createdByName ? ` · ${L("লিখেছেন", "By")} ${editRow.createdByName}` : ""}{editRow.status === "cancelled" ? ` · ${L("বাতিল করা হয়েছে", "Cancelled")}` : ""}</div>}
           </div>
         </div>
-        <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
-          {editRow && !readOnly && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => cancelRow(editRow)}>✖ {L("বাতিল", "Cancel voucher")}</button>}
-          {editRow && editRow.status === "cancelled" && canDelete && <button type="button" className="pm-btn-secondary pm-btn--danger" disabled={saving} onClick={() => deleteRow(editRow)}>🗑️ {L("মুছে ফেলুন", "Delete")}</button>}
-          {editRow && canPrint && <button type="button" className="pm-btn-secondary" onClick={() => printVoucher(editRow)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+        <div className="si-actions si-sticky-actions"style={{ background: "transparent" }}>
+          {editRow && !readOnly && <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => cancelRow(editRow)}> {L("বাতিল", "Cancel voucher")}</button>}
+          {editRow && editRow.status === "cancelled" && canDelete && <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => deleteRow(editRow)}> {L("মুছে ফেলুন", "Delete")}</button>}
+          {editRow && canPrint && <button type="button"className="pm-btn-secondary"onClick={() => printVoucher(editRow)}> {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
           {!readOnly && (
-            <button type="button" className="pm-btn pm-btn--primary" disabled={saving} onClick={save}>
-              {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${editRow ? L("আপডেট", "Update") : L("সেভ", "Save")} (Ctrl+S)`}
+            <button type="button"className="pm-btn pm-btn--primary"disabled={saving} onClick={save}>
+              {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${editRow ? L("আপডেট", "Update") : L("সেভ", "Save")} (Ctrl+S)`}
             </button>
           )}
         </div>
@@ -353,7 +353,7 @@ export default function VouchersTab({
     </div>
   );
 
-  const statusCell = (r) => (r.status === "cancelled" ? <span className="si-badge" style={{ color: "#6b7280", marginRight: 4 }}>{L("বাতিল", "Cancelled")}</span> : null);
+  const statusCell = (r) => (r.status === "cancelled" ? <span className="si-badge"style={{ color: "#6b7280", marginRight: 4 }}>{L("বাতিল", "Cancelled")}</span> : null);
   const listTable = (
     <table className="pm-table">
       <thead><tr>
@@ -366,20 +366,20 @@ export default function VouchersTab({
       </tr></thead>
       <tbody>
         {filtered.map((r) => (
-          <tr key={r.id} className={`pm-clickable${editId === r.id ? " pm-selected" : ""}`} onClick={() => openRow(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+          <tr key={r.id} className={`pm-clickable${editId === r.id ? "pm-selected" : ""}`} onClick={() => openRow(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
             <td>{fmtDay(r.voucherDate)}</td>
             <td className="si-strong">{r.voucherNo}</td>
             <td title={voucherParticulars(r)}>{voucherParticulars(r)}</td>
             <td title={r.narration || ""}>{r.refNo ? `[${r.refNo}] ` : ""}{r.narration || ""}</td>
             {isOwner && <td>{r.createdByName || ""}</td>}
-            <td className="si-num si-strong" style={r.status === "cancelled" ? { textDecoration: "line-through" } : undefined}>{statusCell(r)}{money(r.totalAmount)}</td>
+            <td className="si-num si-strong"style={r.status === "cancelled" ? { textDecoration: "line-through" } : undefined}>{statusCell(r)}{money(r.totalAmount)}</td>
           </tr>
         ))}
       </tbody>
     </table>
   );
   const listMobile = filtered.map((r) => (
-    <button key={r.id} type="button" className="si-mrow" onClick={() => openRow(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
+    <button key={r.id} type="button"className="si-mrow"onClick={() => openRow(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
       <div className="si-mrow-top"><span>{r.voucherNo}</span><span>{cur} {money(r.totalAmount)}</span></div>
       <div className="si-mrow-sub"><span>{fmtDay(r.voucherDate)} · {voucherParticulars(r)}</span><span>{statusCell(r)}</span></div>
       {r.narration && <div className="si-mrow-sub"><span>{r.narration}</span></div>}
@@ -387,7 +387,7 @@ export default function VouchersTab({
   ));
 
   return (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <style>{TILE_CSS}</style>
@@ -396,24 +396,24 @@ export default function VouchersTab({
         <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
       <div className="si-toolbar">
-        <button type="button" className="pm-btn-secondary" onClick={() => { setView(null); setForm(null); setEditId(null); }}>← {L("ভাউচার", "Vouchers")}</button>
-        {canJournal && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {L("নতুন", "New")} {typeTitle}</button>}
-        {canPrint && <button type="button" className="pm-btn-secondary" onClick={printList} disabled={!active.length}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+        <button type="button"className="pm-btn-secondary"onClick={() => { setView(null); setForm(null); setEditId(null); }}>← {L("ভাউচার", "Vouchers")}</button>
+        {canJournal && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন", "New")} {typeTitle}</button>}
+        {canPrint && <button type="button"className="pm-btn-secondary"onClick={printList} disabled={!active.length}> {L("প্রিন্ট", "Print")}</button>}
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (
-            <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
+            <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className="si-filters">
         <div className="si-search">
-          <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("খুঁজুন: নং, খাত, বিবরণ…", "Search: no, account, narration…")} />
-          {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+          <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("খুঁজুন: নং, খাত, বিবরণ…", "Search: no, account, narration…")} />
+          {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
         </div>
-        <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
+        <label className="pm-check"><input type="checkbox"checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও দেখাও", "Show cancelled")}</label>
       </div>
       <div className="si-main is-all">
         <div className="si-box">

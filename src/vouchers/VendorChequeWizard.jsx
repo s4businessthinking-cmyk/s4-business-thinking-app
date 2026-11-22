@@ -158,16 +158,16 @@ export default function VendorChequeWizard({
   const body = created ? (
     <div style={{ padding: 16 }}>
       <div style={{ ...card, textAlign: "center", padding: 18 }}>
-        <div style={{ fontSize: 34 }}>✅</div>
+        <div style={{ fontSize: 34 }}></div>
         <div style={{ fontWeight: 900, fontSize: 16, marginTop: 4 }}>{bn ? "চেক ভাউচার সেভ হয়েছে" : "Cheque voucher saved"}</div>
         <div style={{ fontSize: 13, color: "#475569", marginTop: 4 }}>{created.paymentNo} · {created.vendorName}</div>
         <div style={{ fontSize: 22, fontWeight: 900, color: "#15803d", marginTop: 6 }}>{cur} {f2(created.chequeAmount ?? created.totalAmount)}</div>
         {n2(created.discountAmount) > 0 && <div style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>{bn ? "ছাড়" : "Discount"}: {cur} {f2(created.discountAmount)}</div>}
       </div>
-      {onPrintCheque && <button type="button" style={bigBtn("linear-gradient(135deg,#f97316,#ea580c)")} onClick={() => onPrintCheque(created)}>🖨️ {bn ? "চেক প্রিন্ট করুন" : "Print Cheque"}</button>}
-      <button type="button" style={bigBtn("#eff6ff", "#1d4ed8", "1px solid #2563eb")} onClick={() => onPrintVoucher?.(created)}>📄 {bn ? "চেক পেমেন্ট ভাউচার প্রিন্ট" : "Print Cheque Payment Voucher"}</button>
-      <button type="button" style={bigBtn("#f0fdf4", "#15803d", "1px solid #16a34a")} onClick={() => onHandover?.(created)}>🪪 {bn ? "হস্তান্তর ডকুমেন্ট (আইডি + সই)" : "Handover document (ID + signature)"}</button>
-      <button type="button" style={bigBtn("#fff", "#475569", "1px solid #cbd5e1")} onClick={onClose}>{bn ? "বন্ধ করুন" : "Close"}</button>
+      {onPrintCheque && <button type="button"style={bigBtn("linear-gradient(135deg,#f97316,#ea580c)")} onClick={() => onPrintCheque(created)}> {bn ? "চেক প্রিন্ট করুন" : "Print Cheque"}</button>}
+      <button type="button"style={bigBtn("#eff6ff", "#1d4ed8", "1px solid #2563eb")} onClick={() => onPrintVoucher?.(created)}> {bn ? "চেক পেমেন্ট ভাউচার প্রিন্ট" : "Print Cheque Payment Voucher"}</button>
+      <button type="button"style={bigBtn("#f0fdf4", "#15803d", "1px solid #16a34a")} onClick={() => onHandover?.(created)}> {bn ? "হস্তান্তর ডকুমেন্ট (আইডি + সই)" : "Handover document (ID + signature)"}</button>
+      <button type="button"style={bigBtn("#fff", "#475569", "1px solid #cbd5e1")} onClick={onClose}>{bn ? "বন্ধ করুন" : "Close"}</button>
     </div>
   ) : (
     <div style={{ padding: 12 }}>
@@ -175,8 +175,8 @@ export default function VendorChequeWizard({
         <span style={lbl}>{bn ? "ভেন্ডর" : "Vendor"}</span>
         {vendor ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, padding: "9px 12px", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 9 }}>
-            <div style={{ fontWeight: 900 }}>🏭 {vendor.name}</div>
-            <button type="button" onClick={() => { setVendor(null); setVendorQ(""); }} style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{bn ? "বদলান" : "Change"}</button>
+            <div style={{ fontWeight: 900 }}> {vendor.name}</div>
+            <button type="button"onClick={() => { setVendor(null); setVendorQ(""); }} style={{ border: "1px solid #cbd5e1", background: "#fff", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>{bn ? "বদলান" : "Change"}</button>
           </div>
         ) : (
           <>
@@ -184,7 +184,7 @@ export default function VendorChequeWizard({
             <div style={{ maxHeight: 240, overflowY: "auto", marginTop: 6, border: "1px solid #e2e8f0", borderRadius: 9 }}>
               {filteredVendors.map((v) => (
                 <div key={v.key || v.id || v.name} onClick={() => setVendor(v)} style={{ padding: "9px 12px", borderBottom: "1px solid #f1f5f9", cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
-                  🏭 {v.name} {v.pending ? <span style={{ fontSize: 11, color: "#b45309", fontWeight: 700 }}>· {v.pending} {bn ? "বাকি ইনভয়েস" : "open"}</span> : null}
+                   {v.name} {v.pending ? <span style={{ fontSize: 11, color: "#b45309", fontWeight: 700 }}>· {v.pending} {bn ? "বাকি ইনভয়েস" : "open"}</span> : null}
                 </div>
               ))}
               {!filteredVendors.length && <div style={{ padding: 12, fontSize: 12, color: "#64748b" }}>{bn ? "কোনো ভেন্ডর নেই" : "No vendor found"}</div>}
@@ -197,15 +197,15 @@ export default function VendorChequeWizard({
         <div style={card}>
           <span style={lbl}>{bn ? "কীভাবে হিসাব করবেন" : "Calculate by"}</span>
           <div style={{ display: "flex", gap: 6 }}>
-            <button type="button" style={chip(basis === "month")} onClick={() => setBasis("month")}>📅 {bn ? "মাসিক" : "Monthly"}</button>
-            <button type="button" style={chip(basis === "range")} onClick={() => setBasis("range")}>🗓️ {bn ? "তারিখ ধরে" : "Date range"}</button>
-            <button type="button" style={chip(basis === "invoices")} onClick={() => setBasis("invoices")}>🧾 {bn ? "ইনভয়েস ধরে" : "Invoices"}</button>
+            <button type="button"style={chip(basis === "month")} onClick={() => setBasis("month")}> {bn ? "মাসিক" : "Monthly"}</button>
+            <button type="button"style={chip(basis === "range")} onClick={() => setBasis("range")}> {bn ? "তারিখ ধরে" : "Date range"}</button>
+            <button type="button"style={chip(basis === "invoices")} onClick={() => setBasis("invoices")}> {bn ? "ইনভয়েস ধরে" : "Invoices"}</button>
           </div>
-          {basis === "month" && <input type="month" style={{ ...field, marginTop: 8 }} value={month} onChange={(e) => setMonth(e.target.value)} />}
+          {basis === "month" && <input type="month"style={{ ...field, marginTop: 8 }} value={month} onChange={(e) => setMonth(e.target.value)} />}
           {basis === "range" && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-              <div><span style={lbl}>{bn ? "থেকে" : "From"}</span><input type="date" style={field} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-              <div><span style={lbl}>{bn ? "পর্যন্ত" : "To"}</span><input type="date" style={field} value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <div><span style={lbl}>{bn ? "থেকে" : "From"}</span><input type="date"style={field} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <div><span style={lbl}>{bn ? "পর্যন্ত" : "To"}</span><input type="date"style={field} value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
           )}
         </div>
@@ -214,7 +214,7 @@ export default function VendorChequeWizard({
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <span style={{ ...lbl, marginBottom: 0 }}>{bn ? "বাকি ইনভয়েস" : "Open invoices"} ({shown.length})</span>
             {shown.length > 0 && (
-              <button type="button" onClick={() => setPicked(rows.length === shown.length ? {} : Object.fromEntries(shown.map((i) => [i.id, f2(i.balanceDue)])))}
+              <button type="button"onClick={() => setPicked(rows.length === shown.length ? {} : Object.fromEntries(shown.map((i) => [i.id, f2(i.balanceDue)])))}
                 style={{ border: "none", background: "none", color: "#2563eb", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>
                 {rows.length === shown.length ? (bn ? "সব বাদ" : "Clear all") : (bn ? "সব বাছাই" : "Select all")}
               </button>
@@ -225,12 +225,12 @@ export default function VendorChequeWizard({
             const on = picked[inv.id] !== undefined;
             return (
               <div key={inv.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 6px", borderBottom: "1px solid #f1f5f9", background: on ? "#f0f9ff" : "transparent", borderRadius: 6 }}>
-                <input type="checkbox" checked={on} onChange={() => toggle(inv)} style={{ width: 18, height: 18, flexShrink: 0 }} />
+                <input type="checkbox"checked={on} onChange={() => toggle(inv)} style={{ width: 18, height: 18, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }} onClick={() => toggle(inv)}>
                   <div style={{ fontWeight: 800, fontSize: 13, color: "#0f172a" }}>{inv.supplierInvoiceNo || inv.invoiceNo}{inv.supplierInvoiceNo ? <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}> · {inv.invoiceNo}</span> : null}</div>
                   <div style={{ fontSize: 11, color: "#64748b" }}>{fmtDate(inv.invoiceDate)} · {bn ? "বাকি" : "Due"} <b style={{ color: "#dc2626" }}>{f2(inv.balanceDue)}</b></div>
                 </div>
-                <input inputMode="decimal" disabled={!on} value={on ? picked[inv.id] : ""} placeholder="0.00" onChange={(e) => setRowAmt(inv, e.target.value)}
+                <input inputMode="decimal"disabled={!on} value={on ? picked[inv.id] : ""} placeholder="0.00"onChange={(e) => setRowAmt(inv, e.target.value)}
                   style={{ ...field, width: mobile ? 92 : 120, flex: "0 0 auto", textAlign: "right", fontWeight: 800, padding: "8px 8px", background: on ? "#fff" : "#f1f5f9" }} />
               </div>
             );
@@ -243,7 +243,7 @@ export default function VendorChequeWizard({
         <div style={card}>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
             <div><span style={lbl}>{bn ? "চেক নম্বর *" : "Cheque No *"}</span><input style={{ ...field, fontFamily: "monospace" }} value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} /></div>
-            <div><span style={lbl}>{bn ? "চেকের তারিখ" : "Cheque date"}</span><input type="date" style={field} value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} /></div>
+            <div><span style={lbl}>{bn ? "চেকের তারিখ" : "Cheque date"}</span><input type="date"style={field} value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} /></div>
             <div style={{ gridColumn: mobile ? "1 / -1" : "auto" }}><span style={lbl}>{bn ? "ব্যাংক" : "Bank"}</span>
               <select style={field} value={chequeBank} onChange={(e) => setChequeBank(e.target.value)}>
                 <option value="">—</option>
@@ -252,28 +252,28 @@ export default function VendorChequeWizard({
             </div>
             <div><span style={lbl}>{bn ? "চেক গ্রহণকারী (ঐচ্ছিক)" : "Received by (optional)"}</span><input style={field} value={receivedBy} onChange={(e) => setReceivedBy(e.target.value)} /></div>
             <div><span style={lbl}>{bn ? "ভেন্ডর রিসিট নং (ঐচ্ছিক)" : "Vendor receipt no (optional)"}</span><input style={field} value={vendorReceiptNo} onChange={(e) => setVendorReceiptNo(e.target.value)} /></div>
-            <div><span style={lbl}>{bn ? "চেক কোন মাসের (ঐচ্ছিক)" : "Cheque for month (optional)"}</span><input type="month" style={field} value={chequeMonth} onChange={(e) => setChequeMonth(e.target.value)} /></div>
+            <div><span style={lbl}>{bn ? "চেক কোন মাসের (ঐচ্ছিক)" : "Cheque for month (optional)"}</span><input type="month"style={field} value={chequeMonth} onChange={(e) => setChequeMonth(e.target.value)} /></div>
             <div style={{ gridColumn: mobile ? "1 / -1" : "auto" }}><span style={lbl}>{bn ? "বিবরণ" : "Narration"}</span><input style={field} value={note} onChange={(e) => { setNote(e.target.value); setNoteTouched(true); }} /></div>
           </div>
         </div>
 
         <div style={card}>
           <span style={lbl}>{bn ? "চেকের অঙ্ক" : "Cheque amount"} ({cur})</span>
-          <input inputMode="decimal" style={{ ...field, fontSize: 20, fontWeight: 900, color: "#15803d" }} value={chequeAmtTouched ? chequeAmt : f2(total)}
+          <input inputMode="decimal"style={{ ...field, fontSize: 20, fontWeight: 900, color: "#15803d" }} value={chequeAmtTouched ? chequeAmt : f2(total)}
             onChange={(e) => { setChequeAmt(e.target.value); setChequeAmtTouched(true); }} />
           <div style={{ fontSize: 12, color: "#475569", marginTop: 4, fontStyle: "italic" }}>{chequeAmount > 0 ? `${amountWords(chequeAmount)} Only` : ""}</div>
-          {chequeAmtTouched && <button type="button" onClick={() => { setChequeAmtTouched(false); setChequeAmt(""); }} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, marginTop: 4 }}>{bn ? "↺ মোটের সমান করুন" : "↺ Match the total"}</button>}
+          {chequeAmtTouched && <button type="button"onClick={() => { setChequeAmtTouched(false); setChequeAmt(""); }} style={{ border: "none", background: "none", color: "#2563eb", fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0, marginTop: 4 }}>{bn ? "↺ মোটের সমান করুন" : "↺ Match the total"}</button>}
           {diff > 0.001 && (
             <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#fffbeb", border: "1px solid #f59e0b" }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: "#92400e", marginBottom: 6 }}>
                 {bn ? `মোটের চেয়ে ${cur} ${f2(diff)} কম — এটা কী হবে?` : `${cur} ${f2(diff)} less than the total — what is it?`}
               </div>
               <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, fontWeight: 700, marginBottom: 4, cursor: "pointer" }}>
-                <input type="radio" checked={diffMode === "discount"} onChange={() => setDiffMode("discount")} />
+                <input type="radio"checked={diffMode === "discount"} onChange={() => setDiffMode("discount")} />
                 {bn ? "ছাড় — ইনভয়েস পুরো পরিশোধ হবে" : "Discount — invoices are settled in full"}
               </label>
               <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-                <input type="radio" checked={diffMode === "balance"} onChange={() => setDiffMode("balance")} />
+                <input type="radio"checked={diffMode === "balance"} onChange={() => setDiffMode("balance")} />
                 {bn ? "বাকি থাকবে — ভেন্ডরের কাছে পরে দেব" : "Keep as balance — still owed to the vendor"}
               </label>
             </div>
@@ -287,8 +287,8 @@ export default function VendorChequeWizard({
     <div style={{ position: "fixed", inset: 0, zIndex: 10040, background: "rgba(15,23,42,0.55)", display: "flex", alignItems: mobile ? "stretch" : "center", justifyContent: "center", padding: mobile ? 0 : 16 }}>
       <div style={{ width: "100%", maxWidth: mobile ? "none" : 860, height: mobile ? "100dvh" : "auto", maxHeight: mobile ? "100dvh" : "94vh", background: "#f1f5f9", borderRadius: mobile ? 0 : 14, display: "flex", flexDirection: "column", overflow: "hidden", color: "#0f172a", fontFamily: "inherit" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", paddingTop: mobile ? "max(12px, env(safe-area-inset-top))" : 12, background: "linear-gradient(135deg,#c2410c,#f97316)", color: "#fff" }}>
-          <div style={{ fontWeight: 900, fontSize: 15 }}>🖨️ {bn ? "ভেন্ডর চেক" : "Vendor Cheque"}</div>
-          <button type="button" onClick={onClose} disabled={saving} style={{ border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", width: 34, height: 34, borderRadius: 8, fontSize: 18, cursor: "pointer" }}>✕</button>
+          <div style={{ fontWeight: 900, fontSize: 15 }}> {bn ? "ভেন্ডর চেক" : "Vendor Cheque"}</div>
+          <button type="button"onClick={onClose} disabled={saving} style={{ border: "none", background: "rgba(255,255,255,0.2)", color: "#fff", width: 34, height: 34, borderRadius: 8, fontSize: 18, cursor: "pointer" }}>✕</button>
         </div>
         <div style={{ flex: 1, overflowY: "auto" }}>{body}</div>
         {!created && vendor && (
@@ -297,8 +297,8 @@ export default function VendorChequeWizard({
               <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700 }}>{bn ? "চেক" : "Cheque"}</div>
               <div style={{ fontSize: 18, fontWeight: 900, color: "#15803d" }}>{cur} {f2(chequeAmount)}</div>
             </div>
-            <button type="button" onClick={save} disabled={saving || !rows.length} style={{ flex: 1.4, padding: 13, borderRadius: 10, border: "none", background: saving || !rows.length ? "#94a3b8" : "linear-gradient(135deg,#15803d,#16a34a)", color: "#fff", fontWeight: 900, fontSize: 14, cursor: saving || !rows.length ? "default" : "pointer" }}>
-              {saving ? "…" : `💾 ${bn ? "সেভ করে চেক তৈরি" : "Save & create cheque"}`}
+            <button type="button"onClick={save} disabled={saving || !rows.length} style={{ flex: 1.4, padding: 13, borderRadius: 10, border: "none", background: saving || !rows.length ? "#94a3b8" : "linear-gradient(135deg,#15803d,#16a34a)", color: "#fff", fontWeight: 900, fontSize: 14, cursor: saving || !rows.length ? "default" : "pointer" }}>
+              {saving ? "…" : ` ${bn ? "সেভ করে চেক তৈরি" : "Save & create cheque"}`}
             </button>
           </div>
         )}

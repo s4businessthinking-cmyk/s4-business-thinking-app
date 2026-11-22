@@ -23,13 +23,21 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
   };
   const siLeaveUnsavedOk = () =>
     !siIsDirty() || window.confirm(lang==="bn"?"এই বিলের পরিবর্তন সেভ হয়নি। তবুও চলে যাবেন?":"This bill has unsaved changes. Leave anyway?");
+  const siRestoreLedgerIfNeeded = () => {
+    if (siNavReturn !== "ledger") return;
+    setSiNavReturn(null);
+    setLedgerWin(true);
+  };
   const siLeaveDetail = () => {
     setSelInv(null);
     setSiView("list");
-    if (siNavReturn === "ledger") {
-      setSiNavReturn(null);
-      setLedgerWin(true);
-    }
+    siRestoreLedgerIfNeeded();
+  };
+  const siLeaveFormToList = () => {
+    if (!siLeaveUnsavedOk()) return false;
+    setSiView("list");
+    siRestoreLedgerIfNeeded();
+    return true;
   };
   // Phone back / header back steps out one level at a time instead of leaving Sales.
   useEffect(()=>{
@@ -38,7 +46,7 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
     const guard = {
       leave: () => siView!=="form" || siLeaveUnsavedOk(),
       back: () => {
-        if (siView==="form") { if (siLeaveUnsavedOk()) setSiView("list"); }
+        if (siView==="form") { siLeaveFormToList(); }
         else if (siView==="detail") { siLeaveDetail(); }
         else setSiOpenParty(null);
         return true;
@@ -127,5 +135,5 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
     canQuickAdd: canManageCustomers,
     onQuickAdd: siQuickAddCustomer,
   };
-  return { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint };
+  return { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint };
 }

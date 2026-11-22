@@ -44,7 +44,7 @@ export function useWarrantyAlerts({ shopId, enabled = true, lang = "en", toast, 
     const first = warrantyAlertText(fresh[0], bn);
     const title = fresh.length === 1
       ? `${first.icon} ${first.title}`
-      : (bn ? `🔋 ${fresh.length}টি গ্যারান্টি চেঞ্জ বাকি!` : `🔋 ${fresh.length} warranty changes pending!`);
+      : (bn ? ` ${fresh.length}টি গ্যারান্টি চেঞ্জ বাকি!` : ` ${fresh.length} warranty changes pending!`);
     const body = fresh.length === 1
       ? first.sub
       : fresh.slice(0, 4).map((a) => `${a.claimNo} · ${a.productName || ""}`).join("\n")

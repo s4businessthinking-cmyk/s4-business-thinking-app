@@ -13,7 +13,7 @@ const font = "Tahoma, 'Segoe UI', Arial, sans-serif";
 function Check({ checked, onChange, children, hint, disabled }) {
   return (
     <label style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 12, color: disabled ? "#6b7280" : C.text, cursor: disabled ? "default" : "pointer", padding: "3px 0", lineHeight: 1.35 }}>
-      <input type="checkbox" checked={!!checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} style={{ width: 15, height: 15, margin: "1px 0 0", flexShrink: 0 }} />
+      <input type="checkbox"checked={!!checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} style={{ width: 15, height: 15, margin: "1px 0 0", flexShrink: 0 }} />
       <span>{children}{hint && <b style={{ color: "#9a3412", marginLeft: 6 }}>{hint}</b>}</span>
     </label>
   );
@@ -85,7 +85,7 @@ function PrinterSetup({ bn, billPrinter, barcodePrinter, chequePrinter, onSet, o
     <div style={{ position: "fixed", inset: 0, zIndex: 5100, background: "rgba(10,25,55,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
       <div style={{ width: "min(500px, 100%)", background: "#c7d5c9", border: "1px solid #3e6b54", boxShadow: "0 16px 40px rgba(2,6,23,0.5)", fontFamily: font, color: C.text }}>
         <div style={{ padding: "6px 10px", background: "linear-gradient(180deg,#5f8f74,#3e6b54)", color: "#fff", fontWeight: 700, fontSize: 13 }}>
-          🖨️ {bn ? "প্রিন্টার সেটআপ (PRINTER SETUP)" : "PRINTER SETUP"}
+           {bn ? "প্রিন্টার সেটআপ (PRINTER SETUP)" : "PRINTER SETUP"}
         </div>
         <div style={{ padding: 14, display: "grid", gap: 14 }}>
           {!supported ? (
@@ -97,21 +97,21 @@ function PrinterSetup({ bn, billPrinter, barcodePrinter, chequePrinter, onSet, o
           ) : (
             <>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}>🧾</div>
+                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{bn ? "বিল প্রিন্টার বাছুন" : "Select Bill Printer"}</div>
                   {printers === null ? <div style={{ fontSize: 12 }}>…</div> : select(bill, setBill)}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}>🏷️</div>
+                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{bn ? "বারকোড প্রিন্টার বাছুন" : "Select Barcode Printer"}</div>
                   {printers === null ? <div style={{ fontSize: 12 }}>…</div> : select(barcode, setBarcode)}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}>🏦</div>
+                <div style={{ fontSize: 34, width: 56, textAlign: "center" }}></div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{bn ? "চেক প্রিন্টার বাছুন" : "Select Cheque Printer"}</div>
                   {printers === null ? <div style={{ fontSize: 12 }}>…</div> : select(cheque, setCheque)}
@@ -122,15 +122,15 @@ function PrinterSetup({ bn, billPrinter, barcodePrinter, chequePrinter, onSet, o
               </div>
               <div style={{ fontSize: 11, color: "#1f2937", lineHeight: 1.45 }}>
                 {bn
-                  ? "⚡ প্রিন্টার বেছে রেখে \"প্রিন্টের আগে বিল দেখাও\" টিক তুলে দিলে বিল কোনো ডায়ালগ ছাড়াই সরাসরি এই প্রিন্টারে চলে যাবে।"
-                  : "⚡ With a printer chosen and \"Show Bill Preview\" off, bills go straight to this printer without any dialog."}
+                  ? "প্রিন্টার বেছে রেখে \"প্রিন্টের আগে বিল দেখাও\"টিক তুলে দিলে বিল কোনো ডায়ালগ ছাড়াই সরাসরি এই প্রিন্টারে চলে যাবে।"
+                  : "With a printer chosen and \"Show Bill Preview\"off, bills go straight to this printer without any dialog."}
               </div>
             </>
           )}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, borderTop: "3px double #6b8f7a", paddingTop: 10 }}>
-            {supported && bill && <button type="button" style={winBtn(false)} onClick={testPrint}>{bn ? "টেস্ট প্রিন্ট" : "Test Print"}</button>}
-            {supported && <button type="button" style={winBtn(true)} onClick={() => { onSet(bill, barcode, cheque); onClose(); }}><u>S</u>et</button>}
-            <button type="button" style={winBtn(false)} onClick={onClose}><u>C</u>lose</button>
+            {supported && bill && <button type="button"style={winBtn(false)} onClick={testPrint}>{bn ? "টেস্ট প্রিন্ট" : "Test Print"}</button>}
+            {supported && <button type="button"style={winBtn(true)} onClick={() => { onSet(bill, barcode, cheque); onClose(); }}><u>S</u>et</button>}
+            <button type="button"style={winBtn(false)} onClick={onClose}><u>C</u>lose</button>
           </div>
         </div>
       </div>
@@ -151,7 +151,7 @@ function DocTab({ title, doc, setDoc, isTax, bn }) {
         </Check>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginTop: 6 }}>
           <span style={{ fontSize: 12, fontWeight: 700 }}>{bn ? "কয়টা কপি প্রিন্ট হবে:" : "No. of Copies to Print :"}</span>
-          <input type="number" min={1} max={10} value={doc.copies}
+          <input type="number"min={1} max={10} value={doc.copies}
             onChange={(e) => set("copies", Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)))}
             style={{ width: 70, height: 26, border: "1px solid #8797a9", textAlign: "right", fontFamily: font, fontSize: 13, padding: "0 6px" }} />
         </div>
@@ -170,7 +170,7 @@ function DocTab({ title, doc, setDoc, isTax, bn }) {
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{bn ? "ইনভয়েসের ভাষা" : "Invoice Language"}</div>
             <div style={{ border: "1px solid #8797a9", background: "#fff" }}>
               {[["app", bn ? "অ্যাপের ভাষা অনুযায়ী" : "Same as app"], ["en", "English Only"], ["bn", "বাংলা (Bangla Only)"]].map(([k, label]) => (
-                <button key={k} type="button" onClick={() => set("language", k)}
+                <button key={k} type="button"onClick={() => set("language", k)}
                   style={{ display: "block", width: "100%", textAlign: "left", padding: "5px 8px", border: 0, fontFamily: font, fontSize: 13, cursor: "pointer", background: doc.language === k ? "#0a64d8" : "#fff", color: doc.language === k ? "#fff" : C.text }}>
                   {label}
                 </button>
@@ -199,7 +199,7 @@ function DocTab({ title, doc, setDoc, isTax, bn }) {
 function DesignPreview({ html }) {
   return (
     <div style={{ width: 410, height: 560, overflow: "hidden", background: "#fff", border: `1px solid ${C.border}`, flexShrink: 0, position: "relative" }}>
-      <iframe title="preview" srcDoc={html.replace("</head>", "<style>.no-print{display:none!important}body{padding:10px!important}</style></head>")} sandbox=""
+      <iframe title="preview"srcDoc={html.replace("</head>", "<style>.no-print{display:none!important}body{padding:10px!important}</style></head>")} sandbox=""
         style={{ width: 820, height: 1120, border: 0, transform: "scale(0.5)", transformOrigin: "0 0", pointerEvents: "none" }} />
     </div>
   );
@@ -231,7 +231,7 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
     <>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
         {DESIGN_DOCS.map((d) => (
-          <button key={d.key} type="button" onClick={() => setDoc(d.key)}
+          <button key={d.key} type="button"onClick={() => setDoc(d.key)}
             style={{ ...winBtn(doc === d.key), minWidth: 0, background: doc === d.key ? "#0a64d8" : winBtn(false).background, color: doc === d.key ? "#fff" : C.text }}>
             {bn ? d.bn : d.en}
           </button>
@@ -242,15 +242,15 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
           <Group title={bn ? "পুরো ডিজাইন নিজের মতো (Designer / Pre-printed)" : "Custom layout (Designer / Pre-printed)"}>
             <div style={{ fontSize: 12, lineHeight: 1.5, marginBottom: 8 }}>
               {layout.enabled
-                ? <b style={{ color: "#15803d" }}>✅ {bn ? `চালু — ${layout.preprinted ? "Pre-printed কাগজে শুধু তথ্য" : "নিজের বানানো ডিজাইন"} প্রিন্ট হচ্ছে` : `On — printing ${layout.preprinted ? "data only on pre-printed paper" : "your own layout"}`}</b>
+                ? <b style={{ color: "#15803d" }}> {bn ? `চালু — ${layout.preprinted ? "Pre-printed কাগজে শুধু তথ্য" : "নিজের বানানো ডিজাইন"} প্রিন্ট হচ্ছে` : `On — printing ${layout.preprinted ? "data only on pre-printed paper" : "your own layout"}`}</b>
                 : (bn ? "বন্ধ — নিচের রেডিমেড টেমপ্লেট দিয়ে প্রিন্ট হচ্ছে।" : "Off — the ready-made template below is used.")}
             </div>
-            <button type="button" style={{ ...winBtn(true), minWidth: 180 }} onClick={() => onOpenDesigner(doc)}>
-              🧩 {bn ? "ডিজাইনার খুলুন" : "Open Designer"}
+            <button type="button"style={{ ...winBtn(true), minWidth: 180 }} onClick={() => onOpenDesigner(doc)}>
+               {bn ? "ডিজাইনার খুলুন" : "Open Designer"}
             </button>
             <div style={{ fontSize: 11, color: "#374151", marginTop: 6, lineHeight: 1.45 }}>
               {bn
-                ? "কাগজের উপর নাম, তারিখ, আইটেম টেবিল, টোটাল — যেটা যেখানে চান মাউস দিয়ে বসান। বাঁ পাশ থেকে ফিল্ড যোগ করুন। Print Settings-এর অপশন (বিক্রেতা, সময়, নোট, বাকির মেয়াদ, কাস্টমারের বাকি, VAT সারাংশ) ডিজাইনারেও একইভাবে কাজ করবে — বন্ধ থাকলে সেই ঘর খালি থাকবে। আগে থেকে ছাপানো প্যাড থাকলে \"Pre-printed\" টিক দিন।"
+                ? "কাগজের উপর নাম, তারিখ, আইটেম টেবিল, টোটাল — যেটা যেখানে চান মাউস দিয়ে বসান। বাঁ পাশ থেকে ফিল্ড যোগ করুন। Print Settings-এর অপশন (বিক্রেতা, সময়, নোট, বাকির মেয়াদ, কাস্টমারের বাকি, VAT সারাংশ) ডিজাইনারেও একইভাবে কাজ করবে — বন্ধ থাকলে সেই ঘর খালি থাকবে। আগে থেকে ছাপানো প্যাড থাকলে \"Pre-printed\"টিক দিন।"
                 : "Place name, date, item table, totals anywhere on the paper. Add fields from the left. Print Settings options (salesman, time, note, credit period, customer balance, VAT summary) also apply in the designer — off means that field prints blank. For a pre-printed pad tick \"Pre-printed\"."}
             </div>
           </Group>
@@ -258,7 +258,7 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
           <Group title={bn ? "রেডিমেড টেমপ্লেট" : "Ready-made template"}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(96px,1fr))", gap: 6, opacity: layout.enabled ? 0.5 : 1 }}>
               {TEMPLATES.map((t) => (
-                <button key={t.key} type="button" onClick={() => setStyle("template", t.key)}
+                <button key={t.key} type="button"onClick={() => setStyle("template", t.key)}
                   style={{ padding: 5, border: style.template === t.key ? "2px solid #0a64d8" : `1px solid ${C.border}`, background: "#fff", cursor: "pointer", fontFamily: font, fontSize: 11, textAlign: "center" }}>
                   <div style={{ height: 44, border: "1px solid #d1d5db", marginBottom: 4, display: "flex", flexDirection: "column" }}>
                     <div style={{ height: 12, background: t.sample[0], borderBottom: `2px solid ${t.sample[2]}` }} />
@@ -275,23 +275,23 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
           <Group title={bn ? "রং, লোগো, লেখা" : "Colour, logo, text"}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 700, minWidth: 70 }}>{bn ? "মূল রং:" : "Colour:"}</span>
-              <input type="color" value={style.accent || tpl.accent || "#16a34a"} onChange={(e) => setStyle("accent", e.target.value)} style={{ width: 44, height: 26, border: "1px solid #8797a9", padding: 0 }} />
-              {style.accent && <button type="button" style={{ ...winBtn(false), minWidth: 0 }} onClick={() => setStyle("accent", "")}>{bn ? "ডিফল্ট" : "Default"}</button>}
+              <input type="color"value={style.accent || tpl.accent || "#16a34a"} onChange={(e) => setStyle("accent", e.target.value)} style={{ width: 44, height: 26, border: "1px solid #8797a9", padding: 0 }} />
+              {style.accent && <button type="button"style={{ ...winBtn(false), minWidth: 0 }} onClick={() => setStyle("accent", "")}>{bn ? "ডিফল্ট" : "Default"}</button>}
               <span style={{ fontSize: 12, fontWeight: 700, marginLeft: 8 }}>{bn ? "লেখার সাইজ:" : "Text size:"}</span>
-              <input type="range" min={80} max={130} step={5} value={style.fontScale} onChange={(e) => setStyle("fontScale", parseInt(e.target.value, 10))} />
+              <input type="range"min={80} max={130} step={5} value={style.fontScale} onChange={(e) => setStyle("fontScale", parseInt(e.target.value, 10))} />
               <span style={{ fontSize: 12 }}>{style.fontScale}%</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, fontWeight: 700, minWidth: 70 }}>{bn ? "লোগো:" : "Logo:"}</span>
-              {style.logo && <img src={style.logo} alt="" style={{ height: 32, maxWidth: 100, objectFit: "contain", background: "#fff", border: "1px solid #d1d5db" }} />}
+              {style.logo && <img src={style.logo} alt=""style={{ height: 32, maxWidth: 100, objectFit: "contain", background: "#fff", border: "1px solid #d1d5db" }} />}
               <label style={{ ...winBtn(false), minWidth: 0, display: "inline-block" }}>
                 {style.logo ? (bn ? "বদলান" : "Change") : (bn ? "লোগো দিন" : "Upload")}
-                <input type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ""; }} />
+                <input type="file"accept="image/*"style={{ display: "none" }} onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ""; }} />
               </label>
               {style.logo && (
                 <>
-                  <button type="button" style={{ ...winBtn(false), minWidth: 0 }} onClick={() => setStyle("logo", "")}>✕</button>
-                  <input type="range" min={20} max={280} value={style.logoSize || 56} onChange={(e) => setStyle("logoSize", parseInt(e.target.value, 10))} title={bn ? "লোগোর সাইজ" : "Logo size"} />
+                  <button type="button"style={{ ...winBtn(false), minWidth: 0 }} onClick={() => setStyle("logo", "")}>✕</button>
+                  <input type="range"min={20} max={280} value={style.logoSize || 56} onChange={(e) => setStyle("logoSize", parseInt(e.target.value, 10))} title={bn ? "লোগোর সাইজ" : "Logo size"} />
                   <span style={{ fontSize: 12, minWidth: 36 }}>{style.logoSize || 56}px</span>
                 </>
               )}
@@ -301,7 +301,7 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
                 <div style={{ fontSize: 12, fontWeight: 700 }}>{bn ? "লোগোর জায়গা — বাটন বা স্লাইড দিয়ে সরান" : "Logo place — move with buttons or sliders"}</div>
                 <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                   {[["left", bn ? "বাঁয়ে" : "Left"], ["center", bn ? "মাঝে" : "Center"], ["right", bn ? "ডানে" : "Right"]].map(([k, label]) => (
-                    <button key={k} type="button" onClick={() => setStyle("logoAlign", k)}
+                    <button key={k} type="button"onClick={() => setStyle("logoAlign", k)}
                       style={{ ...winBtn(style.logoAlign === k), minWidth: 0, background: style.logoAlign === k ? "#0a64d8" : winBtn(false).background, color: style.logoAlign === k ? "#fff" : C.text }}>
                       {label}
                     </button>
@@ -309,16 +309,16 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
                 </div>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                   <span style={{ minWidth: 70 }}>{bn ? "বাঁ / ডান" : "Left / Right"}</span>
-                  <input type="range" min={-160} max={220} value={style.logoX || 0} onChange={(e) => setStyle("logoX", parseInt(e.target.value, 10))} style={{ flex: 1 }} />
+                  <input type="range"min={-160} max={220} value={style.logoX || 0} onChange={(e) => setStyle("logoX", parseInt(e.target.value, 10))} style={{ flex: 1 }} />
                   <span style={{ width: 28, textAlign: "right" }}>{style.logoX || 0}</span>
                 </label>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                   <span style={{ minWidth: 70 }}>{bn ? "উপর / নিচ" : "Up / Down"}</span>
-                  <input type="range" min={-80} max={140} value={style.logoY || 0} onChange={(e) => setStyle("logoY", parseInt(e.target.value, 10))} style={{ flex: 1 }} />
+                  <input type="range"min={-80} max={140} value={style.logoY || 0} onChange={(e) => setStyle("logoY", parseInt(e.target.value, 10))} style={{ flex: 1 }} />
                   <span style={{ width: 28, textAlign: "right" }}>{style.logoY || 0}</span>
                 </label>
                 <div style={{ fontSize: 11, color: "#374151" }}>
-                  {bn ? "আরও স্বাধীনভাবে সরাতে Design ট্যাবে \"ডিজাইনার খুলুন\" চাপুন — সেখানে লোগো মাউস দিয়ে টেনে রাখা যায়।" : "For free drag-and-drop, open the Designer — you can pull the logo anywhere."}
+                  {bn ? "আরও স্বাধীনভাবে সরাতে Design ট্যাবে \"ডিজাইনার খুলুন\"চাপুন — সেখানে লোগো মাউস দিয়ে টেনে রাখা যায়।" : "For free drag-and-drop, open the Designer — you can pull the logo anywhere."}
                 </div>
               </div>
             )}
@@ -327,7 +327,7 @@ function DesignTab({ bn, design, setDesign, previewHtml, onOpenDesigner }) {
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 3 }}>{bn ? "নিচের লেখা / শর্তাবলী (খালি রাখলে ডিফল্ট) — OK/Apply চাপলে দোকানে স্থায়ী সেভ" : "Footer / terms (blank = default) — OK/Apply saves them on the shop"}</div>
             <textarea rows={8} value={style.footerText} onChange={(e) => setStyle("footerText", e.target.value)} style={{ width: "100%", boxSizing: "border-box", border: "1px solid #8797a9", fontFamily: font, fontSize: 12, padding: 4, whiteSpace: "pre-wrap" }} placeholder={bn ? "যেমন: TERMS & CONDITIONS..." : "e.g. TERMS & CONDITIONS..."} />
             <Check checked={style.showSignatures} onChange={(v) => setStyle("showSignatures", v)}>{bn ? "স্বাক্ষরের জায়গা প্রিন্ট করো" : "Print signature lines"}</Check>
-            <button type="button" style={{ ...winBtn(false), marginTop: 6 }} onClick={copyToAll}>
+            <button type="button"style={{ ...winBtn(false), marginTop: 6 }} onClick={copyToAll}>
               {bn ? "এই ডিজাইন সব প্রিন্টে লাগাও" : "Use this style for all documents"}
             </button>
           </Group>
@@ -373,7 +373,7 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
     const stored = loadPrintDesign();
     const nextDesign = { ...stored, style: design.style };
     if (!savePrintDesignBestEffort(nextDesign)) {
-      toast?.(bn ? "⚠️ ডিজাইন সেভ হয়নি — লোগো/ছবি অনেক বড়" : "⚠️ Design not saved — logo/image too large", "err");
+      toast?.(bn ? "ডিজাইন সেভ হয়নি — লোগো/ছবি অনেক বড়" : "Design not saved — logo/image too large", "err");
       return false;
     }
     if (shopId) {
@@ -382,23 +382,23 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
         const updated = await saveShopRecord(shopId, { printDesign: extractShopPrintDesign(nextDesign) }, { ownerUid: user?.uid || shop?.ownerUid, profile, user });
         onShopUpdated?.(updated);
       } catch (error) {
-        toast?.(bn ? "⚠️ দোকানে সেভ হয়নি — আবার Apply চাপুন" : "⚠️ Could not save on the shop — press Apply again", "err");
+        toast?.(bn ? "দোকানে সেভ হয়নি — আবার Apply চাপুন" : "Could not save on the shop — press Apply again", "err");
         setSaving(false);
         return false;
       }
       setSaving(false);
     }
-    toast?.(bn ? "✅ প্রিন্ট সেটিংস দোকানে সেভ হয়েছে — logout-এও থাকবে" : "✅ Print settings saved on the shop — they stay after logout");
+    toast?.(bn ? "প্রিন্ট সেটিংস দোকানে সেভ হয়েছে — logout-এও থাকবে" : "Print settings saved on the shop — they stay after logout");
     return true;
   };
   const saveLayout = (kind, layout) => {
     const stored = loadPrintDesign();
     if (!savePrintDesignBestEffort({ ...stored, layout: { ...stored.layout, [kind]: layout } })) {
-      toast?.(bn ? "⚠️ সেভ হয়নি — প্যাডের ছবি অনেক বড়, ছোট ছবি দিন" : "⚠️ Not saved — form image too large", "err");
+      toast?.(bn ? "সেভ হয়নি — প্যাডের ছবি অনেক বড়, ছোট ছবি দিন" : "Not saved — form image too large", "err");
       return false;
     }
     setDesign((d) => ({ ...d, layout: { ...d.layout, [kind]: layout } }));
-    toast?.(bn ? "✅ ডিজাইন সেভ হয়েছে" : "✅ Layout saved");
+    toast?.(bn ? "ডিজাইন সেভ হয়েছে" : "Layout saved");
     return true;
   };
 
@@ -406,17 +406,17 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
     <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(10,25,55,0.45)", display: "flex", alignItems: isDesktop ? "center" : "stretch", justifyContent: "center", padding: isDesktop ? 12 : 0 }}>
       <div style={{ width: isDesktop ? (tab === "design" ? "min(980px, 100%)" : "min(560px, 100%)") : "100%", maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, boxShadow: "0 18px 44px rgba(2,6,23,0.5)", fontFamily: font, color: C.text }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 6px 5px 10px", background: "linear-gradient(180deg,#3f69bd,#2854ad)", color: "#fff", fontWeight: 700, fontSize: 13 }}>
-          <span>🖨️ {bn ? "প্রিন্ট সেটিংস (Print Settings)" : "Print Settings"}</span>
-          <button type="button" onClick={onClose} title={bn ? "বন্ধ করুন (Esc)" : "Close (Esc)"}
+          <span> {bn ? "প্রিন্ট সেটিংস (Print Settings)" : "Print Settings"}</span>
+          <button type="button"onClick={onClose} title={bn ? "বন্ধ করুন (Esc)" : "Close (Esc)"}
             style={{ width: 30, height: 22, border: "1px solid #e8806f", borderRadius: 3, background: "#c42b1c", color: "#fff", fontWeight: 900, cursor: "pointer" }}>✕</button>
         </div>
 
         <div style={{ padding: "10px 10px 0", overflowY: "auto", flex: 1 }}>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
-            <button type="button" style={tabBtn(tab === "general")} onClick={() => setTab("general")}>{bn ? "সাধারণ" : "General"}</button>
-            <button type="button" style={tabBtn(tab === "retail")} onClick={() => setTab("retail")}>{bn ? "রিটেইল ইনভয়েস" : "Retail Invoice"}</button>
-            <button type="button" style={tabBtn(tab === "tax")} onClick={() => setTab("tax")}>{bn ? "ট্যাক্স ইনভয়েস" : "Tax Invoice"}</button>
-            <button type="button" style={tabBtn(tab === "design")} onClick={() => setTab("design")}>🎨 {bn ? "ডিজাইন" : "Design"}</button>
+            <button type="button"style={tabBtn(tab === "general")} onClick={() => setTab("general")}>{bn ? "সাধারণ" : "General"}</button>
+            <button type="button"style={tabBtn(tab === "retail")} onClick={() => setTab("retail")}>{bn ? "রিটেইল ইনভয়েস" : "Retail Invoice"}</button>
+            <button type="button"style={tabBtn(tab === "tax")} onClick={() => setTab("tax")}>{bn ? "ট্যাক্স ইনভয়েস" : "Tax Invoice"}</button>
+            <button type="button"style={tabBtn(tab === "design")} onClick={() => setTab("design")}> {bn ? "ডিজাইন" : "Design"}</button>
           </div>
           <div style={{ border: `1px solid ${C.border}`, background: C.panel, padding: 10 }}>
             {tab === "general" && (
@@ -424,11 +424,11 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
                 <Group title={bn ? "প্রিন্টার" : "Printers"}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ flex: "1 1 220px", minWidth: 0, fontSize: 12, lineHeight: 1.6 }}>
-                      <div>🧾 {bn ? "বিল:" : "Bill:"} <b>{draft.billPrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
-                      <div>🏷️ {bn ? "বারকোড:" : "Barcode:"} <b>{draft.barcodePrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
-                      <div>🏦 {bn ? "চেক:" : "Cheque:"} <b>{draft.chequePrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
+                      <div> {bn ? "বিল:" : "Bill:"} <b>{draft.billPrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
+                      <div> {bn ? "বারকোড:" : "Barcode:"} <b>{draft.barcodePrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
+                      <div> {bn ? "চেক:" : "Cheque:"} <b>{draft.chequePrinter || (bn ? "প্রতিবার জিজ্ঞেস করবে" : "Ask every time")}</b></div>
                     </div>
-                    <button type="button" style={{ ...winBtn(true), minWidth: 130 }} onClick={() => setSetupOpen(true)}>
+                    <button type="button"style={{ ...winBtn(true), minWidth: 130 }} onClick={() => setSetupOpen(true)}>
                       {bn ? "প্রিন্টার সেটআপ" : "Printer Setup"}
                     </button>
                   </div>
@@ -465,8 +465,8 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
                 </Group>
                 <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.45 }}>
                   {bn
-                    ? "🖨️ বিলের নিচের শর্তাবলী, লোগো আর টেমপ্লেট দোকানে সেভ হয় — logout করলেও থাকে, অন্য পিসি/মোবাইলেও আসবে। প্রিন্টার বেছে রাখা শুধু এই পিসিতে থাকে।"
-                    : "🖨️ Invoice terms, logo and template are saved on the shop — they stay after logout and reach other PCs/phones. The chosen printer stays on this PC only."}
+                    ? "বিলের নিচের শর্তাবলী, লোগো আর টেমপ্লেট দোকানে সেভ হয় — logout করলেও থাকে, অন্য পিসি/মোবাইলেও আসবে। প্রিন্টার বেছে রাখা শুধু এই পিসিতে থাকে।"
+                    : "Invoice terms, logo and template are saved on the shop — they stay after logout and reach other PCs/phones. The chosen printer stays on this PC only."}
                 </div>
               </>
             )}
@@ -497,13 +497,13 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
               dirtyRef.current = true;
               setDraft(next);
               savePrintSettings({ ...loadPrintSettings(), billPrinter, barcodePrinter, chequePrinter });
-              toast?.(bn ? "✅ প্রিন্টার সেট হয়েছে" : "✅ Printers set");
+              toast?.(bn ? "প্রিন্টার সেট হয়েছে" : "Printers set");
             }} />
         )}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: 10 }}>
-          <button type="button" style={winBtn(true)} disabled={saving || !ready} onClick={async () => { if (await apply()) onClose(); }}>OK</button>
-          <button type="button" style={winBtn(false)} onClick={onClose}>{bn ? "বাতিল" : "Cancel"}</button>
-          <button type="button" style={winBtn(false)} disabled={saving || !ready} onClick={apply}>{saving ? (bn ? "সেভ হচ্ছে..." : "Saving...") : (bn ? "প্রয়োগ" : "Apply")}</button>
+          <button type="button"style={winBtn(true)} disabled={saving || !ready} onClick={async () => { if (await apply()) onClose(); }}>OK</button>
+          <button type="button"style={winBtn(false)} onClick={onClose}>{bn ? "বাতিল" : "Cancel"}</button>
+          <button type="button"style={winBtn(false)} disabled={saving || !ready} onClick={apply}>{saving ? (bn ? "সেভ হচ্ছে..." : "Saving...") : (bn ? "প্রয়োগ" : "Apply")}</button>
         </div>
       </div>
     </div>

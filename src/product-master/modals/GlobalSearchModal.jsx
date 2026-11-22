@@ -313,12 +313,12 @@ export default function GlobalSearchModal({
   const visibleFields = embedded && !showAllFields ? fieldsConfig.slice(0, EMBEDDED_BASIC_FIELDS) : fieldsConfig;
 
   const windowBody = (
-      <section className={`pm-search-window${embedded ? " pm-search-embedded" : ""}`} onMouseDown={(event) => event.stopPropagation()}>
+      <section className={`pm-search-window${embedded ? "pm-search-embedded" : ""}`} onMouseDown={(event) => event.stopPropagation()}>
         <header className="pm-search-title">
           <strong>Search Product</strong>
-          {!embedded && <button type="button" aria-label="Close Search" onClick={onClose}>✕</button>}
+          {!embedded && <button type="button"aria-label="Close Search"onClick={onClose}>✕</button>}
           {embedded && <span className="pm-search-embedded-hint">Tap a product to open it</span>}
-          {embedded && <button type="button" className="pm-search-back" onClick={onClose}>← Back</button>}
+          {embedded && <button type="button"className="pm-search-back"onClick={onClose}>← Back</button>}
         </header>
 
         <div className="pm-search-content">
@@ -351,11 +351,11 @@ export default function GlobalSearchModal({
               ))}
               <div className="pm-search-command">
                 {embedded && (
-                  <button type="button" className="pm-search-more" onClick={() => setShowAllFields((v) => !v)}>
+                  <button type="button"className="pm-search-more"onClick={() => setShowAllFields((v) => !v)}>
                     {showAllFields ? "Less fields ▲" : "More fields ▼"}
                   </button>
                 )}
-                <button type="button" onClick={() => runSearch()}>Search</button>
+                <button type="button"onClick={() => runSearch()}>Search</button>
               </div>
             </div>
           </fieldset>
@@ -366,7 +366,7 @@ export default function GlobalSearchModal({
           </div>
 
           <div className="pm-search-result-row">
-          <div ref={gridRef} tabIndex={0} className="pm-search-grid-wrap" onKeyDown={onGridKeyDown}
+          <div ref={gridRef} tabIndex={0} className="pm-search-grid-wrap"onKeyDown={onGridKeyDown}
             onFocus={() => { if (!embedded && results.length && !results.some((p) => p.id === selectedId)) setSelectedId(results[0].id); }}>
             <table
               className="pm-search-grid"
@@ -405,9 +405,9 @@ export default function GlobalSearchModal({
                       return (
                         <td key={column.key} style={{ width: Number(column.width) }} title={String(value || "")}>
                           {column.key === "productName" && product.photoUrl ? (
-                            <span className="pm-search-has-photo" title="View photo"
+                            <span className="pm-search-has-photo"title="View photo"
                               onClick={(event) => { event.stopPropagation(); setPhotoView(product); }}
-                              onDoubleClick={(event) => event.stopPropagation()}>📷 </span>
+                              onDoubleClick={(event) => event.stopPropagation()}> </span>
                           ) : null}
                           {value}
                         </td>
@@ -441,7 +441,7 @@ export default function GlobalSearchModal({
           </div>
         </div>
         {photoView && (
-          <div className="pm-photo-viewer" onMouseDown={(event) => { event.stopPropagation(); setPhotoView(null); }}>
+          <div className="pm-photo-viewer"onMouseDown={(event) => { event.stopPropagation(); setPhotoView(null); }}>
             <img src={photoView.photoUrl} alt={photoView.name || "Product"} />
             <span>{photoView.name} — click anywhere to close</span>
           </div>
@@ -450,26 +450,26 @@ export default function GlobalSearchModal({
         <footer className="pm-search-footer">
           <div className="pm-search-options">
             <label>
-              <input type="checkbox" checked={extendedSearch} onChange={(event) => setExtendedSearch(event.target.checked)} />
+              <input type="checkbox"checked={extendedSearch} onChange={(event) => setExtendedSearch(event.target.checked)} />
               <strong>Extended Search</strong>
               <span>(Will display all products containing the search text in any part of the field)</span>
             </label>
             <label>
-              <input type="checkbox" checked={autoSearch} onChange={(event) => setAutoSearch(event.target.checked)} />
+              <input type="checkbox"checked={autoSearch} onChange={(event) => setAutoSearch(event.target.checked)} />
               <strong>Auto Search while typing in text box</strong>
             </label>
           </div>
-          {!embedded && <button type="button" className="pm-search-close" onClick={onClose}>Close</button>}
+          {!embedded && <button type="button"className="pm-search-close"onClick={onClose}>Close</button>}
           {!embedded && (
-            <button type="button" className="pm-search-columns-link" onClick={openColumnSettings}>
+            <button type="button"className="pm-search-columns-link"onClick={openColumnSettings}>
               Click here to change the Search List Column Settings
             </button>
           )}
           {!embedded && showColumnSettings && (
-            <div className="pm-search-column-settings" role="dialog" aria-label="Column Settings">
+            <div className="pm-search-column-settings"role="dialog"aria-label="Column Settings">
               <div className="pm-search-column-settings__title">
                 <strong>Column Settings</strong>
-                <button type="button" onClick={() => setShowColumnSettings(false)} aria-label="Close">✕</button>
+                <button type="button"onClick={() => setShowColumnSettings(false)} aria-label="Close">✕</button>
               </div>
               <div className="pm-search-column-settings__body">
                 <div className="pm-search-column-settings__list">
@@ -486,8 +486,8 @@ export default function GlobalSearchModal({
                   ))}
                 </div>
                 <div className="pm-search-column-settings__arrows">
-                  <button type="button" title="Move column up" onClick={() => moveColumn(-1)}>↑</button>
-                  <button type="button" title="Move column down" onClick={() => moveColumn(1)}>↓</button>
+                  <button type="button"title="Move column up"onClick={() => moveColumn(-1)}>↑</button>
+                  <button type="button"title="Move column down"onClick={() => moveColumn(1)}>↓</button>
                 </div>
                 <div className="pm-search-column-settings__width">
                   <label htmlFor="pm-search-column-width">Width</label>
@@ -499,15 +499,15 @@ export default function GlobalSearchModal({
                     value={draftColumns.find((column) => column.key === selectedColumn)?.width ?? ""}
                     onChange={(event) => updateSelectedWidth(event.target.value)}
                   />
-                  <button type="button" onClick={applyColumnSettings}>OK</button>
+                  <button type="button"onClick={applyColumnSettings}>OK</button>
                 </div>
                 <div className="pm-search-column-settings__actions">
-                  <button type="button" onClick={() => {
+                  <button type="button"onClick={() => {
                     const defaults = defaultColumnSettings();
                     setDraftColumns(defaults);
                     setSelectedColumn(defaults[0].key);
                   }}>Reset</button>
-                  <button type="button" onClick={() => setShowColumnSettings(false)}>Close</button>
+                  <button type="button"onClick={() => setShowColumnSettings(false)}>Close</button>
                 </div>
               </div>
             </div>
@@ -518,7 +518,7 @@ export default function GlobalSearchModal({
 
   if (embedded) return windowBody;
   return (
-    <div className="pm-search-backdrop" onMouseDown={(event) => {
+    <div className="pm-search-backdrop"onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
       {windowBody}

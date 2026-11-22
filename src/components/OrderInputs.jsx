@@ -42,7 +42,7 @@ export function OrderSupplierPicker({ s, th, selectedSupplier, selectedSupplierI
           onFocus={e=>e.currentTarget.blur()}
           onKeyDown={e=>e.stopPropagation()}
         />
-        <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}>🔍</span>
+        <span style={{ position:"absolute", left:11, top:"50%", transform:"translateY(-50%)", fontSize:14, pointerEvents:"none", color:th.txtMuted }}></span>
         {(selectedSupplierId||query)&&canEdit&&(
           <button
             type="button"

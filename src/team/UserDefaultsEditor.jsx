@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react";
 
 export const START_TABS = [
-  ["dashboard", "🏠 ড্যাশবোর্ড", "🏠 Dashboard"],
-  ["sales", "🧾 বিক্রয় ইনভয়েস", "🧾 Sales invoice"],
-  ["quotation", "📄 কোটেশন", "📄 Quotation"],
-  ["delivery", "🚚 ডেলিভারি নোট", "🚚 Delivery note"],
-  ["products", "📦 পণ্য", "📦 Products"],
-  ["purchase", "🛒 ক্রয়", "🛒 Purchase"],
-  ["customers", "👥 কাস্টমার", "👥 Customers"],
-  ["expenses", "💸 খরচ", "💸 Expenses"],
-  ["stockAdjust", "⚖️ স্টক সমন্বয়", "⚖️ Stock adjustment"],
-  ["jobCard", "🔧 জব কার্ড", "🔧 Job card"],
-  ["shop", "📋 অর্ডার", "📋 Orders"],
+  ["dashboard", "ড্যাশবোর্ড", "Dashboard"],
+  ["sales", "বিক্রয় ইনভয়েস", "Sales invoice"],
+  ["quotation", "কোটেশন", "Quotation"],
+  ["delivery", "ডেলিভারি নোট", "Delivery note"],
+  ["products", "পণ্য", "Products"],
+  ["purchase", "ক্রয়", "Purchase"],
+  ["customers", "কাস্টমার", "Customers"],
+  ["expenses", "খরচ", "Expenses"],
+  ["stockAdjust", "স্টক সমন্বয়", "Stock adjustment"],
+  ["jobCard", "জব কার্ড", "Job card"],
+  ["shop", "অর্ডার", "Orders"],
 ];
 
 // Per-login defaults: who the bill is credited to, how it is paid, the bill type and the first screen.
@@ -40,7 +40,7 @@ export default function UserDefaultsEditor({ lang = "bn", th, s, member, team = 
 
   return (
     <div>
-      <div style={{ fontSize: 10, color: "#71717a", marginBottom: 6, textTransform: "uppercase", fontWeight: 700 }}>⚙️ {L("এই ইউজারের ডিফল্ট", "Defaults for this user")}</div>
+      <div style={{ fontSize: 10, color: "#71717a", marginBottom: 6, textTransform: "uppercase", fontWeight: 700 }}> {L("এই ইউজারের ডিফল্ট", "Defaults for this user")}</div>
       {row(L("কর্মচারী রেকর্ড", "Employee record"), (
         <select style={sel} value={d.employeeId || ""} onChange={(e) => {
           const emp = liveEmployees.find((x) => x.id === e.target.value);
@@ -80,8 +80,8 @@ export default function UserDefaultsEditor({ lang = "bn", th, s, member, team = 
         </select>
       ))}
       {dirty && (
-        <button type="button" style={{ ...s.savBtn, width: "100%", marginTop: 6 }} disabled={busy} onClick={save}>
-          {busy ? "..." : `💾 ${L("ডিফল্ট সেভ", "Save defaults")}`}
+        <button type="button"style={{ ...s.savBtn, width: "100%", marginTop: 6 }} disabled={busy} onClick={save}>
+          {busy ? "..." : ` ${L("ডিফল্ট সেভ", "Save defaults")}`}
         </button>
       )}
     </div>

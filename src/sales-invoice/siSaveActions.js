@@ -11,13 +11,13 @@ import { peekInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user }) {
   const siBuild=(status, invoiceNoOverride, extras={})=>{
     if (String(siCurrent.name||"").trim()) {
-      toast(lang==="bn"?"❌ উপরের ঘরে একটা আইটেম আছে যা বিলে যোগ হয়নি — Add চাপুন বা ঘরটা খালি করুন":"❌ An item in the entry row is not added to the bill yet — press Add or clear it","err");
+      toast(lang==="bn"?"উপরের ঘরে একটা আইটেম আছে যা বিলে যোগ হয়নি — Add চাপুন বা ঘরটা খালি করুন":"An item in the entry row is not added to the bill yet — press Add or clear it","err");
       return null;
     }
     const valid=siLines.filter(it=>it.name.trim());
     if (!valid.length){ toast(t.si_errItems,"err"); return null; }
     const badLine = valid.find(it => siN2(it.discountPerc)<0 || siN2(it.discountPerc)>100 || siN2(it.discountFlat)<0 || siN2(it.vatPerc)<0 || siN2(it.unitPrice)<0);
-    if (badLine) { toast(lang==="bn"?`❌ "${badLine.name}": ছাড় ০–১০০% আর দাম/VAT মাইনাস হতে পারে না`:`❌ "${badLine.name}": discount must be 0–100% and price/VAT cannot be negative`,"err"); return null; }
+    if (badLine) { toast(lang==="bn"?` "${badLine.name}": ছাড় ০–১০০% আর দাম/VAT মাইনাস হতে পারে না`:` "${badLine.name}": discount must be 0–100% and price/VAT cannot be negative`,"err"); return null; }
     const isDelivery = isDN || (kind==="sales" && siForm.invoiceType==="delivery");
     const isTax      = siForm.invoiceType==="tax";
     for (const it of valid){
@@ -32,7 +32,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     });
     const formTotals = isDelivery ? siCalcTotals(siDeliveryLines(valid), false) : siCalcTotals(valid, effectiveIsTax, siInvoiceExtras(siForm));
     const { sub, disc, vat, grand } = formTotals;
-    if (grand < -0.001) { toast(lang==="bn"?"❌ সর্বমোট মাইনাস হতে পারে না — সমন্বয়/ছাড় ঠিক করুন":"❌ Grand total cannot be negative — check adjustment/discount","err"); return null; }
+    if (grand < -0.001) { toast(lang==="bn"?"সর্বমোট মাইনাস হতে পারে না — সমন্বয়/ছাড় ঠিক করুন":"Grand total cannot be negative — check adjustment/discount","err"); return null; }
     const priorDoc = editInvId ? invoices.find(inv=>inv.id===editInvId) : null;
     if (!canDiscount && !isDelivery) {
       const reduction = (d, adj) => siN2(d) + Math.max(0, -siN2(adj));
@@ -44,7 +44,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
         return sum + siCalcLine({ ...it, discountPerc: Math.min(siN2(it.discountPerc), auto), discountFlat: 0 }, effectiveIsTax).disc;
       }, 0);
       const allowed = Math.max(baseDoc ? reduction(baseDoc.totalDiscount, baseDoc.adjustment) : 0, autoAllowed);
-      const noDiscountMsg = lang==="bn"?"❌ ডিসকাউন্ট দেওয়ার অনুমতি নেই — মালিকের কাছে পারমিশন নিন":"❌ You are not allowed to give discounts — ask the owner for permission";
+      const noDiscountMsg = lang==="bn"?"ডিসকাউন্ট দেওয়ার অনুমতি নেই — মালিকের কাছে পারমিশন নিন":"You are not allowed to give discounts — ask the owner for permission";
       if (reduction(disc, formTotals.adjustment) > allowed + 0.01) {
         toast(noDiscountMsg,"err"); return null;
       }
@@ -63,15 +63,15 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
         return floor > 0 && siN2(it.unitPrice) < floor - 0.005;
       });
       if (underPriced) {
-        toast(lang==="bn"?`❌ "${underPriced.name}"-এর দাম কমানোর অনুমতি নেই — মালিকের কাছে পারমিশন নিন`:`❌ You are not allowed to lower the price of "${underPriced.name}" — ask the owner for permission`,"err"); return null;
+        toast(lang==="bn"?` "${underPriced.name}"-এর দাম কমানোর অনুমতি নেই — মালিকের কাছে পারমিশন নিন`:`You are not allowed to lower the price of "${underPriced.name}" — ask the owner for permission`,"err"); return null;
       }
     }
     if (status==="draft" && priorDoc && !isQuote && priorDoc.status && priorDoc.status!=="draft") {
-      toast(lang==="bn"?"❌ সেভ করা বিলকে আবার Draft করা যাবে না":"❌ A saved invoice cannot be turned back into a draft","err"); return null;
+      toast(lang==="bn"?"সেভ করা বিলকে আবার Draft করা যাবে না":"A saved invoice cannot be turned back into a draft","err"); return null;
     }
     const paymentMethod = extras.paymentMethod || siForm.paymentMethod;
     const isCash      = paymentMethod==="cash";
-    // Cash / bank transfer / card settle the bill in full. "Partial cash" is an explicit opt-in
+    // Cash / bank transfer / card settle the bill in full. "Partial cash"is an explicit opt-in
     // for transport-style customers who pay cash later across several bills.
     // Print-as-Cash passes cashPartial:false so a leftover partial tick cannot save the bill unpaid.
     const cashPartial = isCash && (extras.cashPartial != null ? !!extras.cashPartial : !!siForm.cashPartial);
@@ -85,13 +85,13 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     const receiptsOnBill = priorDoc ? (receipts||[]).filter(r=>r.status!=="cancelled" && !r.isRefund)
       .reduce((s,r)=>s+(r.allocations||[]).filter(a=>a.invoiceId===priorDoc.id).reduce((x,a)=>x+siN2(a.amount),0),0) : 0;
     if (!isDelivery && !isQuote && !plainCash && priorDoc && receiptsOnBill > grand + 0.01) {
-      toast(lang==="bn"?`❌ এই বিলে আগেই ${siFmt2(receiptsOnBill)} টাকা নেওয়া হয়েছে — সর্বমোট এর চেয়ে কম করা যাবে না`:`❌ ${siFmt2(receiptsOnBill)} has already been received on this bill — the total cannot go below it`,"err"); return null;
+      toast(lang==="bn"?`এই বিলে আগেই ${siFmt2(receiptsOnBill)} টাকা নেওয়া হয়েছে — সর্বমোট এর চেয়ে কম করা যাবে না`:` ${siFmt2(receiptsOnBill)} has already been received on this bill — the total cannot go below it`,"err"); return null;
     }
     if (!isDelivery && !isQuote && plainCash && receiptsOnBill > 0.01) {
-      toast(lang==="bn"?"❌ এই বিলে Receipt Voucher আছে — Cash করা যাবে না, আগে Receipt বাতিল করুন":"❌ This bill has receipt vouchers — it cannot be made cash; cancel the receipts first","err"); return null;
+      toast(lang==="bn"?"এই বিলে Receipt Voucher আছে — Cash করা যাবে না, আগে Receipt বাতিল করুন":"This bill has receipt vouchers — it cannot be made cash; cancel the receipts first","err"); return null;
     }
     if (!isDelivery && !isQuote && !plainCash && (typedPaid < 0 || trackedPaid > grand + 0.01)) {
-      toast(lang==="bn"?"❌ পরিশোধিত টাকা মোট বিলের চেয়ে বেশি বা ঋণাত্মক হতে পারে না!":"❌ Amount paid cannot exceed the grand total or be negative!","err"); return null;
+      toast(lang==="bn"?"পরিশোধিত টাকা মোট বিলের চেয়ে বেশি বা ঋণাত্মক হতে পারে না!":"Amount paid cannot exceed the grand total or be negative!","err"); return null;
     }
     // plain cash invoice: auto fully paid | delivery: confirmed | credit/partial-cash: normal; receipts already posted on the bill always stay counted
     const paid = isDelivery || isQuote ? 0
@@ -137,13 +137,13 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     if (!cust) return true;
     const priorDoc = editInvId ? invoices.find(inv=>inv.id===editInvId) : null;
     if (cust.status==="blocked" && priorDoc?.customerId!==cust.id) {
-      toast(lang==="bn"?`❌ "${cust.customerName}" ব্লক করা কাস্টমার — বিক্রি করা যাবে না`:`❌ "${cust.customerName}" is a blocked customer — cannot be billed`,"err");
+      toast(lang==="bn"?` "${cust.customerName}"ব্লক করা কাস্টমার — বিক্রি করা যাবে না`:` "${cust.customerName}"is a blocked customer — cannot be billed`,"err");
       return false;
     }
     if (p.balanceDue<=0.01) return true;
     if (cust.paymentType==="cash" && !window.confirm(lang==="bn"
-      ? `"${cust.customerName}" শুধু নগদের কাস্টমার। তবুও বাকিতে ${siFmt2(p.balanceDue)} দেবেন?`
-      : `"${cust.customerName}" is a cash-only customer. Give ${siFmt2(p.balanceDue)} on credit anyway?`)) return false;
+      ? `"${cust.customerName}"শুধু নগদের কাস্টমার। তবুও বাকিতে ${siFmt2(p.balanceDue)} দেবেন?`
+      : `"${cust.customerName}"is a cash-only customer. Give ${siFmt2(p.balanceDue)} on credit anyway?`)) return false;
     const limit = siN2(cust.creditLimit);
     if (limit>0) {
       const outstanding = invoices
@@ -200,8 +200,8 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     if (!short.length) return true;
     const list = short.slice(0, 5).map((s) => `${s.name}: ${lang==="bn"?"আছে":"have"} ${siFmt2(s.available)}, ${lang==="bn"?"লাগবে":"need"} ${siFmt2(s.qty)}`).join("\n");
     return window.confirm(lang==="bn"
-      ? `⚠️ স্টকের চেয়ে বেশি বিক্রি হচ্ছে:\n${list}\n\nতবুও সেভ করবেন?`
-      : `⚠️ Selling more than what's in stock:\n${list}\n\nSave anyway?`);
+      ? `স্টকের চেয়ে বেশি বিক্রি হচ্ছে:\n${list}\n\nতবুও সেভ করবেন?`
+      : `Selling more than what's in stock:\n${list}\n\nSave anyway?`);
   };
 
   const saveSalesInvoiceOffline = async (payload, successMessage, options = {}) => {
@@ -312,7 +312,7 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
         if (src && ["converted","invoiced","delivered"].includes(src.status)) {
           toast(lang==="bn"
             ? `${sourceQuote.invoiceNo} আগেই ${src.convertedInvoiceNo ? `→ ${src.convertedInvoiceNo} ` : ""}রূপান্তরিত — আরেকটা ইনভয়েস বানানো যাবে না`
-            : `${sourceQuote.invoiceNo} was already converted${src.convertedInvoiceNo ? ` to ${src.convertedInvoiceNo}` : ""} — cannot create another invoice`, "err");
+            : `${sourceQuote.invoiceNo} was already converted${src.convertedInvoiceNo ? `to ${src.convertedInvoiceNo}` : ""} — cannot create another invoice`, "err");
           return;
         }
         if (src?.status==="cancelled") {

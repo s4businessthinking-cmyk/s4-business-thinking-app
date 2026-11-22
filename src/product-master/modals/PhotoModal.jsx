@@ -89,7 +89,7 @@ export default function PhotoModal({ form, upd, onClose, notify }) {
   const isData = url.startsWith("data:");
 
   return (
-    <Modal title="Product Photo Setting" onClose={onClose} width="md">
+    <Modal title="Product Photo Setting"onClose={onClose} width="md">
       <div
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
@@ -103,7 +103,7 @@ export default function PhotoModal({ form, upd, onClose, notify }) {
         {busy ? (
           <span style={{ fontWeight: 700, color: "#1f3f73" }}>Processing image...</span>
         ) : url ? (
-          <img src={url} alt="Product" style={{ maxWidth: "100%", maxHeight: 240, objectFit: "contain", background: "#fff" }} />
+          <img src={url} alt="Product"style={{ maxWidth: "100%", maxHeight: 240, objectFit: "contain", background: "#fff" }} />
         ) : (
           <span style={{ fontSize: 12.5, color: "#334155", lineHeight: 1.7 }}>
             <b>Take a screenshot and press Ctrl+V</b><br />
@@ -112,11 +112,11 @@ export default function PhotoModal({ form, upd, onClose, notify }) {
           </span>
         )}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }}
+      <input ref={fileRef} type="file"accept="image/*"style={{ display: "none" }}
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; takeImage(f); }} />
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        <button type="button" className="pm-btn-secondary" onClick={pasteFromButton} disabled={busy}>📋 Paste Screenshot</button>
-        <button type="button" className="pm-btn-secondary" onClick={() => fileRef.current?.click()} disabled={busy}>📁 Choose Photo</button>
+        <button type="button"className="pm-btn-secondary"onClick={pasteFromButton} disabled={busy}> Paste Screenshot</button>
+        <button type="button"className="pm-btn-secondary"onClick={() => fileRef.current?.click()} disabled={busy}> Choose Photo</button>
       </div>
       <div className="pm-field">
         <label className="pm-label">Or Photo URL</label>
@@ -130,11 +130,11 @@ export default function PhotoModal({ form, upd, onClose, notify }) {
       </div>
       <div className="pm-window-foot">
         {url && (
-          <button type="button" className="pm-btn-danger" onClick={() => { setUrl(""); upd("photoUrl", ""); }} disabled={busy}>
+          <button type="button"className="pm-btn-danger"onClick={() => { setUrl(""); upd("photoUrl", ""); }} disabled={busy}>
             Remove
           </button>
         )}
-        <button type="button" className="pm-btn-secondary" onClick={onClose}>Cancel</button>
+        <button type="button"className="pm-btn-secondary"onClick={onClose}>Cancel</button>
         <button
           type="button"
           className="pm-btn"

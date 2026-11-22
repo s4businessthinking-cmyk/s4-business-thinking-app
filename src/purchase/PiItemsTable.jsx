@@ -27,9 +27,9 @@ export function PiProductPicker({ products, onSelect, onClose, t, th }) {
             <button key={p.id} onClick={()=>onSelect(p)} style={{ width:"100%", textAlign:"left", padding:"12px 16px", background:"transparent", border:"none", borderBottom:`1px solid ${th.border}`, color:th.txtSecondary, cursor:"pointer", fontFamily:"inherit" }}>
               <div style={{ fontSize:13, fontWeight:700, color:th.txtPrimary }}>{p.name}</div>
               <div style={{ fontSize:11, color:th.txtMuted, marginTop:3, display:"flex", gap:8, flexWrap:"wrap" }}>
-                {p.code&&<span>📋 {p.code}</span>}
-                {p.brand&&<span>🏷️ {p.brand}</span>}
-                {p.category&&<span>🗂️ {p.category}</span>}
+                {p.code&&<span> {p.code}</span>}
+                {p.brand&&<span> {p.brand}</span>}
+                {p.category&&<span> {p.category}</span>}
                 {p.vatExclusive&&<span style={{ color:"#22c55e" }}>{t.cur}{p.vatExclusive}</span>}
               </div>
             </button>
@@ -63,7 +63,7 @@ export function PiItemsTable({ items, lang, onEdit, onDelete, editId }) {
                 <td className="si-wrap">
                   <div className="si-strong">{it.name}</div>
                   {(it.code||it.brand)&&<div className="si-muted">{[it.code,it.brand].filter(Boolean).join(" · ")}</div>}
-                  {it.batchNo&&<div style={{ color:"#7c3aed", fontWeight:700 }}>📦 {bn?"আলাদা ব্যাচ":"Batch"} {it.batchNo}</div>}
+                  {it.batchNo&&<div style={{ color:"#7c3aed", fontWeight:700 }}> {bn?"আলাদা ব্যাচ":"Batch"} {it.batchNo}</div>}
                   {(disc>0||piN2(it.taxPerc)>0||piN2(it.salePrice)>0)&&(
                     <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
                       {disc>0&&<span style={{ color:"#b91c1c" }}>{bn?"ছাড়":"Disc"} {piN2(it.discountPerc)>0?`${it.discountPerc}% `:""}(-{piFmt2(disc)})</span>}
@@ -73,14 +73,14 @@ export function PiItemsTable({ items, lang, onEdit, onDelete, editId }) {
                   )}
                   {(onEdit||onDelete)&&(
                     <div className="si-line-tools">
-                      {onEdit&&<button type="button" className="pm-btn-secondary" onClick={()=>onEdit(it)}>✏️ {bn?"এডিট":"Edit"}</button>}
-                      {onDelete&&<button type="button" className="pm-btn-secondary" style={{ color:"#b91c1c" }} onClick={()=>onDelete(it.id)}>✕ {bn?"মুছুন":"Delete"}</button>}
+                      {onEdit&&<button type="button"className="pm-btn-secondary"onClick={()=>onEdit(it)}> {bn?"এডিট":"Edit"}</button>}
+                      {onDelete&&<button type="button"className="pm-btn-secondary"style={{ color:"#b91c1c" }} onClick={()=>onDelete(it.id)}>✕ {bn?"মুছুন":"Delete"}</button>}
                     </div>
                   )}
                 </td>
                 <td className="si-num">{it.qty} <span className="si-muted">{it.unit}</span></td>
                 <td className="si-num">{piFmt2(it.unitCost)}</td>
-                <td className="si-num si-strong" style={{ color:"#c2410c" }}>{piFmt2(total)}</td>
+                <td className="si-num si-strong"style={{ color:"#c2410c" }}>{piFmt2(total)}</td>
               </tr>
             );
           })}

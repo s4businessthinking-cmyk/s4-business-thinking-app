@@ -22,7 +22,7 @@ const costOf = (p) => n2(p?.landingCost) || n2(p?.averageCost);
 
 const TEXT = {
   loosen: {
-    title: ["📦 পণ্য খোলা (Loosening)", "📦 Product Loosening"],
+    title: ["পণ্য খোলা (Loosening)", "Product Loosening"],
     newBtn: ["নতুন খোলা", "New Loosening"],
     single: ["যে পণ্য খুলবেন (stock থেকে বের হবে)", "Product to open (goes out of stock)"],
     multi: ["খুলে যা পাবেন (stock-এ ঢুকবে)", "What you get (comes into stock)"],
@@ -32,7 +32,7 @@ const TEXT = {
     print: "PRODUCT LOOSENING",
   },
   bundle: {
-    title: ["🧰 পণ্য জোড়া / কিট (Bundling)", "🧰 Product Bundling"],
+    title: ["পণ্য জোড়া / কিট (Bundling)", "Product Bundling"],
     newBtn: ["নতুন কিট বানান", "New Bundle"],
     single: ["যে কিট / সেট বানাবেন (stock-এ ঢুকবে)", "Kit / set to make (comes into stock)"],
     multi: ["কিটে যা যা লাগবে (stock থেকে বের হবে)", "Parts needed (go out of stock)"],
@@ -110,14 +110,14 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
 
   const save = async () => {
     if (saving) return;
-    if (!date) return toast?.(L("❌ তারিখ দিন", "❌ Pick a date"), "err");
+    if (!date) return toast?.(L("তারিখ দিন", "Pick a date"), "err");
     const built = buildConvertItems(kind, single, singleQty, lines, stockMap);
     if (built.error) {
       const msg = {
-        noSingle: L("❌ উপরের পণ্যটা বেছে নিন", "❌ Pick the product at the top"),
-        noQty: L("❌ কতটা লিখুন", "❌ Enter how many"),
-        noLines: L("❌ নিচে অন্তত একটা পণ্য ও পরিমাণ দিন", "❌ Add at least one product with a quantity below"),
-        same: L("❌ একই পণ্য দুই দিকে রাখা যাবে না", "❌ The same product can't be on both sides"),
+        noSingle: L("উপরের পণ্যটা বেছে নিন", "Pick the product at the top"),
+        noQty: L("কতটা লিখুন", "Enter how many"),
+        noLines: L("নিচে অন্তত একটা পণ্য ও পরিমাণ দিন", "Add at least one product with a quantity below"),
+        same: L("একই পণ্য দুই দিকে রাখা যাবে না", "The same product can't be on both sides"),
       }[built.error];
       return toast?.(msg, "err");
     }
@@ -140,11 +140,11 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
       const created = { ...res.data, id: res.documentId };
       logAudit({ shopId, user, profile, action: "create", collection: "stockAdjustments", docId: created.id, docNo: adjustNo, note: `${T("title")} · ${single.name} × ${fq(singleQty)}` });
       setAllRows((list) => [created, ...list.filter((r) => r.id !== created.id)]);
-      toast?.(L(`✅ ${adjustNo} সেভ হয়েছে`, `✅ ${adjustNo} saved`));
+      toast?.(L(` ${adjustNo} সেভ হয়েছে`, ` ${adjustNo} saved`));
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
       setSel(created); setView("detail");
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     } finally {
       setSaving(false);
     }
@@ -162,10 +162,10 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
       setAllRows((list) => list.map((x) => (x.id === r.id ? updated : x)));
       setSel((s) => (s?.id === r.id ? updated : s));
       logAudit({ shopId, user, profile, action: "cancel", collection: "stockAdjustments", docId: r.id, docNo: r.adjustNo });
-      toast?.(L("🚫 বাতিল হয়েছে", "🚫 Cancelled"), "err");
+      toast?.(L("বাতিল হয়েছে", "Cancelled"), "err");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
   const deleteDoc = async (r) => {
@@ -175,11 +175,11 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
       await offlineRemove("stockAdjustments", r.id);
       setAllRows((list) => list.filter((x) => x.id !== r.id));
       logAudit({ shopId, user, profile, action: "delete", collection: "stockAdjustments", docId: r.id, docNo: r.adjustNo });
-      toast?.(L("🗑️ মুছে ফেলা হয়েছে", "🗑️ Deleted"), "err");
+      toast?.(L("মুছে ফেলা হয়েছে", "Deleted"), "err");
       setSel(null); setView("list");
       if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {});
     } catch (e) {
-      toast?.(`❌ ${e?.message || e}`, "err");
+      toast?.(` ${e?.message || e}`, "err");
     }
   };
 
@@ -192,7 +192,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     return kind === "loosen" ? `${s.name || ""} × ${fq(s.qty)} → ${parts}` : `${parts} → ${s.name || ""} × ${fq(s.qty)}`;
   };
   // Memoized: re-renders on every keystroke anywhere in the form, not just search/filters. Must
-  // run before the "form"/"detail" early returns below, since hooks can't be conditionally skipped.
+  // run before the "form"/"detail"early returns below, since hooks can't be conditionally skipped.
   const sorted = useMemo(() => [...rows].sort((a, b) => String(b.adjustDate || b.createdAt || "").localeCompare(String(a.adjustDate || a.createdAt || ""))), [rows]);
   const filtered = useMemo(() => sorted.filter((r) => {
     if (!showCancelled && r.status === "cancelled") return false;
@@ -207,12 +207,12 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     printWithSettings(generateStatementHTML({ shopName, title: TEXT[kind].print, subtitle, cols, rows: body }), { lang });
   };
   const badge = (r) => (
-    <span className="si-badge" style={{ color: r.status === "cancelled" ? "#6b7280" : ACCENT }}>
+    <span className="si-badge"style={{ color: r.status === "cancelled" ? "#6b7280" : ACCENT }}>
       {r.status === "cancelled" ? L("বাতিল", "Cancelled") : L("সম্পন্ন", "Done")}
     </span>
   );
   const shell = (titleLeft, titleRight, children) => (
-    <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+    <div ref={rootRef} className="si-root"style={fitH ? { height: fitH } : undefined}>
       <style>{PM_CSS}</style>
       <style>{SI_CSS}</style>
       <div className="pm-reference-title"><strong style={{ color: ACCENT }}>{titleLeft}</strong><span>{titleRight}</span></div>
@@ -233,17 +233,17 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     return shell(T("newBtn"), T("title"), (
       <>
         <div className="si-body">
-          <div className="si-hint" style={{ padding: "2px 4px" }}>💡 {T("hint")}</div>
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <div className="si-hint"style={{ padding: "2px 4px" }}> {T("hint")}</div>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "140px minmax(0,1fr)", paddingTop: 3 }}>
-              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date" className="pm-input" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-              <div className="si-field"><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input"value={note} onChange={(e) => setNote(e.target.value)} /></div>
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
-            <legend className="pm-panel-legend" style={{ background: dirLegendBg(singleOut) }}>{singleOut ? "−" : "+"} {T("single")}</legend>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
+            <legend className="pm-panel-legend"style={{ background: dirLegendBg(singleOut) }}>{singleOut ? "−" : "+"} {T("single")}</legend>
             <div className="si-panel-body">
               {!single && <ProductPicker products={products} exclude={exclude} stockOf={stockOf} onPick={pickSingle} autoFocus={!mobile} mobile={mobile} lang={lang}
                 placeholder={L("নাম, কোড বা বারকোড লিখুন / স্ক্যান করুন…", "Type or scan name, code or barcode…")} />}
@@ -252,22 +252,22 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
                   <div><b>{single.name}</b>{single.code ? <span className="si-muted"> · {single.code}</span> : null}
                     <div className="si-muted">{L("এখন স্টক", "Stock now")}: <b>{sStock == null ? "…" : fq(sStock)}</b> {single.unit}{singleCost > 0 ? ` · ${L("খরচ", "Cost")} ${fm(singleCost)}` : ""}</div>
                   </div>
-                  <input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "right" }} value={singleQty} onChange={(e) => setSingleQty(e.target.value)} placeholder={L("কতটা", "How many")} />
+                  <input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "right" }} value={singleQty} onChange={(e) => setSingleQty(e.target.value)} placeholder={L("কতটা", "How many")} />
                   <div style={{ fontWeight: 800, color: dirColor(singleOut) }}>{singleOut ? "−" : "+"}{fq(sq)} {single.unit}
-                    {sStock != null && sq > 0 && <div className="si-muted" style={{ fontWeight: 400 }}>{L("পরে", "After")}: {fq(sStock + (singleOut ? -sq : sq))}</div>}
+                    {sStock != null && sq > 0 && <div className="si-muted"style={{ fontWeight: 400 }}>{L("পরে", "After")}: {fq(sStock + (singleOut ? -sq : sq))}</div>}
                   </div>
-                  <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => setSingle(null)}>✕ {L("বদলান", "Change")}</button>
+                  <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => setSingle(null)}>✕ {L("বদলান", "Change")}</button>
                 </div>
               )}
             </div>
           </fieldset>
 
-          <fieldset className="pm-panel" style={{ margin: 0, flex: mobile ? undefined : 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <legend className="pm-panel-legend" style={{ background: dirLegendBg(!singleOut) }}>{singleOut ? "+" : "−"} {T("multi")}</legend>
-            <div className="si-panel-body" style={{ display: "flex", flexDirection: "column", gap: 4, minHeight: 0, flex: 1 }}>
+          <fieldset className="pm-panel"style={{ margin: 0, flex: mobile ? undefined : 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <legend className="pm-panel-legend"style={{ background: dirLegendBg(!singleOut) }}>{singleOut ? "+" : "−"} {T("multi")}</legend>
+            <div className="si-panel-body"style={{ display: "flex", flexDirection: "column", gap: 4, minHeight: 0, flex: 1 }}>
               <ProductPicker products={products} exclude={exclude} stockOf={stockOf} onPick={addLine} mobile={mobile} lang={lang}
                 placeholder={L("পণ্য যোগ করুন — নাম, কোড বা বারকোড…", "Add product — name, code or barcode…")} />
-              <div className="si-box" style={{ flex: mobile ? undefined : 1, minHeight: 90 }}>
+              <div className="si-box"style={{ flex: mobile ? undefined : 1, minHeight: 90 }}>
                 {!lines.length && <div className="si-empty">{L("উপরে খুঁজে পণ্য যোগ করুন", "Search above and add products")}</div>}
                 {lines.length > 0 && (
                   <table className="pm-table">
@@ -288,12 +288,12 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
                         return (
                           <tr key={l.productId}>
                             <td className="si-center">{i + 1}</td>
-                            <td className="si-strong" title={l.name}>{l.name}{l.code ? <span className="si-muted"> · {l.code}</span> : null}</td>
+                            <td className="si-strong"title={l.name}>{l.name}{l.code ? <span className="si-muted"> · {l.code}</span> : null}</td>
                             {!mobile && <td className="si-num">{cur == null ? "…" : fq(cur)} {l.unit}</td>}
-                            <td style={{ padding: "1px 2px" }}><input type="number" min="0" step="any" inputMode="decimal" className="pm-input" style={{ textAlign: "right" }} value={l.per} onChange={(e) => updLine(l.productId, e.target.value)} /></td>
-                            <td className="si-num si-strong" style={{ color: dirColor(!singleOut) }}>{total > 0 ? `${singleOut ? "+" : "−"}${fq(total)}` : "—"}</td>
-                            {!mobile && <td className="si-num" style={after != null && after < 0 ? { color: "#b91c1c", fontWeight: 700 } : undefined}>{after != null && total > 0 ? fq(after) : "—"}</td>}
-                            <td className="si-center"><button type="button" className="pm-btn-secondary pm-btn--danger" style={{ minHeight: 17, padding: "0 5px" }} onClick={() => removeLine(l.productId)}>✕</button></td>
+                            <td style={{ padding: "1px 2px" }}><input type="number"min="0"step="any"inputMode="decimal"className="pm-input"style={{ textAlign: "right" }} value={l.per} onChange={(e) => updLine(l.productId, e.target.value)} /></td>
+                            <td className="si-num si-strong"style={{ color: dirColor(!singleOut) }}>{total > 0 ? `${singleOut ? "+" : "−"}${fq(total)}` : "—"}</td>
+                            {!mobile && <td className="si-num"style={after != null && after < 0 ? { color: "#b91c1c", fontWeight: 700 } : undefined}>{after != null && total > 0 ? fq(after) : "—"}</td>}
+                            <td className="si-center"><button type="button"className="pm-btn-secondary pm-btn--danger"style={{ minHeight: 17, padding: "0 5px" }} onClick={() => removeLine(l.productId)}>✕</button></td>
                           </tr>
                         );
                       })}
@@ -306,11 +306,11 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
             </div>
           </fieldset>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button" className="pm-btn pm-btn--primary" disabled={saving || !single || !lines.length} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : `💾 ${L("সেভ করুন", "Save")}`}
+          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !single || !lines.length} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}`}
           </button>
         </div>
       </>
@@ -322,9 +322,9 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
     return shell(<>{r.adjustNo} {badge(r)}</>, T("title"), (
       <>
         <div className="si-body">
-          <fieldset className="pm-panel" style={{ margin: 0 }}>
+          <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
-            <div className="si-panel-body" style={{ paddingTop: 3 }}>
+            <div className="si-panel-body"style={{ paddingTop: 3 }}>
               <div><b style={{ color: ACCENT }}>{r.adjustNo}</b> · {fmtDay(r.adjustDate)} · {r.createdByName || ""}</div>
               {r.note && <div className="si-muted">{r.note}</div>}
               <div style={{ fontWeight: 700 }}>{summary(r)}</div>
@@ -345,10 +345,10 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
                 {(r.items || []).map((it, i) => (
                   <tr key={i}>
                     <td className="si-center">{i + 1}</td>
-                    <td className="si-strong" title={it.name}>{it.name}{it.code ? <span className="si-muted"> · {it.code}</span> : null}</td>
+                    <td className="si-strong"title={it.name}>{it.name}{it.code ? <span className="si-muted"> · {it.code}</span> : null}</td>
                     <td className="si-num">{it.stockBefore == null ? "—" : fq(it.stockBefore)}</td>
-                    <td className="si-num si-strong" style={{ color: "#b91c1c" }}>{it.direction === "out" ? `−${fq(it.qty)}` : ""}</td>
-                    <td className="si-num si-strong" style={{ color: "#15803d" }}>{it.direction === "in" ? `+${fq(it.qty)}` : ""}</td>
+                    <td className="si-num si-strong"style={{ color: "#b91c1c" }}>{it.direction === "out" ? `−${fq(it.qty)}` : ""}</td>
+                    <td className="si-num si-strong"style={{ color: "#15803d" }}>{it.direction === "in" ? `+${fq(it.qty)}` : ""}</td>
                     <td>{it.unit || ""}</td>
                   </tr>
                 ))}
@@ -356,12 +356,12 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
             </table>
           </div>
         </div>
-        <div className={`si-actions${mobile ? " si-sticky-actions" : ""}`}>
-          <button type="button" className="pm-btn-secondary" onClick={backToList}>← {L("তালিকা", "List")}</button>
-          {canPrint && <button type="button" className="pm-btn-secondary" onClick={() => print(r)}>🖨️ {L("প্রিন্ট", "Print")}</button>}
+        <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
+          <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
+          {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
           <span className="si-toolbar-gap" />
-          {canCancel(r) && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => cancelDoc(r)}>⛔ {L("বাতিল করুন", "Cancel")}</button>}
-          {canDelete && r.status === "cancelled" && <button type="button" className="pm-btn-secondary pm-btn--danger" onClick={() => deleteDoc(r)}>🗑️ {L("মুছুন", "Delete")}</button>}
+          {canCancel(r) && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => cancelDoc(r)}> {L("বাতিল করুন", "Cancel")}</button>}
+          {canDelete && r.status === "cancelled" && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => deleteDoc(r)}> {L("মুছুন", "Delete")}</button>}
         </div>
       </>
     ));
@@ -370,18 +370,18 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
   return shell(T("title"), `${liveCount} ${L("টি", "entries")}`, (
     <>
       <div className="si-toolbar">
-        {canManage && <button type="button" className="pm-btn pm-btn--primary" onClick={openNew}>+ {T("newBtn")}</button>}
+        {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {T("newBtn")}</button>}
         <span className="si-toolbar-gap" />
-        <div className="si-search" style={{ minWidth: mobile ? "100%" : 260 }}>
-          <input className="pm-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, নোট বা পণ্য…", "Number, note or item…")} />
-          {search && <button type="button" onClick={() => setSearch("")}>✕</button>}
+        <div className="si-search"style={{ minWidth: mobile ? "100%" : 260 }}>
+          <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, নোট বা পণ্য…", "Number, note or item…")} />
+          {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
         </div>
-        <label className="pm-check"><input type="checkbox" checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও", "Show cancelled")}</label>
+        <label className="pm-check"><input type="checkbox"checked={showCancelled} onChange={(e) => setShowCancelled(e.target.checked)} /> {L("বাতিলগুলোও", "Show cancelled")}</label>
       </div>
       <div className="si-main is-all">
         <div className="si-box">
           {filtered.length > 0 && (mobile ? filtered.map((r) => (
-            <button key={r.id} type="button" className="si-mrow" onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
+            <button key={r.id} type="button"className="si-mrow"onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
               <div className="si-mrow-top"><span style={{ color: ACCENT }}>{r.adjustNo}</span>{badge(r)}</div>
               <div className="si-mrow-sub"><span>{fmtDay(r.adjustDate)}</span><span>{r.createdByName || ""}</span></div>
               <div className="si-mrow-sub"><span>{summary(r)}</span></div>
@@ -398,9 +398,9 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
               </tr></thead>
               <tbody>
                 {filtered.map((r) => (
-                  <tr key={r.id} className="pm-clickable" onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+                  <tr key={r.id} className="pm-clickable"onClick={() => { setSel(r); setView("detail"); }} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
                     <td>{fmtDay(r.adjustDate)}</td>
-                    <td className="si-strong" style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.adjustNo}</td>
+                    <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : ACCENT }}>{r.adjustNo}</td>
                     <td title={summary(r)}>{summary(r)}</td>
                     <td title={r.note || ""}>{r.note || ""}</td>
                     <td>{r.createdByName || ""}</td>

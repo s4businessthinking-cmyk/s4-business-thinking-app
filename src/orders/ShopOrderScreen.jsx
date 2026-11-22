@@ -90,7 +90,7 @@ export function ShopOrderScreen({ OrderCard, addItToInvoice, can, cancelEditOrde
                             {item.name}
                           </div>
                           {item.brand&&(
-                            <div style={{ fontSize:11, color:"#71717a" }}>🏷️ {item.brand}</div>
+                            <div style={{ fontSize:11, color:"#71717a" }}> {item.brand}</div>
                           )}
                         </div>
                         <div style={{ width:70, textAlign:"center" }}>
@@ -116,7 +116,7 @@ export function ShopOrderScreen({ OrderCard, addItToInvoice, can, cancelEditOrde
                     </button>
                   )}
                   <button style={{ ...s.sendBtn, background:editingOrderId?"#0e7490":undefined }} onClick={sendOrder}>
-                    {editingOrderId?(lang==="bn"?"✅ অর্ডার আপডেট করুন":"✅ Update Order"):t.sendOrder}
+                    {editingOrderId?(lang==="bn"?"অর্ডার আপডেট করুন":"Update Order"):t.sendOrder}
                   </button>
                 </div>
               )}
@@ -137,7 +137,7 @@ export function ShopOrderScreen({ OrderCard, addItToInvoice, can, cancelEditOrde
           {/* Search box - always visible */}
           {orders.length>0&&(
             <div style={{ position:"relative", marginBottom:12 }}>
-              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}>🔍</span>
+              <span style={{ position:"absolute", left:12, top:"50%", transform:"translateY(-50%)", fontSize:15, pointerEvents:"none" }}></span>
               <input
                 style={{ ...s.inp, paddingLeft:36, background:th.bgCard }}
               placeholder={lang==="bn"?"অর্ডার, পণ্য, কোম্পানি/ভেন্ডর নাম বা নম্বর দিয়ে খুঁজুন...":"Search order, item, company/vendor name or number..."}
@@ -151,22 +151,22 @@ export function ShopOrderScreen({ OrderCard, addItToInvoice, can, cancelEditOrde
           {(() => {
               const filtered = filterOrdersByStatusPage(filterOrders(orders));
               if (!filtered.length) return (
-                <div style={s.empty}><div style={{ fontSize:36 }}>🔍</div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
+                <div style={s.empty}><div style={{ fontSize:36 }}></div><div>{lang==="bn"?"কিছু পাওয়া যায়নি":"No results found"}</div></div>
               );
               const groups = groupByDay(filtered);
               return groups.map(([dateStr, dayOrders]) => (
                 <div key={dateStr}>
                   <div style={s.dayHeader}>
                     <span style={s.dayDot} />
-                    <span style={s.dayLabel}>📅 {dateStr}</span>
-                    <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":" orders"}</span>
+                    <span style={s.dayLabel}> {dateStr}</span>
+                    <span style={s.dayCount}>{dayOrders.length}{lang==="bn"?"টি অর্ডার":"orders"}</span>
                   </div>
                   {dayOrders.map(o=><OrderCard key={o.id} order={o} showSenderName={isOrderManager} />)}
                 </div>
               ));
             })()}
           {orders.length===0&&!can("sendOrder")&&(
-            <div style={s.empty}><div style={{ fontSize:42 }}>📭</div><div>{t.noOrders}</div></div>
+            <div style={s.empty}><div style={{ fontSize:42 }}></div><div>{t.noOrders}</div></div>
           )}
         </div>
   );
