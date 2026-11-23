@@ -74,7 +74,8 @@ ok("sales continuedBot has no sigs", (() => {
 })());
 ok("sales hdrHTML repeats Page N/M", /Page"\}\s*\$\{pageNo\}\/\$\{pageCount\}/.test(salesSrc) || /pageNo\}\/\$\{pageCount\}/.test(salesSrc));
 ok("sales multi uses invoice paged class", /invoice paged/.test(salesSrc));
-ok("sales sheet-bot margin-top:0", /\.sheet-bot\{[^}]*margin-top:0/.test(salesSrc));
+ok("sales fillPage pins sheet-bot", /margin-top:\$\{fillPage\?"auto":"0"\}/.test(salesSrc));
+ok("sales fillPage sets sheet min-height", /fillPage\?`;min-height:\$\{sheetH\}`|min-height:\$\{fillPage\?sheetH/.test(salesSrc));
 
 // ── purchase source structure ───────────────────────────────────
 ok("purchase imports paginateInvoiceItems", /paginateInvoiceItems/.test(purchaseSrc));
@@ -87,10 +88,11 @@ ok("purchase continuedBot no .footer", (() => {
 ok("purchase finalBot has .footer + grand-row", /const finalBot[\s\S]*?<div class="footer">[\s\S]*?grand-row|const finalBot[\s\S]*?grand-row[\s\S]*?<div class="footer">/.test(purchaseSrc));
 ok("purchase hdrHTML repeats shop + Page", /shop-name[\s\S]*?pageNo/.test(purchaseSrc) && /Page"\}\s*\$\{pageNo\}|pageNo\}\/\$\{pageCount\}/.test(purchaseSrc));
 ok("purchase multi paged class", /invoice\$\{multi \? " paged" : ""\}/.test(purchaseSrc) || /" paged"/.test(purchaseSrc));
-ok("purchase no margin-top:auto on sheet-bot", !/\.sheet-bot\{[^}]*margin-top:auto/.test(purchaseSrc));
+ok("purchase fillPage pins sheet-bot", /margin-top:\$\{fillPage\?"auto":"0"\}/.test(purchaseSrc));
 
 // ── printDesign sheet / terms ───────────────────────────────────
-ok("printDesign sheet-bot margin-top:0", /\.sheet-bot\{[^}]*margin-top:0!important/.test(designSrc));
+ok("printDesign single-page sheet-bot auto", /\.invoice:not\(\.paged\) \.sheet-bot\{[^}]*margin-top:auto!important/.test(designSrc));
+ok("printDesign paged sheet-bot no pin", /\.invoice\.paged \.sheet-bot\{[^}]*margin-top:0!important/.test(designSrc));
 ok("printDesign .invoice.paged page-break", /\.invoice\.paged\{[^}]*page-break-after:always/.test(designSrc));
 ok("printDesign logo replace is global", /shop-name[\s\S]*?\/g,\s*`<div class="s4-logo-wrap"/.test(designSrc) || /replace\(\/\(<div class="shop-name">[\s\S]*?\/g/.test(designSrc));
 ok("printDesign footer terms replace is global", /footer">[\s\S]*?\/g,\s*`<div class="footer s4-terms"/.test(designSrc));

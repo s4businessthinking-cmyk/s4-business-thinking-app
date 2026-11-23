@@ -75,16 +75,10 @@ export const SI_CSS = `
 .si-toolbar .pm-btn, .si-toolbar .pm-btn-secondary { height: 26px; min-width: 82px; }
 .si-toolbar-gap { flex: 1; }
 .si-toolbar-quick {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   margin-left: 4px; min-width: 0;
 }
-.si-toolbar-field {
-  display: flex; flex-direction: column; gap: 1px; min-width: 0;
-}
-.si-toolbar-field span {
-  font-size: 10px; font-weight: 700; color: #334155; line-height: 1.1; white-space: nowrap;
-}
-.si-toolbar-field .pm-input {
+.si-toolbar-input {
   height: 26px; width: 140px; max-width: 42vw; padding: 2px 6px; font-size: 12px;
 }
 .si-kpis { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 4px 4px 0; }
@@ -164,8 +158,7 @@ export const SI_CSS = `
   .si-toolbar .pm-btn, .si-toolbar .pm-btn-secondary { flex: 1 1 30%; height: 36px; font-size: 12px; min-width: 0; }
   .si-toolbar-gap { display: none; }
   .si-toolbar-quick { flex: 1 1 100%; margin-left: 0; }
-  .si-toolbar-field { flex: 1 1 45%; }
-  .si-toolbar-field .pm-input { width: 100%; max-width: none; height: 34px; font-size: 14px; }
+  .si-toolbar-input { flex: 1 1 45%; width: 100%; max-width: none; height: 34px; font-size: 14px; }
   .si-kpis { grid-template-columns: 1fr 1fr; }
   .si-kpi span { font-size: 11px; }
   .si-kpi b { font-size: 13px; }

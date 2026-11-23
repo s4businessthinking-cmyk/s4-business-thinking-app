@@ -119,7 +119,14 @@ ok("paginate 23 → [22,1]", (() => {
   ok("30 → terms once", (html.match(/class="footer s4-terms"/g) || []).length === 1);
   ok("30 → Item 1 and Item 30", html.includes("Item 1") && html.includes("Item 30"));
   ok("30 → page-break CSS", /page-break-after:always/.test(html));
-  ok("30 → sheet-bot margin-top:0 forced", /\.sheet-bot\{[^}]*margin-top:0!important/.test(html));
+  ok("30 → paged sheet-bot not pinned", /\.invoice\.paged \.sheet-bot\{[^}]*margin-top:0!important/.test(html));
+  ok("30 → single-page pin still in CSS", /\.invoice:not\(\.paged\) \.sheet-bot\{[^}]*margin-top:auto!important/.test(html));
+}
+
+{
+  const html = buildPagedInvoiceHTML(n(5), style);
+  ok("5 → one non-paged sheet class", (html.match(/class="invoice"/g) || []).length === 1 && !(html.match(/class="invoice paged"/g) || []).length);
+  ok("5 → single-page pin CSS present", /\.invoice:not\(\.paged\) \.sheet-bot\{[^}]*margin-top:auto!important/.test(html));
 }
 
 {

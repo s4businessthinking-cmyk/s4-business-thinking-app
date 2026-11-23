@@ -1,5 +1,5 @@
 import { loadPrintDesign, applyDesign, shopHeaderExtras } from "../print/printDesign.js";
-import { printWithSettings } from "../print/printSettings.js";
+import { paperHeightMm, printWithSettings } from "../print/printSettings.js";
 import { piFmt2, piN2 } from "../shared/appShared.jsx";
 import { paginateInvoiceItems } from "../sales-invoice/salesInvoiceShared.js";
 import { PI_PAY_METHODS } from "./purchaseShared.js";
@@ -57,6 +57,9 @@ export function generatePurchaseInvoiceHTML(invoice, shop, lang, opts = {}) {
   const design = opts.design || loadPrintDesign();
   const pages = paginateInvoiceItems(items, 14, 22);
   const multi = pages.length > 1;
+  const pageH = paperHeightMm("A4");
+  const sheetH = `${pageH - 16}mm`;
+  const fillPage = !multi;
 
   const hdrHTML = (pageNo, pageCount) => `<div class="sheet-top"><div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName || "Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area, shop?.countryName].filter(Boolean).join(", ") || ""}</div>${shop?.mobile ? `<div class="shop-sub">${shop.mobile}</div>` : ""}${shopHeaderExtras(shop).details}${shop?.trnNumber ? `<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>` : ""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate || ""}</div>${invoice.createdByName ? `<div class="inv-no">${invoice.createdByName}</div>` : ""}${pageCount > 1 ? `<div class="inv-no">${isBn ? "পৃষ্ঠা" : "Page"} ${pageNo}/${pageCount}</div>` : ""}</div></div>
 <div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div></div></div>`;
@@ -92,10 +95,10 @@ ${isLast ? finalBot() : continuedBot(idx + 1, pages.length)}
 @page{size:A4;margin:8mm}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Times New Roman','Nirmala UI',serif;font-size:12px;color:#111;background:#fff;padding:16px}
-.invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column;min-height:0}
+.invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column;min-height:${fillPage?sheetH:"0"}}
 .sheet-top{flex:0 0 auto}
 .sheet-mid{flex:0 1 auto;display:flex;flex-direction:column;min-height:0}
-.sheet-bot{flex:0 0 auto;margin-top:0}
+.sheet-bot{flex:0 0 auto;margin-top:${fillPage?"auto":"0"}}
 .hdr{background:${headerGrad};color:${headerText};padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid ${accentBorder}}
 .shop-name{font-size:18px;font-weight:900}
 .shop-sub{font-size:11px;margin-top:2px}
@@ -124,7 +127,7 @@ th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:0.3px;
 .sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:6px;padding:4px 8px 10px}
 .sig-line{border-top:1px solid #111;margin-top:22px;padding-top:4px;font-size:11px;text-align:center}
 .footer{text-align:left;padding:6px 12px;background:#fff;border-top:1px solid #111;font-size:11px;color:#111;font-weight:600}
-@media print{body{padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;min-height:0!important;display:flex!important;flex-direction:column!important}thead{display:table-header-group}}
+@media print{body{padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;min-height:${fillPage?sheetH:"0"}!important;display:flex!important;flex-direction:column!important}thead{display:table-header-group}}
 </style></head><body>
 <div class="no-print" style="text-align:center;margin-bottom:14px">
   <button onclick="window.print()" style="padding:10px 28px;background:${grandBg};color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-right:8px">${isBn ? "প্রিন্ট / PDF" : "Print / PDF"}</button>

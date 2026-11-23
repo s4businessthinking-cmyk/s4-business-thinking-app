@@ -116,26 +116,20 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
           {kind==="sales"&&<button type="button"className="pm-btn-secondary"onClick={()=>setReceiptWin({})}> {bnL?"রিসিট (টাকা গ্রহণ)":"Receipts"}</button>}
           {kind==="sales"&&(
             <div className="si-toolbar-quick">
-              <label className="si-toolbar-field">
-                <span>{bnL?"গাড়ি নং":"Vehicle No"}</span>
-                <input
-                  className="pm-input"
-                  value={siVehicleQ||""}
-                  onChange={(e)=>setSiVehicleQ(e.target.value)}
-                  placeholder={bnL?"গাড়ির নম্বর":"Vehicle number"}
-                  aria-label={bnL?"গাড়ি নং দিয়ে সার্চ":"Search by vehicle number"}
-                />
-              </label>
-              <label className="si-toolbar-field">
-                <span>{bnL?"রেফারেন্স নং":"Reference No"}</span>
-                <input
-                  className="pm-input"
-                  value={siRefQ||""}
-                  onChange={(e)=>setSiRefQ(e.target.value)}
-                  placeholder={bnL?"রেফারেন্স নম্বর":"Reference number"}
-                  aria-label={bnL?"রেফারেন্স নং দিয়ে সার্চ":"Search by reference number"}
-                />
-              </label>
+              <input
+                className="pm-input si-toolbar-input"
+                value={siVehicleQ||""}
+                onChange={(e)=>setSiVehicleQ(e.target.value)}
+                placeholder={bnL?"গাড়ির নম্বর":"Vehicle number"}
+                aria-label={bnL?"গাড়ি নং দিয়ে সার্চ":"Search by vehicle number"}
+              />
+              <input
+                className="pm-input si-toolbar-input"
+                value={siRefQ||""}
+                onChange={(e)=>setSiRefQ(e.target.value)}
+                placeholder={bnL?"রেফারেন্স নম্বর":"Reference number"}
+                aria-label={bnL?"রেফারেন্স নং দিয়ে সার্চ":"Search by reference number"}
+              />
             </div>
           )}
         </div>

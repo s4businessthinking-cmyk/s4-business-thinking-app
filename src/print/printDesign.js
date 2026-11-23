@@ -518,12 +518,12 @@ export function shopHeaderExtras(shop) {
 // Applies the chosen template, logo, header note and footer text to a built-in document.
 export function applyDesign(html, kind, styleOverride) {
   const style = styleOverride || loadPrintDesign().style[kind] || STYLE_DEFAULT;
-  // Sheet flex helpers stay for all docs; terms CSS/text only for invoices.
-  // Do not pin the totals block to the page bottom — that left a huge empty gap when
-  // items overflowed and pushed totals onto page 2. Totals sit right under the item table.
+  // Single-page invoices: pin totals/sigs to the bottom so few items still fill A4.
+  // Multi-page (.paged): do NOT pin — that created a huge empty gap / orphan footer page.
   const sheetCss = `.sheet-mid{flex:0 1 auto!important;min-height:0!important}
-.sheet-bot{flex:0 0 auto!important;margin-top:0!important}
 table.items{height:auto!important;margin:0!important}
+.invoice:not(.paged) .sheet-bot{flex:0 0 auto!important;margin-top:auto!important}
+.invoice.paged .sheet-bot{flex:0 0 auto!important;margin-top:0!important}
 .invoice.paged{min-height:0!important;page-break-after:always;break-after:page}
 .invoice.paged:last-of-type{page-break-after:auto;break-after:auto}
 @media print{.invoice.paged{min-height:0!important}}`;

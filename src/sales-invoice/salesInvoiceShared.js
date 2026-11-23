@@ -415,6 +415,10 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
   const CONT_MAX = 22;
   const pages = thermal ? [itemList] : paginateInvoiceItems(itemList, FULL_MAX, CONT_MAX);
   const multi = !thermal && pages.length > 1;
+  // Few items: fill one A4 so totals/sigs sit at the bottom (not floating mid-page).
+  const pageH = paperHeightMm(ds.paper);
+  const sheetH = (!thermal && pageH) ? `${pageH - 16}mm` : null;
+  const fillPage = !thermal && !multi && !!sheetH;
 
   const thankFooter = isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ।":"Thank you for your order."):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ।`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you.`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন।":"Please sign this challan upon delivery."):(isBn?"ব্যবসার জন্য ধন্যবাদ।":"Thank you for your business.");
 
@@ -456,11 +460,11 @@ ${isLast ? finalBot() : continuedBot(idx + 1, pages.length)}
 @page{size:${paperCss(ds.paper)};margin:${thermal?"3mm":"8mm"}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Times New Roman','Nirmala UI',serif;font-size:12px;color:#111;background:#fff;padding:16px}
-.invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column}
+.invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column${fillPage?`;min-height:${sheetH}`:""}}
 .invoice.paged{min-height:0}
 .sheet-top{flex:0 0 auto}
 .sheet-mid{flex:0 1 auto;display:flex;flex-direction:column;min-height:0}
-.sheet-bot{flex:0 0 auto;margin-top:0}
+.sheet-bot{flex:0 0 auto;margin-top:${fillPage?"auto":"0"}}
 .hdr{background:${headerGrad};color:${headerText};padding:8px 12px;display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1.5px solid ${accentBorder}}
 .shop-name{font-size:18px;font-weight:900;letter-spacing:0.3px}
 .shop-sub{font-size:11px;margin-top:2px;color:#111}
@@ -497,7 +501,7 @@ ${isDelivery?`.recv-box{background:#fff;border:1px solid #111;padding:10px;margi
 .sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:6px;padding:4px 8px 10px}
 .sig-line{border-top:1px solid #111;margin-top:22px;padding-top:4px;font-size:11px;text-align:center}
 .footer{text-align:left;padding:6px 12px;background:#fff;border-top:1px solid #111;font-size:11px;color:#111;font-weight:600}
-@media print{html,body{height:auto!important;padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;border-radius:0!important;box-shadow:none!important;min-height:0!important;display:flex!important;flex-direction:column!important}.sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}}
+@media print{html,body{height:auto!important;padding:0!important}.no-print{display:none!important}.invoice{max-width:100%!important;border-radius:0!important;box-shadow:none!important;min-height:${fillPage?sheetH:"0"}!important;display:flex!important;flex-direction:column!important}.sheet-bot,.sigs{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}}
 ${thermal?`body{padding:4px;font-size:11px}.invoice{max-width:100%;border-width:1px;min-height:0!important;display:block}.hdr{flex-direction:column;gap:6px;padding:10px}.inv-title,.inv-no{text-align:left}.body{padding:8px}.info-grid{grid-template-columns:1fr}.totals-wrap{flex-direction:column}.totals{flex:1 1 auto;width:100%}table{font-size:10px}th,td{padding:4px 3px}.sigs{display:none}`:""}
 ${ds.preprinted?`.hdr .shop-block{visibility:hidden}.hdr{min-height:110px}`:""}
 </style></head><body>
