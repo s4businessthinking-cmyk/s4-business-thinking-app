@@ -38,10 +38,12 @@ export function piCalcLine(it) {
   return { gross, disc, tax, total:piR2(base+tax) };
 }
 
-export function piCalcTotals(items) {
+// extra.adjustment: the bill's Adjustment (+/-), added after VAT like the sales invoice adjustment (VAT unchanged).
+export function piCalcTotals(items, extra = {}) {
   let sub=0,disc=0,tax=0,grand=0;
   items.forEach(it=>{ const c=piCalcLine(it); sub+=c.gross; disc+=c.disc; tax+=c.tax; grand+=c.total; });
-  return { sub:piR2(sub), disc:piR2(disc), tax:piR2(tax), grand:piR2(grand) };
+  const adjustment = piR2(piN2(extra?.adjustment));
+  return { sub:piR2(sub), disc:piR2(disc), tax:piR2(tax), adjustment, grand:piR2(piR2(grand) + adjustment) };
 }
 
 export function piEmptyLine() {
@@ -53,5 +55,5 @@ export function piEmptyCurrent() {
 }
 
 export function piEmptyForm() {
-  return { invoiceDate:piToday(), entryDate:piToday(), supplierInvoiceNo:"", refNo:"", currency:"", exchangeRate:"", vendorId:"", vendorName:"", vendorMobile:"", vendorAddress:"", vendorTrn:"", paymentMethod:"cash", amountPaid:"", note:"" };
+  return { invoiceDate:piToday(), entryDate:piToday(), supplierInvoiceNo:"", refNo:"", currency:"", exchangeRate:"", vendorId:"", vendorName:"", vendorMobile:"", vendorAddress:"", vendorTrn:"", paymentMethod:"cash", amountPaid:"", note:"", adjustment:"", adjustmentReasonId:"", adjustmentReason:"" };
 }

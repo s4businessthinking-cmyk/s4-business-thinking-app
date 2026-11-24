@@ -6,6 +6,7 @@ import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
+import { normalizeAllowances, rowName } from "../masters/simpleMasters.js";
 import { taxSettingsOf } from "../reports/taxDomain.js";
 import { partnerDirectoryOf, matchPartnerName, PARTNER_BLOCKED_EXPENSE_CATEGORIES } from "../partners/partners.js";
 
@@ -62,12 +63,14 @@ export function expenseCategoryLabel(row, bn) {
 }
 
 // vatAuto: the VAT box follows the amount until the user types their own VAT figure.
-const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "", partnerId: "", partnerUse: "", partnerPaid: "shop", enteredBy: "" });
+const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", allowanceTypeId: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "", partnerId: "", partnerUse: "", partnerPaid: "shop", enteredBy: "" });
 const ENTERED_BY_KEY = "s4_expense_entered_by";
 
 export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null, shop = null, employeeMode = false, canDelete = false, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
+  // allowance types (Merge / Masters) for an employee expense of type Allowance
+  const allowanceTypes = useMemo(() => normalizeAllowances(shop?.allowanceTypes), [shop?.allowanceTypes]);
   const taxCfg = useMemo(() => taxSettingsOf(shop), [shop]);
   const tn = taxCfg.taxName || "VAT";
   const vatRate = Math.max(0, n(taxCfg.rate));
@@ -157,7 +160,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const lastEnteredBy = () => { try { const id = localStorage.getItem(`${ENTERED_BY_KEY}:${shopId}`) || ""; return partnerDirectory.some((p) => p.id === id) ? id : ""; } catch { return ""; } };
   const openNew = () => { const f = { ...emptyForm(employeeMode), employeeId: employeeMode ? empFilter : "", enteredBy: showEnteredBy ? lastEnteredBy() : "" }; if (f.employeeId) f.paidTo = empName(f.employeeId); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
   const openEdit = (r) => {
-    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: !r.method || r.method === "partner" ? "cash" : r.method, paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "", partnerId: r.partnerId || "", partnerUse: r.partnerId ? "shop" : "", partnerPaid: r.paidByPartner ? "own" : "shop", enteredBy: r.enteredBy || "" };
+    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", allowanceTypeId: r.allowanceTypeId || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: !r.method || r.method === "partner" ? "cash" : r.method, paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "", partnerId: r.partnerId || "", partnerUse: r.partnerId ? "shop" : "", partnerPaid: r.paidByPartner ? "own" : "shop", enteredBy: r.enteredBy || "" };
     setEditId(r.id);
     setForm(f);
     setBaseline(JSON.stringify(f));
@@ -242,6 +245,8 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     const prev = editId ? rows.find((r) => r.id === editId) || {} : {};
     const body = {
       expenseDate: form.expenseDate, category: form.category, categoryName: form.category === "other" ? form.categoryName.trim() : "",
+      allowanceTypeId: form.category === "allowance" ? form.allowanceTypeId || "" : "",
+      allowanceTypeName: form.category === "allowance" && form.allowanceTypeId ? rowName(allowanceTypes.find((a) => a.id === form.allowanceTypeId) || { nameEn: prev.allowanceTypeName }, false) : "",
       amount, method, paidTo: form.paidTo.trim() || (partnerId ? partnerName(partnerId) : ""), refNo: form.refNo.trim(), note: form.note.trim(),
       partnerId: partnerId || "", partnerName: partnerId ? partnerName(partnerId, prev.partnerName || "") : "", paidByPartner: ownPocket,
       ...enteredByFields(prev),
@@ -639,6 +644,12 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
           )}
         </div>
       )}
+      {form.category === "allowance" && allowanceTypes.some((a) => a.active) && fField(L("ভাতার ধরন", "Allowance type"), (
+        <select className="pm-input" disabled={readOnly} value={form.allowanceTypeId || ""} onChange={(e) => setF("allowanceTypeId", e.target.value)}>
+          <option value="">-</option>
+          {allowanceTypes.filter((a) => a.active || a.id === form.allowanceTypeId).map((a) => <option key={a.id} value={a.id}>{[a.code, rowName(a, bn)].filter(Boolean).join(" · ")}</option>)}
+        </select>
+      ))}
       {form.category === "other" && fField(`${L("খরচের ধরন", "Expense type")} *`, <input className="pm-input"disabled={readOnly} value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} />)}
       {partnerBox}
       {!formOwnPocket && fField(L("কীভাবে দিলেন", "Paid by"), (

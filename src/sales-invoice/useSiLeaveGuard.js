@@ -1,7 +1,7 @@
 import { PM_TH } from "./siSkin.js";
 import { STALE_DRAFT_MS, cancelStaleClear, scheduleStaleClear } from "../utils/staleDraftClear.js";
 import { billLeaveGuard } from "../shared/appShared.jsx";
-import { printSalesInvoice, siEmptyForm } from "./siHelpers.js";
+import { printSalesInvoice, salesInvoiceHtml, siEmptyForm } from "./siHelpers.js";
 import { siN2 } from "./salesInvoiceShared.js";
 import { loadPrintSettings } from "../print/printSettings.js";
 import { isOpeningBill } from "../utils/openingBill.js";
@@ -85,18 +85,21 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
     siWin.restore();
     return true;
   };
-  const siPrint = (doc) => {
+  // What a print of this document needs: the customer code, and the customer balance when the print settings ask for it.
+  const siPrintArgs = (doc) => {
     const code = doc.customerId ? (customers||[]).find(c=>c.id===doc.customerId)?.customerCode : "";
     const inv = code && !doc.customerCode ? { ...doc, customerCode:code } : doc;
     const wantBal = siPerm("viewCustomerBalance") && loadPrintSettings().printCustomerBalance;
-    if (!wantBal) { printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint); return; }
+    if (!wantBal) return [inv, {}];
     const nameKey = String(inv.customerName||"").trim().toLowerCase();
     const customerBalance = invoices
       .filter(x => x.status!=="cancelled" && x.status!=="draft" && x.docKind!=="quotation" && x.invoiceType!=="delivery"
         && (inv.customerId ? x.customerId===inv.customerId : String(x.customerName||"").trim().toLowerCase()===nameKey))
       .reduce((sum,x)=>sum+Math.max(0, siN2(x.balanceDue)), 0);
-    printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint, { customerBalance });
+    return [inv, { customerBalance }];
   };
+  const siPrint = (doc) => { const [inv, opts] = siPrintArgs(doc); printSalesInvoice(inv, shop, lang, siShowCode, siColorPrint, opts); };
+  const siDocHtml = (doc) => { const [inv, opts] = siPrintArgs(doc); return salesInvoiceHtml(inv, shop, lang, siShowCode, siColorPrint, opts); };
 
   // Draft vs confirmed are separate group ticks. A bill with receipts stays owner-only until receipts are cancelled.
   const siStatusEditable = (inv) => {
@@ -135,5 +138,5 @@ export function useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, e
     canQuickAdd: canManageCustomers,
     onQuickAdd: siQuickAddCustomer,
   };
-  return { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint };
+  return { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint, siDocHtml };
 }

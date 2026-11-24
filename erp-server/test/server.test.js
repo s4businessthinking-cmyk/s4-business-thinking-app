@@ -454,6 +454,37 @@ test("rules: the accounting period lock blocks old-dated changes", async () => {
   assert.equal((await commit(owner.idToken, [{ op: "update", collection: "expenses", id: "plx1", data: { amount: 10 } }])).status, 200);
 });
 
+test("rules: a value note (credit note for money only) needs no items and stays within the bill", async () => {
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageReturns: true } }, true)])).status, 200);
+  const bill = { shopId: "shop1", invoiceNo: "SI-V1", grandTotal: 105, totalVat: 5, amountPaid: 0, balanceDue: 105, status: "confirmed", createdBy: owner.uid, items: [{ name: "Oil", qty: 1, unitPrice: 100 }] };
+  assert.equal((await commit(owner.idToken, [set("salesInvoices", "vsi1", bill)])).status, 200);
+  const note = (id, extra) => set("salesReturns", id, { shopId: "shop1", returnNo: `SR-${id}`, invoiceId: "vsi1", status: "confirmed", noteType: "value", items: [], total: 21, totalVat: 1, subtotal: 20, createdBy: sales.uid, ...extra });
+  assert.equal((await commit(sales.idToken, [note("vn1", {})])).status, 200);
+  assert.equal((await commit(sales.idToken, [note("vn2", { total: 90 })])).status, 403, "more than the bill less the first note");
+  assert.equal((await commit(sales.idToken, [note("vn3", { items: [{ lineIndex: 0, qty: 1 }] })])).status, 403, "a value note carries no goods");
+  assert.equal((await commit(sales.idToken, [note("vn4", { total: 84 })])).status, 200, "up to what is left");
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "salesReturns", id: "vn1", data: { status: "cancelled" } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("salesReturns", "gr1", { shopId: "shop1", returnNo: "SR-G1", invoiceId: "vsi1", status: "confirmed", items: [], total: 5, createdBy: sales.uid })])).status, 403, "a goods return still needs items");
+});
+
+test("rules: counter shifts — sellers open and close their shift, a closed shift is the owner's to change", async () => {
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSales: true } }, true)])).status, 200);
+  const shift = { shopId: "shop1", status: "open", openingCash: 100, openedBy: sales.uid, openedAt: "2026-11-20T09:00:00.000Z", createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("counterShifts", "cs0", { ...shift, openedBy: owner.uid })])).status, 403, "opener must be the caller");
+  assert.equal((await commit(sales.idToken, [set("counterShifts", "cs0", { ...shift, status: "closed" })])).status, 403, "a shift starts open");
+  assert.equal((await commit(sales.idToken, [set("counterShifts", "cs1", shift)])).status, 200);
+  assert.equal((await commit(outsider.idToken, [{ op: "update", collection: "counterShifts", id: "cs1", data: { status: "closed" } }])).status, 403);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "counterShifts", id: "cs1", data: { status: "closed", closingCash: 95, closedBy: sales.uid } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "counterShifts", id: "cs1", data: { closingCash: 100 } }])).status, 403, "closed is final for staff");
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "counterShifts", id: "cs1" }])).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "update", collection: "counterShifts", id: "cs1", data: { note: "checked" } }])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSales: false } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("counterShifts", "cs2", shift)])).status, 403, "needs manageSales");
+  assert.equal((await api("/v1/db/get", { collection: "counterShifts", id: "cs1" }, sales.idToken)).status, 403);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSales: true } }, true)])).status, 200);
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "counterShifts", id: "cs1" }])).status, 200);
+});
+
 test("rules: reminders — private ones stay with their writer, assignees may tick them off", async () => {
   const rem = (id, extra) => set("reminders", id, { shopId: "shop1", title: "Rent", dueDate: "2026-10-07", status: "open", createdBy: owner.uid, ...extra });
   assert.equal((await commit(owner.idToken, [rem("rm1", { assignedTo: sales.uid })])).status, 200);

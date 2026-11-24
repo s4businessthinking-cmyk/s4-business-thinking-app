@@ -21,6 +21,24 @@ import { PurchaseInvoiceTab } from "../purchase/PurchaseInvoiceTab.jsx";
 import { PiSalesmanView } from "../purchase/PiSalesmanView.jsx";
 import ProductMasterScreen from "../product-master/ProductMasterScreen.jsx";
 import ProfitLossReport from "../reports/ProfitLossReport.jsx";
+import BalanceSheetReport from "../reports/BalanceSheetReport.jsx";
+import BooksHubReport from "../reports/BooksHubReport.jsx";
+import CashFlowReport from "../reports/CashFlowReport.jsx";
+import FundsSummaryReport from "../reports/FundsSummaryReport.jsx";
+import TallyExportReport from "../reports/TallyExportReport.jsx";
+import ChartOfAccountsScreen from "../ledger/ChartOfAccountsScreen.jsx";
+import CounterHub from "../counter/CounterHub.jsx";
+import BulkMessageScreen from "../share/BulkMessageScreen.jsx";
+import MastersHub from "../masters/MastersHub.jsx";
+import TrialBalanceReport from "../reports/TrialBalanceReport.jsx";
+import OpeningHub from "../accounts/OpeningHub.jsx";
+import { countryCodeOf, setShareCountryCode } from "../share/whatsappDocShare.js";
+import PartyAgingReport from "../reports/PartyAgingReport.jsx";
+import StockHubReport from "../reports/StockHubReport.jsx";
+import SalesAnalyticsReport from "../reports/SalesAnalyticsReport.jsx";
+import PurchaseAnalyticsReport from "../reports/PurchaseAnalyticsReport.jsx";
+import SerialRegistryReport from "../reports/SerialRegistryReport.jsx";
+import PriceListScreen from "../product-master/PriceListScreen.jsx";
 import GlobalLedgerWindow from "../ledger/GlobalLedgerWindow.jsx";
 import PurchaseDocsTab from "../purchase/PurchaseDocsTab.jsx";
 import RemindersTab from "../reminders/RemindersTab.jsx";
@@ -42,6 +60,8 @@ import { billLeaveGuard, nextPartyCode } from "../shared/appShared.jsx";
 import { printPaymentVoucher } from "../sales-invoice/salesInvoiceShared.js";
 
 export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenReturnInvoiceId, globalOpenWarrantyClaimId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenReturnInvoiceId, setGlobalOpenWarrantyClaimId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth }) {
+  // local numbers (05...) on WhatsApp get the shop's country code
+  setShareCountryCode(countryCodeOf(localShop));
   const tabContent = (
     <>
       {pinModal&&isOwner&&(
@@ -375,11 +395,12 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       {tab==="vouchers"&&(isOwner||canStaffVouchers)&&(
         <VouchersTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner}
           canJournal={isOwner||can("accountVouchers")} canDelete={isOwner||can("deleteVouchers")} canPrint={isOwner||can("printVouchers")} cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""}
-          makeNo={makeShopNo} leaveGuard={billLeaveGuard} customers={customers} vendors={vendors} banks={UAE_BANKS.map(b=>b.name)}
+          makeNo={makeShopNo} leaveGuard={billLeaveGuard} customers={customers} vendors={vendors} banks={UAE_BANKS.map(b=>b.name)} savedChart={localShop?.chartOfAccounts}
           onOpenReceipts={(isOwner||can("manageSales")) ? ()=>{ setTab("sales"); setSiVoucherReq(Date.now()); } : undefined}
           onOpenPayments={canStaffSupplierArea&&(isOwner||can("vendorPayments")) ? ()=>{ setTab("purchase"); setPiVoucherReq(Date.now()); } : undefined}
           onOpenDebitNote={(isOwner||can("manageReturns")) ? ()=>setTab("purchaseReturn") : undefined}
-          onOpenCreditNote={(isOwner||can("manageReturns")) ? ()=>setTab("salesReturn") : undefined} />
+          onOpenCreditNote={(isOwner||can("manageReturns")) ? ()=>setTab("salesReturn") : undefined}
+          canSeeReceipts={isOwner||can("manageSales")} canSeePayments={isOwner||can("vendorPayments")} />
       )}
 
       {(tab==="salesReturn"||tab==="purchaseReturn")&&(isOwner||can("manageReturns"))&&(
@@ -432,16 +453,116 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
 
       {tab==="globalLedger"&&(isOwner||can("viewGlobalLedger"))&&(
-        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} canPrint={isOwner||can("printLedger")} />
+        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} canPrint={isOwner||can("printLedger")} chartOfAccounts={localShop?.chartOfAccounts} coaGroups={localShop?.coaGroups} />
+      )}
+      {tab==="mergeMasters"&&(isOwner||can("manageCustomers")||can("manageEmployees"))&&(
+        <MastersHub lang={lang} shopId={shopId} shop={localShop} user={user} profile={profile} isOwner={isOwner} customers={customers} vendors={vendors} cur={t.cur||"AED"} toast={toast}
+          onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} onPartiesChanged={(kind)=>{ if (kind==="vendor") reloadVendorsFromOffline(); else reloadCustomersFromOffline(); }} />
+      )}
+      {tab==="bulkMessage"&&(isOwner||can("manageCustomers")||can("manageSales"))&&(
+        <BulkMessageScreen lang={lang} shopId={shopId} shop={localShop} isOwner={isOwner} canSeeDue={isOwner||can("viewCustomerBalance")} customers={customers}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
+      )}
+      {tab==="counter"&&(isOwner||can("manageSales"))&&(
+        <CounterHub lang={lang} shopId={shopId} shop={localShop} user={user} profile={profile} isOwner={isOwner} canSell={isOwner||can("manageSales")}
+          canPrint={isOwner||can("printSales")||can("manageSales")} customers={customers} shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast}
+          onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} onOpenCustomers={()=>setTab("customers")} />
+      )}
+      {tab==="chartOfAccounts"&&(isOwner||can("viewAccounts")||can("accountVouchers"))&&(
+        <ChartOfAccountsScreen lang={lang} shopId={shopId} shop={localShop} isOwner={isOwner} customers={customers} vendors={vendors} banks={UAE_BANKS.map(b=>b.name)}
+          shopName={localShop?.companyName||""} canPrint={isOwner||can("printLedger")||can("printAccounts")} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
       )}
       {tab==="accounts"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
         <ProfitLossReport lang={lang} th={th} s={s} shopId={shopId} products={products}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} isDesktop={isDesktop} canPrint={isOwner||can("printAccounts")} />
       )}
       {tab==="accounts"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব নিকাশ (Accounts) লক করা":"Accounts are locked")}
+      {tab==="balanceSheet"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <BalanceSheetReport lang={lang} shopId={shopId} products={products} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")}
+          fyStartMonth={Number(localShop?.fyStartMonth || localShop?.taxSettings?.fyStartMonth) || 1} />
+      )}
+      {tab==="balanceSheet"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ব্যালেন্স শিট লক করা":"Balance Sheet is locked")}
+      {tab==="booksHub"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <BooksHubReport lang={lang} shopId={shopId} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")} />
+      )}
+      {tab==="booksHub"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"বুকস লক করা":"Books is locked")}
+      {tab==="cashFlow"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <CashFlowReport lang={lang} shopId={shopId} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")} />
+      )}
+      {tab==="cashFlow"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ক্যাশ ফ্লো লক করা":"Cash Flow is locked")}
+      {tab==="openingBalances"&&isOwner&&ownerUnlocked&&(
+        <OpeningHub lang={lang} shopId={shopId} shop={localShop} user={user} profile={profile} isOwner={isOwner} customers={customers} vendors={vendors} cur={t.cur||"AED"} toast={toast}
+          onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} onPartiesChanged={(kind)=>{ if (kind==="vendor") reloadVendorsFromOffline(); else reloadCustomersFromOffline(); }} />
+      )}
+      {tab==="openingBalances"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"শুরুর ব্যালেন্স লক করা":"Opening & Migration is locked")}
+      {tab==="trialBalance"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <TrialBalanceReport lang={lang} shopId={shopId} shop={localShop} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")}
+          fyStartMonth={Number(localShop?.fyStartMonth || localShop?.taxSettings?.fyStartMonth) || 1}
+          onOpenDoc={{
+            can:(col)=>(col==="salesInvoices"&&(isOwner||can("manageSales")))||(col==="purchaseInvoices"&&(isOwner||can("managePurchase"))),
+            open:(col,id)=>{ if(col==="salesInvoices"){ setGlobalOpenSalesInvoiceId(id); setTabState("sales"); } else if(col==="purchaseInvoices"){ setGlobalOpenPurchaseInvoiceId(id); setTabState("purchase"); } },
+          }} />
+      )}
+      {tab==="trialBalance"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ট্রায়াল ব্যালেন্স লক করা":"Trial Balance is locked")}
+      {tab==="fundsSummary"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <FundsSummaryReport lang={lang} shopId={shopId} products={products} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")} />
+      )}
+      {tab==="fundsSummary"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ফান্ড / ওয়ার্কিং ক্যাপিটাল লক করা":"Funds / Working Capital is locked")}
+      {tab==="tallyExport"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <TallyExportReport lang={lang} shopId={shopId} customers={customers} vendors={vendors} chartOfAccounts={localShop?.chartOfAccounts}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canExport={isOwner||can("printAccounts")}
+          fyStartMonth={Number(localShop?.fyStartMonth || localShop?.taxSettings?.fyStartMonth) || 1} />
+      )}
+      {tab==="tallyExport"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব এক্সপোর্ট লক করা":"Accounting Export is locked")}
+      {tab==="partyAging"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <PartyAgingReport lang={lang} shopId={shopId} customers={customers} vendors={vendors}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")} />
+      )}
+      {tab==="partyAging"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"এজিং রিপোর্ট লক করা":"Ageing report is locked")}
+      {tab==="stockHub"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("stockAdjust")))&&(
+        <StockHubReport lang={lang} shopId={shopId} products={products} shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast}
+          canPrint={isOwner||can("printStock")} canSeeCost={isOwner||!!canSeeProductCost} />
+      )}
+      {tab==="stockHub"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"স্টক হাব লক করা":"Stock Hub is locked")}
+      {tab==="salesAnalytics"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <SalesAnalyticsReport lang={lang} shopId={shopId} products={products} shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast}
+          canPrint={isOwner||can("printAccounts")} onOpenInvoice={(isOwner||can("manageSales")) ? (id)=>{ setGlobalOpenSalesInvoiceId(id); setTabState("sales"); } : undefined} />
+      )}
+      {tab==="salesAnalytics"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"সেলস অ্যানালিটিক্স লক করা":"Sales Analytics is locked")}
+      {tab==="purchaseAnalytics"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
+        <PurchaseAnalyticsReport lang={lang} shopId={shopId} products={products} shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast}
+          canPrint={isOwner||can("printAccounts")} onOpenInvoice={(isOwner||can("managePurchase")) ? (id)=>{ setGlobalOpenPurchaseInvoiceId(id); setTabState("purchase"); } : undefined} />
+      )}
+      {tab==="purchaseAnalytics"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"পারচেজ অ্যানালিটিক্স লক করা":"Purchase Analytics is locked")}
+      {tab==="serialRegistry"&&((isOwner&&ownerUnlocked)||(!isOwner&&(can("manageReturns")||can("stockAdjust"))))&&(
+        <SerialRegistryReport lang={lang} shopId={shopId} shop={localShop} products={products} shopName={localShop?.companyName||""} toast={toast}
+          canPrint={isOwner||can("printReturns")||can("printStock")} includeJobs={isOwner||can("manageJobs")}
+          onOpenDoc={{
+            can:(col)=>(col==="salesInvoices"&&(isOwner||can("manageSales")))||(col==="purchaseInvoices"&&(isOwner||can("managePurchase")))||(col==="warrantyClaims"&&(isOwner||can("stockAdjust")||can("manageReturns"))),
+            open:(col,id)=>{
+              if(col==="salesInvoices"){ setGlobalOpenSalesInvoiceId(id); setTabState("sales"); }
+              else if(col==="purchaseInvoices"){ setGlobalOpenPurchaseInvoiceId(id); setTabState("purchase"); }
+              else if(col==="warrantyClaims"){ setGlobalOpenWarrantyClaimId?.(id); setTabState("warrantyClaim"); }
+            },
+          }} />
+      )}
+      {tab==="serialRegistry"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"সিরিয়াল / IMEI লক করা":"Serial / IMEI is locked")}
+      {tab==="priceList"&&(isOwner||can("viewProducts"))&&(
+        <PriceListScreen lang={lang} products={products} customers={(isOwner||can("manageCustomers")||can("manageSales"))?customers:[]}
+          shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printProducts")} />
+      )}
       {tab==="tax"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewTax")))&&(
         <TaxReport lang={lang} shopId={shopId} shop={localShop} user={user} products={products} customers={customers} vendors={vendors}
-          shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} canPrint={isOwner||can("printTax")} />
+          shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} canPrint={isOwner||can("printTax")}
+          isOwner={isOwner} onOpenDoc={{
+            can:(col)=>(col==="salesInvoices"&&(isOwner||can("manageSales")))||(col==="purchaseInvoices"&&(isOwner||can("managePurchase"))),
+            open:(col,id)=>{ if(col==="salesInvoices"){ setGlobalOpenSalesInvoiceId(id); setTabState("sales"); } else { setGlobalOpenPurchaseInvoiceId(id); setTabState("purchase"); } },
+          }} />
       )}
       {tab==="tax"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ট্যাক্স / VAT লক করা":"Tax / VAT is locked")}
       {tab==="partners"&&((isOwner&&ownerUnlocked)||(!isOwner&&(can("viewPartners")||can("managePartners"))))&&(

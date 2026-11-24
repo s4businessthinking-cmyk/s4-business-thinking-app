@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
+import { DocDateRange } from "../components/DocListFilters.jsx";
+import { inDateRange } from "../utils/docStatusFilter.js";
 import { siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
 import { ProductNameLookup, ProductCodeLookup } from "../sales-invoice/ProductLookupInputs.jsx";
 import { offlineCreate, offlinePatch, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { docMessage, partyPhone, pdfFileName } from "../share/whatsappDocShare.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { MinimizedChip, useEscapeKey, useWindowState, WindowButtons } from "../components/WindowChrome.jsx";
@@ -66,6 +70,8 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("active");
+  const [dFrom, setDFrom] = useState("");
+  const [dTo, setDTo] = useState("");
   // Delivery Note (Received) only: pick several, bill them together as one Purchase Invoice.
   const [combineSel, setCombineSel] = useState(() => new Set());
   const [notGot, setNotGot] = useState(() => new Set());
@@ -311,14 +317,24 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
       ...bills.filter((p) => p.purchaseOrderId === r.id && p.status !== "cancelled").map((p) => ({ no: p.invoiceNo, date: p.invoiceDate, what: L("পারচেজ বিল", "Purchase bill") }))]
     : (() => { const b = billOfReceipt(r, bills); return b ? [{ no: b.invoiceNo, date: b.invoiceDate, what: L("পারচেজ বিল", "Purchase bill") }] : []; })());
 
-  const print = (r) => {
+  const docHtml = (r) => {
     const showCost = isPO || (r.items || []).some((it) => n2(it.unitCost) > 0);
     const cols = [{ label: "#" }, { label: "Item" }, { label: "Qty", align: "right" }, { label: "Unit" }, ...(showCost ? [{ label: "Rate", align: "right" }, { label: "Amount", align: "right" }] : [])];
     const body = (r.items || []).map((it, i) => [String(i + 1), [it.name, it.code].filter(Boolean).join(" · "), fq(it.qty), it.unit || "", ...(showCost ? [fm(it.unitCost), fm(n2(it.qty) * n2(it.unitCost))] : [])]);
     const t = docTotals(r.items || [], isPO);
     const foot = showCost ? ["", isPO ? `Subtotal ${fm(t.sub)} · VAT ${fm(t.tax)}` : "", "", "", "TOTAL", `${cur} ${fm(isPO ? t.grand : t.sub)}`] : null;
     const subtitle = [noOf(r), fmtDay(r[K.dateKey]), r.vendorName, r.refNo ? `Ref ${r.refNo}` : "", isPO && r.expectedDate ? `Expected ${fmtDay(r.expectedDate)}` : "", !isPO && r.supplierRef ? `Supplier DN ${r.supplierRef}` : "", r.purchaseOrderNo ? `PO ${r.purchaseOrderNo}` : "", r.status === "cancelled" ? "CANCELLED" : ""].filter(Boolean).join(" · ");
-    printWithSettings(generateStatementHTML({ shopName, title: K.print, subtitle, partyLine: r.note || "", cols, rows: body, foot }), { lang });
+    return generateStatementHTML({ shopName, title: K.print, subtitle, partyLine: r.note || "", cols, rows: body, foot });
+  };
+  const print = (r) => printWithSettings(docHtml(r), { lang });
+  const docWhatsApp = (r) => {
+    const vm = vendors.find((v) => v.id === r.vendorId);
+    const t = docTotals(r.items || [], isPO);
+    return {
+      html: docHtml(r), fileName: pdfFileName(noOf(r), r.vendorName), phone: partyPhone(vm) || r.vendorMobile || "",
+      text: docMessage({ bn: lang === "bn", shop: shopName, docType: isPO ? L("পারচেজ অর্ডার", "Purchase order") : L("মাল গ্রহণ (GRN)", "Goods received note"),
+        no: noOf(r), date: r[K.dateKey], total: isPO ? t.grand : null, cur, party: r.vendorName || "" }),
+    };
   };
 
   const shell = (titleLeft, titleRight, children) => (
@@ -341,11 +357,13 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   const invoicedStates = isPO ? ["received", "invoiced", "closed"] : ["billed"];
   const filtered = useMemo(() => withState.filter(({ r, st }) => {
     if (filter === "active" && st === "cancelled") return false;
+    if (filter === "cancelled" && st !== "cancelled") return false;
+    if (!inDateRange(r, K.dateKey, dFrom, dTo)) return false;
     if (filter === "pending" && !pendingStates.includes(st)) return false;
     if (filter === "invoiced" && !invoicedStates.includes(st)) return false;
     const q = search.trim().toLowerCase();
     return !q || [noOf(r), r.vendorName, r.note, r.supplierRef, r.purchaseOrderNo, r.sourceOrderNo, r.backorderOrderNo, ...(r.items || []).map((it) => `${it.name} ${it.code || ""}`)].join(" ").toLowerCase().includes(q);
-  }), [withState, filter, search, isPO]);
+  }), [withState, filter, search, isPO, dFrom, dTo]);
   const liveRows = useMemo(() => withState.filter(({ st }) => st !== "cancelled"), [withState]);
   const pendingCount = useMemo(() => withState.filter(({ st }) => pendingStates.includes(st)).length, [withState, isPO]);
   const invoicedCount = useMemo(() => withState.filter(({ st }) => invoicedStates.includes(st)).length, [withState, isPO]);
@@ -392,10 +410,11 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
               {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {T("newBtn")}</button>}
               <span className="si-toolbar-gap" />
               <div className="si-pills">
-                {[["active", L("সব", "All")], ["pending", isPO ? L("বাকি আছে", "Pending") : L("বিল হয়নি", "Not billed")], ["invoiced", isPO ? L("ইনভয়েস হয়েছে", "Invoiced") : L("বিল হয়েছে", "Billed")], ["cancelledToo", L("বাতিলসহ", "With cancelled")]].map(([k, label]) => (
-                  <button key={k} type="button"className={`pm-btn-secondary${filter === k ? "is-active" : ""}`} onClick={() => setFilter(k)}>{label}</button>
+                {[["active", L("চালু", "Active"), liveRows.length], ["pending", isPO ? L("বাকি আছে", "Pending") : L("বিল হয়নি", "Not billed"), pendingCount], ["invoiced", isPO ? L("ইনভয়েস হয়েছে", "Invoiced") : L("বিল হয়েছে", "Billed"), invoicedCount], ["cancelled", L("বাতিল", "Cancelled"), withState.length - liveRows.length], ["cancelledToo", L("সব (বাতিলসহ)", "All (with cancelled)"), withState.length]].map(([k, label, count]) => (
+                  <button key={k} type="button" className={`pm-btn-secondary${filter === k ? " is-active" : ""}`} onClick={() => setFilter(k)}>{label} ({count})</button>
                 ))}
               </div>
+              <DocDateRange from={dFrom} to={dTo} onFrom={setDFrom} onTo={setDTo} lang={lang} mobile={mobile} />
               <div className="si-search"style={{ minWidth: mobile ? "100%" : 240 }}>
                 <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, সাপ্লায়ার বা পণ্য…", "Number, supplier or item…")} />
                 {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
@@ -790,6 +809,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
           <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
           {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
+          {canPrint && r.status !== "cancelled" && <WhatsAppButton lang={lang} toast={toast} className="pm-btn-secondary" build={() => docWhatsApp(r)} />}
           {canBill && isPO && onMakeReceipt && <button type="button"className="pm-btn"onClick={() => onMakeReceipt({ ...r, docNo: noOf(r) }, forBill(remaining))}> {L("মাল গ্রহণ করুন", "Receive Goods")}</button>}
           {canBill && onMakePurchase && <button type="button"className="pm-btn pm-btn--primary"onClick={() => billFromOrder(r, remaining)}> {notGot.size ? L("ইনভয়েস + বাকি অর্ডার", "Invoice + leftover order") : L("পারচেজ বিল বানান", "Make Purchase Bill")}</button>}
           <span className="si-toolbar-gap" />

@@ -52,8 +52,11 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     const baseLines = valid.map(it=>lineToBase(it, rate));
     const builtItems=baseLines.map((it,idx)=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), ...(piN2(it.discountFlat)>0?{ discountFlat:piN2(it.discountFlat) }:{}), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null,
       ...(foreign?{ fcUnitCost:piN2(valid[idx].unitCost), ...(piN2(valid[idx].discountFlat)>0?{ fcDiscountFlat:piN2(valid[idx].discountFlat) }:{}) }:{}), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) }; });
-    const { sub, disc, tax, grand } = piCalcTotals(baseLines);
-    const fcGrand = piCalcTotals(valid).grand;
+    // Adjustment (+/-) is typed in the bill's currency, like the lines
+    const adjFc = piN2(piForm.adjustment);
+    const { sub, disc, tax, grand } = piCalcTotals(baseLines, { adjustment: adjFc * rate });
+    const fcGrand = piCalcTotals(valid, { adjustment: adjFc }).grand;
+    if (grand < -0.001) { toast(lang==="bn"?"সর্বমোট মাইনাস হতে পারে না - সমন্বয় ঠিক করুন":"Grand total cannot be negative - fix the adjustment","err"); return null; }
     // Paying the whole bill in a foreign currency settles it exactly, without a rounding paisa left over.
     const fcPaid = piN2(piForm.amountPaid);
     const typedPaid=piForm.paymentMethod==="cash" ? parseFloat(piFmt2(grand)) : (foreign && Math.abs(fcPaid-fcGrand)<0.01 ? grand : fcPaid*rate);
@@ -67,7 +70,10 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
         : priorInv?.goodsReceiptId ? { goodsReceiptId:priorInv.goodsReceiptId, goodsReceiptNo:priorInv.goodsReceiptNo||"", ...((priorInv.goodsReceiptIds||[]).length>1 ? { goodsReceiptIds:priorInv.goodsReceiptIds, goodsReceiptNos:priorInv.goodsReceiptNos } : {}) } : {}),
     };
     return { ...sourceFields, shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate, entryDate:piForm.entryDate||piForm.invoiceDate,
-      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName };
+      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName,
+      // Adjustment (+/-) after VAT and why (Merge / Masters - adjustment reasons); base currency like the other totals
+      adjustment:parseFloat(piFmt2(adjFc * rate)), ...(foreign && adjFc ? { fcAdjustment:adjFc } : {}),
+      adjustmentReasonId:adjFc ? (piForm.adjustmentReasonId||"") : "", adjustmentReason:adjFc ? String(piForm.adjustmentReason||"").trim() : "" };
   };
 
   const nextPurchaseOrderNo = async () => {

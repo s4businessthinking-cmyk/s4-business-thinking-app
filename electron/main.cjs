@@ -124,6 +124,11 @@ async function createWindow() {
   });
   // Websites (tax portal, WhatsApp) open in the user's own browser where their logins are saved; print previews stay in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
+    // WhatsApp links (whatsapp://, wa.me) always go to Windows, which opens WhatsApp Desktop or the browser.
+    if (/^whatsapp:/i.test(url)) {
+      shell.openExternal(url).catch((err) => console.warn("[S4 Share] whatsapp link failed", err?.message || err));
+      return { action: "deny" };
+    }
     if (/^https?:\/\//i.test(url) && !/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(url)) {
       shell.openExternal(url);
       return { action: "deny" };
@@ -151,6 +156,7 @@ app.whenReady().then(() => {
   setupBackupIpc();
   setupPrintIpc();
   setupScanIpc();
+  setupShareIpc();
   createWindow();
   setupAutoUpdater();
 });
@@ -328,6 +334,108 @@ function runWiaScript(scriptPath) {
       else if (code === 0) resolve({ stdout, stderr });
       else reject(Object.assign(new Error(String(stderr || "").trim() || "scan failed"), { code, stderr }));
     });
+  });
+}
+
+// WhatsApp (Windows desktop): a document is printed to a PDF in Documents\S4 Business Thinking\WhatsApp, the file is
+// put on the clipboard as a file (the same as Copy in Explorer) and the party's chat opens in WhatsApp Desktop with the
+// message typed in. WhatsApp cannot take a file from another app by itself: pressing Ctrl+V in the chat (or dragging
+// the file from the folder) attaches the PDF. Nothing is sent without the user pressing Send.
+// Opening the chat tries, in order: whatsapp://send (WhatsApp Desktop, Store or classic), then wa.me in the browser.
+// The chat opens even when the PDF could not be made; the result says which steps worked.
+const SHARE_NAME_RE = /[^\w.\- ()]+/g;
+const shareFolder = () => path.join(app.getPath("documents"), "S4 Business Thinking", "WhatsApp");
+const waPhone = (v) => String(v || "").replace(/\D/g, "").slice(0, 15);
+
+function copyFileToClipboard(file) {
+  if (process.platform !== "win32") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    // the path travels in an environment variable, never inside the command text
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", "Set-Clipboard -LiteralPath $env:S4_CLIP_FILE"],
+      { windowsHide: true, timeout: 15000, env: { ...process.env, S4_CLIP_FILE: file } },
+      (err) => { if (err) console.warn("[S4 Share] clipboard copy failed", err.message); resolve(!err); });
+  });
+}
+
+// WhatsApp Desktop handles whatsapp:// (the Store app registers it as a packaged protocol, the classic app in HKCR).
+function hasWhatsAppDesktop() {
+  try { if (app.getApplicationNameForProtocol("whatsapp://")) return Promise.resolve(true); } catch { /* fall through */ }
+  if (process.platform !== "win32") return Promise.resolve(false);
+  return new Promise((resolve) => execFile("reg.exe", ["query", "HKCR\whatsapp"], { windowsHide: true, timeout: 5000 }, (err) => resolve(!err)));
+}
+
+/** -> "desktop" (WhatsApp Desktop opened) | "web" (wa.me in the browser) */
+async function openWhatsAppChat(phone, text) {
+  const msg = encodeURIComponent(String(text || ""));
+  if (await hasWhatsAppDesktop()) {
+    try {
+      await shell.openExternal(`whatsapp://send?${phone ? `phone=${phone}&` : ""}text=${msg}`);
+      return "desktop";
+    } catch (err) {
+      console.warn("[S4 Share] whatsapp:// failed, using wa.me", err?.message || err);
+    }
+  }
+  await shell.openExternal(`https://wa.me/${phone}?text=${msg}`);
+  return "web";
+}
+
+async function writeSharePdf(html, fileName) {
+  const base = String(fileName || "document").replace(/\.pdf$/i, "").replace(SHARE_NAME_RE, "-").slice(0, 80) || "document";
+  const folder = shareFolder();
+  await fs.promises.mkdir(folder, { recursive: true });
+  const tmp = path.join(app.getPath("temp"), `s4-share-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`);
+  await fs.promises.writeFile(tmp, html, "utf8");
+  const win = new BrowserWindow({ show: false, webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, javascript: false } });
+  try {
+    await win.loadFile(tmp);
+    const pdf = await win.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true, pageSize: "A4" });
+    const file = path.join(folder, `${base}.pdf`);
+    try {
+      await fs.promises.writeFile(file, pdf);
+      return file;
+    } catch (err) {
+      // the same file is still open in a PDF viewer: keep both
+      const alt = path.join(folder, `${base}-${Date.now().toString(36)}.pdf`);
+      console.warn("[S4 Share] PDF in use, saving as", alt, err?.message || err);
+      await fs.promises.writeFile(alt, pdf);
+      return alt;
+    }
+  } finally {
+    win.destroy();
+    fs.promises.unlink(tmp).catch(() => {});
+  }
+}
+
+function setupShareIpc() {
+  ipcMain.handle("s4-share:whatsapp-pdf", async (_event, payload = {}) => {
+    const html = payload.html;
+    if (typeof html !== "string" || !html || Buffer.byteLength(html, "utf8") > PRINT_HTML_MAX_BYTES) throw new Error("invalid document");
+    let file = "";
+    let pdfError = "";
+    try { file = await writeSharePdf(html, payload.fileName); } catch (err) { pdfError = String(err?.message || err); console.warn("[S4 Share] PDF failed", pdfError); }
+    const clipboard = file ? await copyFileToClipboard(file) : false;
+    const via = await openWhatsAppChat(waPhone(payload.phone), payload.text);
+    return { path: file, folder: shareFolder(), clipboard, desktop: via === "desktop", via, pdfError };
+  });
+  // Bulk messages: text only, one chat at a time.
+  ipcMain.handle("s4-share:whatsapp-text", async (_event, payload = {}) => {
+    const via = await openWhatsAppChat(waPhone(payload.phone), payload.text);
+    return { desktop: via === "desktop", via };
+  });
+  const inShareFolder = (file) => {
+    const target = path.resolve(String(file || ""));
+    return target.startsWith(shareFolder() + path.sep) ? target : "";
+  };
+  ipcMain.handle("s4-share:show-file", async (_event, file) => {
+    const target = inShareFolder(file);
+    if (!target) return false;
+    shell.showItemInFolder(target);
+    return true;
+  });
+  // "Copy PDF again" when something else was copied before pasting into WhatsApp.
+  ipcMain.handle("s4-share:copy-file", async (_event, file) => {
+    const target = inShareFolder(file);
+    return target && fs.existsSync(target) ? copyFileToClipboard(target) : false;
   });
 }
 

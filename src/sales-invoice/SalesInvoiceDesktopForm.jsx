@@ -10,6 +10,7 @@ import { StockBadgeLabel } from "../inventory/StockBadge.jsx";
 import { listShopRecords } from "../branch-transfer/branchTransferService";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
 import { printWithSettings } from "../print/printSettings.js";
 import { splitRack } from "./rackLocation.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
@@ -160,6 +161,7 @@ export default function SalesInvoiceDesktopForm({
   onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast, canEditInvoice = () => true,
   onOpenReminder, reminderForm, onChangeReminder, onSaveReminder, onCloseReminder,
   kind = "sales", sourceQuoteNo = "", sourceIsDN = false, sourceKind = "", onConvertQuote, onConvertToDN, canDiscount = true, canSeeCost = false,
+  loyalty = null, whatsAppDoc, adjustmentReasons = [],
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
@@ -465,6 +467,17 @@ export default function SalesInvoiceDesktopForm({
               onSelect={(c) => { onSelectCustomer(c); setTimeout(() => nameRef.current?.focus(), 60); }} />
             <button type="button"onClick={onOpenCustomerPicker} title="Home"style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
           </div>
+          {kind === "sales" && !isDelivery && form.customerId && customers.find((c) => c.id === form.customerId)?.autoWhatsAppInvoice === true && (
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#166534", marginTop: 2 }}>
+              {bn ? "Confirm করলে WhatsApp খুলবে (PDF + মেসেজ)" : "Confirming opens WhatsApp (PDF + message)"}
+            </div>
+          )}
+          {loyalty && (
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#15803d", marginTop: 2 }} title={bn ? "লয়্যালটি: এখন শুধু পয়েন্ট জমা হয়" : "Loyalty: earn only for now"}>
+              {bn ? "লয়্যালটি" : "Loyalty"} {loyalty.no} · {loyalty.points == null ? "…" : `${loyalty.points} ${bn ? "পয়েন্ট" : "pts"}`}
+              {loyalty.earn ? ` · +${loyalty.earn} ${bn ? "এই বিলে" : "on this bill"}` : ""}
+            </div>
+          )}
         </div>
         <div>
           <div style={lbl}>Salesman/Executive Name</div>
@@ -736,6 +749,14 @@ export default function SalesInvoiceDesktopForm({
             <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
               placeholder="+ / -"onChange={(e) => setField("adjustment", e.target.value)} />
           ), 128)}
+          {!isDelivery && Number(String(form.adjustment || "").replace(/,/g, "")) !== 0 && adjustmentReasons.length > 0 && field(bn ? "সমন্বয়ের কারণ" : "Reason", (
+            <select style={inp({ height: 24 })} disabled={!canDiscount} value={form.adjustmentReasonId || ""}
+              onChange={(e) => { const r = adjustmentReasons.find((x) => x.id === e.target.value); setField("adjustmentReasonId", r?.id || ""); setField("adjustmentReason", r?.name || ""); }}>
+              <option value="">-</option>
+              {form.adjustmentReasonId && !adjustmentReasons.some((x) => x.id === form.adjustmentReasonId) && <option value={form.adjustmentReasonId}>{form.adjustmentReason}</option>}
+              {adjustmentReasons.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          ), 128)}
           {field(bn ? "রাউন্ড অফ" : "Round Off", (
             <div style={{ display: "flex", gap: 4 }}>
               <input style={inp({ textAlign: "right", height: 24 })} inputMode="decimal"disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
@@ -784,6 +805,9 @@ export default function SalesInvoiceDesktopForm({
                 style={btn("#e7eef9", C.label, { opacity: canPrintNow ? 1 : 0.5 })}> {bn ? "প্রিন্ট" : "Print"}</button>
             );
           })()}
+          {whatsAppDoc && savedInvoice && savedInvoice.status !== "draft" && (
+            <WhatsAppButton lang={lang} toast={toast} className="" style={btn("#dcfce7", "#166534")} build={() => whatsAppDoc(savedInvoice)} />
+          )}
           {onOpenReminder && savedInvoice && (
             <button type="button"onClick={() => onOpenReminder(savedInvoice)} style={btn("#fef3c7", "#92400e")}> {bn ? "রিমাইন্ডার" : "Remind me"}</button>
           )}

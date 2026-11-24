@@ -1,4 +1,6 @@
 import AgainstInvoiceVoucherWindow from "../vouchers/AgainstInvoiceVoucherWindow.jsx";
+import { DocDateRange, DocListSummary, DocStatusPills } from "../components/DocListFilters.jsx";
+import PendingBillsPanel from "../components/PendingBillsPanel.jsx";
 import { CURRENCIES } from "../reports/taxDomain.js";
 import ChequeHandoverModal from "../vouchers/ChequeHandoverModal.jsx";
 import { MinimizedChip, WindowButtons } from "../components/WindowChrome.jsx";
@@ -21,12 +23,14 @@ import { groupInvoicesByParty } from "../invoices/PartyFolderList.jsx";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
 import { isForeign } from "./purchaseOptions.js";
 import { isOpeningBill } from "../utils/openingBill.js";
-import { printPaymentVoucher, siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
-import { printPurchaseInvoice } from "./purchasePrint.js";
+import { generatePaymentVoucherHTML, printPaymentVoucher, siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
+import { generatePurchaseInvoiceHTML, printPurchaseInvoice } from "./purchasePrint.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { docMessage, partyPhone, pdfFileName, voucherShareDoc } from "../share/whatsappDocShare.js";
 import { settleLeftoverVendorReturnCredits } from "../returns/returnsCreditSettle.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 
-export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
+export function renderPiScreens({ listFilter = null, onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
   const applyVendorReturnCreditSettle = async (p) => {
     const plan = await settleLeftoverVendorReturnCredits({
       returns: billReturns,
@@ -118,7 +122,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
             {subTabs.length>1&&(
               <div className="si-pills">
                 {subTabs.map(tab=>(
-                  <button key={tab.key} type="button"className={`pm-btn-secondary${piSubTab===tab.key?"is-active":""}`}
+                  <button key={tab.key} type="button"className={`pm-btn-secondary${piSubTab===tab.key?" is-active":""}`}
                     onClick={()=>{ setPiSubTab(tab.key); if(tab.key==="ledger") setPiLedgerHidden(false); if(tab.key==="payments"){ setPmtView("list"); setSelVoucher(null); } }}>
                     {tab.icon} {bnL?tab.bn:tab.en}
                   </button>
@@ -179,6 +183,8 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                 onDeleteVoucher={(isOwner||can("deletePayments")) ? (v)=>piDeletePaymentVoucher(v.raw) : undefined}
                 onSetChequeStatus={isOwner ? async (v,st)=>{ const u = await piSetVoucherChequeStatus(v.raw, st); return u ? toVoucherView(u,"payment") : null; } : undefined}
                 onPrint={(isOwner||can("printPayments")) ? (v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts) : undefined}
+                onWhatsApp={(isOwner||can("printPayments")) ? (v)=>voucherShareDoc({ kind:"payment", raw:v.raw, html:generatePaymentVoucherHTML(v.raw, shop, lang), partyRecord:vendors.find(x=>x.id===v.raw.vendorId), bn:lang==="bn", shop:shop?.companyName||"", cur:t.cur||"AED" }) : null}
+                toast={toast}
                 onPrintCheque={onOpenChequePrinter ? (v)=>openVoucherInChequePrinter(v.raw) : undefined}
                 onPrintChequeVoucher={(v)=>printChequePaymentVoucher(v.raw)}
                 onHandover={(v)=>openChequeHandover(v.raw)}
@@ -234,21 +240,28 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
               <input className="pm-input"placeholder={t.pi_searchPh} value={piSearch} onChange={e=>setPiSearch(e.target.value)} />
               {piSearch&&<button type="button"aria-label="Clear"onClick={()=>setPiSearch("")}>✕</button>}
             </div>
-            <div className="si-pills">
-              {["ALL",...Object.keys(PI_STATUSES)].map(st=>(
-                <button key={st} type="button"className={`pm-btn-secondary${piStatusF===st?"is-active":""}`} onClick={()=>setPiStatusF(st)}>
-                  {st==="ALL"?t.pi_allStatus:PI_STATUSES[st]?.[lang]}
-                </button>
-              ))}
-            </div>
+            {listFilter&&(
+              <button type="button" className={`pm-btn-secondary${listFilter.pending?" is-active":""}`} onClick={()=>listFilter.setPending(!listFilter.pending)} title={bnL?"বাকি বিল: দেওয়ার তারিখ ও কত দিন পেরিয়েছে":"Bills with money due, by due date"}>
+                {bnL?"বাকি বিল":"Pending bills"} ({listFilter.pendingCount})
+              </button>
+            )}
+            {!listFilter?.pending&&<DocStatusPills statuses={PI_STATUSES} value={piStatusF} onChange={setPiStatusF} counts={listFilter?.counts} lang={lang} allLabel={t.pi_allStatus} />}
+            {listFilter && !listFilter.pending && <DocDateRange from={listFilter.from} to={listFilter.to} onFrom={listFilter.setFrom} onTo={listFilter.setTo} lang={lang} mobile={piMobile} />}
             <div className="si-pills">
               {[["folders", bnL?"নাম অনুযায়ী":"By name"], ["all", bnL?"সব":"All"]].map(([m,label])=>(
-                <button key={m} type="button"className={`pm-btn-secondary${piGroupMode===m?"is-active":""}`} onClick={()=>{ setPiGroupMode(m); setPiOpenParty(null); }}>{label}</button>
+                <button key={m} type="button"className={`pm-btn-secondary${piGroupMode===m?" is-active":""}`} onClick={()=>{ setPiGroupMode(m); setPiOpenParty(null); }}>{label}</button>
               ))}
             </div>
           </div>
+          {!listFilter?.pending&&<DocListSummary summary={listFilter?.summary} active={piStatusF!=="ALL"||!!listFilter?.from||!!listFilter?.to} lang={lang} cur={t.cur} fmt={piFmt2} />}
+          {listFilter?.pending&&(
+            <PendingBillsPanel kind="purchase" invoices={listFilter.visible||invoices} lang={lang} cur={t.cur} fmt={piFmt2} canPrint={isOwner||can("printPurchase")||can("managePurchase")} shopName={shop?.companyName||""} mobile={piMobile}
+              onOpen={piOpenInvoice}
+              onPay={canVendorPayments ? piGoToMakePayment : undefined}
+              canPayRow={(inv)=>canVendorPayments&&["confirmed","partial"].includes(inv.status)} />
+          )}
 
-          <div className={`si-main${piGroupMode==="all" || piMobile ? "is-all" : ""}`}>
+          <div className={`si-main${piGroupMode==="all" || piMobile ? " is-all" : ""}`} style={listFilter?.pending?{ display:"none" }:undefined}>
             {showParties&&(
               <div className="si-box">
                 <table className="pm-table">
@@ -256,7 +269,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                   <thead><tr><th>{t.pi_vendor}</th><th className="si-num">{bnL?"মোট":"Total"}</th><th className="si-num">{bnL?"বাকি":"Due"}</th></tr></thead>
                   <tbody>
                     {!piMobile&&groups.length>0&&(
-                      <tr className={`pm-clickable${!openGroup?"pm-selected":""}`} onClick={()=>setPiOpenParty(null)}>
+                      <tr className={`pm-clickable${!openGroup?" pm-selected":""}`} onClick={()=>setPiOpenParty(null)}>
                         <td className="si-strong">{bnL?"সব ভেন্ডর":"All vendors"} ({piFiltered.length})</td><td /><td />
                       </tr>
                     )}
@@ -264,7 +277,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                       const stCounts = {};
                       g.invoices.forEach(inv=>{ stCounts[inv.status] = (stCounts[inv.status]||0)+1; });
                       return (
-                      <tr key={g.key} className={`pm-clickable si-party-row${openGroup?.key===g.key?"pm-selected":""}`} onClick={()=>setPiOpenParty(g.key)}>
+                      <tr key={g.key} className={`pm-clickable si-party-row${openGroup?.key===g.key?" pm-selected":""}`} onClick={()=>setPiOpenParty(g.key)}>
                         <td className="si-wrap">
                           {groupName(g)}
                           <div className="si-muted"style={{ fontWeight:400, fontSize:"0.9em" }}>
@@ -279,7 +292,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                           </div>
                         </td>
                         <td className="si-num">{piFmt2(g.total)}</td>
-                        <td className={`si-num${g.due>0.01?"si-due":""}`}>{g.due>0.01?piFmt2(g.due):"-"}</td>
+                        <td className={`si-num${g.due>0.01?" si-due":""}`}>{g.due>0.01?piFmt2(g.due):"-"}</td>
                       </tr>
                       );
                     })}
@@ -354,7 +367,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                               <td className="si-num">{inv.items?.length||0}</td>
                               <td className="si-num si-strong">{piFmt2(inv.grandTotal)}</td>
                               <td className="si-num">{piN2(inv.amountPaid)>0?piFmt2(inv.amountPaid):"-"}</td>
-                              <td className={`si-num${due>0.01?"si-due":""}`}>{due>0.01?piFmt2(due):"-"}</td>
+                              <td className={`si-num${due>0.01?" si-due":""}`}>{due>0.01?piFmt2(due):"-"}</td>
                             </tr>
                           );
                         })}
@@ -380,7 +393,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
   if (piView==="detail"&&selInvoice) {
     const inv = invoices.find(x=>x.id===selInvoice.id) || selInvoice;
     const items = inv.items||[];
-    const calc = piCalcTotals(items);
+    const calc = piCalcTotals(items, { adjustment:inv.adjustment });
     const grand = items.length ? calc.grand : piN2(inv.grandTotal);
     const bal = grand - piN2(inv.amountPaid);
     const isOB = isOpeningBill(inv);
@@ -394,13 +407,14 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
     const vRow = (label, value, opts={}) => (
       <div className="pm-form-row">
         <label className="pm-label">{label}</label>
-        <div className={`si-val${opts.strong?"is-strong":""}`} style={opts.color?{ color:opts.color }:undefined}>{value}</div>
+        <div className={`si-val${opts.strong?" is-strong":""}`} style={opts.color?{ color:opts.color }:undefined}>{value}</div>
       </div>
     );
     const totalRows = [
       [t.pi_subtotal, piFmt2(items.length ? calc.sub : grand)],
       ...(calc.disc>0?[[t.pi_totalDiscount, `- ${piFmt2(calc.disc)}`, "#b91c1c"]]:[]),
       ...(calc.tax>0?[[t.pi_totalTax, `+ ${piFmt2(calc.tax)}`, "#0e7490"]]:[]),
+      ...(calc.adjustment?[[`${bnL?"সমন্বয়":"Adjustment"}${inv.adjustmentReason?` (${inv.adjustmentReason})`:""}`, `${calc.adjustment>0?"+":"-"} ${piFmt2(Math.abs(calc.adjustment))}`]]:[]),
     ];
     const back = () => piLeaveDetail();
     return (
@@ -464,7 +478,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
               <div className="si-panel-body">
                 <div className="si-total-row"><span>{t.pi_paymentMethod}</span><b>{PI_PAY_METHODS[inv.paymentMethod]?.icon} {PI_PAY_METHODS[inv.paymentMethod]?.[lang]||"-"}</b></div>
                 <div className="si-total-row"><span>{t.pi_amountPaid}</span><b style={{ color:"#15803d" }}>{t.cur} {piFmt2(inv.amountPaid)}</b></div>
-                <div className={`si-paid-box${bal>0.01?"is-due":""}`}><span>{bal>0.01?t.pi_balanceDue:t.pi_alreadyFullyPaid}</span><span>{t.cur} {piFmt2(Math.max(0,bal))}</span></div>
+                <div className={`si-paid-box${bal>0.01?" is-due":""}`}><span>{bal>0.01?t.pi_balanceDue:t.pi_alreadyFullyPaid}</span><span>{t.cur} {piFmt2(Math.max(0,bal))}</span></div>
                 {related.length>0&&(
                   <div className="pm-table-wrap"style={{ marginTop:3 }}>
                     <table className="pm-table">
@@ -500,6 +514,12 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
             const vm = vendors.find(v=>v.id===inv.vendorId);
             printPurchaseInvoice({ ...inv, vendorAddress:inv.vendorAddress||vm?.address||"", vendorTrn:inv.vendorTrn||vm?.trnNumber||"" }, shop, lang);
           }}> {bnL?"প্রিন্ট":"Print"}</button>}
+          {purchaseOpts.enablePrint&&(isOwner||can("printPurchase")||can("managePurchase"))&&inv.status!=="draft"&&<WhatsAppButton lang={lang} toast={toast} build={()=>{
+            const vm = vendors.find(v=>v.id===inv.vendorId);
+            return { html:generatePurchaseInvoiceHTML({ ...inv, vendorAddress:inv.vendorAddress||vm?.address||"", vendorTrn:inv.vendorTrn||vm?.trnNumber||"" }, shop, lang),
+              fileName:pdfFileName(inv.invoiceNo, inv.vendorName), phone:partyPhone(vm) || String(inv.vendorMobile||""),
+              text:docMessage({ bn:bnL, shop:shop?.companyName||"", docType:bnL?"পারচেজ ইনভয়েস":"Purchase invoice", no:[inv.invoiceNo, inv.supplierInvoiceNo && `(${inv.supplierInvoiceNo})`].filter(Boolean).join(" "), date:inv.invoiceDate, total:inv.grandTotal, cur:t.cur||"AED", party:inv.vendorName||"" }) };
+          }} />}
           {canEdit&&<button type="button"className="pm-btn pm-btn--primary"onClick={()=>piOpenEdit(inv)}> {t.pi_editBtn}</button>}
           {onStartReturn&&["confirmed","partial","paid"].includes(inv.status)&&<button type="button"className="pm-btn"onClick={()=>onStartReturn(inv)}> {bnL?"রিটার্ন":"Return"}</button>}
           {canPay&&<button type="button"className="pm-btn"onClick={()=>piGoToMakePayment(inv)}>{t.pi_makePayment}</button>}
@@ -723,6 +743,8 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
           <div className="si-total-row"><span>{t.pi_subtotal}</span><b>{t.cur} {piFmt2(totals.sub)}</b></div>
           {totals.disc>0&&<div className="si-total-row"><span>{t.pi_totalDiscount}</span><b style={{ color:"#b91c1c" }}>- {t.cur} {piFmt2(totals.disc)}</b></div>}
           {totals.tax>0&&<div className="si-total-row"><span>{t.pi_totalTax}</span><b style={{ color:"#0e7490" }}>+ {t.cur} {piFmt2(totals.tax)}</b></div>}
+          <div className="si-total-row"><span>{bnL?"সমন্বয় (+/-)":"Adjustment (+/-)"}</span>
+            <input className="pm-input" inputMode="decimal" placeholder="+ / -" style={{ width:110, textAlign:"right" }} value={piForm.adjustment||""} onChange={e=>piUpd("adjustment", e.target.value)} /></div>
           <div className="si-total-row is-grand"><span>{t.pi_grandTotal}</span><span style={{ color:piAccent }}>{t.cur} {piFmt2(totals.grand)}</span></div>
         </>)}
 
@@ -745,7 +767,7 @@ export function renderPiScreens({ onStartReturn, onProductPatched, onScanBill, b
                   {totals.grand>0&&<button type="button"className="pm-btn-secondary"onClick={()=>piUpd("amountPaid",piFmt2(totals.grand))}>{bnL?"পুরো":"Full"}</button>}
                 </div>
               ))}
-              {totals.grand>0&&<div className={`si-paid-box${balance>0.01?"is-due":""}`}><span>{t.pi_balanceDue}</span><span>{t.cur} {piFmt2(balance)}</span></div>}
+              {totals.grand>0&&<div className={`si-paid-box${balance>0.01?" is-due":""}`}><span>{t.pi_balanceDue}</span><span>{t.cur} {piFmt2(balance)}</span></div>}
             </>
           )}
         </>)}

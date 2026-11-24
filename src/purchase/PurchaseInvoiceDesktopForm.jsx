@@ -10,6 +10,7 @@ import { PM_CSS } from "../product-master/pmStyles";
 import PartyPickerWindow, { VENDOR_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
 import { PURCHASE_OPTION_DEFAULTS, PURCHASE_OPTION_LABELS, isForeign, rateOf } from "./purchaseOptions.js";
 import { CURRENCIES } from "../reports/taxDomain.js";
+import { normalizeAdjustments, reasonsFor, rowName } from "../masters/simpleMasters.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 import InvoiceScanWindow from "./scan/InvoiceScanWindow.jsx";
 import { applyPurchaseScan } from "./scan/applyPurchaseScan.js";
@@ -114,6 +115,8 @@ export default function PurchaseInvoiceDesktopForm({
 }) {
   const { piCalcLine, piFmt2, piN2, PI_PAY_METHODS, PI_STATUSES, PI_UNITS } = helpers;
   const bn = lang === "bn";
+  // purchase adjustment reasons (Merge / Masters)
+  const adjustmentReasons = useMemo(() => reasonsFor(normalizeAdjustments(shop?.adjustmentReasons), "purchase").map((a) => ({ id: a.id, name: rowName(a, bn) })), [shop?.adjustmentReasons, bn]);
   // A saved bill opens read-only (also when stepping with < >); Edit unlocks it where editing is allowed.
   const [locked, setLocked] = useState(!!editInvoiceId);
   useEffect(() => { setLocked(!!editInvoiceId); }, [editInvoiceId]);
@@ -616,6 +619,19 @@ export default function PurchaseInvoiceDesktopForm({
           ].map(([l, v]) => (
             <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700 }}><span>{l}</span><span>{v}</span></div>
           ))}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700 }}>
+            <span>{bn ? "সমন্বয়" : "Adjustment"}</span>
+            <input style={inp({ textAlign: "right", height: 22, width: 96 })} inputMode="decimal" placeholder="+ / -" value={form.adjustment || ""}
+              onChange={(e) => setField("adjustment", e.target.value)} title={bn ? "VAT-এর পরে + / - (ভাড়া, রাউন্ডিং, রেট পার্থক্য)" : "+ / - after VAT (freight, rounding, rate difference)"} />
+          </div>
+          {Number(String(form.adjustment || "").replace(/,/g, "")) !== 0 && adjustmentReasons.length > 0 && (
+            <select style={inp({ height: 22 })} value={form.adjustmentReasonId || ""}
+              onChange={(e) => { const r = adjustmentReasons.find((x) => x.id === e.target.value); setField("adjustmentReasonId", r?.id || ""); setField("adjustmentReason", r?.name || ""); }}>
+              <option value="">{bn ? "সমন্বয়ের কারণ" : "Adjustment reason"}</option>
+              {form.adjustmentReasonId && !adjustmentReasons.some((x) => x.id === form.adjustmentReasonId) && <option value={form.adjustmentReasonId}>{form.adjustmentReason}</option>}
+              {adjustmentReasons.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+          )}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "3px 8px", borderRadius: 2 }}>
             <span style={{ fontWeight: 800 }}>TOTAL</span>
             <span style={{ fontSize: 18, fontWeight: 900 }}>{foreign ? billCur : (t.cur || "AED")} {piFmt2(totals.grand)}</span>

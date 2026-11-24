@@ -285,3 +285,41 @@ export function planSettleLeftoverReturnCredits({
   }
   return { invoicePatches, returnPatches };
 }
+
+// ── Value notes: a credit note (sales) or debit note (purchase) for money only - a rate difference, a discount
+// given after the bill, short supply - with VAT and no goods. Saved as a return of that bill with noteType "value"
+// and no items, so the ledger (Sales Return / Purchase Return + VAT), the VAT return and the bill balance treat it
+// exactly like a return, and stock never moves.
+
+/** VAT % the bill was charged at (0 when it had no VAT). */
+export function billVatPerc(invoice, kind = "sales") {
+  const vat = Number(kind === "purchase" ? invoice?.totalTax ?? invoice?.totalVat : invoice?.totalVat) || 0;
+  const net = (Number(invoice?.grandTotal) || 0) - vat;
+  return net > 0 && vat > 0 ? Math.round((vat / net) * 10000) / 100 : 0;
+}
+
+/** amount: the note's value before VAT; vatPerc: VAT % (the bill's rate by default). -> { subtotal, totalVat, total, vatPerc } */
+export function valueNoteTotals({ amount, vatPerc }) {
+  const subtotal = r2(Math.max(0, Number(String(amount ?? "").replace(/,/g, "")) || 0));
+  const perc = Math.min(100, Math.max(0, Number(String(vatPerc ?? "").replace(/,/g, "")) || 0));
+  const totalVat = r2((subtotal * perc) / 100);
+  return { subtotal, totalVat, total: r2(subtotal + totalVat), vatPerc: perc };
+}
+
+/**
+ * A value note against a bill: "" when fine, else INVOICE_MISSING | INVOICE_NOT_RETURNABLE | AMOUNT | OVER
+ * (more than the bill less the returns and notes already made on it).
+ */
+export function validateValueNote(invoice, total, priorReturns = [], exceptReturnId = null) {
+  if (!invoice || invoice.isDeleted || invoice.deleted) return "INVOICE_MISSING";
+  if (!RETURNABLE_STATUSES.includes(invoice.status)) return "INVOICE_NOT_RETURNABLE";
+  if (!(Number(total) > 0)) return "AMOUNT";
+  return Number(total) > valueNoteRoom(invoice, priorReturns, exceptReturnId) + 0.01 ? "OVER" : "";
+}
+
+/** How much a new value note on this bill may be: the bill total less its live returns and notes. */
+export function valueNoteRoom(invoice, priorReturns = [], exceptReturnId = null) {
+  const taken = (priorReturns || []).filter((r) => r && r.status !== "cancelled" && r.invoiceId === invoice?.id && r.id !== exceptReturnId)
+    .reduce((t, r) => t + (Number(r.total) || 0), 0);
+  return r2(Math.max(0, (Number(invoice?.grandTotal) || 0) - taken));
+}

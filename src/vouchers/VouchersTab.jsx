@@ -4,10 +4,14 @@ import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { docMessage, pdfFileName } from "../share/whatsappDocShare.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
-import { EXPENSE_CATEGORIES } from "../expenses/ExpensesTab.jsx";
+import { activeNames, moneyNames, normalizeChart } from "../ledger/chartOfAccounts.js";
+import { CHART_EXPENSE_NAMES } from "../ledger/ChartOfAccountsScreen.jsx";
 import { ACCOUNT_VOUCHER_TYPES, CASH_ACCOUNT, checkContra, checkJournal, r2, voucherParticulars } from "./accountVoucherDomain.js";
+import VoucherRegister from "./VoucherRegister.jsx";
 
 const COL = "accountVouchers";
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -40,7 +44,7 @@ const TILE_CSS = `
 export default function VouchersTab({
   lang = "en", shopId, user, profile, isOwner, canJournal = false, canDelete = false, canPrint = false, cur = "AED", toast, shopName = "",
   makeNo, leaveGuard = null, customers = [], vendors = [], banks = [],
-  onOpenReceipts, onOpenPayments, onOpenDebitNote, onOpenCreditNote,
+  onOpenReceipts, onOpenPayments, onOpenDebitNote, onOpenCreditNote, canSeeReceipts = false, canSeePayments = false, savedChart = null,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -58,6 +62,10 @@ export default function VouchersTab({
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile);
   const type = ACCOUNT_VOUCHER_TYPES[view] || null;
+  // Which voucher kinds the register lists: journal / contra with the journal permission, receipts / payments with theirs.
+  const registerInclude = useMemo(() => ({ journal: isOwner || canJournal, contra: isOwner || canJournal, receipt: !!canSeeReceipts, payment: !!canSeePayments }),
+    [isOwner, canJournal, canSeeReceipts, canSeePayments]);
+  const canRegister = Object.values(registerInclude).some(Boolean);
 
   useEffect(() => {
     if (!shopId) return undefined;
@@ -65,15 +73,18 @@ export default function VouchersTab({
     return () => { try { unsub?.(); } catch { /* ignore */ } };
   }, [shopId]);
 
+  // Pickers come from the chart of accounts (active accounts); until the owner has saved one, the bank list is offered too.
+  const chart = useMemo(() => normalizeChart(savedChart, { expenseNames: CHART_EXPENSE_NAMES }), [savedChart]);
+  const bankHints = useMemo(() => (Array.isArray(savedChart) ? [] : banks.map((b) => `Bank - ${b}`)), [savedChart, banks]);
   const accountNames = useMemo(() => {
     const names = [
-      CASH_ACCOUNT, ...banks.map((b) => `Bank - ${b}`), "Capital", "Drawings", "Sales", "Purchase", "Discount Allowed", "Discount Received",
-      ...EXPENSE_CATEGORIES.filter((c) => c.key !== "other").map((c) => c.en),
+      ...activeNames(chart), ...bankHints,
       ...customers.filter((c) => c && !c.isDeleted).map((c) => c.customerName),
       ...vendors.filter((v) => v && !v.isDeleted).map((v) => v.vendorName),
     ];
     return [...new Set(names.map((x) => String(x || "").trim()).filter(Boolean))];
-  }, [banks, customers, vendors]);
+  }, [chart, bankHints, customers, vendors]);
+  const moneyAccountNames = useMemo(() => [...new Set([...moneyNames(chart), ...bankHints])], [chart, bankHints]);
 
   const mine = useMemo(() => rows.filter((r) => r && !r.isDeleted && r.shopId === shopId && r.voucherType === view && (isOwner || r.createdBy === user?.uid)),
     [rows, shopId, view, isOwner, user?.uid]);
@@ -180,16 +191,23 @@ export default function VouchersTab({
     }
   };
 
-  const printVoucher = (r) => {
+  const voucherHtml = (r) => {
     const t = ACCOUNT_VOUCHER_TYPES[r.voucherType];
     const cols = [{ label: "Account" }, { label: "Note" }, { label: `Debit (${cur})`, align: "right" }, { label: `Credit (${cur})`, align: "right" }];
     const body = (r.lines || []).map((l) => [l.account, l.note || "", l.debit ? money(l.debit) : "", l.credit ? money(l.credit) : ""]);
     const partyLine = [r.narration, r.refNo ? `Ref: ${r.refNo}` : "", r.status === "cancelled" ? "CANCELLED" : ""].filter(Boolean).join(" · ");
-    printWithSettings(generateStatementHTML({
+    return generateStatementHTML({
       shopName, title: t.printTitle, subtitle: `${r.voucherNo} · ${fmtDay(r.voucherDate)}`, partyLine,
       cols, rows: body, foot: ["", "TOTAL", money(r.totalAmount), money(r.totalAmount)],
-    }), { lang });
+    });
   };
+  const printVoucher = (r) => printWithSettings(voucherHtml(r), { lang });
+  // A journal / contra has no party of its own: WhatsApp asks for the number.
+  const voucherWhatsApp = (r) => ({
+    html: voucherHtml(r), fileName: pdfFileName(r.voucherNo), phone: "",
+    text: docMessage({ bn, shop: shopName, docType: r.voucherType === "contra" ? L("কন্ট্রা ভাউচার", "Contra voucher") : L("জার্নাল ভাউচার", "Journal voucher"),
+      no: r.voucherNo, date: r.voucherDate, total: r.totalAmount, cur, extra: r.narration || "" }),
+  });
 
   const printList = () => {
     const cols = [{ label: "Date" }, { label: "No" }, { label: "Particulars" }, { label: "Narration" }, { label: `Amount (${cur})`, align: "right" }];
@@ -227,7 +245,22 @@ export default function VouchersTab({
     { key: "contra", icon: "", label: "Contra", hint: L("ক্যাশ ⇄ ব্যাংক", "Cash ⇄ Bank"), onClick: canJournal ? () => setView("contra") : null },
     { key: "debit", icon: "", label: "Debit Note", hint: L("ভেন্ডরকে মাল ফেরত", "Purchase return"), onClick: onOpenDebitNote },
     { key: "credit", icon: "", label: "Credit Note", hint: L("কাস্টমার থেকে মাল ফেরত", "Sales return"), onClick: onOpenCreditNote },
+    { key: "register", icon: "", label: "Register", hint: L("সব ভাউচারের তালিকা, প্রিন্ট ও Excel", "All vouchers: list, print, Excel"), onClick: canRegister ? () => setView("register") : null },
   ];
+
+  if (view === "register") {
+    return (
+      <div ref={rootRef} className="si-root" style={fitH ? { height: fitH } : undefined}>
+        <style>{PM_CSS}</style>
+        <style>{SI_CSS}</style>
+        <VoucherRegister lang={lang} shopId={shopId} user={user} isOwner={isOwner} include={registerInclude} journalRows={rows} canPrint={canPrint} cur={cur} shopName={shopName} toast={toast} mobile={mobile}
+          onBack={() => setView(null)}
+          onOpenVoucher={(r) => { setView(r.voucherType); openRow(r); }}
+          onOpenReceipts={onOpenReceipts ? () => onOpenReceipts() : undefined}
+          onOpenPayments={onOpenPayments ? () => onOpenPayments() : undefined} />
+      </div>
+    );
+  }
 
   if (!type) {
     return (
@@ -339,6 +372,7 @@ export default function VouchersTab({
           {editRow && !readOnly && <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => cancelRow(editRow)}> {L("বাতিল", "Cancel voucher")}</button>}
           {editRow && editRow.status === "cancelled" && canDelete && <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => deleteRow(editRow)}> {L("মুছে ফেলুন", "Delete")}</button>}
           {editRow && canPrint && <button type="button"className="pm-btn-secondary"onClick={() => printVoucher(editRow)}> {L("প্রিন্ট", "Print")}</button>}
+          {editRow && canPrint && editRow.status !== "cancelled" && <WhatsAppButton lang={lang} toast={toast} className="pm-btn-secondary" build={() => voucherWhatsApp(editRow)} />}
           <span className="si-toolbar-gap" />
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={closeForm}>{L("বন্ধ", "Close")}</button>
           {!readOnly && (
@@ -349,7 +383,7 @@ export default function VouchersTab({
         </div>
       </div>
       <datalist id="vt-accounts">{accountNames.map((a) => <option key={a} value={a} />)}</datalist>
-      <datalist id="vt-money-accounts">{[CASH_ACCOUNT, ...banks.map((b) => `Bank - ${b}`)].map((a) => <option key={a} value={a} />)}</datalist>
+      <datalist id="vt-money-accounts">{moneyAccountNames.map((a) => <option key={a} value={a} />)}</datalist>
     </div>
   );
 
@@ -366,7 +400,7 @@ export default function VouchersTab({
       </tr></thead>
       <tbody>
         {filtered.map((r) => (
-          <tr key={r.id} className={`pm-clickable${editId === r.id ? "pm-selected" : ""}`} onClick={() => openRow(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
+          <tr key={r.id} className={`pm-clickable${editId === r.id ? " pm-selected" : ""}`} onClick={() => openRow(r)} style={r.status === "cancelled" ? { color: "#6b7280" } : undefined}>
             <td>{fmtDay(r.voucherDate)}</td>
             <td className="si-strong">{r.voucherNo}</td>
             <td title={voucherParticulars(r)}>{voucherParticulars(r)}</td>
@@ -402,7 +436,7 @@ export default function VouchersTab({
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (
-            <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
+            <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
         <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />

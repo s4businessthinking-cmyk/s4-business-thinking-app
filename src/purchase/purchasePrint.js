@@ -9,7 +9,7 @@ export function generatePurchaseInvoiceHTML(invoice, shop, lang, opts = {}) {
   const isBn = lang === "bn";
   const cur = invoice.currency || "AED";
   const items = invoice.items || [];
-  const sub = piN2(invoice.subtotal), disc = piN2(invoice.totalDiscount), tax = piN2(invoice.totalTax), grand = piN2(invoice.grandTotal);
+  const sub = piN2(invoice.subtotal), disc = piN2(invoice.totalDiscount), tax = piN2(invoice.totalTax), grand = piN2(invoice.grandTotal), adj = piN2(invoice.adjustment);
   const paid = piN2(invoice.amountPaid), bal = piN2(invoice.balanceDue);
   const title = isBn ? "ক্রয় ইনভয়েস" : "PURCHASE INVOICE";
   const hasTax = items.some((it) => piN2(it.taxPerc) > 0);
@@ -47,7 +47,8 @@ export function generatePurchaseInvoiceHTML(invoice, shop, lang, opts = {}) {
   const amountOptionsHTML = `
     <div class="totals-row"><span class="tl">${isBn ? "সাব-টোটাল" : "Subtotal"}</span><span class="tv">${cur} ${piFmt2(sub)}</span></div>
     <div class="totals-row"><span class="tl">${isBn ? "ছাড়" : "Discount"}</span><span class="tv">- ${cur} ${piFmt2(disc)}</span></div>
-    <div class="totals-row"><span class="tl">Tax</span><span class="tv">+ ${cur} ${piFmt2(tax)}</span></div>
+    <div class="totals-row"><span class="tl">Tax</span><span class="tv">+ ${cur} ${piFmt2(tax)}</span></div>${adj ? `
+    <div class="totals-row"><span class="tl">${isBn ? "সমন্বয়" : "Adjustment"}${invoice.adjustmentReason ? ` (${String(invoice.adjustmentReason).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))})` : ""}</span><span class="tv">${adj > 0 ? "+" : "-"} ${cur} ${piFmt2(Math.abs(adj))}</span></div>` : ""}
   `;
   const paidBalHTML = `<div class="totals-row"><span class="tl">${isBn ? "পরিশোধিত" : "Paid"}</span><span class="tv">${cur} ${piFmt2(paid)}</span></div><div class="totals-row"><span class="tl">${isBn ? "বাকি" : "Balance Due"}</span><span class="tv">${cur} ${piFmt2(Math.max(0, bal))}</span></div>`;
 

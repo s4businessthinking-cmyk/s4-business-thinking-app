@@ -238,6 +238,11 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   const journalPl = journalPlByAccount(journalVouchers, shopId, from, to);
   const journalExpensePl = journalPlTotal(journalPl);
 
+  // which rows count as standard-rated (the VAT201 hub reads this; the totals below do not change)
+  stdSalesRows.forEach((r) => { r.std = true; });
+  stdPurchRows.forEach((r) => { r.std = true; });
+  noTrnPurchRows.forEach((r) => { r.noTrn = true; });
+
   const outputVat = sum(salesRows, "vat");
   const inputVat = sum(stdPurchRows, "vat");
   return {

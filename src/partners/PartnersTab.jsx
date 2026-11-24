@@ -8,7 +8,8 @@ import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
-import { openLink } from "../utils/openLink.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { pdfFileName } from "../share/whatsappDocShare.js";
 import { saveShopRecord } from "../offline/shopService";
 import { computeAccounts } from "../reports/accountsCalc.js";
 import {
@@ -293,19 +294,21 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   const stmt = stmtPartner ? ledgers.get(stmtPartner.id) : null;
   const kindLabel = (k) => (k === "distribution" ? L("লাভ / ক্ষতির ভাগ", "Profit / loss share") : k === "expensePaid" ? L("দোকানের খরচ নিজের পকেট থেকে দিয়েছেন", "Paid a shop expense from own pocket") : (bn ? ENTRY_KINDS[k]?.bn : ENTRY_KINDS[k]?.en) || k);
   const kindIcon = (k) => (k === "distribution" ? "" : k === "expensePaid" ? "" : ENTRY_KINDS[k]?.icon || "");
-  const printStatement = () => {
-    if (!stmtPartner || !stmt) return;
+  const statementHtml = () => {
     const cols = [{ label: "Date" }, { label: "Details" }, { label: `Capital (${cur})`, align: "right" }, { label: `Profit a/c (${cur})`, align: "right" }, { label: "Capital bal", align: "right" }, { label: "Profit bal", align: "right" }];
     const rows = stmt.rows.map((r) => [fmtDay(r.date), `${ENTRY_KINDS[r.kind]?.en || (r.kind === "expensePaid" ? "Shop expense paid by partner" : "Profit / loss share")}${r.label ? ` · ${r.label}` : ""}`, r.capital ? money(r.capital) : "", r.current ? money(r.current) : "", money(r.capitalBal), money(r.currentBal)]);
-    printWithSettings(generateStatementHTML({
+    return generateStatementHTML({
       shopName, title: "PARTNER STATEMENT", subtitle: `${stmtPartner.name} · Share ${n(stmtPartner.sharePercent)}% · As at ${fmtDay(today)}`,
       partyLine: [stmtPartner.mobile, stmtPartner.nationalId ? `ID ${stmtPartner.nationalId}` : ""].filter(Boolean).join(" | "), cols, rows,
       foot: ["", "BALANCE", "", "", money(stmt.capital), money(stmt.current)],
-    }), { lang });
+    });
   };
-  const sendWhatsApp = () => {
+  const printStatement = () => {
     if (!stmtPartner || !stmt) return;
-    const phone = String(stmtPartner.mobile || "").replace(/[^\d]/g, "");
+    printWithSettings(statementHtml(), { lang });
+  };
+  const partnerWhatsApp = () => {
+    if (!stmtPartner || !stmt) return null;
     const lastDist = stmt.rows.filter((r) => r.kind === "distribution").slice(-1)[0];
     const text = [
       `${shopName} — ${L("পার্টনার হিসাব", "Partner statement")} (${fmtDay(today)})`,
@@ -316,7 +319,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
       `${L("তোলা / দেওয়া", "Taken / paid")}: ${cur} ${money(stmt.drawings + stmt.paid)}`,
       stmt.current >= 0 ? `${L("এখন পাওনা", "Now due to you")}: ${cur} ${money(stmt.current)}${lastDist?.dueDate ? ` (${L("তারিখ", "date")} ${fmtDay(lastDist.dueDate)})` : ""}` : `${L("বেশি তোলা হয়েছে", "Drawn in excess")}: ${cur} ${money(-stmt.current)}`,
     ].filter(Boolean).join("\n");
-    openLink(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
+    return { html: statementHtml(), fileName: pdfFileName("Partner-statement", stmtPartner.name), phone: stmtPartner.mobile || "", text };
   };
 
   // ── UI ──
@@ -619,7 +622,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
       <div className="si-filters"style={{ padding: 6 }}>
         <select className="pm-input"style={{ maxWidth: 260 }} value={stmtPartner?.id || ""} onChange={(e) => setStmtId(e.target.value)}>{all.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
         {canPrint && <button type="button"className="pm-btn-secondary"disabled={!stmt} onClick={printStatement}> {L("প্রিন্ট", "Print")}</button>}
-        <button type="button"className="pm-btn-secondary"disabled={!stmt || !stmtPartner?.mobile} onClick={sendWhatsApp}> WhatsApp</button>
+        <WhatsAppButton lang={lang} toast={toast} className="pm-btn-secondary" disabled={!stmt} build={partnerWhatsApp} />
       </div>
       {stmt && (
         <>

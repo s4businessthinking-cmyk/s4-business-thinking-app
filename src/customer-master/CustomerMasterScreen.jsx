@@ -7,6 +7,7 @@ import { logAudit } from "../utils/auditLog.js";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { syncBothSidesParty } from "../utils/bothSidesParty.js";
+import { memberNoIssue } from "../counter/loyalty.js";
 
 export const EMPTY_CUSTOMER = {
   customerName:"", customerCode:"", customerType:"", status:"active",
@@ -19,6 +20,7 @@ export const EMPTY_CUSTOMER = {
   creditLimit:"", openingBalance:"", paymentTerms:"",
   discountPerc:"", assignedSalesman:"",
   notes:"",
+  loyaltyNo:"", loyaltySince:"",
 };
 
 const NUMBER_FIELDS = ["creditLimit", "openingBalance", "paymentTerms", "discountPerc"];
@@ -45,6 +47,8 @@ const toForm = (c) => Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map((k) => 
   ["paymentType", c?.paymentType || "cash"],
   ["linkedVendorId", c?.linkedVendorId || ""],
   ["alsoVendor", !!c?.linkedVendorId],
+  ["loyaltyMember", c?.loyaltyMember === true],
+  ["autoWhatsAppInvoice", c?.autoWhatsAppInvoice === true],
 ]));
 
 const num = (v) => {
@@ -254,6 +258,13 @@ export default function CustomerMasterScreen({
     if (!selectedId && !form.mobileNumber.trim()) { toast(t.cm_errMobile, "err"); if (isMobile) setMobileTab("details"); return; }
     const disc = num(form.discountPerc);
     if (disc < 0 || disc > 100) { toast(L("ছাড় ০ থেকে ১০০% এর মধ্যে দিন", "Discount must be between 0 and 100%"), "err"); return; }
+    // Loyalty: a member needs a card / member number; one already on another customer is only a warning.
+    const memberIssue = form.loyaltyMember ? memberNoIssue(form.loyaltyNo, customers, selectedId || "") : "";
+    if (memberIssue === "required") { toast(L("লয়্যালটি সদস্যের সদস্য নং দিন", "Enter the loyalty member number"), "err"); return; }
+    if (memberIssue === "duplicate" && !window.confirm(L(
+      `সদস্য নং "${form.loyaltyNo.trim()}" আরেকজন কাস্টমারের আছে। তবুও সেভ করবেন?`,
+      `Member number "${form.loyaltyNo.trim()}" is already on another customer. Save anyway?`
+    ))) return;
     const sameName = customers.find((c) => c.id !== selectedId && String(c.customerName || "").trim().toLowerCase() === name.toLowerCase());
     if (sameName && !window.confirm(L(
       `"${sameName.customerName}"নামে আরেকজন কাস্টমার আছে। তবুও সেভ করবেন?`,
@@ -268,6 +279,8 @@ export default function CustomerMasterScreen({
     payload.customerName = name;
     payload.status = form.status || "active";
     payload.paymentType = form.paymentType || "cash";
+    payload.loyaltyMember = !!form.loyaltyMember;
+    payload.autoWhatsAppInvoice = !!form.autoWhatsAppInvoice;
 
     const openingChanged = num(form.openingBalance) !== num(JSON.parse(baseline).openingBalance);
 
@@ -479,6 +492,38 @@ export default function CustomerMasterScreen({
               {row(L("পেমেন্ট শর্ত (দিন)", "Credit Days"), "paymentTerms", { inputMode: "numeric" })}
               {row(L("ডিফল্ট ছাড় (%)", "Discount %"), "discountPerc", { inputMode: "decimal" })}
               {select(L("সেলসম্যান", "Salesman"), "assignedSalesman", [["", "—"], ...salesmen.map((n) => [n, n])])}
+              <label className="pm-form-row" style={{ alignItems: "center" }}>
+                <span className="pm-label">{L("লয়্যালটি", "Loyalty")}</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700 }}>
+                  <input type="checkbox" checked={!!form.loyaltyMember} onChange={(e) => {
+                    upd("loyaltyMember", e.target.checked);
+                    if (e.target.checked && !form.loyaltySince) upd("loyaltySince", new Date().toLocaleDateString("en-CA"));
+                  }} />
+                  {L("লয়্যালটি সদস্য", "Loyalty member")}
+                </span>
+              </label>
+              <label className="pm-form-row" style={{ alignItems: "center" }} title={L(
+                "চেক থাকলে এই কাস্টমারের সেলস ইনভয়েস confirm হলে WhatsApp খুলবে (PDF + মেসেজ) - Send আপনি চাপবেন, চুপচাপ কিছু পাঠানো হয় না",
+                "When ticked, confirming a sales invoice for this customer opens WhatsApp with the PDF and message - you press Send; nothing is sent silently")}>
+                <span className="pm-label">WhatsApp</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700 }}>
+                  <input type="checkbox" checked={!!form.autoWhatsAppInvoice} onChange={(e) => upd("autoWhatsAppInvoice", e.target.checked)} />
+                  {L("ইনভয়েস হলে WhatsApp", "WhatsApp on invoice")}
+                </span>
+              </label>
+              {form.autoWhatsAppInvoice && (
+                <div className="pm-form-row" style={{ fontSize: 11.5, color: "#475569" }}>
+                  <span className="pm-label" />
+                  <span>{L("বিল confirm হলে WhatsApp খুলবে (PDF + মেসেজ); সার্ভার থেকে নিজে পাঠায় না", "Confirming a bill opens WhatsApp (PDF + message); nothing is sent from a server")}</span>
+                </div>
+              )}
+              {form.loyaltyMember && row(L("সদস্য নং", "Member No."), "loyaltyNo", { mono: true, required: true })}
+              {form.loyaltyMember && (
+                <div className="pm-form-row">
+                  <label className="pm-label">{L("সদস্য হওয়ার তারিখ", "Member Since")}</label>
+                  <input type="date" className="pm-input" value={form.loyaltySince} onChange={(e) => upd("loyaltySince", e.target.value)} />
+                </div>
+              )}
               {row(L("নোট", "Notes"), "notes", { multiline: true })}
             </>)}
           </div>

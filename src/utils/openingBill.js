@@ -25,7 +25,8 @@ export const openingBillId = (kind, partyId) => `${KINDS[kind].idPrefix}${partyI
 export const isOpeningBill = (inv) => inv?.source === "openingBalance";
 
 // Creates/updates/cancels the opening bill. Throws when the new amount is below what was already paid.
-export async function syncOpeningBill({ kind, partyId, party, shopId, uid, actorName = "", bn = false }) {
+// date: the opening day (Opening & Migration hub); left out, a new bill is dated today and an existing one keeps its date.
+export async function syncOpeningBill({ kind, partyId, party, shopId, uid, actorName = "", bn = false, date = "" }) {
   const k = KINDS[kind];
   const amount = Math.max(0, Number(num(party.openingBalance).toFixed(2)));
   const id = openingBillId(kind, partyId);
@@ -50,6 +51,7 @@ export async function syncOpeningBill({ kind, partyId, party, shopId, uid, actor
     status: amount <= 0 ? "cancelled" : balanceDue < 0.01 ? "paid" : paid > 0 ? "partial" : "confirmed",
     updatedAt: now,
     updatedBy: uid,
+    ...(date ? { invoiceDate: date } : {}),
   };
   if (existing) {
     await offlineUpdate(k.collection, id, { ...existing, ...fields });
@@ -61,7 +63,7 @@ export async function syncOpeningBill({ kind, partyId, party, shopId, uid, actor
     ...k.extra,
     ...fields,
     invoiceNo: `OB-${k.code(party) || String(partyId).slice(-6).toUpperCase()}`,
-    invoiceDate: today,
+    invoiceDate: date || today,
     items: [],
     paymentMethod: "credit",
     note: "Opening balance",

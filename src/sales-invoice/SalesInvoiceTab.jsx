@@ -9,6 +9,8 @@ import { offlineCacheCloudRecords, offlineList, offlineCreate, offlineUpdate, of
 import { query, collection, where, orderBy, onSnapshot, runTransaction, doc } from "../backend/firestore";
 import { db } from "../firebase-config";
 import { isOpeningBill } from "../utils/openingBill.js";
+import { inDateRange, listSummary, matchesStatus, statusCounts } from "../utils/docStatusFilter.js";
+import { pendingRows } from "../utils/pendingBills.js";
 import { loadInvoiceRows, computeStockMap } from "../inventory/stockFromInvoices";
 import { saleBatchChoices, batchStockByProduct } from "../inventory/batchStock";
 import { cancelStaleClear, scheduleStaleClear, STALE_DRAFT_MS } from "../utils/staleDraftClear.js";
@@ -41,6 +43,12 @@ import { useSiLeaveGuard } from "./useSiLeaveGuard.js";
 import { createSiLineActions } from "./siLineActions.js";
 import { createSiNumbering } from "./siNumbering.js";
 import { useSiData } from "./useSiData.js";
+import { useLoyaltyInfo } from "../counter/useLoyaltyInfo.js";
+import { docMessage, partyPhone, pdfFileName } from "../share/whatsappDocShare.js";
+import { useDocShare } from "../share/WhatsAppButton.jsx";
+import { autoWhatsAppDue } from "../share/autoWhatsApp.js";
+import { moneyReceiptHtml } from "./siHelpers.js";
+import { billSnapshot, isDisplayOpen, showOnDisplay } from "../counter/customerDisplay.js";
 
 // ── SALES INVOICE TAB (main) ──
 export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onConvertToDN, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, openInvoiceId=null, onOpenInvoiceHandled, onStartReturn }) {
@@ -142,14 +150,20 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
 
   const { siAddCurrentItem, siAutoDisc, siChangeCurrentUnit, siDelLine, siFindProduct, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siUpd } = createSiLineActions({ canManageCustomers, customers, isDN, isQuote, kind, lang, onCustomerCreated, products, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiLines, shopId, siCurrent, siEditLineId, siEmptyCurrent, siForm, siLines, siNameRef, siQtyRef, t, toast, user });
 
-  const { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint } = useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, editInvId, invoices, isDN, isOwner, isQuote, kind, lang, productFromMaster, receipts, setEditInvId, setLedgerWin, setSelInv, setShowCustPicker, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiOpenParty, setSiSearch, setSiView, setSourceQuote, shop, siColorPrint, siCurrent, siEmptyCurrent, siForm, siLines, siMobile, siNavReturn, siOpenEdit, siOpenParty, siPerm, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siShowCode, siSnapRef, siView, siWin, t, user });
+  const { customerPickerProps, siCanDeleteDoc, siCanEditDoc, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siOpenFromDesktop, siPickCustomers, siPrint, siDocHtml } = useSiLeaveGuard({ canCancelInv, canManageCustomers, customers, editInvId, invoices, isDN, isOwner, isQuote, kind, lang, productFromMaster, receipts, setEditInvId, setLedgerWin, setSelInv, setShowCustPicker, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiNavReturn, setSiOpenParty, setSiSearch, setSiView, setSourceQuote, shop, siColorPrint, siCurrent, siEmptyCurrent, siForm, siLines, siMobile, siNavReturn, siOpenEdit, siOpenParty, siPerm, siQuickAddCustomer, siSelectCustomer, siSelectProduct, siShowCode, siSnapRef, siView, siWin, t, user });
 
   useEscapeKey(() => {
     if (siView==="form") siLeaveFormToList();
     else if (siView==="detail") siLeaveDetail();
   }, { enabled: siView!=="list" && !siWin.min, level: siView==="form" ? 2 : 1 });
 
-  const { siConfirm, siSaveDraft } = createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user });
+  // Customers with "WhatsApp on invoice" ticked: the bill's PDF + message open right after it becomes a live bill.
+  const siAutoShare = useDocShare({ lang, toast });
+  const siOnInvoiceSaved = (saved, prior) => {
+    const customer = saved?.customerId ? customers.find(c=>c.id===saved.customerId) : null;
+    if (autoWhatsAppDue({ kind, saved, prior, customer })) siAutoShare.startAuto(siWhatsAppDoc(saved), saved.invoiceNo || "");
+  };
+  const { siConfirm, siSaveDraft } = createSiSaveActions({ onInvoiceSaved: siOnInvoiceSaved, COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user });
 
   const siHasPrintableLines = siLines.some((it) => String(it.name || "").trim());
   const siRequestPrint = (inv) => {
@@ -184,8 +198,10 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
 
   // Memoized: invoices can be thousands of rows, and this component re-renders on
   // every keystroke anywhere in the form, not just the search box.
+  const [siFrom,setSiFrom] = useState("");
+  const [siTo,setSiTo] = useState("");
   const siFiltered=useMemo(() => invoices.filter(inv=>{
-    const matchSt=siStatusF==="ALL"||inv.status===siStatusF;
+    const matchSt=matchesStatus(inv, siStatusF)&&inDateRange(inv, "invoiceDate", siFrom, siTo);
     if (!matchSt) return false;
     const vq=siVehicleQ.trim();
     if (vq && !nsmatch(inv.vehicleNo||"", vq)) return false;
@@ -195,7 +211,15 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     if (!q) return true;
     const hay=[inv.invoiceNo,inv.customerName,inv.createdByName,inv.vehicleNo,inv.refNo,...(inv.items||[]).map(it=>it.name+" "+it.code)].filter(Boolean).join(" ");
     return nsmatch(hay,q);
-  }), [invoices, siStatusF, siSearch, siVehicleQ, siRefQ]);
+  }), [invoices, siStatusF, siSearch, siVehicleQ, siRefQ, siFrom, siTo]);
+  // Pills show how many bills each status has; the summary says what the filtered list adds up to.
+  const siStatusCounts=useMemo(() => statusCounts(invoices), [invoices]);
+  const siViewSum=useMemo(() => listSummary(siFiltered, { skip: isOpeningBill }), [siFiltered]);
+  // Pending bills view (sales invoices only): bills with money still due, by due date.
+  const [siPending,setSiPending] = useState(false);
+  const siPendingCount=useMemo(() => (kind==="sales" ? pendingRows(invoices, { kind:"sales", asOf:(()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })() }).length : 0), [invoices, kind]);
+  const siListFilter={ from:siFrom, setFrom:setSiFrom, to:siTo, setTo:setSiTo, counts:siStatusCounts, summary:siViewSum,
+    pending: kind==="sales"&&siPending, setPending:setSiPending, pendingCount:siPendingCount };
   const siKPIs=useMemo(() => invoices.reduce((a,inv)=>{ a.total++; if (inv.status!=="cancelled"&&inv.status!=="draft") { if (!isOpeningBill(inv)) a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; } if (inv.status==="open") a.open++; if (inv.status==="converted") a.converted++; if (inv.status==="confirmed") a.delivered++; if (inv.status==="invoiced") a.invoiced++; if (inv.status==="delivered") a.soDelivered++; return a; },{total:0,amount:0,paid:0,due:0,open:0,converted:0,delivered:0,invoiced:0,soDelivered:0}), [invoices]);
   const kpiCards = isSO
     ? [{l:lang==="bn"?"মোট সেলস অর্ডার":"Sales Orders",v:siKPIs.total,c:"#a1a1aa",pre:""},{l:lang==="bn"?"মোট মূল্য":"Total Value",v:siFmt2(siKPIs.amount),c:"#0e7490",pre:t.cur+" "},{l:SO_STATUSES.open[lang],v:siKPIs.open,c:"#06b6d4",pre:""},{l:lang==="bn"?"ডেলিভারি / ইনভয়েস হয়েছে":"Delivered / Invoiced",v:siKPIs.soDelivered+siKPIs.invoiced,c:"#22c55e",pre:""}]
@@ -218,6 +242,24 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   // cash / bank / card: auto fully paid; delivery: 0; credit / cheque / partial-cash: typed amount
   const formPaid = formIsDelivery || isQuote ? 0 : formIsSettled ? totals.grand : siN2(siForm.amountPaid);
   const balance  = Math.max(0, totals.grand - formPaid);
+  // Loyalty points of the bill's customer (read-only) and the customer display window (does nothing unless it is open).
+  const siLoyalty = useLoyaltyInfo({ shopId, shop, customer: kind==="sales" && siForm.customerId ? customers.find(c=>c.id===siForm.customerId) : null,
+    billNet: siR2(totals.grand - totals.vat), billDay: siForm.invoiceDate, excludeId: editInvId || "", refreshKey: invoices.length + syncRefreshKey });
+  const siLineAmount = (it, tax) => { const c = siCalcLine(it, tax); return c.gross - c.disc + c.vat; };
+  useEffect(() => {
+    if (kind!=="sales" || !isDisplayOpen()) return;
+    const shopName = shop?.companyName || "", cur = t.cur || "AED";
+    if (siView==="form" && siLines.length) {
+      showOnDisplay({ shopName, cur, mode:"live", title:"Bill", no:siInvoiceNo || "", customer:siForm.customerName || "",
+        member: siLoyalty?.no ? `${siLoyalty.no}${siLoyalty.points!=null ? ` · ${siLoyalty.points} pts` : ""}` : "",
+        lines: siLines.map(it=>({ name:it.name || it.code || "", qty:it.qty, amount:siLineAmount(it, formIsTax) })), vat:totals.vat, total:totals.grand, paid:formPaid });
+      return;
+    }
+    const last = invoices.filter(inv=>["confirmed","paid","partial"].includes(inv.status) && !isOpeningBill(inv))
+      .reduce((a, inv)=>(!a || String(inv.createdAt || "") > String(a.createdAt || "") ? inv : a), null);
+    showOnDisplay(last ? billSnapshot(last, { shopName, cur, lineAmount:(it)=>siLineAmount(it, last.invoiceType==="tax") }) : { shopName, cur, mode:"idle", welcome:"Welcome" });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, siView, siLines, totals.grand, totals.vat, formPaid, formIsTax, siForm.customerName, siInvoiceNo, invoices, siLoyalty?.no, siLoyalty?.points, shop?.companyName]);
 
   // ══ LIST ══
   const bnL = lang==="bn";
@@ -248,6 +290,18 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     else if (invoices.length > 0) { onOpenInvoiceHandled?.(); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openInvoiceId, invoices, kind]);
+  // WhatsApp: the print HTML as a PDF with a short message to the customer's number (share/whatsappDocShare.js).
+  const siDocType = (inv) => isSO ? (bnL?"সেলস অর্ডার":"Sales Order") : isQuote ? (bnL?"কোটেশন":"Quotation")
+    : (isDN || inv.invoiceType==="delivery") ? (bnL?"ডেলিভারি নোট":"Delivery Note") : inv.invoiceType==="tax" ? (bnL?"ট্যাক্স ইনভয়েস":"Tax Invoice") : (bnL?"ইনভয়েস":"Invoice");
+  const siWaPhone = (inv) => partyPhone(inv.customerId ? customers.find(c=>c.id===inv.customerId) : null) || String(inv.customerMobile || "");
+  const siWhatsAppDoc = (inv) => ({
+    html: siDocHtml(inv), fileName: pdfFileName(inv.invoiceNo, inv.customerName), phone: siWaPhone(inv),
+    text: docMessage({ bn: bnL, shop: shop?.companyName || "", docType: siDocType(inv), no: inv.invoiceNo, date: inv.invoiceDate, total: inv.grandTotal, cur: t.cur || "AED", party: inv.customerName || "" }),
+  });
+  const siMoneyReceiptDoc = (inv, amount) => ({
+    html: moneyReceiptHtml(inv, amount, shop, lang), fileName: pdfFileName("Receipt", inv.invoiceNo, inv.customerName), phone: siWaPhone(inv),
+    text: docMessage({ bn: bnL, shop: shop?.companyName || "", docType: bnL?"মানি রিসিট":"Money receipt", no: inv.invoiceNo, date: inv.invoiceDate, total: amount, cur: t.cur || "AED", party: inv.customerName || "" }),
+  });
   const siDocTitle = isSO ? (bnL?"সেলস অর্ডার":"SALES ORDER") : isQuote ? (bnL?"কোটেশন":"QUOTATION") : isDN ? (bnL?"ডেলিভারি নোট":"DELIVERY NOTE") : (bnL?"সেলস ইনভয়েস":"SALES INVOICE");
 
   // Reminder on this document — a plain "reminders"collection record carrying linkType/linkId/linkLabel
@@ -279,5 +333,5 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   };
   const siRootStyle = siFitH && !siMobile ? { height:siFitH } : undefined;
 
-  return renderSiScreens({ onStartReturn, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, canViewAllInvoices: isOwner || canViewAllInvoices, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop });
+  return <>{renderSiScreens({ listFilter: siListFilter, onStartReturn, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, canViewAllInvoices: isOwner || canViewAllInvoices, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop })}{siAutoShare.dialogs}</>;
 }

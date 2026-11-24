@@ -22,7 +22,7 @@ export const GROUPS = [
 ];
 
 const BANK = "Bank";
-const FIXED = {
+export const FIXED = {
   [CASH_ACCOUNT]: "money", [BANK]: "money", Sales: "income", "Discount Received": "income", "Purchase Return": "expense", "Bank Interest": "income",
   Purchase: "expense", "Sales Return": "income", "Discount Allowed": "expense", "Bank Charges": "expense",
   "VAT Output": "tax", "VAT Input": "tax", Capital: "equity", Drawings: "equity", "Opening Balance": "equity", "Profit Distribution": "equity",
@@ -30,6 +30,8 @@ const FIXED = {
 };
 const lc = (v) => String(v || "").trim().toLowerCase();
 const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);
+/** Group a named account gets in the ledger: a fixed system account, a "Bank ..." money account, else other. */
+export const ledgerGroupOf = (name) => FIXED[name] || (/^bank\b/i.test(name) ? "money" : "other");
 const live = (d, shopId) => isLive(d, shopId) && d.status !== "cancelled" && d.status !== "draft";
 const liveSales = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
 const livePurchases = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
@@ -48,7 +50,7 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     if (!accounts.has(key)) accounts.set(key, { key, name, group, ...extra });
     return key;
   };
-  const named = (name) => acc(`a:${lc(name)}`, name, FIXED[name] || (/^bank\b/i.test(name) ? "money" : "other"));
+  const named = (name) => acc(`a:${lc(name)}`, name, ledgerGroupOf(name));
 
   const custById = new Map(customers.filter((c) => c?.id).map((c) => [c.id, c]));
   const vendById = new Map(vendors.filter((v) => v?.id).map((v) => [v.id, v]));

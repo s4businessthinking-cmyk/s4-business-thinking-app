@@ -7,7 +7,7 @@ import { localIsoDate } from "../utils/localIsoDate.js";
 export const SI_PAY_TO_VOUCHER_METHOD = { cash:"cash", bank:"bank_transfer", cheque:"cheque", card:"card" };
 
 // Money taken with the bill itself (not through receipt vouchers or credit notes), printed as a receipt for the customer.
-export function printMoneyReceipt(inv, amount, shop, lang) {
+export function moneyReceiptHtml(inv, amount, shop, lang) {
   const receipt = {
     receiptNo:inv.invoiceNo, receiptDate:inv.invoiceDate, customerName:inv.customerName||"Walk-in",
     method:SI_PAY_TO_VOUCHER_METHOD[inv.paymentMethod]||"cash", totalAmount:amount,
@@ -15,7 +15,10 @@ export function printMoneyReceipt(inv, amount, shop, lang) {
     collectedByName:inv.salesmanName||inv.createdByName||"",
     allocations:[{ invoiceNo:inv.invoiceNo, invoiceDate:inv.invoiceDate, amount }],
   };
-  printWithSettings(generatePaymentVoucherHTML(receipt, shop, lang, { title:lang==="bn"?"মানি রিসিট":"MONEY RECEIPT" }), { lang });
+  return generatePaymentVoucherHTML(receipt, shop, lang, { title:lang==="bn"?"মানি রিসিট":"MONEY RECEIPT" });
+}
+export function printMoneyReceipt(inv, amount, shop, lang) {
+  printWithSettings(moneyReceiptHtml(inv, amount, shop, lang), { lang });
 }
 
 // ─── SALES INVOICE ────────────────────────────────────────────
@@ -115,14 +118,18 @@ export function siEmptyForm() {
     deliveryNoteNo:"", vehicleNo:"",
     note:"",
     refNo:"", salesmanId:"", salesmanName:"", currency:"AED", stockLocation:"main", stockLocationName:"Main",
-    billDiscPerc:"", billDiscAmt:"", adjustment:"", roundOff:"", creditDays:"", hideCodeInPrint:false,
+    billDiscPerc:"", billDiscAmt:"", adjustment:"", adjustmentReasonId:"", adjustmentReason:"", roundOff:"", creditDays:"", hideCodeInPrint:false,
     validUntil:"",
   };
 }
 
+// The print HTML of a sales document (also what goes to WhatsApp as the PDF).
+export function salesInvoiceHtml(invoice, shop, lang, showCode, colorPrint, opts={}) {
+  return generateSalesInvoiceHTML(invoice, shop, lang, showCode||false, colorPrint||false, { ...opts, settings:loadPrintSettings() });
+}
 export function printSalesInvoice(invoice, shop, lang, showCode, colorPrint, opts={}) {
   const settings = loadPrintSettings();
-  const html = generateSalesInvoiceHTML(invoice, shop, lang, showCode||false, colorPrint||false, { ...opts, settings });
+  const html = salesInvoiceHtml(invoice, shop, lang, showCode, colorPrint, opts);
   printHtmlDocument(html, { preview:settings.showPreview, lang, printer:settings.billPrinter });
 }
 

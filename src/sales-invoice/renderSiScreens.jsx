@@ -1,4 +1,6 @@
 import { AutoTA, PI_VOUCHER_METHODS } from "../shared/appShared.jsx";
+import { DocDateRange, DocListSummary, DocStatusPills } from "../components/DocListFilters.jsx";
+import PendingBillsPanel from "../components/PendingBillsPanel.jsx";
 import BatchPickModal from "./BatchPickModal";
 import PartyPickerWindow, { CUSTOMER_PICKER_COLS } from "../components/PartyPickerWindow.jsx";
 import { MinimizedChip, WindowButtons } from "../components/WindowChrome.jsx";
@@ -14,9 +16,11 @@ import StockBadge from "../inventory/StockBadge.jsx";
 import { groupInvoicesByParty } from "../invoices/PartyFolderList.jsx";
 import { itemBaseQty } from "../inventory/unitConversion";
 import { printMoneyReceipt, qtIsExpired } from "./siHelpers.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { normalizeAdjustments, reasonsFor, rowName } from "../masters/simpleMasters.js";
 import { salesSpecs } from "../product-master/productSpecs";
 
-export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, canViewAllInvoices = false, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
+export function renderSiScreens({ listFilter = null, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, canViewAllInvoices = false, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty = null, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
   // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
   // is rendered on every screen, not only on the list.
   const siPrintPrompt = canPrintInv&&siPrintModal&&(
@@ -147,21 +151,28 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
             <input className="pm-input"placeholder={t.si_searchPh} value={siSearch} onChange={e=>setSiSearch(e.target.value)} />
             {siSearch&&<button type="button"aria-label="Clear"onClick={()=>setSiSearch("")}>✕</button>}
           </div>
-          <div className="si-pills">
-            {["ALL",...Object.keys(STATUSES)].map(st=>(
-              <button key={st} type="button"className={`pm-btn-secondary${siStatusF===st?"is-active":""}`} onClick={()=>setSiStatusF(st)}>
-                {st==="ALL"?t.si_allStatus:STATUSES[st]?.[lang]}
-              </button>
-            ))}
-          </div>
+          {kind==="sales"&&listFilter&&(
+            <button type="button" className={`pm-btn-secondary${listFilter.pending?" is-active":""}`} onClick={()=>listFilter.setPending(!listFilter.pending)} title={bnL?"বাকি বিল: দেওয়ার তারিখ ও কত দিন পেরিয়েছে":"Bills with money due, by due date"}>
+              {bnL?"বাকি বিল":"Pending bills"} ({listFilter.pendingCount})
+            </button>
+          )}
+          {!listFilter?.pending&&<DocStatusPills statuses={STATUSES} value={siStatusF} onChange={setSiStatusF} counts={listFilter?.counts} lang={lang} allLabel={t.si_allStatus} />}
+          {listFilter && !listFilter.pending && <DocDateRange from={listFilter.from} to={listFilter.to} onFrom={listFilter.setFrom} onTo={listFilter.setTo} lang={lang} mobile={siMobile} />}
           <div className="si-pills">
             {[["folders", bnL?"নাম অনুযায়ী":"By name"], ["all", bnL?"সব":"All"]].map(([m,label])=>(
-              <button key={m} type="button"className={`pm-btn-secondary${siGroupMode===m?"is-active":""}`} onClick={()=>{ setSiGroupMode(m); setSiOpenParty(null); }}>{label}</button>
+              <button key={m} type="button"className={`pm-btn-secondary${siGroupMode===m?" is-active":""}`} onClick={()=>{ setSiGroupMode(m); setSiOpenParty(null); }}>{label}</button>
             ))}
           </div>
         </div>
+        {!listFilter?.pending&&<DocListSummary summary={listFilter?.summary} active={siStatusF!=="ALL"||!!listFilter?.from||!!listFilter?.to} lang={lang} cur={t.cur} fmt={siFmt2} />}
+        {listFilter?.pending&&(
+          <PendingBillsPanel kind="sales" invoices={invoices} lang={lang} cur={t.cur} fmt={siFmt2} canPrint={canPrintInv} shopName={shop?.companyName||""} mobile={siMobile}
+            onOpen={siOpenInvoice}
+            onPay={(inv)=>setReceiptWin({ partyId:inv.customerId||null, partyName:inv.customerName||"", invoiceId:inv.id })}
+            canPayRow={(inv)=>!siIsSettledPay(inv.paymentMethod, inv.cashPartial)&&inv.paymentMethod!=="cash"&&["confirmed","partial"].includes(inv.status)} />
+        )}
 
-        <div className={`si-main${siGroupMode==="all" || siMobile ? "is-all" : ""}`}>
+        <div className={`si-main${siGroupMode==="all" || siMobile ? " is-all" : ""}`} style={listFilter?.pending?{ display:"none" }:undefined}>
           {showParties&&(
             <div className="si-box">
               <table className="pm-table">
@@ -169,7 +180,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                 <thead><tr><th>{t.si_customer}</th><th className="si-num">{bnL?"মোট":"Total"}</th><th className="si-num">{bnL?"বাকি":"Due"}</th></tr></thead>
                 <tbody>
                   {!siMobile&&groups.length>0&&(
-                    <tr className={`pm-clickable${!openGroup?"pm-selected":""}`} onClick={()=>setSiOpenParty(null)}>
+                    <tr className={`pm-clickable${!openGroup?" pm-selected":""}`} onClick={()=>setSiOpenParty(null)}>
                       <td className="si-strong">{bnL?"সব কাস্টমার":"All customers"} ({siFiltered.length})</td><td /><td />
                     </tr>
                   )}
@@ -177,7 +188,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                     const stCounts = {};
                     g.invoices.forEach(inv=>{ stCounts[inv.status] = (stCounts[inv.status]||0)+1; });
                     return (
-                    <tr key={g.key} className={`pm-clickable si-party-row${openGroup?.key===g.key?"pm-selected":""}`} onClick={()=>setSiOpenParty(g.key)}>
+                    <tr key={g.key} className={`pm-clickable si-party-row${openGroup?.key===g.key?" pm-selected":""}`} onClick={()=>setSiOpenParty(g.key)}>
                       <td className="si-wrap">
                         {g.isCash?" ":""}{groupName(g)}
                         <div className="si-muted"style={{ fontWeight:400, fontSize:"0.9em" }}>
@@ -192,7 +203,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                         </div>
                       </td>
                       <td className="si-num">{siFmt2(g.total)}</td>
-                      <td className={`si-num${g.due>0.01?"si-due":""}`}>{g.due>0.01?siFmt2(g.due):"-"}</td>
+                      <td className={`si-num${g.due>0.01?" si-due":""}`}>{g.due>0.01?siFmt2(g.due):"-"}</td>
                     </tr>
                     );
                   })}
@@ -276,7 +287,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                                 <td className="si-num">{siN2(inv.amountPaid)>0?siFmt2(inv.amountPaid):"-"}</td>
                               </>
                             )}
-                            <td className={`si-num${(isQuote||isDN)?"si-strong":due>0.01?"si-due":""}`}>
+                            <td className={`si-num${(isQuote||isDN)?" si-strong":due>0.01?" si-due":""}`}>
                               {(isQuote||isDN) ? siFmt2(inv.grandTotal) : due>0.01 ? siFmt2(due) : "-"}
                             </td>
                           </tr>
@@ -321,14 +332,14 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
     const vRow = (label, value, opts={}) => (
       <div className="pm-form-row">
         <label className="pm-label">{label}</label>
-        <div className={`si-val${opts.strong?"is-strong":""}`} style={opts.color?{ color:opts.color }:undefined}>{value}</div>
+        <div className={`si-val${opts.strong?" is-strong":""}`} style={opts.color?{ color:opts.color }:undefined}>{value}</div>
       </div>
     );
     const totalRows = [
       [t.si_subtotal, siFmt2(sub)],
       ...(disc>0?[[t.si_totalDiscount, `- ${siFmt2(disc)}`, "#b91c1c"]]:[]),
       ...(vat>0?[["VAT", `+ ${siFmt2(vat)}`, "#0e7490"]]:[]),
-      ...(adjustment?[[bnL?"সমন্বয়":"Adjustment", `${adjustment>0?"+":"-"} ${siFmt2(Math.abs(adjustment))}`]]:[]),
+      ...(adjustment?[[`${bnL?"সমন্বয়":"Adjustment"}${inv.adjustmentReason?` (${inv.adjustmentReason})`:""}`, `${adjustment>0?"+":"-"} ${siFmt2(Math.abs(adjustment))}`]]:[]),
       ...(roundOff?[["Round Off", `${roundOff>0?"+":"-"} ${siFmt2(Math.abs(roundOff))}`]]:[]),
     ];
     const back = () => siLeaveDetail();
@@ -407,7 +418,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                   ) : !isInvDelivery && (
                     <>
                       <div className="si-total-row"><span>{t.si_amountPaid}</span><b style={{ color:"#15803d" }}>{t.cur} {siFmt2(inv.amountPaid)}</b></div>
-                      <div className={`si-paid-box${bal>0.01?"is-due":""}`}><span>{t.si_balanceDue}</span><span>{t.cur} {siFmt2(Math.max(0,bal))}</span></div>
+                      <div className={`si-paid-box${bal>0.01?" is-due":""}`}><span>{t.si_balanceDue}</span><span>{t.cur} {siFmt2(Math.max(0,bal))}</span></div>
                     </>
                   )}
                   {related.length>0&&(
@@ -440,7 +451,9 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         <div className="si-actions">
           <button type="button"className="pm-btn-secondary"onClick={back}>← {bnL?"তালিকা":"List"}</button>
           {canPrintInv&&<button type="button"className="pm-btn pm-btn--primary"onClick={()=>siRequestPrint(inv)}> {bnL?"প্রিন্ট":"Print"}</button>}
+          {canPrintInv&&inv.status!=="draft"&&siWhatsAppDoc&&<WhatsAppButton lang={lang} toast={toast} build={()=>siWhatsAppDoc(inv)} />}
           {paidOnBill>0.01&&<button type="button"className="pm-btn"onClick={()=>printMoneyReceipt(inv, paidOnBill, shop, lang)} title={bnL?"বিলের সাথে নেওয়া টাকার রশিদ":"Receipt for the money taken with this bill"}> {bnL?"মানি রিসিট":"Money Receipt"}</button>}
+          {paidOnBill>0.01&&siMoneyReceiptDoc&&<WhatsAppButton lang={lang} toast={toast} label={bnL?"রিসিট WhatsApp":"Receipt WhatsApp"} build={()=>siMoneyReceiptDoc(inv, paidOnBill)} />}
           {canConvert&&isSO&&onConvertToDN&&<button type="button"className="pm-btn"onClick={()=>onConvertToDN(inv)}> {bnL?"ডেলিভারি নোট বানান":"Make Delivery Note"}</button>}
           {canConvert&&<button type="button"className="pm-btn"onClick={()=>onConvertQuote(inv)}> {bnL?"ইনভয়েসে রূপান্তর":"Convert to Invoice"}</button>}
           {canEdit&&<button type="button"className="pm-btn"onClick={()=>siOpenEdit(inv)}> {bnL?"এডিট":"Edit"}</button>}
@@ -492,7 +505,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
           onQuickAdd={canManageCustomers ? siQuickAddCustomer : null} />
       )}
       <SalesInvoiceDesktopForm
-        lang={lang} t={t} shopId={shopId} products={products} customers={siPickCustomers} onSelectCustomer={siSelectCustomer} team={team} invoices={invoices}
+        lang={lang} t={t} shopId={shopId} products={products} customers={siPickCustomers} onSelectCustomer={siSelectCustomer} team={team} invoices={invoices} loyalty={siLoyalty}
         form={siForm} setField={siUpd} lines={siLines} setLines={setSiLines} current={siCurrent} setCurrent={setSiCurrent}
         totals={totals} formPaid={formPaid} balance={balance}
         invoiceNo={siInvoiceNo} editInvId={editInvId} saving={siSaving} nameRef={siNameRef} qtyRef={siQtyRef}
@@ -516,6 +529,8 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
         canDiscount={canDiscount}
         canSeeCost={canSeeCost}
         onPrintInvoice={canPrintInv ? (inv)=>siRequestPrint(inv) : undefined}
+        whatsAppDoc={canPrintInv ? siWhatsAppDoc : undefined}
+        adjustmentReasons={reasonsFor(normalizeAdjustments(shop?.adjustmentReasons), "sales").map((a)=>({ id:a.id, name:rowName(a, bnL) }))}
         onOpenProductMaster={onOpenProductMaster}
         toast={toast}
         onOpenReminder={siOpenReminderForm}
@@ -775,7 +790,7 @@ export function renderSiScreens({ STATUSES, balance, billReturns, bnL, canCancel
                   {totals.grand>0&&<button type="button"className="pm-btn-secondary"onClick={()=>siUpd("amountPaid",siFmt2(totals.grand))}>{bnL?"পুরো":"Full"}</button>}
                 </div>
               ))}
-              {totals.grand>0&&<div className={`si-paid-box${balance>0.01?"is-due":""}`}><span>{t.si_balanceDue}</span><span>{t.cur} {siFmt2(balance)}</span></div>}
+              {totals.grand>0&&<div className={`si-paid-box${balance>0.01?" is-due":""}`}><span>{t.si_balanceDue}</span><span>{t.cur} {siFmt2(balance)}</span></div>}
             </>
           )}
         </>)}

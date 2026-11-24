@@ -6,7 +6,8 @@ import { isOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlineGetById, offlineList, offlinePatch, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
-import { printPaymentVoucher, siFmt2, siN2 } from "./salesInvoiceShared.js";
+import { generatePaymentVoucherHTML, printPaymentVoucher, siFmt2, siN2 } from "./salesInvoiceShared.js";
+import { voucherShareDoc } from "../share/whatsappDocShare.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import { siToday } from "./siHelpers.js";
 
@@ -232,6 +233,8 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
           const u = await siSetReceiptCheque(v.raw, st); return u ? toVoucherView(u,"receipt") : null;
         }}
         onPrint={canPrintInv ? (v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts) : undefined}
+        onWhatsApp={canPrintInv ? (v)=>voucherShareDoc({ kind:"receipt", raw:v.raw, html:generatePaymentVoucherHTML(v.raw, shop, lang), partyRecord:customers.find(c=>c.id===v.raw.customerId), bn:lang==="bn", shop:shop?.companyName||"", cur:t.cur||"AED" }) : null}
+        toast={toast}
         onClose={()=>{
           setReceiptWin(null);
           if (siNavReturn === "ledger") {
@@ -243,6 +246,11 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
     );
   })() : null;
 
+  // bill amount and balance next to each bill on the cash receipt print
+  const cashAllocDetail = (v) => (v.raw.allocations||[]).map(a=>{
+    const inv = invoices.find(i=>i.id===a.invoiceId);
+    return { invoiceId:a.invoiceId, invoiceAmount:inv?.grandTotal||0, balanceAfter:inv?.balanceDue||0 };
+  });
   const cashReceiptWindow = cashReceiptWin && kind==="sales" ? (() => {
     const openAllCash = invoices.filter(inv => ["confirmed","partial"].includes(inv.status) && siN2(inv.balanceDue)>0.01 && inv.paymentMethod==="cash" && inv.cashPartial);
     return (
@@ -260,12 +268,10 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
         onCancelVoucher={canCancelInv ? async (v)=>{ const u = await siCancelReceipt(v.raw); return u ? toVoucherView(u,"receipt") : null; } : undefined}
         onDeleteVoucher={canCancelInv ? (v)=>siDeleteReceipt(v.raw) : undefined}
         onPrint={canPrintInv ? (v,opts)=>{
-          const allocDetail = (v.raw.allocations||[]).map(a=>{
-            const inv = invoices.find(i=>i.id===a.invoiceId);
-            return { invoiceId:a.invoiceId, invoiceAmount:inv?.grandTotal||0, balanceAfter:inv?.balanceDue||0 };
-          });
-          printPaymentVoucher(v.raw, shop, lang, { ...opts, allocDetail, title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" });
+          printPaymentVoucher(v.raw, shop, lang, { ...opts, allocDetail:cashAllocDetail(v), title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" });
         } : undefined}
+        onWhatsApp={canPrintInv ? (v)=>voucherShareDoc({ kind:"receipt", raw:v.raw, html:generatePaymentVoucherHTML(v.raw, shop, lang, { allocDetail:cashAllocDetail(v), title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" }), partyRecord:customers.find(c=>c.id===v.raw.customerId), bn:lang==="bn", shop:shop?.companyName||"", cur:t.cur||"AED" }) : null}
+        toast={toast}
         onClose={()=>setCashReceiptWin(null)}
       />
     );

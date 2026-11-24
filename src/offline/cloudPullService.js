@@ -54,6 +54,7 @@ export const SHOP_PULL_COLLECTIONS = [
   "attendance",
   "bankReconciliations",
   "jobOrders",
+  "counterShifts",
   "partners",
   "partnerEntries",
   "partnerDocs",

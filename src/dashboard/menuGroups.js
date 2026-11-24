@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 // Same sections as classic desktop accounting software: Masters / Transaction / Accounts / Reports / Utilities.
 export const MENU_GROUPS = [
   { key: "home", bn: "", en: "", tabs: ["dashboard", "owner", "shop"] },
-  { key: "masters", icon: "", bn: "মাস্টার (Masters)", en: "Masters", tabs: ["products", "vendors", "customers", "employees"] },
-  { key: "transaction", icon: "", bn: "লেনদেন (Transaction)", en: "Transaction", tabs: ["purchaseOrder", "salesOrder", "delivery", "goodsReceipt", "branchTransfer", "stockAdjust", "productExchange", "warrantyClaim", "loosen", "bundle", "purchase", "sales", "purchaseReturn", "salesReturn", "employeeExpense", "attendance", "quotation", "jobCard"] },
-  { key: "accounts", icon: "", bn: "হিসাব (Accounts)", en: "Accounts", tabs: ["globalLedger", "vouchers", "expenses", "cheque", "pdc", "securityCheque", "bankRec", "partners"] },
-  { key: "reports", icon: "", bn: "রিপোর্ট (Reports)", en: "Reports", tabs: ["accounts", "tax", "auditLog"] },
-  { key: "utilities", icon: "", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["labels", "reminders", "calculator", "settings"] },
+  { key: "masters", icon: "", bn: "মাস্টার (Masters)", en: "Masters", tabs: ["products", "priceList", "vendors", "customers", "employees", "mergeMasters"] },
+  { key: "transaction", icon: "", bn: "লেনদেন (Transaction)", en: "Transaction", tabs: ["purchaseOrder", "salesOrder", "delivery", "goodsReceipt", "branchTransfer", "stockAdjust", "productExchange", "warrantyClaim", "loosen", "bundle", "purchase", "sales", "counter", "purchaseReturn", "salesReturn", "employeeExpense", "attendance", "quotation", "jobCard"] },
+  { key: "accounts", icon: "", bn: "হিসাব (Accounts)", en: "Accounts", tabs: ["globalLedger", "chartOfAccounts", "openingBalances", "vouchers", "expenses", "cheque", "pdc", "securityCheque", "bankRec", "partners"] },
+  { key: "reports", icon: "", bn: "রিপোর্ট (Reports)", en: "Reports", tabs: ["accounts", "balanceSheet", "trialBalance", "booksHub", "cashFlow", "fundsSummary", "tallyExport", "partyAging", "stockHub", "salesAnalytics", "purchaseAnalytics", "serialRegistry", "tax", "auditLog"] },
+  { key: "utilities", icon: "", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["labels", "reminders", "bulkMessage", "calculator", "settings"] },
 ];
 
 // items: [[tabKey, label], …] already filtered by permission; empty groups are dropped, unknown tabs go to Utilities.

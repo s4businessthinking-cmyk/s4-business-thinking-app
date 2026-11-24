@@ -17,6 +17,8 @@ import { printWithSettings } from "../print/printSettings.js";
 import { loadHandoverDocs, saveHandoverDocs, handoverSummary } from "../vouchers/chequeHandoverStore.js";
 import { logAudit } from "../utils/auditLog.js";
 import { isOpeningBill } from "../utils/openingBill.js";
+import { inDateRange, listSummary, matchesStatus, statusCounts } from "../utils/docStatusFilter.js";
+import { pendingRows } from "../utils/pendingBills.js";
 import { loadInvoiceRows, computeStockMap } from "../inventory/stockFromInvoices";
 import { rescaleForUnit, unitFactorFor } from "../inventory/unitConversion";
 import { cancelStaleClear, scheduleStaleClear, STALE_DRAFT_MS } from "../utils/staleDraftClear.js";
@@ -192,16 +194,26 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
     () => invoices.filter((inv) => isOwner || canViewAllPurchase || inv.createdBy === user?.uid),
     [invoices, isOwner, canViewAllPurchase, user?.uid]
   );
+  const [piFrom,setPiFrom] = useState("");
+  const [piTo,setPiTo] = useState("");
   const piFiltered = useMemo(() => piVisibleInvoices.filter(inv=>{
     const q=piSearch.trim();
-    const matchSt=piStatusF==="ALL"||inv.status===piStatusF;
+    const matchSt=matchesStatus(inv, piStatusF)&&inDateRange(inv, "invoiceDate", piFrom, piTo);
     if (!q) return matchSt;
     const hay=[inv.invoiceNo,inv.vendorName,inv.supplierInvoiceNo,inv.refNo,inv.createdByName,...(inv.items||[]).map(it=>it.name+" "+it.code+" "+it.brand)].filter(Boolean).join(" ");
     return matchSt&&nsmatch(hay,q);
-  }), [piVisibleInvoices, piSearch, piStatusF]);
+  }), [piVisibleInvoices, piSearch, piStatusF, piFrom, piTo]);
+  // Pills show how many bills each status has; the summary says what the filtered list adds up to (same rules as the KPIs).
+  const piStatusCounts = useMemo(() => statusCounts(piVisibleInvoices), [piVisibleInvoices]);
+  const piViewSum = useMemo(() => listSummary(piFiltered, { skip: (inv) => isOpeningBill(inv) || isBranchTransferBill(inv) }), [piFiltered]);
+  // Pending bills view: bills with money still due to suppliers, by due date.
+  const [piPending,setPiPending] = useState(false);
+  const piPendingCount = useMemo(() => pendingRows(piVisibleInvoices, { kind:"purchase", asOf:(()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })() }).length, [piVisibleInvoices]);
+  const piListFilter = { from:piFrom, setFrom:setPiFrom, to:piTo, setTo:setPiTo, counts:piStatusCounts, summary:piViewSum,
+    pending:piPending, setPending:setPiPending, pendingCount:piPendingCount, visible:piVisibleInvoices };
   const piKPIs = useMemo(() => piVisibleInvoices.reduce((a,inv)=>{ a.total++; if (inv.status==="cancelled"||inv.status==="draft"||isBranchTransferBill(inv)) return a; if (!isOpeningBill(inv)) a.amount+=inv.grandTotal||0; a.paid+=inv.amountPaid||0; a.due+=inv.balanceDue||0; return a; },{ total:0,amount:0,paid:0,due:0 }), [piVisibleInvoices]);
 
-  const totals=piCalcTotals(piLines);
+  const totals=piCalcTotals(piLines, { adjustment:piForm.adjustment });
   const paid=piForm.paymentMethod==="cash" ? totals.grand : piN2(piForm.amountPaid), balance=Math.max(0,totals.grand-paid);
 
   // ══════ LIST VIEW ══════
@@ -243,7 +255,7 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
 
   return (
     <>
-      {renderPiScreens({ onStartReturn, onProductPatched, onScanBill: canManagePurchase ? () => setScanOpen(true) : undefined, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs })}
+      {renderPiScreens({ listFilter: piListFilter, onStartReturn, onProductPatched, onScanBill: canManagePurchase ? () => setScanOpen(true) : undefined, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs })}
       {scanOpen && (
         <InvoiceScanWindow lang={lang} products={products} vendors={pickVendors} onApply={applyScan} onClose={() => setScanOpen(false)}
           onOpenProductMaster={onOpenProductMaster} onProductPatched={onProductPatched} />

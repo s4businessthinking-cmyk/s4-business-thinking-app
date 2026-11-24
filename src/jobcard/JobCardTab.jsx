@@ -5,11 +5,16 @@ import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { saveShopRecord } from "../offline/shopService";
 import { printWithSettings } from "../print/printSettings.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { docMessage, partyPhone, pdfFileName } from "../share/whatsappDocShare.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { taxSettingsOf } from "../reports/taxDomain.js";
 import ProductPicker from "../components/ProductPicker.jsx";
 import { jobSettingsOf, statusOf, isClosed, jobTotals, warrantyUntil, jobToInvoiceSource, r2, DEFAULT_STATUSES, DEFAULT_WARRANTIES } from "./jobCard.js";
+import { buildJobReport, jobReportFileName, jobReportRows, serviceIssues } from "./jobReport.js";
+import { saveTextFile } from "../utils/saveTextFile.js";
+import { csvText } from "../reports/vatExport.js";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -223,7 +228,7 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
     onMakeInvoice(jobToInvoiceSource(j, { taxRegistered }));
   };
 
-  const printJob = (j) => {
+  const jobHtml = (j) => {
     const t = jobTotals(j);
     const cols = [{ label: "#" }, { label: "Description" }, { label: "Qty", align: "right" }, { label: `Rate (${cur})`, align: "right" }, { label: "VAT %", align: "right" }, { label: `Amount (${cur})`, align: "right" }];
     const lines = [
@@ -241,34 +246,44 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
       j.warrantyName && n(j.warrantyDays) > 0 ? `Warranty: ${j.warrantyName}${wu ? ` (until ${fmtDay(wu)})` : ""}` : "",
       `Status: ${statusOf(settings, j.status).en}`, settings.terms ? `Terms: ${settings.terms}` : "",
     ].filter(Boolean).join("  |  ");
-    printWithSettings(generateStatementHTML({
+    return generateStatementHTML({
       shopName: shop?.companyName || "", title: `JOB CARD ${j.jobNo}`, subtitle: fmtDay(j.jobDate), partyLine: party, cols, rows: lines,
       foot: ["", `Services ${money(t.services)} · Parts ${money(t.parts)} · VAT ${money(t.vat)}`, "", "", "TOTAL", money(t.total)],
-    }), { lang });
+    });
   };
+  const printJob = (j) => printWithSettings(jobHtml(j), { lang });
+  const jobWhatsApp = (j) => ({
+    html: jobHtml(j), fileName: pdfFileName(j.jobNo, j.customerName),
+    phone: partyPhone(customers.find((c) => c.id === j.customerId)) || j.customerMobile || "",
+    text: docMessage({ bn: lang === "bn", shop: shop?.companyName || "", docType: L("জব কার্ড", "Job card"), no: j.jobNo, date: j.jobDate,
+      total: jobTotals(j).total, cur, party: j.customerName || "", extra: `${L("অবস্থা", "Status")}: ${statusOf(settings, j.status)[lang === "bn" ? "bn" : "en"]}` }),
+  });
 
   // ── report ──
   const [rFrom, setRFrom] = useState(monthStart);
   const [rTo, setRTo] = useState(() => localDay());
   const [rStatus, setRStatus] = useState("");
   const [rTech, setRTech] = useState("");
-  const reportRows = useMemo(() => jobs
-    .filter((j) => (!rFrom || String(j.jobDate) >= rFrom) && (!rTo || String(j.jobDate) <= rTo))
-    .filter((j) => !rStatus || j.status === rStatus)
-    .filter((j) => !rTech || j.technicianId === rTech)
-    .sort((a, b) => String(a.jobDate).localeCompare(String(b.jobDate)) || String(a.jobNo).localeCompare(String(b.jobNo)))
-    .map((j) => ({ j, t: jobTotals(j) })), [jobs, rFrom, rTo, rStatus, rTech]);
-  const live = reportRows.filter((r) => r.j.status !== "cancelled");
-  const rSum = live.reduce((a, r) => ({ services: a.services + r.t.services, parts: a.parts + r.t.parts, total: a.total + r.t.total }), { services: 0, parts: 0, total: 0 });
-  const byTech = useMemo(() => {
-    const m = new Map();
-    live.forEach(({ j, t }) => { const k = j.technicianName || L("কেউ না", "Unassigned"); const c = m.get(k) || { jobs: 0, services: 0, total: 0 }; c.jobs += 1; c.services += t.services; c.total += t.total; m.set(k, c); });
-    return [...m.entries()].sort((a, b) => b[1].total - a[1].total);
-  }, [live]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [rQuery, setRQuery] = useState("");
+  const rBad = !!(rFrom && rTo && rFrom > rTo);
+  const report = useMemo(() => buildJobReport(rBad ? [] : jobs, { from: rFrom, to: rTo, status: rStatus, technicianId: rTech, query: rQuery }), [jobs, rFrom, rTo, rStatus, rTech, rQuery, rBad]);
+  const rSum = report.kpi;
+  const rQuick = [
+    ["today", L("আজ", "Today"), localDay(), localDay()],
+    ["month", L("এই মাস", "This month"), monthStart(), localDay()],
+    ["year", L("এই বছর", "This year"), `${new Date().getFullYear()}-01-01`, localDay()],
+    ["all", L("সব সময়", "All time"), "", ""],
+  ];
+  const rActive = rQuick.find(([, , f, t]) => f === rFrom && t === rTo)?.[0];
   const printReport = () => {
-    const cols = [{ label: "Date" }, { label: "Job No" }, { label: "Customer" }, { label: settings.showVehicle ? "Vehicle / Item" : "Item" }, { label: "Technician" }, { label: "Status" }, { label: `Services`, align: "right" }, { label: `Parts`, align: "right" }, { label: `Total (${cur})`, align: "right" }, { label: "Invoice" }];
-    const body = reportRows.map(({ j, t }) => [fmtDay(j.jobDate), j.jobNo, j.customerName || "", [j.vehicleNo, j.itemDesc].filter(Boolean).join(" · "), j.technicianName || "", statusOf(settings, j.status).en, money(t.services), money(t.parts), money(t.total), j.convertedInvoiceNo || ""]);
-    printWithSettings(generateStatementHTML({ shopName: shop?.companyName || "", title: "JOB ORDER REPORT", subtitle: `${fmtDay(rFrom) || "Start"} — ${fmtDay(rTo) || "Today"}`, cols, rows: body, foot: ["", "", "", "", "", "TOTAL", money(rSum.services), money(rSum.parts), money(rSum.total), ""] }), { lang });
+    const cols = [{ label: "Date" }, { label: "Job No" }, { label: "Customer" }, { label: settings.showVehicle ? "Vehicle / Item" : "Item" }, { label: "Technician" }, { label: "Status" }, { label: "Services", align: "right" }, { label: "Parts", align: "right" }, { label: "VAT", align: "right" }, { label: `Total (${cur})`, align: "right" }, { label: "Invoice" }];
+    const body = report.rows.map(({ job: j, totals: t, cancelled }) => [fmtDay(j.jobDate), j.jobNo, j.customerName || "", [j.vehicleNo, j.itemDesc].filter(Boolean).join(" · "), j.technicianName || "", statusOf(settings, j.status).en, cancelled ? "-" : money(t.services), cancelled ? "-" : money(t.parts), cancelled ? "-" : money(t.vat), cancelled ? "-" : money(t.total), j.convertedInvoiceNo || ""]);
+    const subtitle = `${fmtDay(rFrom) || "Start"} — ${fmtDay(rTo) || "Today"}`;
+    const party = `Jobs ${rSum.jobs} · Billed ${rSum.billedJobs} (${money(rSum.billedTotal)}) · Not billed ${rSum.unbilledJobs} (${money(rSum.unbilledTotal)})${rSum.cancelled ? ` · Cancelled ${rSum.cancelled} (not in totals)` : ""}`;
+    printWithSettings(generateStatementHTML({ shopName: shop?.companyName || "", title: "JOB ORDER REPORT", subtitle, partyLine: party, cols, rows: body, foot: ["", "", "", "", "", "TOTAL", money(rSum.services), money(rSum.parts), money(rSum.vat), money(rSum.total), ""] }), { lang });
+  };
+  const exportReport = async () => {
+    try { await saveTextFile(jobReportFileName(rFrom, rTo), csvText(jobReportRows(report, (k) => statusOf(settings, k).en))); } catch (e) { toast?.(` ${e?.message || e}`, "err"); }
   };
 
   // ── settings (owner) ──
@@ -289,6 +304,7 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
   const saveSettings = async () => {
     if (!isOwner || !sDraft) return;
     if (sDraft.services.some((s) => !s.name.trim())) { toast?.(L("প্রতিটি সার্ভিসের নাম দিন", "Every service needs a name"), "err"); return; }
+    if (serviceIssues(sDraft.services).duplicates.size) { toast?.(L("একই নামে দুটো সার্ভিস আছে — নাম আলাদা করুন", "Two services have the same name — make the names different"), "err"); return; }
     if (!sDraft.statuses.length) { toast?.(L("অন্তত একটা স্ট্যাটাস লাগবে", "Keep at least one status"), "err"); return; }
     if (sDraft.statuses.some((s) => !String(s.en || s.bn || "").trim())) { toast?.(L("প্রতিটি স্ট্যাটাসের নাম দিন", "Every status needs a name"), "err"); return; }
     setSSaving(true);
@@ -315,9 +331,9 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
 
   const sectionPills = (
     <div className="si-pills"style={{ margin: "4px 0" }}>
-      <button type="button"className={`pm-btn-secondary${section === "jobs" ? "is-active" : ""}`} onClick={() => setSection("jobs")}> {L("জব অর্ডার", "Job Orders")}</button>
-      <button type="button"className={`pm-btn-secondary${section === "report" ? "is-active" : ""}`} onClick={() => setSection("report")}> {L("জব রিপোর্ট", "Job Order Report")}</button>
-      {isOwner && <button type="button"className={`pm-btn-secondary${section === "settings" ? "is-active" : ""}`} onClick={openSettings}> {L("সার্ভিস চার্জ / ওয়ারেন্টি / স্ট্যাটাস", "Service charges / Warranty / Status")}</button>}
+      <button type="button"className={`pm-btn-secondary${section === "jobs" ? " is-active" : ""}`} onClick={() => setSection("jobs")}> {L("জব অর্ডার", "Job Orders")}</button>
+      <button type="button"className={`pm-btn-secondary${section === "report" ? " is-active" : ""}`} onClick={() => setSection("report")}> {L("জব রিপোর্ট", "Job Order Report")}</button>
+      {isOwner && <button type="button"className={`pm-btn-secondary${section === "settings" ? " is-active" : ""}`} onClick={openSettings}> {L("সার্ভিস চার্জ / ওয়ারেন্টি / স্ট্যাটাস", "Service charges / Warranty / Status")}</button>}
     </div>
   );
 
@@ -327,9 +343,9 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
         {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন জব কার্ড", "New Job Card")}</button>}
         <span className="si-toolbar-gap" />
         <div className="si-pills">
-          <button type="button"className={`pm-btn-secondary${statusFilter === "open" ? "is-active" : ""}`} onClick={() => setStatusFilter("open")}>{L("চলমান", "Open")} ({openCount})</button>
-          {settings.allStatuses.map((s) => (counts.get(s.key) ? <button key={s.key} type="button"className={`pm-btn-secondary${statusFilter === s.key ? "is-active" : ""}`} onClick={() => setStatusFilter(s.key)}>{stLabel(s.key)} ({counts.get(s.key)})</button> : null))}
-          <button type="button"className={`pm-btn-secondary${statusFilter === "all" ? "is-active" : ""}`} onClick={() => setStatusFilter("all")}>{L("সব", "All")}</button>
+          <button type="button"className={`pm-btn-secondary${statusFilter === "open" ? " is-active" : ""}`} onClick={() => setStatusFilter("open")}>{L("চলমান", "Open")} ({openCount})</button>
+          {settings.allStatuses.map((s) => (counts.get(s.key) ? <button key={s.key} type="button"className={`pm-btn-secondary${statusFilter === s.key ? " is-active" : ""}`} onClick={() => setStatusFilter(s.key)}>{stLabel(s.key)} ({counts.get(s.key)})</button> : null))}
+          <button type="button"className={`pm-btn-secondary${statusFilter === "all" ? " is-active" : ""}`} onClick={() => setStatusFilter("all")}>{L("সব", "All")}</button>
         </div>
       </div>
       <div className="si-kpis">
@@ -393,6 +409,7 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
           <button type="button"className="pm-btn-secondary"onClick={() => { setView("list"); setSelId(null); }}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
           {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => printJob(sel)}> {L("জব কার্ড প্রিন্ট", "Print job card")}</button>}
+          {canPrint && sel.status !== "cancelled" && <WhatsAppButton lang={lang} toast={toast} className="pm-btn-secondary" build={() => jobWhatsApp(sel)} />}
           {canManage && !closed && <button type="button"className="pm-btn-secondary"onClick={() => openEdit(sel)}> {L("এডিট", "Edit")}</button>}
           {canManage && !closed && onMakeInvoice && <button type="button"className="pm-btn pm-btn--primary"onClick={() => makeInvoice(sel)}> {L("সেলস বিল বানান", "Make Sales Invoice")}</button>}
           {canManage && !closed && <button type="button"className="pm-btn-secondary pm-btn--danger"onClick={() => cancelJob(sel)}> {L("বাতিল", "Cancel")}</button>}
@@ -517,7 +534,7 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
                   <span className="pm-label"style={{ margin: 0 }}> {L("সার্ভিস", "Services")}</span>
                   <select className="pm-input"style={{ width: mobile ? "100%" : 220 }} value=""onChange={(e) => { const s = settings.services.find((x) => x.id === e.target.value); if (s) addService(s); }}>
                     <option value="">{settings.services.length ? L("+ সার্ভিস চার্জ মাস্টার থেকে", "+ From service charge master") : L("(সার্ভিস মাস্টার খালি)", "(Service master is empty)")}</option>
-                    {settings.services.map((s) => <option key={s.id} value={s.id}>{s.name} — {money(s.charge)}</option>)}
+                    {settings.services.map((s) => <option key={s.id} value={s.id}>{[s.code, s.name].filter(Boolean).join(" · ")} — {money(s.charge)}{s.vatPerc !== undefined ? ` · VAT ${n(s.vatPerc)}%` : ""}</option>)}
                   </select>
                   <button type="button"className="pm-btn-secondary"onClick={() => addService(null)}>+ {L("নিজে লিখুন", "Custom")}</button>
                 </div>
@@ -536,6 +553,9 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
                       ))}
                     </tbody>
                   </table>
+                )}
+                {form.services.some((s) => String(s.name || "").trim() && !(n(s.charge) > 0)) && (
+                  <div className="si-hint" style={{ marginLeft: 0, color: "#b45309", fontWeight: 700 }}>{L("কোনো সার্ভিসের চার্জ 0 — ঠিক থাকলে রেখে দিন, নাহলে চার্জ লিখুন।", "A service has no charge — leave it if that is right, otherwise enter the charge.")}</div>
                 )}
                 <span className="pm-label"style={{ margin: "6px 0 0" }}> {L("পার্টস (প্রোডাক্ট মাস্টার থেকে — বিল হলে স্টক কমবে)", "Parts (from Product Master — stock goes down when billed)")}</span>
                 <ProductPicker products={products} exclude={[]} onPick={addPart} placeholder={L("পার্টস খুঁজুন: নাম, কোড, বারকোড…", "Search parts: name, code, barcode…")} mobile={mobile} lang={lang} />
@@ -572,50 +592,68 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
   const reportView = (
     <>
       <div className="si-toolbar">
-        <input type="date"className="pm-input"style={{ width: 130 }} value={rFrom} onChange={(e) => setRFrom(e.target.value)} />
-        <input type="date"className="pm-input"style={{ width: 130 }} value={rTo} onChange={(e) => setRTo(e.target.value)} />
-        <select className="pm-input"style={{ width: 160 }} value={rStatus} onChange={(e) => setRStatus(e.target.value)}>
+        <div className="si-pills">
+          {rQuick.map(([key, label, f, t]) => <button key={key} type="button" className={`pm-btn-secondary${rActive === key ? " is-active" : ""}`} onClick={() => { setRFrom(f); setRTo(t); }}>{label}</button>)}
+        </div>
+        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: rBad ? "#b91c1c" : undefined }} value={rFrom} onChange={(e) => setRFrom(e.target.value)} />
+        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: rBad ? "#b91c1c" : undefined }} value={rTo} onChange={(e) => setRTo(e.target.value)} />
+        <span className="si-toolbar-gap" />
+        {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={printReport} disabled={!report.rows.length}> {L("প্রিন্ট", "Print")}</button>}
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportReport} disabled={!report.rows.length}> Excel</button>}
+      </div>
+      <div className="si-toolbar">
+        <input className="pm-input" style={{ width: mobile ? "100%" : 220 }} value={rQuery} onChange={(e) => setRQuery(e.target.value)} placeholder={L("জব নং, কাস্টমার, মোবাইল, গাড়ি, বিল নং", "Job no, customer, mobile, vehicle, invoice no")} />
+        <select className="pm-input" style={{ width: mobile ? "48%" : 170 }} value={rStatus} onChange={(e) => setRStatus(e.target.value)}>
           <option value="">{L("সব অবস্থা", "All statuses")}</option>
+          <option value="billed">{L("বিল হয়েছে", "Billed")}</option>
+          <option value="unbilled">{L("বিল হয়নি", "Not billed")}</option>
           {settings.allStatuses.map((s) => <option key={s.key} value={s.key}>{stLabel(s.key)}</option>)}
         </select>
-        <select className="pm-input"style={{ width: 160 }} value={rTech} onChange={(e) => setRTech(e.target.value)}>
+        <select className="pm-input" style={{ width: mobile ? "48%" : 170 }} value={rTech} onChange={(e) => setRTech(e.target.value)}>
           <option value="">{L("সব টেকনিশিয়ান", "All technicians")}</option>
           {employees.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
         </select>
-        <span className="si-toolbar-gap" />
-        {canPrint && <button type="button"className="pm-btn-secondary"onClick={printReport} disabled={!reportRows.length}> {L("প্রিন্ট", "Print")}</button>}
       </div>
-      <div className="si-kpis">
-        <div className="si-kpi"><span>{L("জব", "Jobs")}</span><b>{live.length}</b></div>
+      <div className="si-kpis" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}>
+        <div className="si-kpi"><span>{L("জব", "Jobs")}</span><b>{rSum.jobs}</b></div>
         <div className="si-kpi"><span>{L("সার্ভিস চার্জ", "Service charges")}</span><b>{money(rSum.services)}</b></div>
         <div className="si-kpi"><span>{L("পার্টস", "Parts")}</span><b>{money(rSum.parts)}</b></div>
         <div className="si-kpi"><span>{L("মোট (VAT সহ)", "Total (with VAT)")}</span><b style={{ color: ACCENT }}>{cur} {money(rSum.total)}</b></div>
-        <div className="si-kpi"><span>{L("বিল হয়েছে", "Invoiced")}</span><b style={{ color: "#15803d" }}>{live.filter((r) => r.j.status === "invoiced").length}</b></div>
+        <div className="si-kpi"><span>{L("বিল হয়েছে", "Billed")} ({rSum.billedJobs})</span><b style={{ color: "#15803d" }}>{money(rSum.billedTotal)}</b></div>
+        <div className="si-kpi"><span>{L("বিল হয়নি", "Not billed")} ({rSum.unbilledJobs})</span><b style={{ color: rSum.unbilledJobs ? "#b45309" : undefined }}>{money(rSum.unbilledTotal)}</b></div>
       </div>
-      <div className={mobile ? "si-main is-all" : "si-main"}>
-        {!mobile && (
-          <div className="si-box">
-            <table className="pm-table">
-              <thead><tr><th>{L("টেকনিশিয়ান", "Technician")}</th><th className="si-num">{L("জব", "Jobs")}</th><th className="si-num">{L("সার্ভিস", "Service")}</th></tr></thead>
-              <tbody>{byTech.map(([name, v]) => <tr key={name}><td>{name}</td><td className="si-num">{v.jobs}</td><td className="si-num">{money(v.services)}</td></tr>)}</tbody>
-            </table>
-            {!byTech.length && <div className="si-empty">{L("কিছু নেই", "Nothing")}</div>}
-          </div>
-        )}
+      {rBad && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
+      <div className={mobile ? "si-main is-all" : "si-main"} style={{ overflow: "auto" }}>
         <div className="si-box">
-          {!reportRows.length ? <div className="si-empty">{L("এই সময়ে কোনো জব নেই", "No jobs in this period")}</div> : (
+          <table className="pm-table">
+            <thead><tr><th>{L("টেকনিশিয়ান", "Technician")}</th><th className="si-num">{L("জব", "Jobs")}</th><th className="si-num">{L("সার্ভিস", "Service")}</th><th className="si-num">{L("মোট", "Total")}</th></tr></thead>
+            <tbody>{report.byTechnician.map((v) => <tr key={v.name || "-"} className="pm-clickable" onClick={() => setRTech(employees.find((e) => e.name === v.name)?.id || "")}><td>{v.name || L("কেউ না", "Unassigned")}</td><td className="si-num">{v.jobs}</td><td className="si-num">{money(v.services)}</td><td className="si-num">{money(v.total)}</td></tr>)}</tbody>
+          </table>
+          {!report.byTechnician.length && <div className="si-empty">{L("কিছু নেই", "Nothing")}</div>}
+          <table className="pm-table" style={{ marginTop: 8 }}>
+            <thead><tr><th>{L("অবস্থা", "Status")}</th><th className="si-num">{L("জব", "Jobs")}</th><th className="si-num">{L("মোট", "Total")}</th></tr></thead>
+            <tbody>{report.byStatus.map((v) => <tr key={v.key} className="pm-clickable" onClick={() => setRStatus(v.key)}><td>{badge(v.key)}</td><td className="si-num">{v.jobs}</td><td className="si-num">{v.key === "cancelled" ? "-" : money(v.total)}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <div className="si-box">
+          {!report.rows.length ? <div className="si-empty">{L("এই সময়ে কোনো জব নেই", "No jobs in this period")}</div> : (
             <table className="pm-table">
               <thead><tr><th style={{ width: 78 }}>{L("তারিখ", "Date")}</th><th style={{ width: 80 }}>{L("জব নং", "Job No")}</th><th>{L("কাস্টমার", "Customer")}</th><th>{L("গাড়ি / জিনিস", "Vehicle / Item")}</th><th>{L("টেকনিশিয়ান", "Technician")}</th><th>{L("অবস্থা", "Status")}</th><th className="si-num">{L("সার্ভিস", "Service")}</th><th className="si-num">{L("পার্টস", "Parts")}</th><th className="si-num">{L("মোট", "Total")}</th><th>{L("বিল", "Invoice")}</th></tr></thead>
               <tbody>
-                {reportRows.map(({ j, t }) => (
-                  <tr key={j.id} className="pm-clickable"onClick={() => { setSection("jobs"); setSelId(j.id); setView("detail"); }} style={j.status === "cancelled" ? { color: "#6b7280", textDecoration: "line-through" } : undefined}>
+                {report.rows.map(({ job: j, totals: t, cancelled }) => (
+                  <tr key={j.id} className="pm-clickable" onClick={() => { setSection("jobs"); setSelId(j.id); setView("detail"); }} style={cancelled ? { color: "#6b7280", textDecoration: "line-through" } : undefined}>
                     <td>{fmtDay(j.jobDate)}</td><td className="si-strong">{j.jobNo}</td><td>{j.customerName}</td><td>{[j.vehicleNo, j.itemDesc].filter(Boolean).join(" · ")}</td><td>{j.technicianName}</td>
-                    <td>{badge(j.status)}</td><td className="si-num">{money(t.services)}</td><td className="si-num">{money(t.parts)}</td><td className="si-num si-strong">{money(t.total)}</td><td>{j.convertedInvoiceNo || ""}</td>
+                    <td>{badge(j.status)}</td><td className="si-num">{money(t.services)}</td><td className="si-num">{money(t.parts)}</td><td className="si-num si-strong">{money(t.total)}</td>
+                    <td style={{ color: j.convertedInvoiceNo ? "#15803d" : undefined, fontWeight: j.convertedInvoiceNo ? 700 : undefined }}>{j.convertedInvoiceNo || ""}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot><tr><td colSpan={6} className="si-strong">{L("মোট (বাতিল বাদে)", "Total (cancelled left out)")}</td><td className="si-num si-strong">{money(rSum.services)}</td><td className="si-num si-strong">{money(rSum.parts)}</td><td className="si-num si-strong">{money(rSum.total)}</td><td /></tr></tfoot>
             </table>
           )}
+          <div className="si-hint" style={{ marginLeft: 0, marginTop: 6 }}>
+            {L("প্রতিটি জবের টাকা সার্ভিস ও পার্টসের লাইন থেকে (VAT সহ)। বিল হয়েছে = জব থেকে সেলস বিল বানানো হয়েছে (বিল নং দেখায়)। বাতিল জব তালিকায় দাগ কাটা, মোটে ধরা হয়নি।", "Each job's amount comes from its service and part lines (with VAT). Billed = a sales invoice was made from the job (its number shows). Cancelled jobs are struck through and left out of the totals.")}
+          </div>
         </div>
       </div>
     </>
@@ -633,12 +671,13 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
           <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend"> {L("সার্ভিস চার্জ মাস্টার", "Service Charge Master")}</legend>
             <table className="pm-table">
-              <thead><tr><th>{L("সার্ভিসের নাম", "Service name")}</th><th style={{ width: 84 }}>{L("চার্জ", "Charge")}</th><th style={{ width: 56 }}>VAT%</th><th style={{ width: 56 }}>{L("ঘণ্টা", "Hours")}</th><th style={{ width: 28 }} /></tr></thead>
+              <thead><tr><th style={{ width: 80 }}>{L("কোড", "Code")}</th><th>{L("সার্ভিসের নাম", "Service name")}</th><th style={{ width: 84 }}>{L("চার্জ", "Charge")}</th><th style={{ width: 56 }}>VAT%</th><th style={{ width: 56 }}>{L("ঘণ্টা", "Hours")}</th><th style={{ width: 28 }} /></tr></thead>
               <tbody>
                 {sDraft.services.map((s) => (
                   <tr key={s.id}>
-                    <td><input className="pm-input"value={s.name} onChange={(e) => sRow("services", s.id, { name: e.target.value })} /></td>
-                    <td><input className="pm-input"inputMode="decimal"value={s.charge} onChange={(e) => sRow("services", s.id, { charge: e.target.value })} style={{ textAlign: "right" }} /></td>
+                    <td><input className="pm-input" value={s.code || ""} onChange={(e) => sRow("services", s.id, { code: e.target.value })} /></td>
+                    <td><input className="pm-input" value={s.name} onChange={(e) => sRow("services", s.id, { name: e.target.value })} style={serviceIssues(sDraft.services).isDuplicate(s) ? { borderColor: "#b91c1c" } : undefined} title={serviceIssues(sDraft.services).isDuplicate(s) ? L("এই নাম আরেকটা সার্ভিসেও আছে", "Another service has this name") : undefined} /></td>
+                    <td><input className="pm-input" inputMode="decimal" value={s.charge} onChange={(e) => sRow("services", s.id, { charge: e.target.value })} style={{ textAlign: "right", ...(String(s.name || "").trim() && !(n(s.charge) > 0) ? { borderColor: "#b45309" } : {}) }} /></td>
                     <td><input className="pm-input"inputMode="decimal"placeholder={defaultVat} value={s.vatPerc} onChange={(e) => sRow("services", s.id, { vatPerc: e.target.value })} /></td>
                     <td><input className="pm-input"inputMode="decimal"value={s.hours} onChange={(e) => sRow("services", s.id, { hours: e.target.value })} /></td>
                     <td><button type="button"style={{ border: 0, background: "none", cursor: "pointer", color: "#b91c1c" }} onClick={() => sDel("services", s.id)}>✕</button></td>
@@ -646,7 +685,17 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
                 ))}
               </tbody>
             </table>
-            <button type="button"className="pm-btn-secondary"style={{ marginTop: 4 }} onClick={() => sSet("services", [...sDraft.services, { id: uid(), name: "", charge: "", vatPerc: "", hours: "" }])}>+ {L("সার্ভিস যোগ", "Add service")}</button>
+            <button type="button" className="pm-btn-secondary" style={{ marginTop: 4 }} onClick={() => sSet("services", [...sDraft.services, { id: uid(), code: "", name: "", charge: "", vatPerc: "", hours: "" }])}>+ {L("সার্ভিস যোগ", "Add service")}</button>
+            {(() => {
+              const iss = serviceIssues(sDraft.services);
+              return (
+                <div className="si-hint" style={{ marginLeft: 0, marginTop: 4 }}>
+                  {L(`জব কার্ডে সার্ভিস বাছলে এই চার্জ আর VAT % নিজে বসে (পরে বদলানো যায়)। VAT খালি রাখলে ডিফল্ট ${defaultVat}% বসে। ঘণ্টা শুধু তথ্যের জন্য।`, `Picking a service on a job card fills in this charge and VAT % (both can still be changed there). A blank VAT uses the default ${defaultVat}%. Hours are for reference only.`)}
+                  {iss.noCharge > 0 && <div style={{ color: "#b45309", fontWeight: 700 }}>{L(`${iss.noCharge}টি সার্ভিসের চার্জ নেই — জব কার্ডে 0 বসবে।`, `${iss.noCharge} service(s) have no charge — they will come in at 0.`)}</div>}
+                  {iss.duplicates.size > 0 && <div style={{ color: "#b91c1c", fontWeight: 700 }}>{L("একই নামে একাধিক সার্ভিস আছে — সেভ করার আগে নাম আলাদা করুন।", "Some services share a name — make them different before saving.")}</div>}
+                </div>
+              );
+            })()}
           </fieldset>
 
           <fieldset className="pm-panel"style={{ margin: 0 }}>

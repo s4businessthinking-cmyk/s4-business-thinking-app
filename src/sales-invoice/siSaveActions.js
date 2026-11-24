@@ -1,4 +1,5 @@
 import { applyInvoiceStockEffect, STOCK_AFFECTING_INVOICE_STATUSES, unlinkedStockOk } from "../shared/appShared.jsx";
+import { afterInvoiceSaved } from "../share/autoWhatsApp.js";
 import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlineGetById, offlineUpdate } from "../offline/offlineRepository";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
@@ -8,7 +9,7 @@ import { itemBaseQty, unitFactorFor } from "../inventory/unitConversion";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 import { peekInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 
-export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user }) {
+export function createSiSaveActions({ onInvoiceSaved, COL, billReturns, bumpShopSiSerial, canDiscount, customers, editInvId, invoices, isDN, isQuote, isSO, kind, lang, products, profile, receipts, reserveSiInvoiceNo, setInvoices, setSelInv, setSiPrintModal, setSiSaving, setSiView, setSourceQuote, shopId, siAutoDisc, siCurrent, siFindProduct, siForm, siInvoiceNo, siLines, siLoadedPaidRef, siOpenNew, siPrint, siSaveLockRef, sourceQuote, t, toast, user }) {
   const siBuild=(status, invoiceNoOverride, extras={})=>{
     if (String(siCurrent.name||"").trim()) {
       toast(lang==="bn"?"উপরের ঘরে একটা আইটেম আছে যা বিলে যোগ হয়নি — Add চাপুন বা ঘরটা খালি করুন":"An item in the entry row is not added to the bill yet — press Add or clear it","err");
@@ -123,6 +124,9 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
       billDiscAmt:isDelivery?0:parseFloat(siFmt2(formTotals.billDisc)),
       billDiscount:isDelivery?0:parseFloat(siFmt2(formTotals.billDisc)),
       adjustment:isDelivery?0:siN2(siForm.adjustment),
+      // why the adjustment was given (Merge / Masters - adjustment reasons); empty when there is no adjustment
+      adjustmentReasonId:!isDelivery&&siN2(siForm.adjustment)?(siForm.adjustmentReasonId||""):"",
+      adjustmentReason:!isDelivery&&siN2(siForm.adjustment)?String(siForm.adjustmentReason||"").trim():"",
       roundOff:isDelivery?0:siN2(siForm.roundOff),
       creditDays:Math.max(0, Math.round(siN2(siForm.creditDays))),
       dueDate:!isDelivery && !isQuote && siN2(siForm.creditDays)>0 && siForm.invoiceDate ? siAddDays(siForm.invoiceDate, Math.round(siN2(siForm.creditDays))) : "",
@@ -292,6 +296,9 @@ export function createSiSaveActions({ COL, billReturns, bumpShopSiSerial, canDis
     if (options.print === true) {
       setSiPrintModal(savedInvoice);
     }
+
+    // Auto WhatsApp for customers who asked for it; the bill is already saved and nothing here can undo that.
+    afterInvoiceSaved(onInvoiceSaved, savedInvoice, priorInvoice);
 
     return savedInvoice;
   };

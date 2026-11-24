@@ -8,6 +8,10 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { collectBankTransactions, reconcile, METHOD_LABEL, r2 } from "./bankRec.js";
+import { lockedLines, parseStatementRows, reconciliationFileName, reconciliationRows, statementSummary, suggestEntryType, suggestMatches } from "./bankStatement.js";
+import { activePeriodLock, periodLockMessage } from "./periodLock.js";
+import { saveTextFile } from "../utils/saveTextFile.js";
+import { csvText } from "../reports/vatExport.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,6 +43,10 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
   const [busy, setBusy] = useState("");
   const [settingsForm, setSettingsForm] = useState(null);
   const [entryForm, setEntryForm] = useState(null);
+  // statement import: { file, lines, skipped, summary, rows: [{ status, candidates, choice, entryType }] }
+  const [imp, setImp] = useState(null);
+  const [lastImport, setLastImport] = useState(null);
+  const fileRef = useRef(null);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile);
@@ -99,8 +107,12 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
   const syncSoon = () => { if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {}); };
   const stamp = () => ({ updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" });
 
+  const lockDate = activePeriodLock();
+  const isLocked = (day) => !!lockDate && !!day && day <= lockDate;
   const setCleared = async (t, date) => {
     if (!canManage || t.autoCleared || busy) return;
+    const prevDay = markDocs.get(t.key)?.clearedDate || "";
+    if (isLocked(date) || isLocked(prevDay)) { toast?.(periodLockMessage(lockDate), "err"); return; }
     setBusy(t.key);
     const prev = markDocs.get(t.key);
     try {
@@ -160,6 +172,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
     const amount = r2(f.amount);
     if (!(amount > 0)) { toast?.(L("সঠিক টাকার পরিমাণ লিখুন", "Enter a valid amount"), "err"); return; }
     if (!f.date) { toast?.(L("তারিখ দিন", "Pick a date"), "err"); return; }
+    if (isLocked(f.date)) { toast?.(periodLockMessage(lockDate), "err"); return; }
     const type = ENTRY_TYPES.find((x) => x.key === f.entryType) || ENTRY_TYPES[0];
     setBusy("entry");
     try {
@@ -193,7 +206,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
     if (stmt === "") { toast?.(L("ব্যাংক স্টেটমেন্টের ব্যালেন্স লিখুন", "Enter the bank statement balance"), "err"); return; }
     setBusy("stmt");
     try {
-      const payload = { shopId, kind: "statement", asOf, statementBalance: r2(stmt), bookBalance: rec.bookBalance, bankBalance: rec.bankBalance, difference: rec.difference,
+      const payload = { shopId, kind: "statement", asOf, statementBalance: r2(stmt), bookBalance: rec.bookBalance, bankBalance: rec.bankBalance, difference: rec.difference, ...(lastImport ? { statementFile: lastImport.file, statementFrom: lastImport.from } : {}),
         unclearedInTotal: rec.unclearedInTotal, unclearedOutTotal: rec.unclearedOutTotal, createdBy: user?.uid || "", createdByName: profile?.personName || "", createdAt: new Date().toISOString(), ...stamp() };
       const res = await offlineCreate("bankReconciliations", payload);
       setRecDocs((l) => [...l, { ...payload, id: res.documentId }]);
@@ -204,6 +217,65 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
     } finally {
       setBusy("");
     }
+  };
+
+  // ── statement import ──
+  const txByKey = useMemo(() => new Map(txs.map((t) => [t.key, t])), [txs]);
+  const readStatement = async (file) => {
+    if (!file) return;
+    try {
+      const XLSX = await import("xlsx");
+      const wb = /\.csv$/i.test(file.name) ? XLSX.read(await file.text(), { type: "string", raw: true }) : XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const parsed = parseStatementRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true }));
+      if (parsed.error) { toast?.(L("তারিখ আর টাকার কলাম পাওয়া যায়নি (Date, Debit / Credit বা Amount)", "No date and amount columns found (Date, Debit / Credit or Amount)"), "err"); return; }
+      const sugg = suggestMatches(parsed.lines, txs, { clearedOn: rec.clearedOn });
+      setImp({
+        file: file.name, lines: parsed.lines, skipped: parsed.skipped, summary: statementSummary(parsed.lines),
+        rows: parsed.lines.map((l, i) => ({ status: sugg[i].status, candidates: sugg[i].candidates, choice: sugg[i].txKey, entryType: sugg[i].status === "none" ? suggestEntryType(l) : "" })),
+      });
+    } catch (e) { toast?.(L("ফাইল পড়া যায়নি: ", "Could not read the file: ") + (e?.message || e), "err"); }
+    finally { if (fileRef.current) fileRef.current.value = ""; }
+  };
+  const setImpRow = (i, patch) => setImp((s) => ({ ...s, rows: s.rows.map((r, k) => (k === i ? { ...r, ...patch } : r)) }));
+  const chosenTwice = imp ? imp.rows.map((r) => r.choice).filter(Boolean).filter((k, i, a) => a.indexOf(k) !== i) : [];
+  const applyImport = async () => {
+    if (!imp || !canManage || busy) return;
+    if (chosenTwice.length) { toast?.(L("একই লেনদেন দুটো লাইনে বাছা হয়েছে", "The same movement is picked for two lines"), "err"); return; }
+    const locked = new Set(lockedLines(imp.lines, lockDate).map((l) => l.row));
+    const todo = imp.rows.map((r, i) => ({ ...r, line: imp.lines[i] })).filter((r) => (r.choice || r.entryType) && !locked.has(r.line.row));
+    const matches = todo.filter((r) => r.choice).length, newEntries = todo.filter((r) => !r.choice && r.entryType).length;
+    if (!todo.length) { toast?.(L("কিছু বাছা হয়নি", "Nothing picked"), "err"); return; }
+    if (!window.confirm(L(`${matches}টি লেনদেন মিলেছে হিসেবে চিহ্নিত হবে আর ${newEntries}টি ব্যাংক এন্ট্রি যোগ হবে। চালাবেন?`, `Mark ${matches} movement(s) as cleared and add ${newEntries} bank entr${newEntries === 1 ? "y" : "ies"}?`))) return;
+    let done = 0;
+    try {
+      for (const r of todo) {
+        if (r.choice) {
+          const t = txByKey.get(r.choice);
+          if (t) await setCleared(t, r.line.date > t.date ? r.line.date : t.date);
+        } else {
+          const type = ENTRY_TYPES.find((x) => x.key === r.entryType);
+          if (!type || type.dir !== r.line.dir) continue;
+          const payload = { shopId, kind: "entry", entryType: type.key, direction: type.dir, amount: r2(r.line.amount), date: r.line.date, refNo: r.line.ref || "", note: r.line.desc || type.en,
+            status: "active", source: "statementImport", createdBy: user?.uid || "", createdByName: profile?.personName || "", createdAt: new Date().toISOString(), ...stamp() };
+          const res = await offlineCreate("bankReconciliations", payload);
+          setRecDocs((l) => [...l, { ...payload, id: res.documentId }]);
+        }
+        done += 1;
+      }
+      setLastImport({ file: imp.file, from: imp.summary?.from || "" });
+      if (imp.summary?.to) setAsOf(imp.summary.to);
+      if (imp.summary?.closing != null) setStmt(String(imp.summary.closing));
+      logAudit({ shopId, user, profile, action: "import", collection: "bankReconciliations", docNo: imp.file, amount: imp.summary?.closing ?? null, note: `${matches} matched, ${newEntries} entries` });
+      toast?.(L(`সম্পন্ন - ${done}টি লাইন`, `Done - ${done} line(s)`));
+      setImp(null);
+      syncSoon();
+    } catch (e) {
+      toast?.(L(`${done}টির পর থেমেছে: `, `Stopped after ${done}: `) + (e?.message || e), "err");
+    }
+  };
+  const exportCsv = async () => {
+    try { await saveTextFile(reconciliationFileName(asOf), csvText(reconciliationRows(rec, { asOf, statementBalance: stmt === "" ? null : n(stmt), typeLabel: (t) => COL_LABEL[t.col]?.[1] || t.col }))); }
+    catch (e) { toast?.(e.message || String(e), "err"); }
   };
 
   const print = () => {
@@ -312,6 +384,9 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
         <input className="pm-input"inputMode="decimal"style={{ width: 150 }} placeholder={L("স্টেটমেন্টের ব্যালেন্স", "Statement balance")} value={stmt} onChange={(e) => setStmt(e.target.value)} />
         {canManage && <button type="button"className="pm-btn pm-btn--primary"disabled={!!busy || stmt === ""} onClick={saveStatement}> {L("সেভ", "Save")}</button>}
         {canPrint && <button type="button"className="pm-btn-secondary"onClick={print}> {L("প্রিন্ট", "Print")}</button>}
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv}> Excel</button>}
+        {canManage && <button type="button" className="pm-btn-secondary" onClick={() => fileRef.current?.click()} disabled={!data}> {L("স্টেটমেন্ট আনুন (CSV / Excel)", "Import statement (CSV / Excel)")}</button>}
+        <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: "none" }} onChange={(e) => readStatement(e.target.files?.[0])} />
       </div>
       <div className="si-kpis">
         {kpi(L("বই অনুযায়ী ব্যালেন্স", "Balance as per books"), `${cur} ${money(rec.bookBalance)}`)}
@@ -404,6 +479,73 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
       </div>
       {settingsWindow}
       {entryWindow}
+      {imp && (
+        <div className="pm-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) setImp(null); }}>
+          <div className="pm-window" style={{ maxWidth: 1100 }}>
+            <div className="pm-window-title"><span> {L("ব্যাংক স্টেটমেন্ট", "Bank statement")}: {imp.file}</span><button type="button" className="pm-window-close" onClick={() => setImp(null)}>x</button></div>
+            <div className="pm-window-body">
+              <div className="si-panel-body" style={{ gap: 6 }}>
+                {imp.summary && (
+                  <div>
+                    {fmtDay(imp.summary.from)} - {fmtDay(imp.summary.to)} · {imp.summary.count} {L("লাইন", "lines")} · {L("জমা", "In")} {money(imp.summary.totalIn)} · {L("খরচ", "Out")} {money(imp.summary.totalOut)}
+                    {imp.summary.closing != null && <> · {L("শুরু", "Opening")} {money(imp.summary.opening)} · {L("শেষ", "Closing")} <b>{money(imp.summary.closing)}</b></>}
+                    {imp.summary.balanced === false && <span style={{ color: "#b91c1c" }}> · {L("স্টেটমেন্টের ব্যালেন্স কলাম লাইনের সাথে মেলেনি - ফাইল দেখে নিন", "The statement's balance column does not follow its lines - check the file")}</span>}
+                  </div>
+                )}
+                {imp.skipped.length > 0 && (
+                  <div className="si-muted">{L("বাদ দেওয়া সারি", "Skipped rows")}: {imp.skipped.map((s) => `${s.row} (${{ date: L("তারিখ নেই", "no date"), amount: L("টাকা নেই", "no amount"), both: L("ডেবিট আর ক্রেডিট দুটোই", "debit and credit both") }[s.reason] || s.reason})`).join(", ")}</div>
+                )}
+                {lockDate && lockedLines(imp.lines, lockDate).length > 0 && <div className="si-paid-box is-due">{L(`${lockedLines(imp.lines, lockDate).length}টি লাইন পিরিয়ড লকের (${fmtDay(lockDate)}) আগে - এগুলো বাদ যাবে`, `${lockedLines(imp.lines, lockDate).length} line(s) are on or before the period lock (${fmtDay(lockDate)}) - they are left out`)}</div>}
+                {chosenTwice.length > 0 && <div className="si-paid-box is-due">{L("একই লেনদেন দুটো লাইনে বাছা হয়েছে", "The same movement is picked for two lines")}</div>}
+                <div style={{ overflow: "auto", maxHeight: mobile ? undefined : 420 }}>
+                  <table className="pm-table">
+                    <thead><tr>
+                      <th style={{ width: 80 }}>{L("তারিখ", "Date")}</th><th>{L("বিবরণ", "Description")}</th>
+                      <th style={{ width: 90 }} className="si-num">{L("জমা", "In")}</th><th style={{ width: 90 }} className="si-num">{L("খরচ", "Out")}</th>
+                      <th style={{ width: 330 }}>{L("S4-এ কোন লেনদেন", "S4 movement")}</th>
+                    </tr></thead>
+                    <tbody>
+                      {imp.lines.map((l, i) => {
+                        const r = imp.rows[i];
+                        const lockedLine = !!lockDate && l.date <= lockDate;
+                        const sameDir = ENTRY_TYPES.filter((x) => x.dir === l.dir);
+                        return (
+                          <tr key={`${l.row}-${i}`} style={lockedLine ? { color: "#94a3b8" } : undefined}>
+                            <td>{fmtDay(l.date)}</td>
+                            <td title={l.desc}>{l.desc}{l.ref ? <span className="si-muted"> · {l.ref}</span> : null}</td>
+                            <td className="si-num" style={{ color: "#15803d" }}>{l.dir === "in" ? money(l.amount) : ""}</td>
+                            <td className="si-num" style={{ color: "#b91c1c" }}>{l.dir === "out" ? money(l.amount) : ""}</td>
+                            <td>
+                              <select className="pm-input" style={{ height: 24, borderColor: r.status === "ambiguous" && !r.choice ? "#b45309" : undefined }} disabled={lockedLine}
+                                value={r.choice ? `t:${r.choice}` : r.entryType ? `e:${r.entryType}` : ""}
+                                onChange={(e) => { const v = e.target.value; setImpRow(i, v.startsWith("t:") ? { choice: v.slice(2), entryType: "" } : v.startsWith("e:") ? { choice: "", entryType: v.slice(2) } : { choice: "", entryType: "" }); }}>
+                                <option value="">{r.status === "ambiguous" ? L("একাধিক মিল - বেছে নিন", "Several fit - pick one") : L("বাদ দিন", "Skip")}</option>
+                                {r.candidates.map((k) => { const t = txByKey.get(k); return t ? <option key={k} value={`t:${k}`}>{`${fmtDay(t.date)} · ${COL_LABEL[t.col]?.[bn ? 0 : 1] || t.col} ${t.no || ""} · ${t.party || ""} · ${money(t.amount)}`}</option> : null; })}
+                                {sameDir.map((x) => <option key={x.key} value={`e:${x.key}`}>{L("নতুন ব্যাংক এন্ট্রি", "New bank entry")}: {bn ? x.bn : x.en}</option>)}
+                              </select>
+                              {r.status === "match" && r.choice && <span className="si-muted" style={{ marginLeft: 4 }}>{L("প্রস্তাব", "suggested")}</span>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="si-hint" style={{ marginLeft: 0 }}>
+                  {L("মিল খোঁজা হয় একই দিক, টাকা ±০.০৫ আর তারিখ ±৩ দিনের মধ্যে; একাধিক সমান মিল হলে নিজে বেছে নিতে হয়। মিলালে শুধু S4-এর লেনদেনটা 'ব্যাংকে মিলেছে' চিহ্নিত হয় - বিল বা ভাউচারের টাকা বদলায় না। ব্যাংকে আছে কিন্তু S4-এ নেই (চার্জ, সুদ, নগদ জমা / উত্তোলন) সেগুলো নতুন ব্যাংক এন্ট্রি হিসেবে যোগ করা যায়; বাকিগুলোর জন্য আগে S4-এ ভাউচার লিখুন।",
+                    "Matches need the same direction, an amount within 0.05 and a date within 3 days; when several fit equally you pick one. A match only marks the S4 movement as cleared in the bank - no bill or voucher amount changes. Bank-only lines (charges, interest, cash deposits / withdrawals) can be added as new bank entries; for anything else write the voucher in S4 first.")}
+                </div>
+              </div>
+            </div>
+            <div className="si-actions si-sticky-actions" style={{ background: "transparent" }}>
+              <span>{L("মিল", "Matched")} <b>{imp.rows.filter((r) => r.choice).length}</b> · {L("নতুন এন্ট্রি", "New entries")} <b>{imp.rows.filter((r) => !r.choice && r.entryType).length}</b> · {L("বাকি", "Left")} <b>{imp.rows.filter((r) => !r.choice && !r.entryType).length}</b></span>
+              <span className="si-toolbar-gap" />
+              <button type="button" className="pm-btn-secondary" onClick={() => setImp(null)}>{L("বন্ধ", "Close")}</button>
+              <button type="button" className="pm-btn pm-btn--primary" disabled={!!busy || chosenTwice.length > 0} onClick={applyImport}> {L("প্রয়োগ করুন", "Apply")}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

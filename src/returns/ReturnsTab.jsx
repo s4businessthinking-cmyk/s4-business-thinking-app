@@ -4,6 +4,8 @@ import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineCreate, offlineGetById, offlinePatch, offlineRemove } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { docMessage, pdfFileName } from "../share/whatsappDocShare.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
@@ -11,7 +13,8 @@ import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js
 import { averageCosts } from "../reports/averageCost.js";
 import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
-import { RETURN_KINDS, RETURNABLE_STATUSES, billHaystack, grnLabel, planPartyReturnSettlement, poGrnFieldsFromInvoice, returnedQtyByLine, validateReturnItems } from "./returnsDomain.js";
+import { RETURN_KINDS, RETURNABLE_STATUSES, billHaystack, billVatPerc, grnLabel, planPartyReturnSettlement, poGrnFieldsFromInvoice, returnedQtyByLine, validateReturnItems, validateValueNote, valueNoteRoom, valueNoteTotals } from "./returnsDomain.js";
+import { normalizeAdjustments, reasonsFor, rowName } from "../masters/simpleMasters.js";
 import { cancelReturnRefundVoucher, createReturnRefundVoucher } from "./returnsRefundVoucher.js";
 
 export { RETURN_KINDS, returnedQtyByLine, returnsAsLedgerVouchers } from "./returnsDomain.js";
@@ -75,6 +78,10 @@ export default function ReturnsTab({
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [editOf, setEditOf] = useState(null);
+  // "goods" = a return of items; "value" = a credit / debit note for money only (no goods, see returnsDomain.js)
+  const [noteMode, setNoteMode] = useState("goods");
+  const [valueAmt, setValueAmt] = useState("");
+  const [valueVat, setValueVat] = useState("");
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile, view);
@@ -109,6 +116,7 @@ export default function ReturnsTab({
     setReason("");
     setRefundMethod("cash");
     setEditOf(null);
+    setNoteMode("goods"); setValueAmt(""); setValueVat("");
     setInv(found);
     setSel(null);
     setView("form");
@@ -116,7 +124,7 @@ export default function ReturnsTab({
   // eslint-disable-next-line react-hooks/exhaustive-deps -- open once per openInvoiceId
   }, [openInvoiceId, invoices]);
 
-  const formDirty = () => view === "form" && !!inv && Object.values(qtys).some((q) => n2(q) > 0);
+  const formDirty = () => view === "form" && !!inv && (Object.values(qtys).some((q) => n2(q) > 0) || n2(valueAmt) > 0);
   const leaveOk = () => !formDirty() || window.confirm(L("এই রিটার্ন সেভ হয়নি। তবুও চলে যাবেন?", "This return is not saved. Leave anyway?"));
   useEffect(() => {
     if (!leaveGuard || view === "list") return undefined;
@@ -171,8 +179,12 @@ export default function ReturnsTab({
     if (!q) return lines;
     return lines.filter((l) => `${l.it.name || ""} ${l.it.code || ""} ${l.it.brand || ""}`.toLowerCase().includes(q));
   }, [lines, itemQ]);
-  const total = r2(lines.reduce((t, l) => t + l.amount, 0));
-  const totalVat = r2(lines.reduce((t, l) => t + l.vat, 0));
+  const isValueNote = noteMode === "value";
+  const valueTotals = valueNoteTotals({ amount: valueAmt, vatPerc: valueVat === "" ? billVatPerc(inv, kind) : valueVat });
+  const total = isValueNote ? valueTotals.total : r2(lines.reduce((t, l) => t + l.amount, 0));
+  const totalVat = isValueNote ? valueTotals.totalVat : r2(lines.reduce((t, l) => t + l.vat, 0));
+  const valueRoom = inv && isValueNote ? valueNoteRoom(inv, returns, editOf?.id || null) : 0;
+  const reasonChoices = useMemo(() => reasonsFor(normalizeAdjustments(shop?.adjustmentReasons), kind === "purchase" ? "purchase" : "sales").map((a) => rowName(a, bn)), [shop?.adjustmentReasons, kind, bn]);
   // Settle against source bill + other open bills of the same party (so cheque/last balance shrinks).
   const settlementPreview = useMemo(() => {
     if (!inv) return { appliedToInvoice: 0, refundAmount: 0, appliedAllocations: [] };
@@ -215,6 +227,7 @@ export default function ReturnsTab({
   const resetForm = () => {
     setDate(localDay()); setInvQ(""); setItemQ(""); setInv(null); setQtys({}); setSerials({});
     setReason(""); setRefundMethod("cash"); setEditOf(null);
+    setNoteMode("goods"); setValueAmt(""); setValueVat("");
   };
   const openNew = () => { resetForm(); setView("form"); };
 
@@ -231,6 +244,9 @@ export default function ReturnsTab({
     });
     setQtys(q);
     setSerials(s);
+    setNoteMode(r.noteType === "value" ? "value" : "goods");
+    setValueAmt(r.noteType === "value" ? String(r.subtotal ?? "") : "");
+    setValueVat(r.noteType === "value" ? String(r.vatPerc ?? "") : "");
     setReason(r.reason || "");
     setRefundMethod(r.refundMethod || "cash");
     setEditOf(r);
@@ -391,8 +407,9 @@ export default function ReturnsTab({
     if (!date) return toast?.(L("রিটার্নের তারিখ দিন", "Pick the return date"), "err");
     const billDay = String(inv.invoiceDate || "").slice(0, 10);
     if (billDay && date < billDay) return toast?.(L(`রিটার্নের তারিখ বিলের তারিখের (${billDay}) আগে হতে পারে না`, `The return date can't be before the bill date (${billDay})`), "err");
-    const picked = lines.filter((l) => l.qty > 0);
-    if (!picked.length) return toast?.(L("কোন পণ্য কতটা ফেরত, সেটা লিখুন", "Enter the quantity to return"), "err");
+    const picked = isValueNote ? [] : lines.filter((l) => l.qty > 0);
+    if (!isValueNote && !picked.length) return toast?.(L("কোন পণ্য কতটা ফেরত, সেটা লিখুন", "Enter the quantity to return"), "err");
+    if (isValueNote && !(total > 0)) return toast?.(L("নোটের অঙ্ক দিন", "Enter the note amount"), "err");
     const over = lines.find((l) => n2(qtys[l.idx]) > l.returnable + 1e-9);
     if (over) return toast?.(L(` "${over.it.name}": সর্বোচ্চ ${over.returnable} ফেরত দেওয়া যায়`, ` "${over.it.name}": at most ${over.returnable} can be returned`), "err");
     setSaving(true);
@@ -410,7 +427,8 @@ export default function ReturnsTab({
         ...((serials[l.idx] || l.it.serialNo) ? { serialNo: String(serials[l.idx] || l.it.serialNo).trim() } : {}),
       }));
       const priorForCap = editing ? returns.filter((x) => x.id !== editing.id) : returns;
-      const bad = validateReturnItems(fresh, draftItems, priorForCap, editing?.id || null);
+      const bad = isValueNote ? validateValueNote(fresh, total, priorForCap, editing?.id || null) : validateReturnItems(fresh, draftItems, priorForCap, editing?.id || null);
+      if (bad === "OVER") throw new Error(L(`নোট বিলের বাকি অংশের (${cur} ${f2(valueNoteRoom(fresh, priorForCap, editing?.id || null))}) বেশি হতে পারে না`, `The note can't be more than what is left of the bill (${cur} ${f2(valueNoteRoom(fresh, priorForCap, editing?.id || null))})`));
       if (bad === "INVOICE_NOT_RETURNABLE" || bad === "INVOICE_MISSING") throw new Error(L("এই বিল এখন আর ফেরতযোগ্য নয় (বাতিল/ড্রাফট)", "This bill can no longer be returned (cancelled/draft)"));
       if (bad) throw new Error(L("রিটার্নের পরিমাণ সঠিক নয়", "Return quantities are not valid"));
 
@@ -452,6 +470,7 @@ export default function ReturnsTab({
         partyId: bill[K.partyId] || null, partyName: bill[K.partyName] || "", partyMobile: bill[K.partyMobile] || "",
         ...poGrnFieldsFromInvoice(bill),
         items: draftItems,
+        ...(isValueNote ? { noteType: "value", vatPerc: valueTotals.vatPerc } : {}),
         subtotal: r2(total - totalVat), totalVat, total,
         appliedToInvoice: appliedNow, appliedAllocations: allocNow,
         refundAmount: refundNow, refundMethod: refundNow > 0 ? refundMethod : "",
@@ -577,15 +596,17 @@ export default function ReturnsTab({
   const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
   const methodName = (key) => (REFUND_METHODS.find((m) => m.key === key) || {})[bn ? "bn" : "en"] || key || "";
 
-  const print = (r) => {
+  const returnHtml = (r) => {
     const cols = [
       { label: "#" }, { label: "Item" }, { label: "Qty", align: "right" },
       { label: "Rate", align: "right" }, { label: `Amount (${cur})`, align: "right" },
     ];
-    const rows = (r.items || []).map((it, i) => [
-      String(i + 1), [it.name, it.code, it.serialNo && `S/N ${it.serialNo}`].filter(Boolean).join(" · "),
-      `${it.qty} ${it.unit || ""}`, f2(it.rate), f2(it.amount),
-    ]);
+    const rows = r.noteType === "value"
+      ? [["1", `Value adjustment (no goods)${r.reason ? ` - ${r.reason}` : ""}`, "", n2(r.vatPerc) ? `VAT ${n2(r.vatPerc)}%` : "", f2(r.subtotal)]]
+      : (r.items || []).map((it, i) => [
+        String(i + 1), [it.name, it.code, it.serialNo && `S/N ${it.serialNo}`].filter(Boolean).join(" · "),
+        `${it.qty} ${it.unit || ""}`, f2(it.rate), f2(it.amount),
+      ]);
     const shopLabel = [
       shopName || shop?.companyName || "",
       shop?.trnNumber ? `TRN: ${shop.trnNumber}` : "",
@@ -607,7 +628,7 @@ export default function ReturnsTab({
       r.reason ? `Reason: ${r.reason}` : "",
       `Return total: ${cur} ${f2(r.total)}`,
     ].filter(Boolean);
-    printWithSettings(generateStatementHTML({
+    return generateStatementHTML({
       shopName: shopLabel,
       title: K.printTitle,
       subtitle,
@@ -616,8 +637,14 @@ export default function ReturnsTab({
       rows,
       foot: ["", "", "", "TOTAL", f2(r.total)],
       summaryLines,
-    }), { lang });
+    });
   };
+  const print = (r) => printWithSettings(returnHtml(r), { lang });
+  const returnWhatsAppDoc = (r) => ({
+    html: returnHtml(r), fileName: pdfFileName(r.returnNo, r.partyName), phone: r.partyMobile || "",
+    text: docMessage({ bn, shop: shopName || shop?.companyName || "", docType: kind === "sales" ? L("সেলস রিটার্ন", "Sales return") : L("পারচেজ রিটার্ন", "Purchase return"),
+      no: [r.returnNo, r.invoiceNo && `(${r.invoiceNo})`].filter(Boolean).join(" "), date: r.returnDate, total: r.total, cur, party: r.partyName || "" }),
+  });
   const backToList = () => { if (leaveOk()) { setSel(null); setView("list"); } };
   const statusBadge = (r) => (
     <span className="si-badge"style={{ color: r.status === "cancelled" ? "#6b7280" : K.accent }}>
@@ -724,8 +751,35 @@ export default function ReturnsTab({
           )}
 
           {inv && (
+            <div className="si-pills" style={{ margin: "2px 0" }}>
+              {[["goods", L("মাল ফেরত", "Goods return")], ["value", L("শুধু দামের নোট (মাল ছাড়া)", "Value note (no goods)")]].map(([k, label]) => (
+                <button key={k} type="button" disabled={!!editOf} className={`pm-btn-secondary${noteMode === k ? " is-active" : ""}`}
+                  onClick={() => { setNoteMode(k); setQtys({}); setValueAmt(""); setValueVat(""); }}>{label}</button>
+              ))}
+            </div>
+          )}
+          {inv && isValueNote && (
+            <fieldset className="pm-panel" style={{ margin: 0 }}>
+              <legend className="pm-panel-legend">{L("নোটের অঙ্ক", "Note amount")}</legend>
+              <div className="si-panel-body">
+                <div className="si-grid2">
+                  <div className="si-field"><span className="pm-label">{L("অঙ্ক (VAT ছাড়া)", "Amount (before VAT)")} *</span>
+                    <input className="pm-input" inputMode="decimal" value={valueAmt} onChange={(e) => setValueAmt(e.target.value)} style={{ textAlign: "right" }} autoFocus={!mobile} />
+                  </div>
+                  <div className="si-field"><span className="pm-label">VAT %</span>
+                    <input className="pm-input" inputMode="decimal" value={valueVat} placeholder={String(billVatPerc(inv, kind))} onChange={(e) => setValueVat(e.target.value)} style={{ textAlign: "right" }} />
+                  </div>
+                </div>
+                <div className="si-hint" style={{ marginLeft: 0 }}>
+                  {L(`দামের পার্থক্য, বিলের পরে ছাড় বা কম মাল আসার মতো ক্ষেত্রে - মাল ফেরত হয় না, স্টক নড়ে না। VAT বিলের হারে (${billVatPerc(inv, kind)}%) ধরা হয়, দরকার হলে বদলান। এই বিলে সর্বোচ্চ ${cur} ${f2(valueRoom)}।`,
+                    `For a rate difference, a discount after the bill or short supply - no goods come back and stock does not move. VAT is taken at the bill's rate (${billVatPerc(inv, kind)}%) unless you change it. At most ${cur} ${f2(valueRoom)} on this bill.`)}
+                </div>
+              </div>
+            </fieldset>
+          )}
+          {inv && (
             <>
-              <fieldset className="pm-panel"style={{ margin: 0 }}>
+              {!isValueNote && <fieldset className="pm-panel"style={{ margin: 0 }}>
                 <legend className="pm-panel-legend">{L("কোন পণ্য কতটা ফেরত", "Items to return")}</legend>
                 <div className="si-field"style={{ marginBottom: 8 }}>
                   <input className="pm-input"value={itemQ} onChange={(e) => setItemQ(e.target.value)} placeholder={L("এই বিলে পণ্য খুঁজুন (নাম/কোড)…", "Filter items on this bill (name/code)…")} />
@@ -795,13 +849,14 @@ export default function ReturnsTab({
                   <button type="button"className="pm-btn-secondary"onClick={() => setQtys(Object.fromEntries(lines.filter((l) => l.returnable > 0).map((l) => [l.idx, String(l.returnable)])))}>{L("সব ফেরত", "Return all")}</button>
                   <button type="button"className="pm-btn-secondary"onClick={() => setQtys({})}>{L("সব মুছুন", "Clear")}</button>
                 </div>
-              </fieldset>
+              </fieldset>}
 
               <div className="si-cols">
                 <fieldset className="pm-panel"style={{ margin: 0 }}>
                   <legend className="pm-panel-legend">{L("কারণ", "Reason")}</legend>
                   <div className="si-panel-body">
-                    <input className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)} placeholder={L("যেমন: নষ্ট মাল / ভুল পণ্য", "e.g. damaged / wrong item")} />
+                    <input className="pm-input"value={reason} list={isValueNote ? "vn-reasons" : undefined} onChange={(e) => setReason(e.target.value)} placeholder={isValueNote ? L("যেমন: রেট পার্থক্য / পরে ছাড়", "e.g. rate difference / discount after the bill") : L("যেমন: নষ্ট মাল / ভুল পণ্য", "e.g. damaged / wrong item")} />
+                    {isValueNote && <datalist id="vn-reasons">{reasonChoices.map((r) => <option key={r} value={r} />)}</datalist>}
                     {refund > 0.009 && (
                       <div className="si-field">
                         <span className="pm-label">{K.refund[bn ? "bn" : "en"]} — {L("কীভাবে", "how")}</span>
@@ -834,7 +889,7 @@ export default function ReturnsTab({
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
           <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !inv || total <= 0 || dateBad} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${editOf ? L("এডিট সেভ", "Save Edit") : L("রিটার্ন সেভ", "Save Return")}`}
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${editOf ? L("এডিট সেভ", "Save Edit") : isValueNote ? L("নোট সেভ", "Save Note") : L("রিটার্ন সেভ", "Save Return")}`}
           </button>
         </div>
       </>
@@ -856,6 +911,7 @@ export default function ReturnsTab({
                 {vRow(L("বিল", "Bill"), `${r.invoiceNo}${r.supplierInvoiceNo ? ` (${r.supplierInvoiceNo})` : ""}${r.invoiceDate ? ` · ${fmtDay(r.invoiceDate)}` : ""}`)}
                 {r.purchaseOrderNo && vRow("PO", r.purchaseOrderNo)}
                 {grnLabel(r) && vRow("GRN", grnLabel(r))}
+                {r.noteType === "value" && vRow(L("ধরন", "Type"), L(`শুধু দামের নোট - মাল ছাড়া${n2(r.vatPerc) ? `, VAT ${n2(r.vatPerc)}%` : ""}`, `Value note - no goods${n2(r.vatPerc) ? `, VAT ${n2(r.vatPerc)}%` : ""}`), { strong: true })}
                 {r.reason && vRow(L("কারণ", "Reason"), r.reason)}
                 {r.refundVoucherNo && vRow(L("রিফান্ড ভাউচার", "Refund voucher"), r.refundVoucherNo)}
                 {vRow(L("লিখেছেন", "By"), r.createdByName || "—")}
@@ -911,6 +967,7 @@ export default function ReturnsTab({
         <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
           <button type="button"className="pm-btn-secondary"onClick={backToList}>← {L("তালিকা", "List")}</button>
           {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => print(r)}> {L("প্রিন্ট", "Print")}</button>}
+          {canPrint && r.status !== "cancelled" && <WhatsAppButton lang={lang} toast={toast} className="pm-btn-secondary" build={() => returnWhatsAppDoc(r)} />}
           {canCancel(r) && <button type="button"className="pm-btn"disabled={saving} onClick={() => startEdit(r)}> {L("এডিট", "Edit")}</button>}
           <span className="si-toolbar-gap" />
           {canCancel(r) && <button type="button"className="pm-btn-secondary pm-btn--danger"disabled={saving} onClick={() => cancelReturn(r)}> {L("রিটার্ন বাতিল", "Cancel Return")}</button>}
@@ -968,7 +1025,7 @@ export default function ReturnsTab({
             <button key={r.id} type="button"className="si-mrow"onClick={() => openDetail(r)} style={r.status === "cancelled" ? { opacity: 0.6 } : undefined}>
               <div className="si-mrow-top"><span style={{ color: K.accent }}>{r.returnNo}</span><span>{cur} {f2(r.total)}</span></div>
               <div className="si-mrow-sub"><span>{fmtDay(r.returnDate)} · {L("বিল", "Bill")} {r.invoiceNo}</span>{statusBadge(r)}</div>
-              <div className="si-mrow-sub"><span>{r.partyName || "—"} · {(r.items || []).length} {L("টি পণ্য", "items")}</span>{n2(r.refundAmount) > 0 && <span>{L("ফেরত", "Refund")} <b>{f2(r.refundAmount)}</b></span>}</div>
+              <div className="si-mrow-sub"><span>{r.partyName || "—"} · {r.noteType === "value" ? L("দামের নোট", "Value note") : `${(r.items || []).length} ${L("টি পণ্য", "items")}`}</span>{n2(r.refundAmount) > 0 && <span>{L("ফেরত", "Refund")} <b>{f2(r.refundAmount)}</b></span>}</div>
             </button>
           )) : filtered.length > 0 && (
             <table className="pm-table">
@@ -991,7 +1048,7 @@ export default function ReturnsTab({
                     <td className="si-strong"style={{ color: r.status === "cancelled" ? undefined : K.accent }}>{r.returnNo}</td>
                     <td>{r.invoiceNo}{r.supplierInvoiceNo ? ` (${r.supplierInvoiceNo})` : ""}</td>
                     <td title={r.partyName || ""}>{r.partyName || "—"}</td>
-                    <td className="si-center">{(r.items || []).length}</td>
+                    <td className="si-center">{r.noteType === "value" ? L("নোট", "Note") : (r.items || []).length}</td>
                     <td title={r.reason || ""}>{r.reason || ""}</td>
                     <td className="si-num">{f2(r.appliedToInvoice)}</td>
                     <td className="si-num">{n2(r.refundAmount) > 0 ? f2(r.refundAmount) : "—"}</td>

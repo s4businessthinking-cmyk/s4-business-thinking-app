@@ -44,7 +44,7 @@ import { renderBtWorkspace } from "./renderBtWorkspace.jsx";
 import { useBtWorkspaceActions } from "./useBtWorkspaceActions.js";
 
 // Base-unit quantity sold from each branch, keyed "branchId|productId".
-function branchSalesMap(products, salesInvoices, deliveryNotes, shopId) {
+export function branchSalesMap(products, salesInvoices, deliveryNotes, shopId) {
   const productById = new Map((products || []).map((p) => [p.id, p]));
   const out = new Map();
   const add = (doc, statuses) => {

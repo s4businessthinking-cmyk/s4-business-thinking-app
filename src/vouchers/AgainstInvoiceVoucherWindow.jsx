@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { C, inp, lbl, btn, th, td, Modal, GridTable, todayIso, fmtDate, fmtDateLong, textMatch } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
 
 const METHODS = [["cash", "Cash"], ["cheque", "Cheque"], ["bank_transfer", "Bank Transfer"], ["card", "Card"]];
 const METHOD_LABEL = Object.fromEntries(METHODS);
@@ -123,6 +124,7 @@ export default function AgainstInvoiceVoucherWindow({
   parties = [], salesmen = [], banks = [], getOpenInvoices, vouchers = [], prefill = null,
   saving = false, onSave, onCancelVoucher, onDeleteVoucher, onSetChequeStatus, onPrint, onClose, initialViewId = null,
   onPrintCheque, onPrintChequeVoucher, onHandover, onPrepareParty = null,
+  onWhatsApp = null, toast,
 }) {
   const bn = lang === "bn";
   const isReceipt = mode === "receipt";
@@ -598,6 +600,7 @@ export default function AgainstInvoiceVoucherWindow({
               <div style={{ display: "flex", gap: 6, marginRight: narrow ? 0 : "auto", flexWrap: "wrap", order: narrow ? 2 : 0 }}>
                 {onPrint && <button type="button"onClick={() => onPrint(viewing)} style={btn()}> Print</button>}
                 {onPrint && <button type="button"onClick={() => onPrint(viewing, { summaryOnly: true })} style={btn()}> Print (Summary)</button>}
+                {onWhatsApp && <WhatsAppButton lang={lang} toast={toast} className="" style={btn("#dcfce7", "#166534")} build={() => onWhatsApp(viewing)} />}
                 {!cancelled && viewing.method === "cheque" && onPrintCheque && (
                   <button type="button"onClick={() => onPrintCheque(viewing)} style={btn()}> Print Cheque</button>
                 )}

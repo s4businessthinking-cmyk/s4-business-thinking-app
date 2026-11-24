@@ -12,12 +12,13 @@ import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { buildGlobalLedger, balances, accountStatement, GROUPS } from "./globalLedger.js";
+import { groupPath, normalizeGroups } from "./coaGroups.js";
 
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const drCr = (v) => (Math.abs(v) < 0.005 ? "0.00" : `${money(Math.abs(v))} ${v > 0 ? "Dr" : "Cr"}`);
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
-const TYPE_LABEL = {
+export const TYPE_LABEL = {
   sale: ["বিক্রয়", "Sales"], saleReceipt: ["বিলে জমা", "Paid on bill"], purchase: ["ক্রয়", "Purchase"], purchasePayment: ["বিলে পেমেন্ট", "Paid on bill"],
   opening: ["ওপেনিং", "Opening"], receipt: ["রসিদ", "Receipt"], payment: ["পেমেন্ট", "Payment"], salesReturn: ["সেলস রিটার্ন", "Sales return"],
   purchaseReturn: ["পারচেজ রিটার্ন", "Purchase return"], refundPaid: ["রিফান্ড দেওয়া", "Refund paid"], refundReceived: ["রিফান্ড পাওয়া", "Refund received"],
@@ -26,7 +27,7 @@ const TYPE_LABEL = {
   distribution: ["লাভ বণ্টন", "Profit share"], bank: ["ব্যাংক এন্ট্রি", "Bank entry"],
 };
 
-export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose, embedded = false, canPrint = false }) {
+export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose, embedded = false, canPrint = false, chartOfAccounts = null, coaGroups = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const win = useWindowState({ maximized: true });
@@ -60,6 +61,13 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
     return () => { cancelled = true; };
   }, [shopId]);
 
+  // Account codes from the chart of accounts, shown next to the name (the ledger itself is built from the documents).
+  const codeOf = useMemo(() => new Map((Array.isArray(chartOfAccounts) ? chartOfAccounts : []).filter((a) => a?.code && a?.name).map((a) => [String(a.name).trim().toLowerCase(), a.code])), [chartOfAccounts]);
+  // the shop's own sub-group of an account (CoA groups), shown under the name; the ledger groups stay as posted
+  const subGroupOf = useMemo(() => {
+    const groups = normalizeGroups(coaGroups);
+    return new Map((Array.isArray(chartOfAccounts) ? chartOfAccounts : []).filter((a) => a?.groupId && a?.name).map((a) => [String(a.name).trim().toLowerCase(), groupPath(groups, a.groupId, lang === "bn")]).filter(([, p]) => p));
+  }, [chartOfAccounts, coaGroups, lang]);
   const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
   const bal = useMemo(() => (ledger ? balances(ledger.postings, to) : new Map()), [ledger, to]);
 
@@ -70,7 +78,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
     return GROUPS.map((g) => ({
       ...g,
       accounts: [...ledger.accounts.values()]
-        .filter((a) => a.group === g.id && (!q || a.name.toLowerCase().includes(q)) && (!hideZero || Math.abs(bal.get(a.key) || 0) >= 0.005 || a.key === selKey))
+        .filter((a) => a.group === g.id && (!q || a.name.toLowerCase().includes(q) || String(codeOf.get(a.name.toLowerCase()) || "").toLowerCase().includes(q)) && (!hideZero || Math.abs(bal.get(a.key) || 0) >= 0.005 || a.key === selKey))
         .sort((a, b) => a.name.localeCompare(b.name)),
     })).filter((g) => g.accounts.length);
   }, [ledger, search, hideZero, bal, selKey]);
@@ -167,7 +175,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
                         return (
                           <div key={a.key} data-sel={on ? "1" : "0"} onClick={() => setSelKey(a.key)}
                             style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 8px 4px 14px", cursor: "pointer", fontSize: 12.5, background: on ? C.sel : "transparent", fontWeight: on ? 800 : 500, borderBottom: "1px solid #eef2f7" }}>
-                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{codeOf.get(a.name.toLowerCase()) ? <span style={{ color: "#64748b" }}>{codeOf.get(a.name.toLowerCase())} </span> : null}{a.name}{subGroupOf.get(a.name.toLowerCase()) ? <span style={{ color: "#64748b", fontSize: "0.9em" }}> · {subGroupOf.get(a.name.toLowerCase())}</span> : null}</span>
                             <span style={{ whiteSpace: "nowrap", color: v > 0 ? C.label : v < 0 ? C.green : "#64748b", fontVariantNumeric: "tabular-nums" }}>{drCr(v)}</span>
                           </div>
                         );

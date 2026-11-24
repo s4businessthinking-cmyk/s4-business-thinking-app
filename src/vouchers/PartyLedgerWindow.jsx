@@ -3,6 +3,8 @@ import { C, inp, lbl, btn, GridTable, fmtDate, todayIso } from "../sales-invoice
 import { PartySelect } from "./AgainstInvoiceVoucherWindow.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { printWithSettings } from "../print/printSettings.js";
+import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import { docMessage, pdfFileName } from "../share/whatsappDocShare.js";
 import { loadPrintDesign, renderLayoutDocument, generateStatementHTML } from "../print/printDesign.js";
 import { invMeta, statementRefValue } from "./partyLedgerMeta.js";
 
@@ -498,7 +500,8 @@ export default function PartyLedgerWindow({
     const v = c.render(r);
     return typeof v === "object" && v !== null ? String(r.particulars ?? "") : String(v ?? "");
   };
-  const printOutstanding = () => {
+  // out: where the finished HTML goes - the printer, or the WhatsApp PDF.
+  const printOutstanding = (out = printWithSettings) => {
     const os = outstanding;
     const cols = osCols;
     const footVal = { amt: os.total, cn: os.cn, pdc: os.pdc, after: os.afterPdc, act: os.act };
@@ -509,7 +512,7 @@ export default function PartyLedgerWindow({
       ...(osOpts.ageing ? [`Ageing (days): ${os.ageing.map((b) => `${b.label}: ${f2(b.amount)}`).join("   ")}`] : []),
     ];
     const partyBits = [party.code, party.name, party.mobile, party.trn ? `TRN ${party.trn}` : ""].filter(Boolean);
-    printWithSettings(generateStatementHTML({
+    out(generateStatementHTML({
       shopName, title: "STATEMENT OF ACCOUNT", subtitle: `As on ${fmtDate(os.asOf)}${from || to ? ` · Bills ${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "Today"}` : ""}`,
       partyLine: partyBits.join(" · "),
       cols: cols.map((c) => ({ label: c.label, align: c.align })),
@@ -517,9 +520,9 @@ export default function PartyLedgerWindow({
       foot, summaryLines,
     }, loadPrintDesign().style.statement));
   };
-  const printLedger = () => {
+  const printLedger = (out = printWithSettings) => {
     persistLedgerOpts();
-    if (party && isOutstanding && outstanding) { printOutstanding(); return; }
+    if (party && isOutstanding && outstanding) { printOutstanding(out); return; }
     const cols = party ? stmtColsForPrint : summaryCols;
     const rows = party ? stmtRows : summary;
     const period = from || to ? `${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "Today"}` : "All dates";
@@ -539,16 +542,28 @@ export default function PartyLedgerWindow({
         shopName, title: `${partyLabel.toUpperCase()} STATEMENT`, partyName: party.code ? `${party.name} (${party.code})` : party.name, partyMobile: party.mobile || "", period,
         printDate: fmtDate(todayIso()), totalDebit: f2(totalDr), totalCredit: f2(totalCr), closing: balText(totals.closing),
       };
-      printWithSettings(renderLayoutDocument(design.layout.statement, "statement", { fields, items, logo: design.style.statement?.logo }, { title: fields.title, bn }));
+      out(renderLayoutDocument(design.layout.statement, "statement", { fields, items, logo: design.style.statement?.logo }, { title: fields.title, bn }));
       return;
     }
     const totalIdx = { dr: cols.findIndex((c) => c.key === "dr"), cr: cols.findIndex((c) => c.key === "cr"), bal: cols.findIndex((c) => c.key === "bal") };
     const foot = cols.map((c, i) => (i === totalIdx.dr - 1 ? "TOTAL" : i === totalIdx.dr ? f2(totalDr) : i === totalIdx.cr ? f2(totalCr) : i === totalIdx.bal ? balText(totals.closing) : ""));
-    printWithSettings(generateStatementHTML({
+    out(generateStatementHTML({
       shopName, title: party ? `${partyLabel.toUpperCase()} STATEMENT` : `${partyLabel.toUpperCase()} LEDGER SUMMARY`, subtitle: period,
       partyLine: party ? [party.code, party.name, party.mobile].filter(Boolean).join(" · ") : "",
       cols: cols.map((c) => ({ label: c.label, align: c.align })), rows: rows.map((r) => cols.map((c) => cellForPrint(c, r))), foot,
     }, design.style.statement));
+  };
+
+  const statementWhatsApp = () => {
+    let html = "";
+    printLedger((h) => { html = h; });
+    const balance = isOutstanding && outstanding ? `${cur} ${f2(outstanding.act)}` : balText(totals.closing);
+    const period = from || to ? `${from ? fmtDate(from) : "Start"} - ${to ? fmtDate(to) : fmtDate(todayIso())}` : "";
+    return {
+      html, fileName: pdfFileName("Statement", party?.name), phone: party?.mobile || "",
+      text: docMessage({ bn, shop: shopName, docType: isOutstanding ? (bn ? "বকেয়া বিলের হিসাব" : "Outstanding statement") : (bn ? "হিসাব বিবরণী" : "Statement of account"),
+        date: todayIso(), party: party?.name || "", cur, extra: [period && `${bn ? "সময়" : "Period"}: ${period}`, `${bn ? "ব্যালেন্স" : "Balance"}: ${balance}`].filter(Boolean).join("\n") }),
+    };
   };
 
   const totalBox = (label, value, color) => (
@@ -749,7 +764,8 @@ export default function PartyLedgerWindow({
                  {isCustomer ? (bn ? "টাকা গ্রহণ" : "Receive Payment") : (bn ? "পেমেন্ট দিন" : "Make Payment")}
               </button>
             )}
-            <button type="button"onClick={printLedger} disabled={party ? (isOutstanding ? !outstanding?.rows.length : !stmtRows.length) : !summary.length} style={btn()}> Print</button>
+            <button type="button"onClick={() => printLedger()} disabled={party ? (isOutstanding ? !outstanding?.rows.length : !stmtRows.length) : !summary.length} style={btn()}> Print</button>
+            {party && <WhatsAppButton lang={lang} toast={toast} className="" style={btn("#dcfce7", "#166534")} disabled={isOutstanding ? !outstanding?.rows.length : !stmtRows.length} build={statementWhatsApp} />}
             <button type="button"onClick={onClose} style={btn()}>Close</button>
           </div>
         </div>

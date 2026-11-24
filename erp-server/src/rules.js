@@ -135,6 +135,16 @@ async function validReturnDoc(c, req, invCol, retCol, exceptId = null) {
   if (!["confirmed", "cancelled"].includes(req.status)) return false;
   if (req.status === "cancelled") return true;
   if (!(typeof req.total === "number" && req.total > 0)) return false;
+  // Value note (credit / debit note for money only): no goods, and no more than the bill less its other returns / notes.
+  if (req.noteType === "value") {
+    if (!Array.isArray(req.items) || req.items.length) return false;
+    const bill = await c.get(invCol, req.invoiceId);
+    if (!bill || bill.shopId !== req.shopId || bill.isDeleted || bill.deleted || !RETURNABLE_INV.has(bill.status)) return false;
+    const others = typeof c.list === "function" ? await c.list(retCol, req.shopId) : [];
+    const taken = (others || []).filter((r) => r && r.status !== "cancelled" && r.invoiceId === req.invoiceId && !(exceptId && r.id === exceptId))
+      .reduce((t, r) => t + num(r.total), 0);
+    return req.total <= num(bill.grandTotal) - taken + 0.01;
+  }
   if (!Array.isArray(req.items) || !req.items.length) return false;
   const inv = await c.get(invCol, req.invoiceId);
   if (!inv || inv.shopId !== req.shopId || inv.isDeleted || inv.deleted) return false;
@@ -673,6 +683,14 @@ export const RULES = {
     create: async (c, req) => memberMay(c, req.shopId, "viewTax"),
     update: async (c, res) => memberMay(c, res.shopId, "viewTax"),
     del: async (c, res) => memberMay(c, res.shopId, "viewTax"),
+  }),
+  // Counter cash shifts: staff who may sell open and close them (opener = caller); a closed shift is final for staff,
+  // only the owner corrects or removes one.
+  counterShifts: shopScoped({
+    view: withReportRead("manageSales"),
+    create: async (c, req) => req.openedBy === c.uid && req.status === "open" && (await memberMay(c, req.shopId, "manageSales")),
+    update: async (c, res) => (await isOwnerOfShop(c, res.shopId)) || (res.status === "open" && (await memberMay(c, res.shopId, "manageSales"))),
+    del: ownerDelete,
   }),
   // Private reminders are seen by their writer only; anyone they are meant for may tick them off.
   reminders: {
