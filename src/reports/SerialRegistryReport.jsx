@@ -79,11 +79,13 @@ export default function SerialRegistryReport({ lang = "en", shopId, shop, produc
 
   const registry = useMemo(() => (data ? buildSerialRegistry({ ...data, products }, { shopId }) : null), [data, products, shopId]);
   const rows = useMemo(() => (registry ? filterSerials(registry, { query, group }) : []), [registry, query, group]);
+  // Tiles count the serials the search matches, so each tile equals the rows shown when it is picked.
+  const searched = useMemo(() => (registry ? filterSerials(registry, { query }) : []), [registry, query]);
   const counts = useMemo(() => {
     const m = Object.fromEntries(STATUS_GROUPS.map((g) => [g, 0]));
-    (registry || []).forEach((r) => { if (r.group in m) m[r.group] += 1; });
+    searched.forEach((r) => { if (r.group in m) m[r.group] += 1; });
     return m;
-  }, [registry]);
+  }, [searched]);
   const sources = useMemo(() => {
     const m = new Map();
     (registry || []).forEach((r) => r.events.forEach((e) => m.set(e.col, (m.get(e.col) || 0) + 1)));
@@ -157,7 +159,7 @@ export default function SerialRegistryReport({ lang = "en", shopId, shop, produc
 
       {registry && (
         <div className="si-kpis sr-kpis">
-          {kpi(L("মোট সিরিয়াল", "Serials"), String(registry.length), undefined, () => setGroup(""), !group)}
+          {kpi(L("মোট সিরিয়াল", "Serials"), String(searched.length), undefined, () => setGroup(""), !group)}
           {STATUS_GROUPS.filter((g) => includeJobs || g !== "service").map((g) => <React.Fragment key={g}>{kpi(groupName(g), String(counts[g]), GROUP_COLOR[g], () => setGroup(group === g ? "" : g), group === g)}</React.Fragment>)}
         </div>
       )}

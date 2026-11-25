@@ -69,7 +69,9 @@ export function buildSerialRegistry(data, { shopId = "" } = {}) {
   });
 
   const rows = [...bySerial.values()].map((r) => {
-    r.events.sort((a, b) => a.date.localeCompare(b.date) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+    // Same day: lifecycle order, then document no and id, so the result never depends on load order.
+    r.events.sort((a, b) => a.date.localeCompare(b.date) || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind)
+      || String(a.no).localeCompare(String(b.no), undefined, { numeric: true }) || String(a.docId).localeCompare(String(b.docId)));
     const last = r.events[r.events.length - 1];
     const named = [...r.events].reverse().find((e) => e.productId || e.productName) || last;
     return { ...r, productId: named.productId, productName: named.productName, productCode: named.productCode, status: last.kind, group: groupOf(last.kind), last };
@@ -82,5 +84,5 @@ export function filterSerials(rows, { query = "", group = "" } = {}) {
   const q = String(query || "").trim().toLowerCase();
   const qs = normSerial(query);
   return (rows || []).filter((r) => (!group || r.group === group)
-    && (!q || r.key.includes(qs) || [r.productName, r.productCode, ...r.events.map((e) => e.party)].some((v) => String(v || "").toLowerCase().includes(q))));
+    && (!q || (qs && r.key.includes(qs)) || [r.productName, r.productCode, ...r.events.map((e) => e.party)].some((v) => String(v || "").toLowerCase().includes(q))));
 }

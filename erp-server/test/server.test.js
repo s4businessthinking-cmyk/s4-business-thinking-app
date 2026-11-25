@@ -485,6 +485,23 @@ test("rules: counter shifts — sellers open and close their shift, a closed shi
   assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "counterShifts", id: "cs1" }])).status, 200);
 });
 
+test("rules: location moves — stock staff record and cancel their own, the owner corrects", async () => {
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { stockAdjust: true } }, true)])).status, 200);
+  const mv = { shopId: "shop1", moveNo: "LT-0001", moveDate: "2026-11-20", fromId: "main", toId: "g1", lines: [{ productId: "p1", qty: 2 }], status: "active", createdBy: sales.uid };
+  assert.equal((await commit(sales.idToken, [set("locationMoves", "lm0", { ...mv, createdBy: owner.uid })])).status, 403, "recorded as the caller");
+  assert.equal((await commit(sales.idToken, [set("locationMoves", "lm0", { ...mv, status: "cancelled" })])).status, 403, "a move starts active");
+  assert.equal((await commit(sales.idToken, [set("locationMoves", "lm1", mv)])).status, 200);
+  assert.equal((await commit(outsider.idToken, [{ op: "update", collection: "locationMoves", id: "lm1", data: { status: "cancelled" } }])).status, 403);
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "locationMoves", id: "lm1", data: { lines: [{ productId: "p1", qty: 5 }] } }])).status, 403, "staff cannot change a move");
+  assert.equal((await commit(sales.idToken, [{ op: "update", collection: "locationMoves", id: "lm1", data: { status: "cancelled", cancelledBy: sales.uid } }])).status, 200);
+  assert.equal((await commit(sales.idToken, [{ op: "delete", collection: "locationMoves", id: "lm1" }])).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "update", collection: "locationMoves", id: "lm1", data: { note: "checked" } }])).status, 200);
+  assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { stockAdjust: false } }, true)])).status, 200);
+  assert.equal((await commit(sales.idToken, [set("locationMoves", "lm2", mv)])).status, 403, "needs stockAdjust");
+  assert.equal((await api("/v1/db/get", { collection: "locationMoves", id: "lm1" }, sales.idToken)).status, 403);
+  assert.equal((await commit(owner.idToken, [{ op: "delete", collection: "locationMoves", id: "lm1" }])).status, 200);
+});
+
 test("rules: reminders — private ones stay with their writer, assignees may tick them off", async () => {
   const rem = (id, extra) => set("reminders", id, { shopId: "shop1", title: "Rent", dueDate: "2026-10-07", status: "open", createdBy: owner.uid, ...extra });
   assert.equal((await commit(owner.idToken, [rem("rm1", { assignedTo: sales.uid })])).status, 200);

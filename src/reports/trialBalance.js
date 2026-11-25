@@ -14,10 +14,11 @@ const emptyTotals = () => ({ opening: 0, dr: 0, cr: 0, closing: 0 });
 const addTo = (t, a) => { t.opening = r2(t.opening + a.opening); t.dr = r2(t.dr + a.dr); t.cr = r2(t.cr + a.cr); t.closing = r2(t.closing + a.closing); };
 
 /** Per account: { key, name, group, opening, dr, cr, closing } for postings up to `to`, opening = before `from`. */
-export function accountBalances(ledger, { from = "", to = "" } = {}) {
+export function accountBalances(ledger, { from = "", to = "", excludeDocIds = null } = {}) {
   const m = new Map();
   (ledger?.postings || []).forEach((p) => {
     if (to && p.date > to) return;
+    if (excludeDocIds && excludeDocIds.has(p.docId)) return;
     if (!m.has(p.key)) m.set(p.key, { opening: 0, dr: 0, cr: 0 });
     const a = m.get(p.key);
     if (from && p.date < from) a.opening = r2(a.opening + p.dr - p.cr);
@@ -34,10 +35,11 @@ export function accountBalances(ledger, { from = "", to = "" } = {}) {
  * -> { sections: [{ id, en, bn, totals, nodes }], totals, difference, accounts }
  * node: { type: "group", id, group, depth, totals, nodes } | { type: "account", key, name, code, opening, dr, cr, closing }
  */
-export function buildTrialBalance(ledger, { from = "", to = "", chart = [], coaGroups = [], includeZero = false } = {}) {
+// excludeDocIds: postings left out (e.g. the year-end closing journal, to see the figures before closing)
+export function buildTrialBalance(ledger, { from = "", to = "", chart = [], coaGroups = [], includeZero = false, excludeDocIds = null } = {}) {
   const groups = normalizeGroups(coaGroups);
   const byName = new Map((Array.isArray(chart) ? chart : []).filter((a) => a?.name).map((a) => [lc(a.name), a]));
-  const all = accountBalances(ledger, { from, to }).filter((a) => includeZero || !(zero(a.opening) && zero(a.dr) && zero(a.cr)))
+  const all = accountBalances(ledger, { from, to, excludeDocIds }).filter((a) => includeZero || !(zero(a.opening) && zero(a.dr) && zero(a.cr)))
     .map((a) => {
       const c = a.partyId ? null : byName.get(lc(a.name));
       const g = c?.groupId ? groups.find((x) => x.id === c.groupId) : null;

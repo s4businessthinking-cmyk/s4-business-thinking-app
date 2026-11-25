@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { computeVat } from "./taxDomain.js";
-import { buildVat201, emirateOf, vat201FileName, vat201Rows } from "./vat201.js";
+import { buildVat201, emirateOf, vat201FileName, vat201RegionRows, vat201Rows, vat201SummaryLines } from "./vat201.js";
+import { vatPackRows } from "./vatExport.js";
 
 const S = "x";
 const customers = [
@@ -75,4 +76,25 @@ test("CSV rows and file name", () => {
   assert.ok(rows.some((r) => r[1].includes("not allocated")));
   assert.ok(rows.some((r) => r[1].includes("without TRN")));
   assert.equal(vat201FileName("2026-10-01", "2026-12-31"), "vat201-2026-10-01-2026-12-31.csv");
+});
+
+test("UAE By Emirate tab and the VAT pack use the same split and boxes as the VAT return", () => {
+  const vat = vatOf();
+  const ret = buildVat201(vat, { customers, shopEmirate: "Sharjah" });
+  const regions = vat201RegionRows(ret);
+  const dubai = regions.find((r) => r.region === "Dubai");
+  assert.deepEqual([dubai.taxable, dubai.vat, dubai.bills], [1100, 55, 2], "DXB / Deira read as Dubai; the credit note is not a bill");
+  assert.equal(regions.length, 8, "seven Emirates and the unallocated line");
+  assert.deepEqual([regions[7].region, regions[7].taxable], ["", 400]);
+  const regionVat = Math.round(regions.reduce((t, r) => t + r.vat, 0) * 100) / 100;
+  const stdVat = ret.boxes.filter((b) => b.emirate).reduce((t, b) => t + b.vat, 0) + ret.unmapped.vat;
+  assert.equal(regionVat, Math.round(stdVat * 100) / 100);
+  const lines = vat201SummaryLines(ret);
+  assert.deepEqual(lines.find((l) => l.box === "Box 14" && l.label.endsWith("VAT")).amount, 57);
+  assert.deepEqual(lines.find((l) => l.box === "Box 1b" && l.label.endsWith("amount")).amount, 1100);
+  const pack = vatPackRows({ vat, summary: lines, meta: {}, regionRows: regions });
+  assert.ok(pack.some((r) => r[0] === "Box 1b" && r[3] === "1100.00"));
+  assert.ok(pack.some((r) => r[0] === "Dubai" && r[2] === "1100.00"), "pack region split = VAT201");
+  assert.equal(pack.some((r) => r[0] === "Deira"), false);
+  assert.ok(vatPackRows({ vat, summary: [] }).some((r) => r[0] === "Deira" || r[0] === "Dubai"), "without the override the pack keeps the old raw split");
 });

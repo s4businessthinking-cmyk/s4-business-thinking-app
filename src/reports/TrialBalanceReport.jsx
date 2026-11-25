@@ -17,6 +17,10 @@ import { fyStartDate } from "./balanceSheet.js";
 import { r2 } from "./reportFilters.js";
 import { csvText } from "./vatExport.js";
 import { buildTrialBalance, closingByKey, comparePeriod, trialBalanceFileName, trialBalanceRows } from "./trialBalance.js";
+import MonthEndPackPanel from "./MonthEndPackPanel.jsx";
+import YearEndPanel from "./YearEndPanel.jsx";
+import ForexPanel from "./ForexPanel.jsx";
+import { yearEndDocIds } from "./yearEnd.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const drCr = (v) => (Math.abs(v) < 0.005 ? "" : `${money(Math.abs(v))} ${v > 0 ? "Dr" : "Cr"}`);
@@ -38,7 +42,7 @@ const TB_CSS = `
 .tb-fold { display: inline-block; width: 12px; color: #475569; }
 `;
 
-export default function TrialBalanceReport({ lang = "en", shopId, shop, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false, fyStartMonth = 1, onOpenDoc = null }) {
+export default function TrialBalanceReport({ lang = "en", shopId, shop, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false, fyStartMonth = 1, onOpenDoc = null, products = [], user = null, profile = null, isOwner = false, onShopUpdated }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const today = localDay();
@@ -53,6 +57,10 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
+  const [showPack, setShowPack] = useState(false);
+  const [showYear, setShowYear] = useState(false);
+  const [showFx, setShowFx] = useState(false);
+  const [beforeClose, setBeforeClose] = useState(false);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile);
@@ -70,6 +78,8 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
         salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [],
         receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av), partnerEntries: rowsOf(pe),
         bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
+        // for the month-end pack: stock / VAT / P&L read the full document rows, bank reconciliation its own records
+        rows, bankDocs: rowsOf(br),
       });
     }).catch((err) => { console.warn("[S4 Trial balance] load failed", err); if (!cancelled) setError(String(err?.message || err)); });
     return () => { cancelled = true; };
@@ -83,8 +93,11 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
 
   const badRange = !!(from && to && from > to);
   const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
-  const opts = { chart: shop?.chartOfAccounts || [], coaGroups: shop?.coaGroups || [], includeZero };
-  const tb = useMemo(() => (ledger && !badRange ? buildTrialBalance(ledger, { from, to, ...opts }) : null), [ledger, from, to, badRange, shop?.chartOfAccounts, shop?.coaGroups, includeZero]); // eslint-disable-line react-hooks/exhaustive-deps
+  // year-end closing journals inside the period: the trial balance can show the figures before closing
+  const closeIds = useMemo(() => yearEndDocIds(data?.accountVouchers, from, to), [data, from, to]);
+  const excludeDocIds = beforeClose && closeIds.size ? closeIds : null;
+  const opts = { chart: shop?.chartOfAccounts || [], coaGroups: shop?.coaGroups || [], includeZero, excludeDocIds };
+  const tb = useMemo(() => (ledger && !badRange ? buildTrialBalance(ledger, { from, to, ...opts }) : null), [ledger, from, to, badRange, shop?.chartOfAccounts, shop?.coaGroups, includeZero, excludeDocIds]); // eslint-disable-line react-hooks/exhaustive-deps
   const cmpRange = compareMode ? comparePeriod(from, to, compareMode) : null;
   const cmp = useMemo(() => (ledger && cmpRange ? closingByKey(buildTrialBalance(ledger, { ...cmpRange, ...opts, includeZero: true })) : null), [ledger, cmpRange?.from, cmpRange?.to, shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
   const stmt = useMemo(() => (ledger && selKey ? accountStatement(ledger.postings, selKey, { from, to }) : null), [ledger, selKey, from, to]);
@@ -166,6 +179,9 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
       <div className="si-toolbar">
         {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!tb}> {L("প্রিন্ট", "Print")}</button>}
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!tb}> Excel</button>}
+        <button type="button" className={`pm-btn-secondary${showPack ? " is-active" : ""}`} onClick={() => setShowPack((v) => !v)} disabled={!ledger}> {L("মাস শেষের প্যাক", "Month-end pack")}</button>
+        <button type="button" className={`pm-btn-secondary${showYear ? " is-active" : ""}`} onClick={() => setShowYear((v) => !v)} disabled={!ledger}> {L("বছর শেষ", "Year-end close")}</button>
+        <button type="button" className={`pm-btn-secondary${showFx ? " is-active" : ""}`} onClick={() => setShowFx((v) => !v)} disabled={!ledger}>{L("বিদেশি মুদ্রা", "Forex")}</button>
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
         <span className="si-toolbar-gap" />
         <div className="si-pills">
@@ -182,6 +198,7 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
           <option value="lastYear" disabled={!from}>{L("গত বছরের একই সময়ের সাথে", "Same period last year")}</option>
         </select>
         <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><input type="checkbox" checked={includeZero} onChange={(e) => setIncludeZero(e.target.checked)} /> {L("শূন্য খাতও", "Show zero accounts")}</label>
+        {closeIds.size > 0 && <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title={L("বছর শেষের বন্ধের জার্নাল বাদ দিয়ে", "Leave out the year-end closing journal")}><input type="checkbox" checked={beforeClose} onChange={(e) => setBeforeClose(e.target.checked)} /> {L("বছর বন্ধের আগের হিসাব", "Before year-end closing")}</label>}
         <span className="si-toolbar-gap" />
         <button type="button" className="pm-btn-secondary" onClick={() => setFolded(new Set())}>{L("সব খুলুন", "Expand all")}</button>
         <button type="button" className="pm-btn-secondary" onClick={() => setFolded(new Set(allIds))}>{L("সব ভাঁজ", "Collapse all")}</button>
@@ -195,6 +212,18 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
         </div>
       )}
       <div className="si-body">
+        {showFx && ledger && (
+          <ForexPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data} vendors={vendors}
+            shopName={shopName} toast={toast} onSaved={() => setTick((v) => v + 1)} onClose={() => setShowFx(false)} />
+        )}
+        {showYear && ledger && (
+          <YearEndPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data} ledger={ledger}
+            products={products} shopName={shopName} cur={cur} toast={toast} onShopUpdated={onShopUpdated} onSaved={() => setTick((v) => v + 1)} onClose={() => setShowYear(false)} />
+        )}
+        {showPack && ledger && (
+          <MonthEndPackPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data} ledger={ledger}
+            products={products} customers={customers} vendors={vendors} shopName={shopName} cur={cur} toast={toast} onShopUpdated={onShopUpdated} onClose={() => setShowPack(false)} />
+        )}
         {error && <div className="si-paid-box is-due">{L("ডেটা পড়া যায়নি: ", "Could not load: ")}{error}</div>}
         {badRange && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষ তারিখের পরে", "The start date is after the end date")}</div>}
         {!tb && !error && !badRange && <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div>}
@@ -262,8 +291,8 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
         )}
         <div className="si-note">
           {L(
-            "গ্লোবাল লেজার থেকে: প্রতিটি খাতের শুরুর ব্যালেন্স (শুরুর তারিখের আগে), এই সময়ের ডেবিট / ক্রেডিট আর শেষ ব্যালেন্স - draft ও বাতিল বাদ। সাজানো লেজারের ভাগ > হিসাবের খাতে বানানো গ্রুপ > খাত; গ্রুপ শুধু সাজায়, অঙ্ক বদলায় না। ডাবল এন্ট্রি বলে মোট ডেবিট = মোট ক্রেডিট - পার্থক্য সবসময় ০ হওয়ার কথা। খাতে ক্লিক করলে বিবরণী, বিল নম্বরে ক্লিক করলে সেলস / পারচেজ বিল খোলে।",
-            "From the Global Ledger: each account's opening balance (before the start date), the period's debits / credits and the closing balance - drafts and cancelled documents left out. Arranged ledger side > the groups made in the Chart of Accounts > account; groups only arrange, they never change a figure. Double entry means total debits = total credits - the difference should always be 0. Click an account for its statement, and a bill number to open the sales / purchase bill."
+            "গ্লোবাল লেজার থেকে: প্রতিটি খাতের শুরুর ব্যালেন্স (শুরুর তারিখের আগে), এই সময়ের ডেবিট / ক্রেডিট আর শেষ ব্যালেন্স - draft ও বাতিল বাদ। সাজানো লেজারের ভাগ > হিসাবের খাতে বানানো গ্রুপ > খাত; গ্রুপ শুধু সাজায়, অঙ্ক বদলায় না। ডাবল এন্ট্রি বলে মোট ডেবিট = মোট ক্রেডিট - পার্থক্য সবসময় ০ হওয়ার কথা। S4-এ স্টক লেজারের খাত নয়: ব্যালেন্স শিট শেষ স্টক (গড় খরচে) আলাদা যোগ করে, তাই ব্যালেন্স শিটের মোট = এই ট্রায়াল ব্যালেন্স + স্টক। খাতে ক্লিক করলে বিবরণী, বিল নম্বরে ক্লিক করলে সেলস / পারচেজ বিল খোলে।",
+            "From the Global Ledger: each account's opening balance (before the start date), the period's debits / credits and the closing balance - drafts and cancelled documents left out. Arranged ledger side > the groups made in the Chart of Accounts > account; groups only arrange, they never change a figure. Double entry means total debits = total credits - the difference should always be 0. Stock is not a ledger account in S4: the Balance Sheet adds the closing stock (average cost) on its own, so the Balance Sheet total is this trial balance plus stock. Click an account for its statement, and a bill number to open the sales / purchase bill."
           )}
         </div>
       </div>

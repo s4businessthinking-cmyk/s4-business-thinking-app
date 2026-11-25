@@ -5,6 +5,8 @@ import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
+import PayrollPanel from "./PayrollPanel.jsx";
+import { grossSalary } from "./employeeProfile.js";
 import { ATTENDANCE_STATUSES, statusInfo, monthDates, marksByDate, summarizeMonth, payableFor, hoursBetween, wagesPaidByEmployee } from "./attendance.js";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
@@ -13,7 +15,7 @@ const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() +
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 const sameMarks = (a, b) => JSON.stringify(a || {}) === JSON.stringify(b || {});
 
-export default function AttendanceTab({ lang = "en", shopId, user, profile, canManage, cur = "AED", toast, shopName = "", leaveGuard = null }) {
+export default function AttendanceTab({ lang = "en", shopId, user, profile, canManage, cur = "AED", toast, shopName = "", leaveGuard = null, isOwner = false, shop = null, onShopUpdated }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [employees, setEmployees] = useState([]);
@@ -118,7 +120,7 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
   const paidByEmp = useMemo(() => wagesPaidByEmployee(expenses, shopId, month), [expenses, shopId, month]);
   const monthRows = useMemo(() => monthStaff.map((e) => {
     const sum = summarizeMonth(byDate, e.id, month, e.joinDate || "", e.status === "inactive" ? e.leftDate || "" : "");
-    const pay = payableFor(e, sum, month);
+    const pay = payableFor({ ...e, salary: grossSalary(e) }, sum, month);
     const paid = paidByEmp.get(e.id) || 0;
     return { e, sum, pay, paid, due: Math.round((pay.total - paid) * 100) / 100 };
   }), [monthStaff, byDate, month, paidByEmp]);
@@ -294,8 +296,17 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
       <div className="si-pills"style={{ margin: "4px 0" }}>
         <button type="button"className={`pm-btn-secondary${view === "day" ? "is-active" : ""}`} onClick={() => setView("day")}> {L("দৈনিক হাজিরা", "Daily marking")}</button>
         <button type="button"className={`pm-btn-secondary${view === "month" ? "is-active" : ""}`} onClick={() => { if (dirty && !window.confirm(L("হাজিরা সেভ করা হয়নি। চলে যাবেন?", "Attendance is not saved. Leave anyway?"))) return; setDraft(saved); setView("month"); }}> {L("মাসিক রেজিস্টার", "Monthly register")}</button>
+        {isOwner && <button type="button" className={`pm-btn-secondary${view === "payroll" ? " is-active" : ""}`} onClick={() => { if (dirty && !window.confirm(L("হাজিরা সেভ করা হয়নি। চলে যাবেন?", "Attendance is not saved. Leave anyway?"))) return; setDraft(saved); setView("payroll"); }}>{L("বেতন (পে-রোল)", "Payroll run")}</button>}
       </div>
-      {view === "day" ? dayView : monthView}
+      {view === "payroll" && isOwner && (
+        <div className="si-toolbar">
+          <input type="month" className="pm-input" style={{ width: 150 }} value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} />
+        </div>
+      )}
+      {view === "day" ? dayView : view === "payroll" && isOwner ? (
+        <PayrollPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} month={month} employees={employees} byDate={byDate} expenses={expenses}
+          cur={cur} toast={toast} shopName={shopName} onShopUpdated={onShopUpdated} />
+      ) : monthView}
     </div>
   );
 }

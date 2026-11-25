@@ -101,9 +101,9 @@ export default function PurchaseAnalyticsReport({ lang = "en", shopId, products 
     const amountCol = `${L("টাকা (VAT সহ)", "Amount (incl. VAT)")} (${cur})`, netCol = `${L("নিট (VAT ছাড়া)", "Net (excl. VAT)")} (${cur})`;
     if (view === "period") {
       return { title: a.unit === "day" ? L("দিন অনুযায়ী ক্রয়", "PURCHASES BY DAY") : L("মাস অনুযায়ী ক্রয়", "PURCHASES BY MONTH"),
-        cols: [a.unit === "day" ? L("দিন", "Day") : L("মাস", "Month"), L("বিল", "Bills"), amountCol, "VAT", netCol], num: [1, 2, 3, 4],
-        rows: a.byPeriod.map((r) => [fmtPeriod(r.period), String(r.count), money(r.amount), money(r.vat), money(r.net)]),
-        foot: [L("মোট", "Total"), String(k.count), money(k.gross), money(k.vat), money(k.net)] };
+        cols: [a.unit === "day" ? L("দিন", "Day") : L("মাস", "Month"), L("বিল", "Bills"), amountCol, "VAT", netCol, `${L("রিটার্ন (VAT সহ)", "Returns (incl. VAT)")} (${cur})`, `${L("নিট ক্রয় (রিটার্নের পরে)", "Net purchases (after returns)")} (${cur})`], num: [1, 2, 3, 4, 5, 6],
+        rows: a.byPeriod.map((r) => [fmtPeriod(r.period), String(r.count), money(r.amount), money(r.vat), money(r.net), r.returns ? money(-r.returns) : "", money(r.netPurchases)]),
+        foot: [L("মোট", "Total"), String(k.count), money(k.gross), money(k.vat), money(k.net), k.returnsTotal ? money(-k.returnsTotal) : "", money(k.netPurchases)] };
     }
     if (view === "vendor") {
       return { title: L("সাপ্লায়ার অনুযায়ী ক্রয়", "PURCHASES BY SUPPLIER"),

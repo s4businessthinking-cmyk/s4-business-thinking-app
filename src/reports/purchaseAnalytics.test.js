@@ -92,3 +92,42 @@ test("filters: supplier, supplier bill no, product, method, user, status", () =>
   assert.deepEqual(buildPurchaseAnalytics(data, NOV).options.methods, ["bank_transfer", "cash", "credit"]);
   assert.equal(payStatus({ status: "confirmed" }), "unpaid");
 });
+
+test("returns follow their bill: bill-level filters and the bill's supplier decide whether a return counts", () => {
+  // r3 is against PI-1 (bank transfer, Rafiq, paid) and its party name differs from the bill's supplier
+  const r3 = { id: "r3", shopId: S, status: "confirmed", returnDate: "2026-11-21", invoiceId: "a", partyName: "GT Trading", total: 21, totalVat: 1, items: [{ productId: "p2", code: "B-200", name: "Brake Pad", brand: "TRW", amount: 21, vatAmt: 1 }] };
+  const d2 = { ...data, purchaseReturns: [...purchaseReturns, r3] };
+  assert.equal(buildPurchaseAnalytics(d2, NOV).kpi.returnsTotal, 63);
+  // user / method / status come from the bill; r1 has no bill so it drops out once a bill filter is set
+  const rafiq = buildPurchaseAnalytics(d2, { ...NOV, user: "Rafiq" });
+  assert.deepEqual([rafiq.kpi.returnsTotal, rafiq.kpi.returnsCount], [21, 1]);
+  assert.equal(rafiq.kpi.netPurchases, 210 - 21 - (10 - 1));
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, user: "Karim" }).kpi.returnsTotal, 0);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, method: "credit" }).kpi.returnsTotal, 0);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, method: "bank_transfer" }).kpi.returnsTotal, 21);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, status: "paid" }).kpi.returnsTotal, 21);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, status: "unpaid" }).kpi.returnsTotal, 0);
+  // supplier: the bill's supplier (Gulf Traders), its supplier bill no, or the return's own party name all match
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, vendor: "gulf" }).kpi.returnsTotal, 21);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, vendor: "gt-778" }).kpi.returnsTotal, 21);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, vendor: "gt trading" }).kpi.returnsTotal, 21);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, vendor: "star" }).kpi.returnsTotal, 42);
+  // product filter still works line by line on top
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, user: "Rafiq", brand: "Bosch" }).kpi.returnsTotal, 0);
+  assert.equal(buildPurchaseAnalytics(d2, { ...NOV, brand: "TRW" }).kpi.returnsTotal, 63);
+  // a return on a cancelled bill does not borrow a filter match
+  assert.equal(buildPurchaseAnalytics({ ...data, purchaseReturns: [{ ...r3, invoiceId: "x" }] }, { ...NOV, user: "Rafiq" }).kpi.returnsTotal, 0);
+});
+
+test("the period rows add up to the KPIs, returns included, under any filter", () => {
+  const r3 = { id: "r3", shopId: S, status: "confirmed", returnDate: "2026-11-21", invoiceId: "a", partyName: "Gulf Traders", total: 21, totalVat: 1, items: [{ productId: "p2", code: "B-200", name: "Brake Pad", brand: "TRW", amount: 21, vatAmt: 1 }] };
+  const d2 = { ...data, purchaseReturns: [...purchaseReturns, r3] };
+  const nov = buildPurchaseAnalytics(d2, NOV);
+  assert.deepEqual(nov.byPeriod.filter((r) => !r.count).map((r) => [r.period, r.returns]), [["2026-11-20", 42], ["2026-11-21", 21]], "days with returns only get their own row");
+  [NOV, { ...NOV, user: "Rafiq" }, { ...NOV, brand: "TRW" }, { ...NOV, vendor: "gulf" }, { ...NOV, method: "credit" }, { shopId: S, today: "2027-01-31" }].forEach((f) => {
+    const a = buildPurchaseAnalytics(d2, f);
+    const sum = (k) => Math.round(a.byPeriod.reduce((t, r) => t + r[k], 0) * 100) / 100;
+    assert.deepEqual([sum("amount"), sum("vat"), sum("net"), sum("returns"), sum("returnsVat"), sum("netPurchases")], [a.kpi.gross, a.kpi.vat, a.kpi.net, a.kpi.returnsTotal, a.kpi.returnsVat, a.kpi.netPurchases], JSON.stringify(f));
+    assert.equal(a.invoices.reduce((t, r) => t + r.amount, 0).toFixed(2), a.kpi.gross.toFixed(2));
+  });
+});

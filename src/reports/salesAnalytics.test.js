@@ -68,7 +68,8 @@ test("breakdowns: customer, method, salesman, period", () => {
   assert.deepEqual(a.byMethod.map((m) => [m.key, m.count]), [["credit", 1], ["cash", 1]]);
   assert.deepEqual(a.bySalesman.map((m) => m.key), ["Karim", "Rafiq"]);
   assert.equal(a.unit, "day");
-  assert.deepEqual(a.byPeriod.map((r) => [r.period, r.amount]), [["2026-11-02", 105], ["2026-11-15", 283.5]]);
+  // the day of the return gets its own row (returns only)
+  assert.deepEqual(a.byPeriod.map((r) => [r.period, r.amount, r.returns]), [["2026-11-02", 105, 0], ["2026-11-15", 283.5, 0], ["2026-11-20", 0, 31.5]]);
   // all time: first bill 20 Oct; more than about two months to today goes by month
   assert.equal(buildSalesAnalytics(data, { shopId: S, today: "2026-11-30" }).unit, "day");
   const all = buildSalesAnalytics(data, { shopId: S, today: "2027-01-31" });
@@ -101,4 +102,40 @@ test("filter choices come from live bills only", () => {
   assert.deepEqual(a.options.types, ["regular", "tax"]);
   assert.deepEqual(a.options.categories, ["Brakes", "Filters"]);
   assert.equal(payStatus({ status: "confirmed" }), "unpaid");
+});
+
+test("returns follow their bill: bill-level filters and the bill's customer decide whether a return counts", () => {
+  // r3 is against SI-1 (cash, Rafiq, tax invoice, paid) and its party name differs from the bill's customer
+  const r3 = { id: "r3", shopId: S, status: "confirmed", returnDate: "2026-11-21", invoiceId: "a", partyName: "Noor Auto", total: 21, totalVat: 1, items: [{ productId: "p2", code: "B-200", name: "Brake Pad", brand: "TRW", amount: 21, vatAmt: 1 }] };
+  const d2 = { ...data, salesReturns: [...salesReturns, r3] };
+  const base = buildSalesAnalytics(d2, NOV);
+  assert.equal(base.kpi.returnsTotal, 52.5);
+  // salesman / method / type / status come from the bill; r1 has no bill so it drops out once a bill filter is set
+  const rafiq = buildSalesAnalytics(d2, { ...NOV, salesman: "Rafiq" });
+  assert.deepEqual([rafiq.kpi.returnsTotal, rafiq.kpi.returnsCount], [21, 1]);
+  assert.equal(rafiq.kpi.netSales, 105 - 21 - (5 - 1));
+  assert.deepEqual([buildSalesAnalytics(d2, { ...NOV, salesman: "Karim" }).kpi.returnsTotal, buildSalesAnalytics(d2, { ...NOV, method: "credit" }).kpi.returnsTotal], [0, 0]);
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, method: "cash" }).kpi.returnsTotal, 21);
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, type: "tax" }).kpi.returnsTotal, 21);
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, status: "paid" }).kpi.returnsTotal, 21);
+  // customer: the bill's customer (Al Noor) or the return's own party name both match
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, customer: "al noor" }).kpi.returnsTotal, 52.5);
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, customer: "noor auto" }).kpi.returnsTotal, 21);
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, customer: "star" }).kpi.returnsTotal, 0);
+  // product filter still works line by line on top
+  assert.equal(buildSalesAnalytics(d2, { ...NOV, salesman: "Rafiq", brand: "Bosch" }).kpi.returnsTotal, 0);
+  // a cancelled bill's return does not borrow a filter match
+  const lost = { ...r3, id: "r4", invoiceId: "x" };
+  assert.equal(buildSalesAnalytics({ ...data, salesReturns: [lost] }, { ...NOV, salesman: "Rafiq" }).kpi.returnsTotal, 0);
+});
+
+test("the period rows add up to the KPIs, returns included, under any filter", () => {
+  const r3 = { id: "r3", shopId: S, status: "confirmed", returnDate: "2026-11-21", invoiceId: "a", partyName: "Al Noor", total: 21, totalVat: 1, items: [{ productId: "p2", code: "B-200", name: "Brake Pad", brand: "TRW", amount: 21, vatAmt: 1 }] };
+  const d2 = { ...data, salesReturns: [...salesReturns, r3] };
+  [NOV, { ...NOV, salesman: "Rafiq" }, { ...NOV, brand: "TRW" }, { ...NOV, customer: "al noor" }, { shopId: S, today: "2027-01-31" }].forEach((f) => {
+    const a = buildSalesAnalytics(d2, f);
+    const sum = (k) => Math.round(a.byPeriod.reduce((t, r) => t + r[k], 0) * 100) / 100;
+    assert.deepEqual([sum("amount"), sum("vat"), sum("net"), sum("returns"), sum("returnsVat"), sum("netSales")], [a.kpi.gross, a.kpi.vat, a.kpi.net, a.kpi.returnsTotal, a.kpi.returnsVat, a.kpi.netSales], JSON.stringify(f));
+    assert.equal(a.invoices.reduce((t, r) => t + r.amount, 0).toFixed(2), a.kpi.gross.toFixed(2));
+  });
 });

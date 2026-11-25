@@ -6,6 +6,7 @@ import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { computeAccounts, r2 } from "./accountsCalc.js";
+import GroupViewPanel from "./GroupViewPanel.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -17,14 +18,16 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
   const [to, setTo] = useState(() => localDay());
   const [data, setData] = useState(null);
   const [tick, setTick] = useState(0);
+  const [showGroup, setShowGroup] = useState(false);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses")])
-      .then(([rows, rc, pm, ex]) => { if (!cancelled) setData({ ...rows, receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex) }); })
+    // journals too: their expense / income lines (depreciation, exchange difference, typed journals) are P&L
+    Promise.all([loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses"), offlineList("accountVouchers").catch(() => [])])
+      .then(([rows, rc, pm, ex, av]) => { if (!cancelled) setData({ ...rows, receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av) }); })
       .catch((err) => console.warn("[S4 P&L] load failed", err));
     return () => { cancelled = true; };
   }, [shopId, tick]);
@@ -123,6 +126,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
       <div className="si-toolbar">
         {canPrint && <button type="button"className="pm-btn pm-btn--primary"onClick={print} disabled={!report || badRange}> {L("প্রিন্ট", "Print")}</button>}
         <button type="button"className="pm-btn-secondary"onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
+        <button type="button" className={`pm-btn-secondary${showGroup ? " is-active" : ""}`} onClick={() => setShowGroup((v) => !v)} disabled={!report || badRange}>{L("গ্রুপ ভিউ (ব্রাঞ্চ)", "Group view (branches)")}</button>
         <span className="si-toolbar-gap" />
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => (
@@ -141,6 +145,9 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
         </div>
       )}
       <div className="si-body">
+        {showGroup && report && !badRange && (
+          <GroupViewPanel lang={lang} shopId={shopId} data={data} products={products} from={from} to={to} report={report} shopName={shopName} cur={cur} canPrint={canPrint} onClose={() => setShowGroup(false)} />
+        )}
         {badRange && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
         {!report ? (
           <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div>

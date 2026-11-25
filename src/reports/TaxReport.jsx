@@ -13,15 +13,16 @@ import { computeAccounts } from "./accountsCalc.js";
 import { r2 } from "./reportFilters.js";
 import { TAX_PRESETS, UAE_CT_DEFAULTS, UAE_EMIRATES, addDays, computeVat, corporateTax, ctDueDate, fyRange, periodRange, presetSettings, taxSettingsOf } from "./taxDomain.js";
 import { csvText, excludedCounts, purchaseDetail, salesDetail, vatChecks, vatFileName, vatPackRows } from "./vatExport.js";
-import { buildVat201, vat201FileName, vat201Rows } from "./vat201.js";
+import { buildVat201, vat201FileName, vat201RegionRows, vat201Rows, vat201SummaryLines } from "./vat201.js";
 import Vat201Panel from "./Vat201Panel.jsx";
+import EInvoicePanel from "../tax/EInvoicePanel.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const csvCell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 
-export default function TaxReport({ lang = "en", shopId, shop, user, products = [], customers = [], vendors = [], shopName = "", toast, onShopUpdated, canPrint = false, isOwner = false, onOpenDoc = null }) {
+export default function TaxReport({ lang = "en", shopId, shop, user, profile = null, products = [], customers = [], vendors = [], shopName = "", toast, onShopUpdated, canPrint = false, isOwner = false, onOpenDoc = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const settings = useMemo(() => taxSettingsOf(shop), [shop]);
@@ -47,8 +48,9 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses")])
-      .then(([rows, rc, pm, ex]) => { if (!cancelled) setData({ ...rows, receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex) }); })
+    // accountVouchers: fixed-asset bills carry input VAT, and journal P&L lines feed the Corporate Tax profit (same as the P&L page)
+    Promise.all([loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses"), offlineList("accountVouchers").catch(() => [])])
+      .then(([rows, rc, pm, ex, av]) => { if (!cancelled) setData({ ...rows, receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av) }); })
       .catch((err) => console.warn("[S4 Tax] load failed", err));
     return () => { cancelled = true; };
   }, [shopId, tick]);
@@ -121,6 +123,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
     ]);
     const billFoot = (rows) => [L("মোট", "Total"), `${rows.length}`, "", "", "", money(rows.reduce((t, r) => t + r.taxable, 0)), money(rows.reduce((t, r) => t + r.vat, 0)), money(rows.reduce((t, r) => t + r.total, 0))];
 
+    const regionList = ret201 ? vat201RegionRows(ret201) : vat?.regionRows || [];
     const tables = !vat ? {} : {
       sales: { title: L(`বিক্রির ${tn} — বিল অনুযায়ী`, `Output ${tn} — Sales bills`), cols: billCols(L("কাস্টমার", "Customer"), L("মূল বিল", "Orig. bill")), rows: billRows(vat.salesRows, L("নগদ কাস্টমার", "Cash customer")), foot: billFoot(vat.salesRows), returns: vat.salesRows.map((r) => r.isReturn) },
       purchases: (() => {
@@ -137,8 +140,9 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
       regions: {
         title: isUae ? L(`Emirate অনুযায়ী বিক্রির ${tn}`, `Output ${tn} by Emirate`) : L(`এলাকা অনুযায়ী বিক্রির ${tn}`, `Output ${tn} by region`),
         cols: [{ label: isUae ? "Emirate" : L("এলাকা / শহর", "Region / City") }, { label: L("বিল", "Bills"), align: "right", w: 70 }, { label: `${L("VAT ছাড়া বিক্রি", "Taxable sales")} (${cur})`, align: "right", w: 140 }, { label: `${tn} (${cur})`, align: "right", w: 110 }],
-        rows: vat.regionRows.map((x) => [x.region || L("লেখা নেই (নগদ / কাস্টমারে Emirate নেই)", "Not set (cash / customer has no Emirate)"), x.bills, money(x.taxable), money(x.vat)]),
-        foot: [L("মোট", "Total"), vat.regionRows.reduce((t, x) => t + x.bills, 0), money(vat.regionRows.reduce((t, x) => t + x.taxable, 0)), money(vat.regionRows.reduce((t, x) => t + x.vat, 0))],
+        // UAE: the same Emirate split as the VAT201 boxes (common spellings read, unallocated sales on their own line)
+        rows: regionList.map((x) => [x.region || (isUae ? L("Emirate বরাদ্দ হয়নি", "Not allocated to an Emirate") : L("লেখা নেই (নগদ / কাস্টমারে Emirate নেই)", "Not set (cash / customer has no Emirate)")), x.bills, money(x.taxable), money(x.vat)]),
+        foot: [L("মোট", "Total"), regionList.reduce((t, x) => t + x.bills, 0), money(regionList.reduce((t, x) => t + x.taxable, 0)), money(regionList.reduce((t, x) => t + x.vat, 0))],
       },
       vendors: {
         title: L(`সাপ্লায়ার অনুযায়ী ক্রয়ের ${tn}`, `Input ${tn} by supplier`),
@@ -285,7 +289,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
   // Summary, sales detail, purchase detail, region split and checks for the period in one file.
   const exportPack = () => {
     if (!vat) return;
-    saveCsv(fileName(), vatPackRows({ vat, summary: summaryForExport(), meta: exportMeta(), excluded: leftOut }));
+    // UAE: the pack carries the VAT201 boxes and Emirate split, the same figures as the VAT return tab
+    saveCsv(fileName(), vatPackRows({ vat, summary: ret201 ? vat201SummaryLines(ret201) : summaryForExport(), meta: exportMeta(), excluded: leftOut, regionRows: ret201 ? vat201RegionRows(ret201) : null }));
   };
 
   // ── settings ──
@@ -494,6 +499,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
     ["customers", L("কাস্টমার অনুযায়ী", "By customer")],
     ["products", L("পণ্য অনুযায়ী", "By product")],
     ["regions", isUae ? L("Emirate অনুযায়ী", "By Emirate") : L("এলাকা অনুযায়ী", "By region")],
+    // UAE e-invoicing (Peppol PINT AE) - UAE shops only
+    ...(isUae ? [["einvoice", L("ই-ইনভয়েস (PINT AE)", "e-Invoice (PINT AE)")]] : []),
   ];
 
   const tableView = (tb) => (
@@ -611,8 +618,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
           {settings.ctEnabled && <button type="button"className={`pm-btn-secondary${view === "ct" ? " is-active" : ""}`} onClick={() => setView("ct")}> {L("কর্পোরেট ট্যাক্স", "Corporate Tax")}</button>}
         </div>
         <button type="button"className="pm-btn pm-btn--primary"onClick={fileNow}> {mobile ? L("জমা দিন", "File") : view === "ct" ? L("Corporate Tax জমা দিন", "File Corporate Tax") : L(`${tn} জমা দিন`, `File ${tn}`)}</button>
-        {canPrint && <button type="button"className="pm-btn-secondary"onClick={print} disabled={loading || badRange}> {L("প্রিন্ট", "Print")}</button>}
-        {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={loading || badRange} title={L("এই ভিউয়ের CSV", "CSV of this view")}> Excel</button>}
+        {canPrint && tab !== "einvoice" && <button type="button"className="pm-btn-secondary"onClick={print} disabled={loading || badRange}> {L("প্রিন্ট", "Print")}</button>}
+        {canPrint && tab !== "einvoice" && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={loading || badRange} title={L("এই ভিউয়ের CSV", "CSV of this view")}> Excel</button>}
         {canPrint && view === "vat" && <button type="button" className="pm-btn-secondary" onClick={exportPack} disabled={loading || badRange || !vat} title={L("সারাংশ + বিক্রির বিল + ক্রয়ের বিল + যাচাই, এক ফাইলে", "Summary + sales bills + purchase bills + checks in one file")}> {L("পিরিয়ড প্যাক (CSV)", "Period pack (CSV)")}</button>}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
         <button type="button"className="pm-btn-secondary"onClick={openSettings}> {L("সেটিং", "Settings")}</button>
@@ -663,6 +670,9 @@ export default function TaxReport({ lang = "en", shopId, shop, user, products = 
       <div className="si-body">
         {settings.taxApplicable === "none" && view === "vat" && <div className="si-paid-box is-due">{L(`দোকানের তথ্যে "TAX Applicable" = None দেওয়া আছে — VAT রেজিস্টার্ড হলে  সেটিংস → দোকানের তথ্যে বদলে দিন।`, `Shop Info has "TAX Applicable" = None — change it in  Settings → Shop Info if you are VAT registered.`)}</div>}
         {badRange && view === "vat" && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
+        {isUae && view === "vat" && tab === "einvoice" && !badRange && (
+          <EInvoicePanel lang={lang} shopId={shopId} shop={shop} customers={customers} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} from={from} to={to} shopName={shopName} toast={toast} />
+        )}
         {loading ? <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div> : view === "ct" ? (
           <>
             {twoCols(

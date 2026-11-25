@@ -51,6 +51,8 @@ const SECTIONS = [
     { k: "salaryDay", bn: "মাসের কত তারিখে বেতন", en: "Salary day of month", mode: "numeric" },
     { k: "bankName", bn: "ব্যাংকের নাম", en: "Bank name", show: (f) => f.payMethod === "bank" || f.payMethod === "wps" },
     { k: "bankAccount", bn: "অ্যাকাউন্ট / IBAN", en: "Account / IBAN", show: (f) => f.payMethod === "bank" || f.payMethod === "wps" },
+    { k: "bankRoutingCode", bn: "ব্যাংক রাউটিং কোড (WPS, ৯ সংখ্যা)", en: "Bank routing code (WPS, 9 digits)", mode: "numeric", show: (f) => f.payMethod === "wps" },
+    { k: "wpsPersonId", bn: "MOHRE পার্সন আইডি (WPS, ১৪ সংখ্যা)", en: "MOHRE person ID (WPS, 14 digits)", mode: "numeric", show: (f) => f.payMethod === "wps" },
     { k: "contractType", bn: "চুক্তির ধরন", en: "Contract type", t: "select", opts: [["", "—", "—"], ["unlimited", "মেয়াদহীন", "Unlimited"], ["limited", "নির্দিষ্ট মেয়াদ", "Limited / fixed term"], ["partTime", "পার্ট টাইম", "Part time"], ["daily", "দৈনিক মজুরি", "Daily wage"]] },
     { k: "contractStart", bn: "চুক্তি শুরু", en: "Contract start", t: "date" },
     { k: "contractEnd", bn: "চুক্তি শেষ", en: "Contract end", t: "date", show: (f) => f.contractType !== "unlimited" },
@@ -401,7 +403,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
   const fieldLabel = (f) => (bn ? (f.bnFn ? f.bnFn(ctx) : f.bn) : (f.enFn ? f.enFn(ctx) : f.en));
   const renderField = (f) => {
     if (f.show && !f.show(form, ctx)) return null;
-    if (section === "pay" && !canSeeSalary && (f.t === "money" || ["payMethod", "salaryDay", "bankName", "bankAccount", "otRate"].includes(f.k))) return null;
+    if (section === "pay" && !canSeeSalary && (f.t === "money" || ["payMethod", "salaryDay", "bankName", "bankAccount", "bankRoutingCode", "wpsPersonId", "otRate"].includes(f.k))) return null;
     const label = f.t === "money" ? `${fieldLabel(f)} (${cur})` : fieldLabel(f);
     let control;
     if (f.t === "select") control = <select className="pm-input"disabled={readOnly} value={form[f.k]} onChange={(e) => setF(f.k, e.target.value)}>{f.opts.map((o) => <option key={o[0]} value={o[0]}>{bn ? o[1] : o[2]}</option>)}</select>;

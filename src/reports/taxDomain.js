@@ -117,6 +117,9 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   const purchRet = liveReturnsOf(data.extras?.purchaseReturns, shopId).filter((r) => inPeriod(r.returnDate));
   // Only expense bills with VAT on them (rent, electricity, repairs…) are claimable; salary and other no-VAT costs stay out.
   const expenseBills = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && n(e.vatAmount) > 0 && inPeriod(e.expenseDate));
+  // VAT on a fixed asset bought through the asset register (its booking journal carries the bill's VAT)
+  const assetBills = (data.accountVouchers || data.extras?.accountVouchers || [])
+    .filter((v) => isLive(v, shopId) && v.status !== "cancelled" && v.source === "fixedAsset" && v.faKind === "buy" && n(v.vatAmount) > 0 && inPeriod(v.voucherDate));
 
   const salesRows = [
     ...sales.map((inv) => ({
@@ -152,6 +155,12 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
       return { id: e.id, date: dayOf(e.expenseDate), no: e.expenseNo || "", ref: e.refNo || "", party: e.paidTo || e.categoryName || e.category || "",
         trn, vatClaimable: !!trn,
         taxable: r2(n(e.amount) - n(e.vatAmount)), vat: r2(e.vatAmount), total: r2(e.amount), isReturn: false, isExpense: true };
+    }),
+    ...assetBills.map((v) => {
+      const trn = v.supplierTrn || "";
+      const total = r2(n(v.totalAmount));
+      return { id: v.id, date: dayOf(v.voucherDate), no: v.voucherNo || "", ref: v.refNo || "", party: v.paidTo || "",
+        trn, vatClaimable: !!trn, taxable: r2(total - n(v.vatAmount)), vat: r2(v.vatAmount), total, isReturn: false, isExpense: true, isAsset: true };
     }),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.no.localeCompare(b.no));
 

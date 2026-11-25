@@ -442,6 +442,16 @@ export const RULES = {
       || (res.createdBy === c.uid && req.createdBy === res.createdBy && (await memberMay(c, res.shopId, "stockAdjust"))),
     del: memberDelete("deleteStock"),
   }),
+  // Godown / location transfers inside one shop (no quantity or money change): stock staff record them as themselves;
+  // after that staff may only cancel one, the owner corrects or removes.
+  locationMoves: shopScoped({
+    view: "stockAdjust",
+    create: async (c, req) => req.createdBy === c.uid && req.status === "active" && (await memberMay(c, req.shopId, "stockAdjust")),
+    update: async (c, res, req) => (await isOwnerOfShop(c, res.shopId))
+      || (req.createdBy === res.createdBy && req.status === "cancelled" && JSON.stringify(req.lines || []) === JSON.stringify(res.lines || [])
+        && req.fromId === res.fromId && req.toId === res.toId && req.moveDate === res.moveDate && (await memberMay(c, res.shopId, "stockAdjust"))),
+    del: ownerDelete,
+  }),
   // Battery / product guarantee: customer → company → replacement (stock only at replaced/delivered).
   warrantyClaims: shopScoped({
     view: ["stockAdjust", "manageReturns"],

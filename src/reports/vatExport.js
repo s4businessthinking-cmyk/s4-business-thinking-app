@@ -16,7 +16,7 @@ export function vatFileName({ periodLabel = "", from = "", to = "", part = "" } 
 }
 
 const salesType = (r) => (r.isReturn ? "Sales return" : "Sale");
-const purchaseType = (r) => (r.isReturn ? "Purchase return" : r.isExpense ? "Expense" : "Purchase");
+const purchaseType = (r) => (r.isReturn ? "Purchase return" : r.isAsset ? "Fixed asset" : r.isExpense ? "Expense" : "Purchase");
 
 export const SALES_DETAIL_COLS = ["Date", "Type", "Document No", "Original Bill", "Customer", "Customer TRN", "Taxable", "VAT", "Total"];
 export const PURCHASE_DETAIL_COLS = ["Date", "Type", "Document No", "Supplier Bill No", "Supplier", "Supplier TRN", "Taxable", "VAT", "Total"];
@@ -65,15 +65,18 @@ export function vatChecks(vat) {
 export function excludedCounts(data, { shopId = "", from = "", to = "" } = {}) {
   const out = { salesDraft: 0, salesCancelled: 0, quotations: 0, deliveryNotes: 0, salesOpening: 0, purchaseDraft: 0, purchaseCancelled: 0, branchTransfers: 0, purchaseOpening: 0, returnsCancelled: 0 };
   const inPeriod = (d) => inRange(dayOf(d), from, to);
+  // A legacy delivery note moved to deliveryNotes keeps its id, so it is counted once even if both copies are read.
+  const deliveryIds = new Set();
+  const delivery = (doc) => { if (!doc.id || !deliveryIds.has(doc.id)) out.deliveryNotes += 1; if (doc.id) deliveryIds.add(doc.id); };
   (data?.salesInvoices || []).forEach((inv) => {
     if (!isLive(inv, shopId) || !inPeriod(inv.invoiceDate)) return;
     if (inv.docKind === "quotation" || inv.docKind === "salesOrder") out.quotations += 1;
-    else if (inv.invoiceType === "delivery" || inv.docKind === "delivery") out.deliveryNotes += 1;
+    else if (inv.invoiceType === "delivery" || inv.docKind === "delivery") delivery(inv);
     else if (inv.status === "draft") out.salesDraft += 1;
     else if (inv.status === "cancelled") out.salesCancelled += 1;
     else if (inv.source === "openingBalance") out.salesOpening += 1;
   });
-  (data?.deliveryNotes || []).forEach((dn) => { if (isLive(dn, shopId) && inPeriod(dn.invoiceDate)) out.deliveryNotes += 1; });
+  (data?.deliveryNotes || []).forEach((dn) => { if (isLive(dn, shopId) && inPeriod(dn.invoiceDate)) delivery(dn); });
   (data?.purchaseInvoices || []).forEach((inv) => {
     if (!isLive(inv, shopId) || !inPeriod(inv.invoiceDate)) return;
     if (inv.internalTransfer || inv.sourceType === "branch_transfer") out.branchTransfers += 1;
@@ -91,7 +94,7 @@ export function excludedCounts(data, { shopId = "", from = "", to = "" } = {}) {
  * One file for the period: header, return summary, sales detail, purchase detail, excluded purchases, region split
  * and the checks. summary: [{ box, label, labelBn, amount }] from the Tax page; regions: computeVat regionRows.
  */
-export function vatPackRows({ vat, summary = [], meta = {}, excluded = null }) {
+export function vatPackRows({ vat, summary = [], meta = {}, excluded = null, regionRows = null }) {
   const s = salesDetail(vat), p = purchaseDetail(vat), c = vatChecks(vat);
   const blank = [];
   const out = [
@@ -105,8 +108,9 @@ export function vatPackRows({ vat, summary = [], meta = {}, excluded = null }) {
   if (p.excluded.length) {
     out.push(blank, ["PURCHASES NOT RECOVERABLE (SUPPLIER HAS NO TRN)"], p.cols, ...p.excluded, ["Total", `${p.excluded.length} line(s)`, "", "", "", "", num(p.excludedTotals.taxable), num(p.excludedTotals.vat), num(p.excludedTotals.total)]);
   }
-  if ((vat?.regionRows || []).length) {
-    out.push(blank, ["OUTPUT VAT BY EMIRATE / REGION"], ["Region", "Bills", "Taxable", "VAT"], ...vat.regionRows.map((x) => [x.region || "Not set", String(x.bills), num(x.taxable), num(x.vat)]));
+  const regions = regionRows || vat?.regionRows || [];
+  if (regions.length) {
+    out.push(blank, ["OUTPUT VAT BY EMIRATE / REGION"], ["Region", "Bills", "Taxable", "VAT"], ...regions.map((x) => [x.region || "Not set", String(x.bills), num(x.taxable), num(x.vat)]));
   }
   out.push(blank, ["CHECKS"], ["Check", "Detail", "Summary", "Result"],
     ["Output VAT: sales detail vs summary", num(c.salesDetailVat), num(c.outputVat), c.salesOk ? "OK" : "MISMATCH"],

@@ -94,6 +94,23 @@ export function buildVat201(vat, { customers = [], shopEmirate = "", noVatBox = 
   };
 }
 
+/** Emirate rows (1a-1g, then the unallocated sales) in the shape of computeVat's regionRows. */
+export const vat201RegionRows = (ret) => [
+  ...ret.boxes.filter((b) => b.emirate).map((b) => ({ region: b.emirate, bills: b.rows.filter((r) => !r.isReturn).length, taxable: b.amount, vat: b.vat })),
+  ...(ret.unmapped.rows.length ? [{ region: "", bills: ret.unmapped.rows.filter((r) => !r.isReturn).length, taxable: ret.unmapped.amount, vat: ret.unmapped.vat }] : []),
+];
+
+/** Box lines for the VAT period pack summary: { box, label, labelBn, amount } (amount and VAT on their own lines). */
+export function vat201SummaryLines(ret) {
+  const out = [];
+  ret.boxes.forEach((b) => {
+    if (b.amount != null) out.push({ box: `Box ${b.id}`, label: `${b.en} - amount`, labelBn: `${b.bn} - মূল্য`, amount: b.amount });
+    out.push({ box: `Box ${b.id}`, label: `${b.en} - VAT`, labelBn: `${b.bn} - VAT`, amount: b.vat });
+  });
+  if (ret.unmapped.rows.length) out.push({ box: "", label: "Sales not allocated to an Emirate (in box 8) - amount", labelBn: "Emirate বরাদ্দ হয়নি - মূল্য", amount: ret.unmapped.amount });
+  return out;
+}
+
 export const VAT201_COLS = ["Box", "Description", "Amount (AED)", "VAT amount (AED)", "Adjustment (AED)", "Note"];
 /** CSV rows ready to type into the FTA portal. */
 export function vat201Rows(ret) {

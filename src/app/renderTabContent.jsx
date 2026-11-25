@@ -389,7 +389,8 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
 
       {tab==="attendance"&&(isOwner||can("manageEmployees"))&&(
         <AttendanceTab lang={lang} shopId={shopId} user={user} profile={profile} canManage={isOwner||can("manageEmployees")}
-          cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard} />
+          cur={t.cur||"AED"} toast={toast} shopName={localShop?.companyName||""} leaveGuard={billLeaveGuard}
+          isOwner={isOwner} shop={localShop} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
       )}
 
       {tab==="vouchers"&&(isOwner||canStaffVouchers)&&(
@@ -478,7 +479,8 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
       {tab==="accounts"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব নিকাশ (Accounts) লক করা":"Accounts are locked")}
       {tab==="balanceSheet"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
-        <BalanceSheetReport lang={lang} shopId={shopId} products={products} customers={customers} vendors={vendors}
+        <BalanceSheetReport lang={lang} shopId={shopId} products={products} customers={customers} vendors={vendors} yearEnds={localShop?.yearEnds}
+          shop={localShop} user={user} profile={profile} isOwner={isOwner} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")}
           fyStartMonth={Number(localShop?.fyStartMonth || localShop?.taxSettings?.fyStartMonth) || 1} />
       )}
@@ -499,7 +501,8 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
       {tab==="openingBalances"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"শুরুর ব্যালেন্স লক করা":"Opening & Migration is locked")}
       {tab==="trialBalance"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
-        <TrialBalanceReport lang={lang} shopId={shopId} shop={localShop} customers={customers} vendors={vendors}
+        <TrialBalanceReport lang={lang} shopId={shopId} shop={localShop} customers={customers} vendors={vendors} products={products} user={user} profile={profile} isOwner={isOwner}
+          onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")}
           fyStartMonth={Number(localShop?.fyStartMonth || localShop?.taxSettings?.fyStartMonth) || 1}
           onOpenDoc={{
@@ -526,7 +529,8 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       {tab==="partyAging"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"এজিং রিপোর্ট লক করা":"Ageing report is locked")}
       {tab==="stockHub"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("stockAdjust")))&&(
         <StockHubReport lang={lang} shopId={shopId} products={products} shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast}
-          canPrint={isOwner||can("printStock")} canSeeCost={isOwner||!!canSeeProductCost} />
+          canPrint={isOwner||can("printStock")} canSeeCost={isOwner||!!canSeeProductCost}
+          shop={localShop} user={user} profile={profile} isOwner={isOwner} canMove={isOwner||can("stockAdjust")} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
       )}
       {tab==="stockHub"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"স্টক হাব লক করা":"Stock Hub is locked")}
       {tab==="salesAnalytics"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
@@ -557,7 +561,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printProducts")} />
       )}
       {tab==="tax"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewTax")))&&(
-        <TaxReport lang={lang} shopId={shopId} shop={localShop} user={user} products={products} customers={customers} vendors={vendors}
+        <TaxReport lang={lang} shopId={shopId} shop={localShop} user={user} profile={profile} products={products} customers={customers} vendors={vendors}
           shopName={localShop?.companyName||""} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} canPrint={isOwner||can("printTax")}
           isOwner={isOwner} onOpenDoc={{
             can:(col)=>(col==="salesInvoices"&&(isOwner||can("manageSales")))||(col==="purchaseInvoices"&&(isOwner||can("managePurchase"))),

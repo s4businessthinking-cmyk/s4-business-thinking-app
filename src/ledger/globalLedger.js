@@ -27,6 +27,10 @@ export const FIXED = {
   Purchase: "expense", "Sales Return": "income", "Discount Allowed": "expense", "Bank Charges": "expense",
   "VAT Output": "tax", "VAT Input": "tax", Capital: "equity", Drawings: "equity", "Opening Balance": "equity", "Profit Distribution": "equity",
   "Bounced Cheques (unpaid)": "other", "Bank Adjustment": "other",
+  // fixed asset register (src/accounts/fixedAssets.js)
+  Depreciation: "expense", "Gain on Asset Disposal": "income", "Loss on Asset Disposal": "expense",
+  // foreign currency bills (src/reports/forex.js)
+  "Exchange Gain": "income", "Exchange Loss": "expense",
 };
 const lc = (v) => String(v || "").trim().toLowerCase();
 const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);

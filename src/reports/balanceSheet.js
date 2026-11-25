@@ -5,6 +5,7 @@
 // except income / expense (rolled into profit) and capital / partner accounts (equity).
 import { recordDay, dayOf } from "../accounts/periodLock.js";
 import { n, r2, isLive } from "./reportFilters.js";
+import { isFixedAssetAccount } from "../accounts/fixedAssets.js";
 
 const add = (list, name, amount, key) => { list.push({ key, name, amount: r2(amount) }); };
 const sum = (list) => r2(list.reduce((t, l) => t + l.amount, 0));
@@ -18,7 +19,7 @@ const DOC_NO = {
   expenses: "expenseNo", accountVouchers: "voucherNo", salesReturns: "returnNo", purchaseReturns: "returnNo",
 };
 export const SECTION_ORDER = {
-  assets: ["cash", "receivable", "supplierAdvance", "stock", "vatRefundable", "otherAsset"],
+  assets: ["cash", "receivable", "supplierAdvance", "stock", "vatRefundable", "otherAsset", "fixedAsset"],
   liabilities: ["payable", "customerAdvance", "vatPayable", "overdraft", "otherLiability"],
   equity: ["equity"],
 };
@@ -111,8 +112,10 @@ export function moneyBreakdown(postings, accounts, asOf) {
  * -> { assets, liabilities, equity } as [{ id, lines: [{ key, name, amount }], total }], their totals,
  * profit to date and the difference (0 when the books agree).
  */
-export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStock = 0 }) {
-  const cash = [], receivable = [], supplierAdvance = [], otherAsset = [];
+// closedStock: stock value on the last closed year-end day (yearEnd.js) - later profit counts from it and the stock gain
+// of the closed years shows in equity on its own line. Left out (no year closed) the sheet works as before.
+export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStock = 0, closedStock = null }) {
+  const cash = [], receivable = [], supplierAdvance = [], otherAsset = [], fixedAsset = [];
   const payable = [], customerAdvance = [], overdraft = [], otherLiability = [];
   const capital = [];
   let pl = 0, vat = 0;
@@ -125,6 +128,8 @@ export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStoc
     if (a.group === "money") { if (v > 0) add(cash, a.name, v, a.key); else add(overdraft, a.name, -v, a.key); return; }
     if (a.group === "customer") { if (v > 0) add(receivable, a.name, v, a.key); else add(customerAdvance, a.name, -v, a.key); return; }
     if (a.group === "vendor") { if (v < 0) add(payable, a.name, -v, a.key); else add(supplierAdvance, a.name, v, a.key); return; }
+    // fixed asset cost and its accumulated depreciation stay together as one non-current section (cost less depreciation)
+    if (isFixedAssetAccount(a.name)) { add(fixedAsset, a.name, v, a.key); return; }
     if (v > 0) add(otherAsset, a.name, v, a.key); else add(otherLiability, a.name, -v, a.key);
   });
 
@@ -134,15 +139,17 @@ export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStoc
   if (vat > 0) add(vatAsset, "VAT refundable", vat, "vat");
   if (vat < 0) add(vatLiability, "VAT payable", -vat, "vat");
   // Ledger profit is income less purchases and expenses; adding the stock change turns purchases into cost of goods sold.
-  const profit = r2(-pl + closingStock - openingStock);
+  const stockBase = closedStock == null ? openingStock : closedStock;
+  const profit = r2(-pl + closingStock - stockBase);
   const equityLines = [...capital.sort(byName)];
   if (Math.abs(openingStock) >= 0.005) add(equityLines, "Opening stock", openingStock, "openingStock");
+  if (closedStock != null && Math.abs(closedStock - openingStock) >= 0.005) add(equityLines, "Stock gain of closed years", r2(closedStock - openingStock), "closedStockGain");
   if (Math.abs(profit) >= 0.005) add(equityLines, "Profit to date", profit, "profit");
 
   const section = (id, lines, sort = true) => ({ id, lines: sort ? lines.sort(byName) : lines, total: sum(lines) });
   const assets = [
     section("cash", cash), section("receivable", receivable), section("supplierAdvance", supplierAdvance),
-    section("stock", stock, false), section("vatRefundable", vatAsset, false), section("otherAsset", otherAsset),
+    section("stock", stock, false), section("vatRefundable", vatAsset, false), section("otherAsset", otherAsset), section("fixedAsset", fixedAsset),
   ].filter((s) => s.lines.length);
   const liabilities = [
     section("payable", payable), section("customerAdvance", customerAdvance), section("vatPayable", vatLiability, false),
@@ -153,8 +160,8 @@ export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStoc
   const totalAssets = r2(assets.reduce((t, s) => t + s.total, 0));
   const totalLiabilities = r2(liabilities.reduce((t, s) => t + s.total, 0));
   const totalEquity = r2(equity.reduce((t, s) => t + s.total, 0));
-  // Trading shop has no fixed-asset register yet: every BS line is treated as current.
-  const workingCapital = r2(totalAssets - totalLiabilities);
+  // every line is current except the fixed asset register's section
+  const workingCapital = r2(totalAssets - sum(fixedAsset) - totalLiabilities);
   return {
     assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, profit,
     workingCapital, difference: r2(totalAssets - totalLiabilities - totalEquity),

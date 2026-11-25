@@ -13,6 +13,7 @@ import { BRANCH_TRANSFER_COLLECTIONS } from "../branch-transfer/branchTransferSe
 import { BRANCH_TRANSFER_STATUSES, remainingQuantityForLine, statusLabel } from "../branch-transfer/branchTransferDomain.js";
 import { branchSalesMap } from "../branch-transfer/BranchTransferNative.jsx";
 import { averageCosts } from "./averageCost.js";
+import GodownsPanel from "../inventory/GodownsPanel.jsx";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { branchStock, itemLedger, movementByProduct, onHandAt, productMatches, stockMovements, valuation } from "./stockHub.js";
 
@@ -29,6 +30,7 @@ const TABS = [
   { id: "ledger", bn: "আইটেম লেজার", en: "Item ledger" },
   { id: "valuation", bn: "স্টকের মূল্য", en: "Valuation" },
   { id: "locations", bn: "র‍্যাক / ব্রাঞ্চ", en: "Rack / branch" },
+  { id: "godowns", bn: "গোডাউন / লোকেশন", en: "Godowns / locations" },
 ];
 const KIND_LABEL = {
   purchase: ["ক্রয়", "Purchase"], goodsReceipt: ["মাল রিসিভ (GRN)", "Goods received"], sale: ["বিক্রয়", "Sale"],
@@ -50,7 +52,8 @@ const SH_CSS = `
 .sh-table tr.is-link:hover td { background: #eef4ff; }
 `;
 
-export default function StockHubReport({ lang = "en", shopId, products = [], shopName = "", toast, canPrint = false, canSeeCost = false, cur = "AED" }) {
+export default function StockHubReport({ lang = "en", shopId, products = [], shopName = "", toast, canPrint = false, canSeeCost = false, cur = "AED",
+  shop = null, user = null, profile = null, isOwner = false, canMove = false, onShopUpdated }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [tab, setTab] = useState("onhand");
@@ -214,7 +217,7 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
   const kpi = (label, value, color) => (
     <div className="si-kpi" title={`${label}: ${value}`}><span>{label}</span><b style={{ color }}>{value}</b></div>
   );
-  const usesAsOf = tab === "onhand" || tab === "valuation";
+  const usesAsOf = tab === "onhand" || tab === "valuation" || tab === "godowns";
   const usesRange = tab === "movement" || tab === "ledger";
   const ready = !!movements;
   const warn = { color: "#b45309", fontWeight: 700, marginTop: 3 };
@@ -236,8 +239,8 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
           ))}
         </div>
         <span className="si-toolbar-gap" />
-        {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!ready || (tab === "ledger" && !ledger)}> {L("প্রিন্ট", "Print")}</button>}
-        {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!ready || (tab === "ledger" && !ledger)}> Excel</button>}
+        {canPrint && tab !== "godowns" && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!ready || (tab === "ledger" && !ledger)}> {L("প্রিন্ট", "Print")}</button>}
+        {canPrint && tab !== "godowns" && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!ready || (tab === "ledger" && !ledger)}> Excel</button>}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
       </div>
       <div className="si-toolbar">
@@ -331,6 +334,10 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
 
       <div className="si-body">
         {error && <div className="si-paid-box is-due">{L("ডেটা পড়া যায়নি: ", "Could not load: ")}{error}</div>}
+        {ready && tab === "godowns" && (
+          <GodownsPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canMove={canMove} canPrint={canPrint} canSeeCost={canSeeCost}
+            products={products} movements={movements} avgCost={avgCost} day={day} cur={cur} toast={toast} shopName={shopName} onShopUpdated={onShopUpdated} filterIds={search || category ? listedIds : null} />
+        )}
         {badRange && usesRange && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
         {mismatch.length > 0 && (
           <div className="si-paid-box is-due">{L(`${mismatch.length}টি প্রোডাক্টের হিসাব প্রোডাক্ট পেজের স্টকের সাথে মেলেনি: ${mismatch.slice(0, 5).map(nameOf).join(", ")}`, `${mismatch.length} product(s) do not agree with the stock on the product screen: ${mismatch.slice(0, 5).map(nameOf).join(", ")}`)}</div>

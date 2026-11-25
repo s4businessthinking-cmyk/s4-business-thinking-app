@@ -12,6 +12,8 @@ import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
 import { TYPE_LABEL } from "../ledger/GlobalLedgerWindow.jsx";
 import { averageCosts } from "./averageCost.js";
+import { closedYearAt } from "./yearEnd.js";
+import FixedAssetsPanel from "../accounts/FixedAssetsPanel.jsx";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import {
   alignSides, buildBalanceSheet, excludedDocs, fyStartDate, moneyBreakdown, negativeStock, openingBsAsOf, openingStockValue, stockDocsUpTo,
@@ -31,6 +33,7 @@ const SECTION_LABEL = {
   stock: ["স্টক", "Inventory"],
   vatRefundable: ["VAT ফেরতযোগ্য", "VAT refundable"],
   otherAsset: ["অন্যান্য সম্পদ", "Other assets"],
+  fixedAsset: ["স্থায়ী সম্পদ (খরচ - অবচয়)", "Fixed assets (cost less depreciation)"],
   payable: ["সাপ্লায়ারদের দেনা", "Trade payables (suppliers)"],
   customerAdvance: ["কাস্টমারের অগ্রিম", "Advances from customers"],
   vatPayable: ["VAT দেনা", "VAT payable"],
@@ -42,6 +45,7 @@ const LINE_LABEL = {
   stock: ["সমাপনী স্টক (গড় খরচে)", "Closing stock (average cost)"],
   vat: ["নিট VAT", "Net VAT"],
   openingStock: ["ওপেনিং স্টক (প্রোডাক্ট মাস্টার)", "Opening stock (product master)"],
+  closedStockGain: ["বন্ধ বছরগুলোর স্টক বৃদ্ধি", "Stock gain of closed years"],
   profit: ["আজ পর্যন্ত লাভ / ক্ষতি", "Profit / loss to date"],
 };
 const DOC_LABEL = {
@@ -63,7 +67,8 @@ const BS_CSS = `
 `;
 
 export default function BalanceSheetReport({
-  lang = "en", shopId, products = [], customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false, fyStartMonth = 1,
+  lang = "en", shopId, products = [], customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false, fyStartMonth = 1, yearEnds = null,
+  shop = null, user = null, profile = null, isOwner = false, onShopUpdated,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -71,6 +76,7 @@ export default function BalanceSheetReport({
   const [compareAsOf, setCompareAsOf] = useState("");
   const [detail, setDetail] = useState(false);
   const [panel, setPanel] = useState("");
+  const [showAssets, setShowAssets] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
@@ -127,9 +133,11 @@ export default function BalanceSheetReport({
   const stock = useMemo(() => stockAt(day), [data, products, shopId, day]); // eslint-disable-line react-hooks/exhaustive-deps
   const stockCmp = useMemo(() => (cmpDay ? stockAt(cmpDay) : null), [data, products, shopId, cmpDay]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sheetAt = (d, st) => (ledger && st ? buildBalanceSheet({ accounts: ledger.accounts, bal: balances(ledger.postings, d), closingStock: st.value, openingStock }) : null);
-  const sheet = useMemo(() => sheetAt(day, stock), [ledger, stock, day, openingStock]); // eslint-disable-line react-hooks/exhaustive-deps
-  const sheetCmp = useMemo(() => (cmpDay ? sheetAt(cmpDay, stockCmp) : null), [ledger, stockCmp, cmpDay, openingStock]); // eslint-disable-line react-hooks/exhaustive-deps
+  // after a year-end close, profit counts from the stock value on that year-end day (yearEnd.js)
+  const sheetAt = (d, st) => (ledger && st ? buildBalanceSheet({ accounts: ledger.accounts, bal: balances(ledger.postings, d), closingStock: st.value, openingStock,
+    closedStock: closedYearAt(yearEnds, d, data?.accountVouchers)?.stockValue ?? null }) : null);
+  const sheet = useMemo(() => sheetAt(day, stock), [ledger, stock, day, openingStock, yearEnds]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sheetCmp = useMemo(() => (cmpDay ? sheetAt(cmpDay, stockCmp) : null), [ledger, stockCmp, cmpDay, openingStock, yearEnds]); // eslint-disable-line react-hooks/exhaustive-deps
   const moneyRows = useMemo(() => (ledger ? moneyBreakdown(ledger.postings, ledger.accounts, day) : []), [ledger, day]);
 
   const excluded = useMemo(() => (data ? excludedDocs([
@@ -291,6 +299,7 @@ export default function BalanceSheetReport({
         {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!sheet}> {L("প্রিন্ট", "Print")}</button>}
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!sheet}> Excel</button>}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
+        <button type="button" className={`pm-btn-secondary${showAssets ? " is-active" : ""}`} onClick={() => setShowAssets((v) => !v)} disabled={!data}>{L("স্থায়ী সম্পদ", "Fixed assets")}</button>
         <label className="pm-btn-secondary" style={{ display: "inline-flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
           <input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> {L("পার্টি অনুযায়ী", "Party detail")}
         </label>
@@ -316,6 +325,11 @@ export default function BalanceSheetReport({
       )}
       <div className="si-body">
         {error && <div className="si-paid-box is-due">{L("ডেটা পড়া যায়নি: ", "Could not load: ")}{error}</div>}
+        {showAssets && data && (
+          <FixedAssetsPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data}
+            moneyAccounts={ledger ? [...ledger.accounts.values()].filter((a) => a.group === "money").map((a) => a.name) : []} vendors={vendors} asOf={day}
+            shopName={shopName} cur={cur} toast={toast} onShopUpdated={onShopUpdated} onSaved={() => setTick((v) => v + 1)} onClose={() => setShowAssets(false)} />
+        )}
         {!sheet && !error ? (
           <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div>
         ) : sheet && (

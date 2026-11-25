@@ -47,11 +47,12 @@ export function buildSalesAnalytics(data, filters = {}) {
     categories: [...new Set(allSales.flatMap((i) => (i.items || []).map(catOf)).filter(Boolean))].sort(),
   };
 
-  const sales = allSales.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to)
-    && custMatches(inv.customerName, inv.customerMobile)
-    && (!method || inv.paymentMethod === method) && (!salesman || salesmanOf(inv) === salesman)
-    && (!type || inv.invoiceType === type) && (!status || payStatus(inv) === status));
+  const billFilter = !!(method || salesman || type || status);
+  const billMatches = (inv) => (!method || inv.paymentMethod === method) && (!salesman || salesmanOf(inv) === salesman)
+    && (!type || inv.invoiceType === type) && (!status || payStatus(inv) === status);
+  const sales = allSales.filter((inv) => inRange(dayOf(inv.invoiceDate), from, to) && custMatches(inv.customerName, inv.customerMobile) && billMatches(inv));
 
+  const periodRow = (period) => () => ({ period, count: 0, amount: 0, net: 0, vat: 0, returns: 0, returnsVat: 0, netSales: 0 });
   const byProduct = new Map(), byBrand = new Map(), byCategory = new Map(), byCustomer = new Map(), byMethod = new Map(), bySalesman = new Map(), byPeriod = new Map();
   const invoices = [];
   let gross = 0, vat = 0, discount = 0, paid = 0, balance = 0, qty = 0;
@@ -79,7 +80,7 @@ export function buildSalesAnalytics(data, filters = {}) {
     const sm = salesmanOf(inv) || "-";
     bump(bySalesman, sm, () => ({ key: sm, count: 0, amount: 0, net: 0 }), count);
     const d = dayOf(inv.invoiceDate), period = unit === "day" ? d : d.slice(0, 7);
-    bump(byPeriod, period, () => ({ period, count: 0, amount: 0, net: 0, vat: 0 }), (row) => { count(row); row.vat = r2(row.vat + tax); });
+    bump(byPeriod, period, periodRow(period), (row) => { count(row); row.vat = r2(row.vat + tax); });
 
     let lineQty = 0;
     matched.forEach((it) => {
@@ -101,21 +102,32 @@ export function buildSalesAnalytics(data, filters = {}) {
     });
   });
 
-  // Returns in the period for the same customer / product filters (bill-level filters do not apply to a return).
+  // Returns dated in the period. A return follows its bill: the bill-level filters (payment, salesman, type,
+  // status) and the customer filter are checked on the bill it was made against (the bill may be from an earlier
+  // period). A return without a live bill only counts when no bill-level filter is set.
+  const billById = new Map(allSales.map((inv) => [inv.id, inv]));
   let returnsTotal = 0, returnsVat = 0, returnsCount = 0;
   liveReturnsOf(data?.salesReturns, shopId).forEach((ret) => {
-    if (!inRange(dayOf(ret.returnDate), from, to) || !custMatches(ret.partyName, ret.partyMobile)) return;
+    if (!inRange(dayOf(ret.returnDate), from, to)) return;
+    const bill = ret.invoiceId ? billById.get(ret.invoiceId) : null;
+    if (!custMatches(ret.partyName, ret.partyMobile) && !(bill && custMatches(bill.customerName, bill.customerMobile))) return;
+    if (billFilter && !(bill && billMatches(bill))) return;
+    let total, tax;
     if (lineFilter) {
       const lines = (ret.items || []).filter(lineMatches);
       if (!lines.length) return;
-      returnsTotal += lines.reduce((t, it) => t + n(it.amount), 0);
-      returnsVat += lines.reduce((t, it) => t + n(it.vatAmt), 0);
+      total = lines.reduce((t, it) => t + n(it.amount), 0);
+      tax = lines.reduce((t, it) => t + n(it.vatAmt), 0);
     } else {
-      returnsTotal += n(ret.total);
-      returnsVat += n(ret.totalVat);
+      total = n(ret.total);
+      tax = n(ret.totalVat);
     }
-    returnsCount += 1;
+    returnsTotal += total; returnsVat += tax; returnsCount += 1;
+    const d = dayOf(ret.returnDate), period = unit === "day" ? d : d.slice(0, 7);
+    bump(byPeriod, period, periodRow(period), (row) => { row.returns = r2(row.returns + total); row.returnsVat = r2(row.returnsVat + tax); });
   });
+  // net sales of each period, the P&L way (the period rows then add up to the KPI)
+  byPeriod.forEach((row) => { row.netSales = r2(row.net - (row.returns - row.returnsVat)); });
 
   const kpi = {
     count: invoices.length, gross: r2(gross), vat: r2(vat), net: r2(gross - vat), discount: lineFilter ? null : r2(discount),
