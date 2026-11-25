@@ -6,9 +6,9 @@
 //      category and amount per line, VAT breakdown, totals, currency, type, reference to the original bill);
 //   2. readiness checks the shop can fix (status Ready | Blocked, each reason in BN + EN);
 //   3. the UBL XML payload (Invoice 380 / CreditNote 381);
-//   4. a status kept on the document (eInvoice: draft / ready / blocked / queued for the ASP).
-// Nothing here talks to a government or ASP service: there is no API client, so nothing is ever marked sent or
-// cleared. PINT AE sets no general QR code requirement, so no QR is produced.
+//   4. a status kept on the document (eInvoice: draft / ready / blocked / queued for the ASP, then submitted /
+//      accepted once the shop's own ASP answered - see uaeEInvoiceAsp.js; nothing here talks to a government
+//      service, and nothing is ever marked cleared). PINT AE sets no general QR code requirement, so no QR is produced.
 
 const num = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const r2 = (v) => Math.round((num(v) + Number.EPSILON) * 100) / 100;
@@ -23,7 +23,9 @@ export const UAE_ENDPOINT_SCHEME = "0235";
 // Invoice transaction type flags (free zone, deemed supply, margin scheme, summary, continuous supply, disclosed
 // agent, e-commerce, exports): none of these special cases are raised by S4's ordinary tax invoices.
 export const DEFAULT_TRANSACTION_FLAGS = "00000000";
-export const EINVOICE_STATUSES = ["draft", "ready", "blocked", "queued"];
+export const EINVOICE_STATUSES = ["draft", "ready", "blocked", "queued", "submitted", "accepted"];
+// Statuses set only from the ASP's reply; a later bill change does not undo them (the panel shows the change).
+export const SENT_STATUSES = ["submitted", "accepted"];
 export const EMIRATE_CODES = { "Abu Dhabi": "AUH", Dubai: "DXB", Sharjah: "SHJ", Ajman: "AJM", "Umm Al Quwain": "UAQ", "Ras Al Khaimah": "RAK", Fujairah: "FUJ" };
 const LIVE = ["confirmed", "partial", "paid"];
 
@@ -247,6 +249,7 @@ export function payloadDigest(text) {
 /**
  * Everything the panel shows for one document. saved: doc.eInvoice. -> { edoc, problems, live, status, xml, digest, stale }
  * status: the saved one (queued / ready / blocked) unless the bill changed since, then "draft"; never saved -> "draft".
+ * A submitted / accepted document keeps that status; stale then means the bill changed after it was sent.
  */
 export function eInvoiceState({ kind, doc, original, shop, customer, today = "" }) {
   const edoc = buildEDocument({ kind, doc, original, shop, customer });
@@ -255,13 +258,15 @@ export function eInvoiceState({ kind, doc, original, shop, customer, today = "" 
   const digest = payloadDigest(xml);
   const saved = doc.eInvoice || null;
   const stale = !!saved && saved.digest && saved.digest !== digest;
-  const status = !saved || stale ? "draft" : EINVOICE_STATUSES.includes(saved.status) ? saved.status : "draft";
+  const sent = !!saved && SENT_STATUSES.includes(saved.status);
+  const status = sent ? saved.status : !saved || stale ? "draft" : EINVOICE_STATUSES.includes(saved.status) ? saved.status : "draft";
   return { edoc, problems, live: problems.length ? "blocked" : "ready", status, xml, digest, stale };
 }
 
 /** The status kept on the document after a check / queue. Queue only a Ready document. */
 export function eInvoiceRecord(state, { action = "validate", uid = "", by = "", now = new Date() } = {}) {
   const at = new Date(now).toISOString();
+  if (SENT_STATUSES.includes(state.status)) return { error: "sent" };
   if (action === "queue") {
     if (state.problems.length) return { error: "blocked" };
     return { status: "queued", errors: [], digest: state.digest, validatedAt: at, queuedAt: at, by, uid, format: "PINT AE (UBL 2.1)" };

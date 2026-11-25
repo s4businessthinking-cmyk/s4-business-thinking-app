@@ -37,6 +37,7 @@ export const AUDIT_COLLECTION_LABELS = {
   products: { bn: "পণ্য", en: "Product" },
   vendors: { bn: "ভেন্ডর", en: "Vendor" },
   customers: { bn: "কাস্টমার", en: "Customer" },
+  shops: { bn: "দোকানের সেটিং", en: "Shop settings" },
 };
 
 // Never throws: a failed log must not block the action it records.

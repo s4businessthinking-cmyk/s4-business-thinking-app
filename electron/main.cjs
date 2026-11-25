@@ -157,6 +157,7 @@ app.whenReady().then(() => {
   setupPrintIpc();
   setupScanIpc();
   setupShareIpc();
+  setupAspIpc();
   createWindow();
   setupAutoUpdater();
 });
@@ -436,6 +437,39 @@ function setupShareIpc() {
   ipcMain.handle("s4-share:copy-file", async (_event, file) => {
     const target = inShareFolder(file);
     return target && fs.existsSync(target) ? copyFileToClipboard(target) : false;
+  });
+}
+
+// UAE e-invoicing: the request to the shop's own ASP. Sent from here, not from the page, because an ASP's
+// server-to-server API does not answer browser (CORS) requests. https only (plain http only to this computer),
+// no redirects (the auth header must not follow to another host), size and time limits; headers are never logged.
+const ASP_MAX_BODY = 5 * 1024 * 1024;
+const ASP_MAX_REPLY = 256 * 1024;
+const ASP_TIMEOUT_MS = 30000;
+function setupAspIpc() {
+  ipcMain.handle("s4-asp:request", async (_event, req = {}) => {
+    let url;
+    try { url = new URL(String(req.url || "")); } catch { throw new Error("The ASP address is not a valid link"); }
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) throw new Error("The ASP address must start with https://");
+    const method = req.method === "GET" ? "GET" : "POST";
+    const headers = {};
+    Object.entries(req.headers && typeof req.headers === "object" ? req.headers : {}).forEach(([k, v]) => {
+      if (/^[A-Za-z0-9-]+$/.test(k) && typeof v === "string" && !/[\r\n]/.test(v)) headers[k] = v;
+    });
+    const body = method === "POST" && typeof req.body === "string" ? req.body : undefined;
+    if (body && Buffer.byteLength(body, "utf8") > ASP_MAX_BODY) throw new Error("The document is too large to send");
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ASP_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { method, headers, body, redirect: "error", signal: ctrl.signal });
+      const text = await res.text();
+      return { status: res.status, text: text.slice(0, ASP_MAX_REPLY) };
+    } catch (err) {
+      throw new Error(ctrl.signal.aborted ? `The ASP did not answer within ${ASP_TIMEOUT_MS / 1000} seconds` : String(err?.cause?.message || err?.message || err));
+    } finally {
+      clearTimeout(timer);
+    }
   });
 }
 

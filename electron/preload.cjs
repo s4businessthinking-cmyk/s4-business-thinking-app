@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld("S4Desktop", {
   scan: {
     acquire: () => ipcRenderer.invoke("s4-scan:acquire"),
   },
+  asp: {
+    request: (req) => ipcRenderer.invoke("s4-asp:request", req),
+  },
   share: {
     whatsappPdf: (payload) => ipcRenderer.invoke("s4-share:whatsapp-pdf", payload),
     whatsappText: (payload) => ipcRenderer.invoke("s4-share:whatsapp-text", payload),

@@ -311,7 +311,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
     };
     setSaving(true);
     try {
-      const updated = await saveShopRecord(shopId, { country: clean.country, currency: clean.currency, fyStartMonth: clean.fyStartMonth, taxSettings: clean }, { ownerUid: user?.uid || shop?.ownerUid });
+      // merged, so what other screens keep under taxSettings (VAT201 no-VAT box, e-Invoice ASP) is not lost
+      const updated = await saveShopRecord(shopId, { country: clean.country, currency: clean.currency, fyStartMonth: clean.fyStartMonth, taxSettings: { ...(shop?.taxSettings || {}), ...clean } }, { ownerUid: user?.uid || shop?.ownerUid });
       onShopUpdated?.(updated);
       setEditing(null);
       if (!clean.ctEnabled) setView("vat");
@@ -671,7 +672,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
         {settings.taxApplicable === "none" && view === "vat" && <div className="si-paid-box is-due">{L(`দোকানের তথ্যে "TAX Applicable" = None দেওয়া আছে — VAT রেজিস্টার্ড হলে  সেটিংস → দোকানের তথ্যে বদলে দিন।`, `Shop Info has "TAX Applicable" = None — change it in  Settings → Shop Info if you are VAT registered.`)}</div>}
         {badRange && view === "vat" && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
         {isUae && view === "vat" && tab === "einvoice" && !badRange && (
-          <EInvoicePanel lang={lang} shopId={shopId} shop={shop} customers={customers} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} from={from} to={to} shopName={shopName} toast={toast} />
+          <EInvoicePanel lang={lang} shopId={shopId} shop={shop} customers={customers} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} from={from} to={to} shopName={shopName} toast={toast} onShopUpdated={onShopUpdated} />
         )}
         {loading ? <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div> : view === "ct" ? (
           <>

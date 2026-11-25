@@ -1,6 +1,7 @@
 // UAE e-invoice tab of the Tax screen: tax invoices and credit notes of the period with their e-invoice status,
-// readiness reasons, the PINT AE fields, the UBL XML payload download, and queueing for the shop's Accredited
-// Service Provider. S4 has no ASP / FTA connection, so nothing is ever sent from here. Rules in uaeEInvoice.js.
+// readiness reasons, the PINT AE fields, the UBL XML payload download, queueing, and sending to the shop's own
+// Accredited Service Provider once the owner has added and tested it (ASP connection). A document shows submitted /
+// accepted only from the ASP's real reply; nothing goes to the FTA from S4. Rules in uaeEInvoice.js / uaeEInvoiceAsp.js.
 import React, { useEffect, useMemo, useState } from "react";
 import { offlineUpdate } from "../offline/offlineRepository";
 import { loadInvoiceRows } from "../inventory/stockFromInvoices";
@@ -10,15 +11,18 @@ import { saveTextFile } from "../utils/saveTextFile.js";
 import { logAudit } from "../utils/auditLog.js";
 import { csvText } from "../reports/vatExport.js";
 import { REGISTER_COLS, eInvoiceDocs, eInvoiceRecord, eInvoiceState, reasonText, registerRows } from "./uaeEInvoice.js";
+import { aspState, isDesktopTransport, normalizeAspConfig, submissionRecord, submitEInvoiceXml } from "./uaeEInvoiceAsp.js";
+import AspConnectionPanel, { ASP_STATE_LABEL } from "./AspConnectionPanel.jsx";
 
 const money = (v) => (Math.round(((Number(v) || 0) + Number.EPSILON) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 const STATUS = {
   draft: ["যাচাই হয়নি", "Not checked", "#64748b"], ready: ["প্রস্তুত", "Ready", "#15803d"], blocked: ["আটকে আছে", "Blocked", "#b91c1c"], queued: ["ASP-র জন্য সারিতে", "Queued for ASP", "#1d4ed8"],
+  submitted: ["ASP-তে জমা হয়েছে", "Submitted to ASP", "#0f766e"], accepted: ["ASP গ্রহণ করেছে", "Accepted by ASP", "#15803d"],
 };
 
-export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [], user, profile, isOwner = false, canPrint = false, from, to, shopName = "", toast }) {
+export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [], user, profile, isOwner = false, canPrint = false, from, to, shopName = "", toast, onShopUpdated }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const today = localDay();
@@ -28,6 +32,10 @@ export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [
   const [filter, setFilter] = useState("all");
   const [open, setOpen] = useState("");
   const [busy, setBusy] = useState(false);
+  const [aspOpen, setAspOpen] = useState(false);
+  const aspRaw = shop?.taxSettings?.eInvoiceAsp || null;
+  const asp = aspState(aspRaw);
+  const aspCfg = normalizeAspConfig(aspRaw);
 
   useEffect(() => {
     let off = false;
@@ -71,8 +79,37 @@ export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [
     partyLine: "Format: Peppol PINT AE (UBL 2.1). Not submitted to the FTA - submission is through the shop's Accredited Service Provider.",
     cols: REGISTER_COLS.map((label, i) => ({ label, align: i >= 5 && i <= 7 ? "right" : undefined })), rows: registerRows(shown),
   }), { lang });
+  // Send to the ASP: only a Ready / Queued document whose XML is unchanged since it was checked, only when connected.
+  const canSend = (x) => isOwner && asp === "connected" && ["ready", "queued"].includes(x.state.status) && !x.state.problems.length;
+  const sendOne = async (x) => {
+    const res = await submitEInvoiceXml({ config: aspRaw, xml: x.state.xml });
+    const rec = submissionRecord(x.doc.eInvoice, x.state, res, { aspName: aspCfg.displayName, by: who, uid: user?.uid || "" });
+    await offlineUpdate(x.state.edoc.source.collection, x.doc.id, { eInvoice: rec });
+    const reply = [res.httpStatus ? `HTTP ${res.httpStatus}` : "no answer", res.aspRef && `ref ${res.aspRef}`, res.aspStatus && `status ${res.aspStatus}`].filter(Boolean).join(", ");
+    logAudit({ shopId, user, profile, action: "edit", collection: x.state.edoc.source.collection, docId: x.doc.id, docNo: x.state.edoc.id,
+      note: res.ok ? `e-Invoice ${rec.status} to ASP ${aspCfg.displayName} (${reply})` : `e-Invoice send to ASP ${aspCfg.displayName} failed (${reply}): ${String(res.message || res.outcome).slice(0, 200)}` });
+    return { res, rec };
+  };
+  const failText = (res) => (res.network && !isDesktopTransport() ? `${res.message} - ${L("ব্রাউজার থেকে ASP অনুরোধ আটকাতে পারে (CORS); ডেস্কটপ অ্যাপ থেকে পাঠান", "the ASP may block requests from a browser (CORS); send from the desktop app")}` : res.message);
+  const send = (x) => run(async () => {
+    if (!canSend(x)) return;
+    const { res, rec } = await sendOne(x);
+    if (res.ok) toast?.(rec.status === "accepted" ? L(`${x.state.edoc.id}: ASP গ্রহণ করেছে`, `${x.state.edoc.id}: accepted by the ASP`) : L(`${x.state.edoc.id}: ASP-তে জমা হয়েছে (HTTP ${res.httpStatus})`, `${x.state.edoc.id}: submitted to the ASP (HTTP ${res.httpStatus})`));
+    else toast?.(res.outcome === "rejected" ? L(`${x.state.edoc.id}: ASP ফেরত দিয়েছে - ${res.message || res.aspStatus}`, `${x.state.edoc.id}: rejected by the ASP - ${res.message || res.aspStatus}`) : L(`${x.state.edoc.id} পাঠানো যায়নি: ${failText(res)}`, `${x.state.edoc.id} not sent: ${failText(res)}`), "err");
+  });
+  const sendQueued = () => run(async () => {
+    const list = items.filter((x) => x.state.status === "queued" && canSend(x));
+    let ok = 0, lastFail = null;
+    for (const x of list) { const { res } = await sendOne(x); if (res.ok) ok += 1; else lastFail = res; }
+    toast?.(L(`${list.length}টির মধ্যে ${ok}টি ASP-তে জমা হয়েছে, ${list.length - ok}টি হয়নি`, `${ok} of ${list.length} submitted to the ASP, ${list.length - ok} not`) + (lastFail ? ` - ${failText(lastFail)}` : ""), lastFail ? "err" : undefined);
+  });
   const exportCsv = async () => { try { await saveTextFile(`e-invoice-register-${from || "start"}_${to || "today"}.csv`, csvText([REGISTER_COLS, ...registerRows(shown)])); } catch (e) { toast?.(e?.message || String(e), "err"); } };
 
+  const aspLabel = ASP_STATE_LABEL[asp] || ASP_STATE_LABEL.none;
+  const queuedCount = items.filter((x) => x.state.status === "queued").length;
+  const aspBlockReason = asp === "none" ? L("আগে ASP যোগ করুন", "Add your ASP first") : asp === "portal" ? L("ASP-র API তথ্য যোগ করলে পাঠানো যাবে", "Add the ASP's API details to send from here")
+    : asp === "off" ? L("ASP বন্ধ রাখা আছে", "The ASP is switched off") : asp === "invalid" ? L("ASP-র API তথ্য অসম্পূর্ণ", "The ASP's API details are incomplete")
+    : asp === "failed" ? L(`সংযোগ পরীক্ষা ব্যর্থ: ${aspCfg.lastError || ""}`, `Connection test failed: ${aspCfg.lastError || ""}`) : asp === "untested" ? L("আগে সংযোগ পরীক্ষা করুন", "Test the connection first") : "";
   const badge = (k) => { const s = STATUS[k] || STATUS.draft; return <span style={{ color: s[2], fontWeight: 700 }}>{bn ? s[0] : s[1]}</span>; };
   const field = (label, value) => <div><span className="si-muted">{label}: </span><b>{value || "-"}</b></div>;
 
@@ -80,19 +117,28 @@ export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div className="si-paid-box" style={{ background: "#eff6ff", borderColor: "#bfdbfe", color: "#1e3a8a" }}>
         {L(
-          "UAE ই-ইনভয়েস (Peppol PINT AE): S4 প্রতিটি ট্যাক্স ইনভয়েস আর ক্রেডিট নোটের e-invoice XML বানায় আর যাচাই করে। সরকারের কাছে পাঠানো হয় দোকানের নিজের Accredited Service Provider (ASP)-এর মাধ্যমে - S4-এ এখনো কোনো ASP সংযোগ নেই, তাই এখান থেকে কিছু পাঠানো হয় না, \"পাঠানো হয়েছে\" দেখানো হয় না। XML ডাউনলোড করে ASP-র পোর্টালে দিতে পারেন। PINT AE-তে QR কোড বাধ্যতামূলক নয়, তাই QR বানানো হয় না।",
-          "UAE e-invoicing (Peppol PINT AE): S4 builds and checks the e-invoice XML of every tax invoice and credit note. Submission to the government goes through the shop's own Accredited Service Provider (ASP) - S4 has no ASP connection yet, so nothing is sent from here and nothing is shown as sent. You can download the XML and give it to your ASP. PINT AE does not require a QR code, so none is produced.",
+          "UAE ই-ইনভয়েস (Peppol PINT AE): S4 প্রতিটি ট্যাক্স ইনভয়েস আর ক্রেডিট নোটের e-invoice XML বানায় আর যাচাই করে। সরকারের কাছে যায় দোকানের নিজের Accredited Service Provider (ASP)-এর মাধ্যমে: মালিক \"ASP সংযোগ\"-এ ASP যোগ করে পরীক্ষা করলে এখান থেকে ASP-তে পাঠানো যায়। অবস্থা \"জমা হয়েছে\" / \"গ্রহণ করেছে\" দেখায় শুধু ASP-র আসল উত্তর থেকে; S4 সরাসরি FTA-তে কিছু পাঠায় না। XML ডাউনলোড করে ASP-র পোর্টালেও দিতে পারেন। PINT AE-তে QR কোড বাধ্যতামূলক নয়, তাই QR বানানো হয় না।",
+          "UAE e-invoicing (Peppol PINT AE): S4 builds and checks the e-invoice XML of every tax invoice and credit note. It reaches the government through the shop's own Accredited Service Provider (ASP): once the owner adds and tests the ASP under \"ASP connection\", documents can be sent to it from here. \"Submitted\" / \"Accepted\" show only from the ASP's real reply; S4 sends nothing to the FTA directly. You can also download the XML for the ASP's portal. PINT AE does not require a QR code, so none is produced.",
         )}
       </div>
       <div className="si-toolbar">
+        <span style={{ fontSize: 12.5 }}>ASP: <b style={{ color: aspLabel[2] }}>{bn ? aspLabel[0] : aspLabel[1]}</b>{aspCfg.displayName && asp !== "none" ? ` · ${aspCfg.displayName}` : ""}</span>
+        <button type="button" className={`pm-btn-secondary${aspOpen ? " is-active" : ""}`} onClick={() => setAspOpen((v) => !v)}>
+          {asp === "none" && isOwner ? L("ASP যোগ করুন", "Add ASP") : L("ASP সংযোগ", "ASP connection")}
+        </button>
+        {!isOwner && asp === "none" && <span className="si-muted">{L("ASP যোগ করবেন দোকানের মালিক", "The shop owner adds the ASP")}</span>}
+      </div>
+      {aspOpen && <AspConnectionPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} onShopUpdated={onShopUpdated} toast={toast} onClose={() => setAspOpen(false)} />}
+      <div className="si-toolbar">
         <div className="si-pills">
-          {[["all", L("সব", "All")], ["draft", L("যাচাই হয়নি", "Not checked")], ["ready", L("প্রস্তুত", "Ready")], ["blocked", L("আটকে", "Blocked")], ["queued", L("সারিতে", "Queued")], ["blockedNow", L("এখন সমস্যা", "Problems now")]].map(([k, label]) => (
+          {[["all", L("সব", "All")], ["draft", L("যাচাই হয়নি", "Not checked")], ["ready", L("প্রস্তুত", "Ready")], ["blocked", L("আটকে", "Blocked")], ["queued", L("সারিতে", "Queued")], ["submitted", L("জমা হয়েছে", "Submitted")], ["accepted", L("গ্রহণ করেছে", "Accepted")], ["blockedNow", L("এখন সমস্যা", "Problems now")]].map(([k, label]) => (
             <button key={k} type="button" className={`pm-btn-secondary${filter === k ? " is-active" : ""}`} onClick={() => setFilter(k)}>{label}{k !== "all" && k !== "blockedNow" ? ` (${count(k)})` : ""}</button>
           ))}
         </div>
         <span className="si-toolbar-gap" />
         {isOwner && <button type="button" className="pm-btn pm-btn--primary" onClick={validateAll} disabled={busy || !items.length}>{L("সব যাচাই করুন", "Check all")}</button>}
-        <button type="button" className="pm-btn-secondary" disabled title={L("S4-এ এখনো কোনো ASP / FTA সংযোগ নেই - আপনার ASP-র API আর শপের credentials যোগ হলে চালু হবে", "S4 has no ASP / FTA connection yet - this turns on once your ASP's API and the shop's credentials are added")}>{L("ASP-তে পাঠান (সংযোগ নেই)", "Submit to ASP (not connected)")}</button>
+        {isOwner && asp === "connected" && <button type="button" className="pm-btn pm-btn--primary" onClick={sendQueued} disabled={busy || !queuedCount}>{L(`সারির সব ASP-তে পাঠান (${queuedCount})`, `Send queued to ASP (${queuedCount})`)}</button>}
+        {isOwner && asp !== "connected" && <button type="button" className="pm-btn-secondary" onClick={() => setAspOpen(true)} title={aspBlockReason}>{asp === "none" ? L("পাঠাতে আগে ASP যোগ করুন", "Add ASP to send") : `${L("এখনো পাঠানো যাবে না", "Cannot send yet")}: ${aspBlockReason}`}</button>}
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={printRegister} disabled={!shown.length}>{L("রেজিস্টার প্রিন্ট", "Print register")}</button>}
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!shown.length}>Excel</button>}
       </div>
@@ -113,15 +159,18 @@ export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [
                       <td className="si-strong">{e.id}{e.billingRef ? <span className="si-muted"> · {e.billingRef.id}</span> : null}</td>
                       <td>{fmtDay(e.issueDate)}</td><td>{e.buyer.name}</td><td style={{ fontFamily: "monospace" }}>{e.buyer.trn || "-"}</td>
                       <td className="si-num">{money(e.totals.taxInclusive)}</td>
-                      <td>{badge(s.status)}{s.stale && <div className="si-muted" style={{ fontSize: 11.5 }}>{L("যাচাইয়ের পরে বদলেছে", "Changed since it was checked")}</div>}
+                      <td>{badge(s.status)}{s.stale && <div className="si-muted" style={{ fontSize: 11.5, color: ["submitted", "accepted"].includes(s.status) ? "#b91c1c" : undefined }}>{["submitted", "accepted"].includes(s.status) ? L("পাঠানোর পরে বিল বদলেছে - ASP-কে জানান", "Bill changed after it was sent - tell the ASP") : L("যাচাইয়ের পরে বদলেছে", "Changed since it was checked")}</div>}
+                        {x.doc.eInvoice?.lastError && ["ready", "queued"].includes(s.status) && <div style={{ fontSize: 11.5, color: "#b91c1c" }}>ASP: {String(x.doc.eInvoice.lastError).slice(0, 160)}</div>}
+                        {x.doc.eInvoice?.aspRef && <div className="si-muted" style={{ fontSize: 11.5 }}>ref {x.doc.eInvoice.aspRef}</div>}
                         {s.status === "draft" && <div className="si-muted" style={{ fontSize: 11.5 }}>{s.live === "ready" ? L("এখন প্রস্তুত দেখাচ্ছে", "Looks ready now") : L(`${s.problems.length}টি সমস্যা`, `${s.problems.length} problem(s)`)}</div>}
                       </td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         <button type="button" className="pm-btn-secondary" onClick={() => setOpen(open === k ? "" : k)}>{open === k ? L("বন্ধ", "Close") : L("দেখুন", "Preview")}</button>
-                        {isOwner && s.status !== "queued" && <button type="button" className="pm-btn-secondary" onClick={() => validate(x)} disabled={busy}>{L("যাচাই", "Check")}</button>}
+                        {isOwner && !["queued", "submitted", "accepted"].includes(s.status) && <button type="button" className="pm-btn-secondary" onClick={() => validate(x)} disabled={busy}>{L("যাচাই", "Check")}</button>}
                         <button type="button" className="pm-btn-secondary" onClick={() => download(x)}>XML</button>
                         {isOwner && s.status === "ready" && <button type="button" className="pm-btn-secondary" onClick={() => queue(x, true)} disabled={busy}>{L("সারিতে রাখুন", "Queue for ASP")}</button>}
                         {isOwner && s.status === "queued" && <button type="button" className="pm-btn-secondary" onClick={() => queue(x, false)} disabled={busy}>{L("সারি থেকে সরান", "Take off queue")}</button>}
+                        {canSend(x) && <button type="button" className="pm-btn-secondary" style={{ fontWeight: 700 }} onClick={() => send(x)} disabled={busy}>{L("ASP-তে পাঠান", "Send to ASP")}</button>}
                       </td>
                     </tr>
                     {open === k && (
@@ -146,6 +195,7 @@ export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [
                           <thead><tr><th>#</th><th>{L("আইটেম", "Item")}</th><th className="si-num">{L("পরিমাণ", "Qty")}</th><th className="si-num">{L("দাম", "Price")}</th><th className="si-num">{L("নিট", "Net")}</th><th>{L("VAT ধরন", "VAT cat.")}</th><th className="si-num">VAT</th></tr></thead>
                           <tbody>{e.lines.map((l) => <tr key={l.id}><td>{l.id}</td><td>{l.name}{l.code ? ` (${l.code})` : ""}</td><td className="si-num">{l.qty}</td><td className="si-num">{l.price}</td><td className="si-num">{money(l.net)}</td><td>{l.category || "?"} {l.vatPerc}%</td><td className="si-num">{money(l.vat)}</td></tr>)}</tbody>
                         </table>
+                        {x.doc.eInvoice?.submittedAt && <div className="si-muted" style={{ marginTop: 4 }}>{L("ASP-তে পাঠানো", "Sent to ASP")}: {String(x.doc.eInvoice.submittedAt).slice(0, 16).replace("T", " ")} · {x.doc.eInvoice.aspName || ""} · HTTP {x.doc.eInvoice.httpStatus || "-"}{x.doc.eInvoice.aspStatus ? ` · ${x.doc.eInvoice.aspStatus}` : ""}{x.doc.eInvoice.submittedBy ? ` · ${x.doc.eInvoice.submittedBy}` : ""}</div>}
                         {x.doc.eInvoice?.validatedAt && <div className="si-muted" style={{ marginTop: 4 }}>{L("শেষ যাচাই", "Last checked")}: {String(x.doc.eInvoice.validatedAt).slice(0, 16).replace("T", " ")} · {x.doc.eInvoice.by || ""}</div>}
                       </td></tr>
                     )}
@@ -158,8 +208,8 @@ export default function EInvoicePanel({ lang = "en", shopId, shop, customers = [
       )}
       <div className="si-note">
         {L(
-          "শুধু ট্যাক্স ইনভয়েস আর তার রিটার্ন / ভ্যালু নোট (ক্রেডিট নোট) এখানে আসে। কাস্টমারের TRN না থাকলে \"আটকে\" দেখায়: সাধারণ ভোক্তার (B2C) বিক্রি এই পর্যায়ে ই-ইনভয়েসের বাইরে। \"সারিতে রাখুন\" মানে শুধু - এই বিল ASP-কে দেওয়ার জন্য তৈরি; পাঠানো হয়নি। বিল বদলালে অবস্থা আবার \"যাচাই হয়নি\" হয়। পর্যায়ের তারিখ অর্থ মন্ত্রণালয় ঠিক করে - আপনার দোকানের তারিখ মিলিয়ে নিন।",
-          "Only tax invoices and their returns / value notes (credit notes) are listed. A customer without a TRN shows Blocked: a sale to a consumer (B2C) is outside this e-invoicing phase. \"Queue for ASP\" only means the bill is ready to hand to the ASP - it has not been sent. If a bill changes, its status goes back to \"Not checked\". Phase dates are set by the Ministry of Finance - check the date that applies to your shop.",
+          "শুধু ট্যাক্স ইনভয়েস আর তার রিটার্ন / ভ্যালু নোট (ক্রেডিট নোট) এখানে আসে। কাস্টমারের TRN না থাকলে \"আটকে\" দেখায়: সাধারণ ভোক্তার (B2C) বিক্রি এই পর্যায়ে ই-ইনভয়েসের বাইরে। \"সারিতে রাখুন\" মানে শুধু - এই বিল ASP-কে দেওয়ার জন্য তৈরি; পাঠানো হয় শুধু \"ASP-তে পাঠান\" চাপলে। বিল বদলালে অবস্থা আবার \"যাচাই হয়নি\" হয়। পর্যায়ের তারিখ অর্থ মন্ত্রণালয় ঠিক করে - আপনার দোকানের তারিখ মিলিয়ে নিন।",
+          "Only tax invoices and their returns / value notes (credit notes) are listed. A customer without a TRN shows Blocked: a sale to a consumer (B2C) is outside this e-invoicing phase. \"Queue for ASP\" only means the bill is ready to hand to the ASP - it is sent only with \"Send to ASP\". If a bill changes, its status goes back to \"Not checked\". Phase dates are set by the Ministry of Finance - check the date that applies to your shop.",
         )}
       </div>
     </div>
