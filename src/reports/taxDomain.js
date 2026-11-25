@@ -44,12 +44,20 @@ export const UAE_EMIRATES = ["Abu Dhabi", "Dubai", "Sharjah", "Ajman", "Umm Al Q
 const PRESET_KEYS = ["taxName", "rate", "filingUrl", "dueDays", "ctEnabled", "ctFilingUrl"];
 
 // Country, currency, financial year and "tax applicable" live on the shop (Shop Info); the Tax page reads them from there.
+// Sign-up saves the shop's country as a phone-list code ("AE"); Shop Info and the Tax page use the preset key ("ae").
+// Only the UAE spellings are folded in; other codes keep their old meaning.
+const UAE_NAMES = new Set(["ae", "uae", "united arab emirates", "united arab emirates (uae)"]);
+export const countryKey = (v) => {
+  const s = String(v ?? "").trim();
+  return UAE_NAMES.has(s.toLowerCase()) ? "ae" : s;
+};
+
 export function taxSettingsOf(shop) {
   const saved = shop?.taxSettings && typeof shop.taxSettings === "object" ? shop.taxSettings : {};
-  const country = shop?.country || saved.country || DEFAULT_TAX_SETTINGS.country;
+  const country = countryKey(shop?.country) || countryKey(saved.country) || DEFAULT_TAX_SETTINGS.country;
   const preset = presetSettings(country);
   // A shop that moved to another country gets that country's rate and website instead of the old ones.
-  const presetPart = saved.country === country
+  const presetPart = countryKey(saved.country) === country
     ? {}
     : { ...Object.fromEntries(PRESET_KEYS.map((k) => [k, preset[k]])), ...(country === "ae" ? UAE_CT_DEFAULTS : {}) };
   const merged = {

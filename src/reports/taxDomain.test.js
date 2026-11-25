@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { computeVat, corporateTax, ctDueDate, fyRange, periodRange, taxSettingsOf, addDays } from "./taxDomain.js";
+import { computeVat, corporateTax, ctDueDate, fyRange, periodRange, taxSettingsOf, addDays, countryKey } from "./taxDomain.js";
 
 test("tax periods follow the monthly / quarterly setting", () => {
   const today = new Date(2026, 9, 7);
@@ -85,4 +85,16 @@ test("corporate tax: 0% up to the threshold, then the rate; small business relie
   assert.equal(sbr.sbrApplied, true);
   assert.equal(sbr.tax, 0);
   assert.equal(corporateTax({ profit: 500000, revenue: 4e6, settings: { ...settings, sbrElected: true } }).sbrApplied, false);
+});
+
+test("a UAE shop saved by sign-up as \"AE\" (or \"UAE\") is a UAE shop on the Tax page; other codes keep their meaning", () => {
+  for (const c of ["AE", "ae", " UAE ", "United Arab Emirates", "United Arab Emirates (UAE)"]) {
+    const s = taxSettingsOf({ country: c });
+    assert.deepEqual([s.country, s.rate, s.currency, s.ctEnabled], ["ae", 5, "AED", true], c);
+  }
+  // the owner's saved UAE settings are kept, not reset to the preset
+  assert.equal(taxSettingsOf({ country: "AE", taxSettings: { country: "ae", rate: 5, filingUrl: "https://my.link" } }).filingUrl, "https://my.link");
+  // no change for other countries: "IN" / "BD" stay as they were (custom), never the India GST preset
+  assert.deepEqual(["IN", "BD", "in", "sa"].map((c) => taxSettingsOf({ country: c }).country), ["custom", "custom", "in", "sa"]);
+  assert.deepEqual([countryKey("AE"), countryKey(""), countryKey(null), countryKey("BD")], ["ae", "", "", "BD"]);
 });

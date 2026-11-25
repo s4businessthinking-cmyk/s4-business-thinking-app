@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { saveShopRecord } from "../offline/shopService";
 import { normUrl, openLink } from "../utils/openLink.js";
-import { CURRENCIES, TAX_PRESETS, UAE_EMIRATES } from "../reports/taxDomain.js";
+import { CURRENCIES, TAX_PRESETS, UAE_EMIRATES, countryKey } from "../reports/taxDomain.js";
 import { getLocalAccessStatus } from "../auth/licenseService.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -12,7 +12,7 @@ const fromShop = (shop) => ({
   companyNameAr: shop.companyNameAr || "",
   address: shop.address || shop.area || "",
   addressAr: shop.addressAr || "",
-  country: shop.country || shop.taxSettings?.country || "ae",
+  country: countryKey(shop.country) || countryKey(shop.taxSettings?.country) || "ae",
   emirate: shop.emirate || "",
   mobile: shop.mobile || "",
   fax: shop.fax || "",
