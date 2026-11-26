@@ -278,7 +278,7 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
   })() : null;
 
   const ledgerWindow = ledgerWin && kind==="sales" ? (
-    <PartyLedgerWindow lang={lang} mode="customer"cur={t.cur||"AED"} shopName={shop?.companyName||""}
+    <PartyLedgerWindow lang={lang} mode="customer" cur={t.cur||"AED"} shopName={shop?.companyName||""} toast={toast}
       partyCodes={Object.fromEntries((customers||[]).filter(c=>c.customerCode).map(c=>[c.id, c.customerCode]))}
       partyTrns={Object.fromEntries((customers||[]).filter(c=>c.trnNumber).map(c=>[c.id, c.trnNumber]))}
       invoices={invoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.customerId||null, partyName:inv.customerName||"", partyMobile:inv.customerMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.deliveryNoteNo||"", method:inv.paymentMethod, raw:inv }))}

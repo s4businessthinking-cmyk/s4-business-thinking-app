@@ -144,7 +144,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
             </div>
           )}
           {piSubTab==="ledger"&&canViewSupplierLedger&&!piLedgerHidden&&(
-            <PartyLedgerWindow lang={lang} mode="supplier"cur={t.cur||"AED"} shopName={shop?.companyName||""}
+            <PartyLedgerWindow lang={lang} mode="supplier" cur={t.cur||"AED"} shopName={shop?.companyName||""} toast={toast}
               partyCodes={Object.fromEntries((vendors||[]).filter(v=>v.vendorCode).map(v=>[v.id, v.vendorCode]))}
               partyTrns={Object.fromEntries((vendors||[]).filter(v=>v.trnNumber).map(v=>[v.id, v.trnNumber]))}
               invoices={piMoneyInvoices.map(inv=>({ id:inv.id, no:inv.invoiceNo, date:String(inv.invoiceDate||"").slice(0,10), partyId:inv.vendorId||null, partyName:inv.vendorName||"", partyMobile:inv.vendorMobile||"", total:inv.grandTotal, paid:inv.amountPaid, status:inv.status, ref:inv.supplierInvoiceNo||"", method:inv.paymentMethod, raw:inv }))}

@@ -102,7 +102,7 @@ const sumFiltered = (list, from, to, filters) => {
 // invoices: [{ id, no, date, partyId, partyName, partyMobile, total, paid, status, ref, method, raw }]
 // vouchers: [{ id, no, date, partyId, partyName, method, amount, status, allocations, raw }]
 export default function PartyLedgerWindow({
-  lang = "en", mode = "customer", cur = "AED", shopName = "",
+  lang = "en", mode = "customer", cur = "AED", shopName = "", toast,
   invoices = [], vouchers = [], partyCodes = null, partyTrns = null, onOpenInvoice, onOpenVoucher, onNewVoucher, onClose,
   resumePartyKey = null, onPartyKeyChange,
 }) {
