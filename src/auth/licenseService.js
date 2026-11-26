@@ -7,7 +7,11 @@
 import { validateLicensePayload } from "./licensePayloadRules.js";
 import { API_BASE } from "../backend/config.js";
 import { defaultAuth } from "../backend/auth.js";
-import { syncCloudAccessCacheFromLicense, setCloudAccessCache } from "../offline/cloudAccessPolicy.js";
+import {
+  applyCloudAccessPolicy,
+  syncCloudAccessCacheFromLicense,
+  setCloudAccessCache,
+} from "../offline/cloudAccessPolicy.js";
 
 export { validateLicensePayload, licenseActivationErrorText } from "./licensePayloadRules.js";
 
@@ -407,7 +411,11 @@ export async function verifyOfflineLicensePayload(licenseKey, partyContext = {})
     }
 
     const signatureBytes = base64UrlToBytes(parsed.signaturePart);
-    const signature = await verifySignature(parsed.signingInput, signatureBytes);
+    let signature = await verifySignature(parsed.signingInput, signatureBytes);
+    // Legacy generator scripts sign the payload segment only (not "S4-LIC-v1.<payload>").
+    if (!signature.ok) {
+      signature = await verifySignature(parsed.payloadPart, signatureBytes);
+    }
 
     if (!signature.ok) {
       return {
@@ -560,7 +568,12 @@ export async function getLocalLicenseStatus() {
       readMetaValue("license_bound_device_fingerprint") || payload?.deviceFingerprint || "";
 
     const payloadValidation = payload
-      ? validateLicensePayload(payload, { deviceId, deviceFingerprint })
+      ? validateLicensePayload(payload, {
+          deviceId,
+          deviceFingerprint,
+          shopName: payload.shopName || "",
+          phone: payload.phone || payload.mobile || payload.mobileNumber || "",
+        })
       : null;
 
     const plan = normalizePlan(payload?.plan);
@@ -725,6 +738,11 @@ export async function getOrCreateTrialStatus() {
   });
 }
 
+function finalizeAccessStatus(accessStatus) {
+  applyCloudAccessPolicy(accessStatus);
+  return accessStatus;
+}
+
 export async function getLocalAccessStatus() {
   let license = await getLocalLicenseStatus();
 
@@ -733,7 +751,7 @@ export async function getLocalAccessStatus() {
     license = await getLocalLicenseStatus();
     const trial = await getOrCreateTrialStatus();
     if (license.status !== LICENSE_STATUS.ACTIVE) {
-      return {
+      return finalizeAccessStatus({
         ok: true,
         accessAllowed: false,
         accessReason: "LICENSE_REVOKED_ONLINE",
@@ -741,9 +759,9 @@ export async function getLocalAccessStatus() {
         trialStatus: trial.status,
         license,
         trial,
-      };
+      });
     }
-    return {
+    return finalizeAccessStatus({
       ok: true,
       accessAllowed: true,
       accessReason: "LICENSE_ACTIVE",
@@ -751,13 +769,13 @@ export async function getLocalAccessStatus() {
       trialStatus: trial.status,
       license,
       trial,
-    };
+    });
   }
 
   const trial = await getOrCreateTrialStatus();
 
   if (trial.status === TRIAL_STATUS.ACTIVE) {
-    return {
+    return finalizeAccessStatus({
       ok: true,
       accessAllowed: true,
       accessReason: "TRIAL_ACTIVE",
@@ -765,11 +783,11 @@ export async function getLocalAccessStatus() {
       trialStatus: trial.status,
       license,
       trial,
-    };
+    });
   }
 
   if (trial.status === TRIAL_STATUS.EXPIRED) {
-    return {
+    return finalizeAccessStatus({
       ok: true,
       accessAllowed: false,
       accessReason: "TRIAL_EXPIRED",
@@ -777,11 +795,11 @@ export async function getLocalAccessStatus() {
       trialStatus: trial.status,
       license,
       trial,
-    };
+    });
   }
 
   if (trial.status === TRIAL_STATUS.CLOCK_ROLLBACK) {
-    return {
+    return finalizeAccessStatus({
       ok: true,
       accessAllowed: false,
       accessReason: "CLOCK_ROLLBACK",
@@ -789,10 +807,10 @@ export async function getLocalAccessStatus() {
       trialStatus: trial.status,
       license,
       trial,
-    };
+    });
   }
 
-  return {
+  return finalizeAccessStatus({
     ok: true,
     accessAllowed: false,
     accessReason: "TRIAL_STATE_UNKNOWN",
@@ -800,7 +818,7 @@ export async function getLocalAccessStatus() {
     trialStatus: trial.status,
     license,
     trial,
-  };
+  });
 }
 
 export async function expireTrialForTest(confirmText) {

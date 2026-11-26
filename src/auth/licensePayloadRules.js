@@ -84,6 +84,8 @@ export function licenseActivationErrorText(reason, lang = "en") {
       ? "আগে Settings → Account & Company-এ Company Name ও মোবাইল নম্বর সেভ করুন"
       : "Save Company Name and mobile in Settings → Account & Company first",
     MISSING_PARTY_FIELDS_IN_LICENSE: bn ? "কীতে কোম্পানি বা মোবাইল নেই" : "Key is missing company or mobile",
+    SIGNATURE_INVALID: bn ? "লাইসেন্স সিগনেচার মিলছে না — কী আবার কপি করুন বা নতুন কী নিন" : "License signature invalid — copy the key again or request a new one",
+    INVALID_LICENSE_KEY_FORMAT: bn ? "লাইসেন্স কী ফরম্যাট ভুল" : "Invalid license key format",
   };
   return map[reason] || reason || (bn ? "লাইসেন্স অ্যাক্টিভ হয়নি" : "License not activated");
 }

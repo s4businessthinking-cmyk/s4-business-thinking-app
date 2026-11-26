@@ -5,7 +5,7 @@ import { sendEmailVerification, requestSignupCode, sendPasswordResetEmail } from
 import { Header } from "../components/AppHeader.jsx";
 import { registerLocalOwnerAccount, registerLocalSalesmanAccount, friendlyLocalAuthError, loginWithCredentials } from "./localAuthBootstrap";
 import { saveShopRecord } from "../offline/shopService";
-import { isAcceptablePassword } from "./passwordRules.js";
+import { isAcceptablePassword, PASSWORD_HINT } from "./passwordRules.js";
 import { updateLocalUserPassword } from "./localAuthService";
 import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
@@ -112,17 +112,23 @@ export function ChangePasswordScreen({ t, lang, setLang, profile, toast, s:sp, t
       return toast(lang==="bn"?"নতুন পাসওয়ার্ড দিন":"Enter a new password","err");
     }
     if (!isAcceptablePassword(newPw)) {
-      return toast(friendlyAuthError({ code:"validation/short-password" }, lang), "err");
+      return toast(PASSWORD_HINT[lang === "bn" ? "bn" : "en"], "err");
     }
     if (newPw !== newPw2) {
-      return toast(friendlyAuthError({ code:"validation/password-mismatch" }, lang), "err");
+      return toast(lang === "bn" ? "পাসওয়ার্ড দুটো একই হতে হবে" : "Passwords must match", "err");
     }
     setBusy(true);
+    if (!profile?.localUserId) {
+      return toast(lang === "bn" ? "Local user পাওয়া যায়নি — Logout করে আবার Login করুন" : "Local user missing — log out and sign in again", "err");
+    }
     try {
       const updatedUser = await updateLocalUserPassword(profile.localUserId, newPw, {
         mustChangePassword: false,
         clearEmergencyBootstrap: true,
       });
+      if (!updatedUser?.id) {
+        return toast(lang === "bn" ? "পাসওয়ার্ড সেভ হয়নি" : "Password was not saved", "err");
+      }
       toast(t.changePwSaved);
       onPasswordChanged(updatedUser);
     } catch(err) {
@@ -137,9 +143,12 @@ export function ChangePasswordScreen({ t, lang, setLang, profile, toast, s:sp, t
         <div style={_s.authIcon}></div>
         <div style={_s.authTitle}>{t.changePwTitle}</div>
         <div style={_s.authSub}>{t.changePwSub}</div>
+        <div style={{ ..._s.authSub, marginBottom:8, fontSize:11 }}>{t.changePwMatchHint || PASSWORD_HINT[lang === "bn" ? "bn" : "en"]}</div>
         <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
-          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
+          <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:4 }}>{t.changePwNewLbl || (lang==="bn"?"নতুন পাসওয়ার্ড":"New password")}</div>
+          <input style={{ ..._s.inp, marginBottom:10 }} type={showPw?"text":"password"} placeholder={t.changePwNewLbl || t.passwordLbl} value={newPw} onChange={e=>setNewPw(e.target.value)} autoComplete="new-password" />
+          <div style={{ fontSize:11, color:"#a1a1aa", marginBottom:4 }}>{t.changePwConfirmLbl || (lang==="bn"?"আবার একই পাসওয়ার্ড":"Confirm same password")}</div>
+          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.changePwConfirmLbl || t.confirmPwLbl} value={newPw2} onChange={e=>setNewPw2(e.target.value)} autoComplete="new-password" />
           <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
             <input type="checkbox"checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
             <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>

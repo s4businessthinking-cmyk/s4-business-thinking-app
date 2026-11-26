@@ -92,7 +92,7 @@ export async function startOfflineEngine() {
 
     const status = await getOfflineStatus();
 
-    await getLocalLicenseStatus().catch(() => {});
+    await getLocalAccessStatus().catch(() => {});
 
     const autoSync = startAutoFirebaseSync({
       intervalMs: 10000,

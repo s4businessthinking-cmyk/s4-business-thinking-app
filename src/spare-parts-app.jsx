@@ -879,9 +879,10 @@ export default function App() {
           theme={theme}
           setTheme={setTheme}
           onPasswordChanged={(localUser) => {
+            if (!localUser?.id) return;
             const updatedProfile = buildProfileFromLocal(localUser);
             setProfile(updatedProfile);
-            saveCachedProfile(user.uid, updatedProfile);
+            if (user?.uid) saveCachedProfile(user.uid, updatedProfile);
           }}
           onLogout={handleLogout}
         />

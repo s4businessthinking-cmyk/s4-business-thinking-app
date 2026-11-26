@@ -216,8 +216,8 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
         shopName: companyForKey,
         phone: mobileForKey,
       });
-      const latestLicense = helper.getStatus ? await helper.getStatus() : result;
-      const latestAccess = helper.accessStatus ? await helper.accessStatus() : null;
+      const latestLicense = await getLocalLicenseStatus();
+      const latestAccess = await getLocalAccessStatus();
       setStatus(latestLicense);
       setAccessStatus(latestAccess);
       const failText = licenseActivationErrorText(result?.reason, lang) || txt.invalid;

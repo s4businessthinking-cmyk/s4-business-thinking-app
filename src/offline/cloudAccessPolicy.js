@@ -15,10 +15,44 @@ export function cloudFeaturesFromLicensePayload(payload) {
 }
 
 export function syncCloudAccessCacheFromLicense(licenseStatus) {
-  const allowed =
-    licenseStatus?.status === "ACTIVE" && cloudFeaturesFromLicensePayload(licenseStatus?.payload);
+  if (licenseStatus?.status !== "ACTIVE") {
+    return isCloudAccessAllowedSync();
+  }
+  const allowed = cloudFeaturesFromLicensePayload(licenseStatus?.payload);
   setCloudAccessCache(allowed);
   return allowed;
+}
+
+const TRIAL_ACTIVE = "TRIAL_ACTIVE";
+const LICENSE_ACTIVE = "ACTIVE";
+
+/**
+ * Trial = 15-day online demo (email login + cloud). Paid license Y/N sets cloud via payload features.
+ */
+export function applyCloudAccessPolicy(accessStatus) {
+  if (import.meta.env?.VITE_S4_CLOUD_ALWAYS === "1") {
+    setCloudAccessCache(true);
+    return true;
+  }
+
+  const license = accessStatus?.license;
+  const trialStatus =
+    accessStatus?.trialStatus || accessStatus?.trial?.status || "";
+
+  if (license?.status === LICENSE_ACTIVE) {
+    return syncCloudAccessCacheFromLicense({
+      status: license.status,
+      payload: license.payload,
+    });
+  }
+
+  if (trialStatus === TRIAL_ACTIVE) {
+    setCloudAccessCache(true);
+    return true;
+  }
+
+  setCloudAccessCache(false);
+  return false;
 }
 
 export function isCloudAccessAllowedSync() {
