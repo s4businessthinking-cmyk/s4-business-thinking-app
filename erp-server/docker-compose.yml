@@ -1,6 +1,8 @@
 services:
   s4erp:
-    build: .
+    build:
+      context: ..
+      dockerfile: erp-server/Dockerfile
     container_name: s4erp
     restart: unless-stopped
     network_mode: host
