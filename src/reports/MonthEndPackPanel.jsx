@@ -25,6 +25,7 @@ import { vat201ForPeriod } from "./vat201.js";
 import { closedYearAt } from "./yearEnd.js";
 import { csvText } from "./vatExport.js";
 import { combinePrintHtml, packChecks, packCsvRows, packFileName, packSections, packStatus } from "./monthEndPack.js";
+import DateField from "../components/DateField.jsx";
 
 const pad = (v) => String(v).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -138,8 +139,8 @@ export default function MonthEndPackPanel({ lang = "en", shopId, shop, user, pro
             <button type="button" className={`pm-btn-secondary${from === lastStart && to === lastEnd ? " is-active" : ""}`} onClick={() => { setFrom(lastStart); setTo(lastEnd); }}>{L("গত মাস", "Last month")}</button>
             <button type="button" className={`pm-btn-secondary${from === thisStart && to === today ? " is-active" : ""}`} onClick={() => { setFrom(thisStart); setTo(today); }}>{L("এই মাস", "This month")}</button>
           </div>
-          <input type="date" className="pm-input" style={{ width: 130, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input type="date" className="pm-input" style={{ width: 130, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
+          <DateField className="pm-input" style={{ width: 130, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
+          <DateField className="pm-input" style={{ width: 130, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
           <span className="si-toolbar-gap" />
           {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!pack}> {L("প্যাক প্রিন্ট / PDF", "Print / PDF pack")}</button>}
           {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!pack}> {L("প্যাক Excel", "Excel pack")}</button>}

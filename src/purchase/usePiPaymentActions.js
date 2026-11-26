@@ -185,6 +185,8 @@ export function usePiPaymentActions({ canVendorPayments, genPaymentNo, invoices,
           amountPaid: update.newAmountPaid,
           balanceDue: update.newBalance,
           status: update.newStatus,
+          // Vendor payment / cheque clear return-settle mark so badge says Paid (cash), not Settled by return.
+          settleKind: "",
           updatedAt: nowIso,
           updatedBy: user?.uid || "",
         }, update.invoice, { deferPersist: true });

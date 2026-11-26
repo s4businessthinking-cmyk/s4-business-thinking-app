@@ -13,17 +13,20 @@ import {
   deleteLocalUser,
   getLocalUserById,
   getLocalUserByFirebaseUid,
+  getLocalUserByUsername,
   listLocalUsers,
   updateLocalUserPassword,
   updateLocalUserProfile,
   verifyLocalUserPassword,
 } from "./localAuthService";
+import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
 /**
  * Triggers background sync with proper error handling and fallback.
  * If offline engine sync fails, attempts direct cloud write as fallback.
  */
 async function triggerBackgroundSync(fallbackCloudWrite = null) {
+  if (!isCloudAccessAllowedSync()) return;
   if (typeof window === "undefined") return;
   
   // Check if offline engine is ready
@@ -387,6 +390,52 @@ export async function createShopStaffUser({
   country = "BD",
   countryName = "",
 } = {}) {
+  if (!isCloudAccessAllowedSync()) {
+    const trimmedUsername = String(username || "").trim();
+    if (!trimmedUsername || !password || !personName?.trim() || !shopId) {
+      throw Object.assign(new Error("VALIDATION"), { code: "VALIDATION" });
+    }
+    if (await getLocalUserByUsername(trimmedUsername)) {
+      throw Object.assign(new Error("Username already exists"), { code: "USERNAME_TAKEN" });
+    }
+
+    const localUser = await createLocalUser({
+      username: trimmedUsername,
+      password,
+      role: "salesman",
+      personName: personName.trim(),
+      email: String(email || "").trim(),
+      firebaseUid: "",
+      shopId,
+      permissions,
+      mustChangePassword: false,
+      isEmergencyBootstrap: false,
+    });
+
+    await syncTeamMemberToCloud(localUser, {
+      position,
+      mobile,
+      area,
+      country,
+      countryName,
+      groupId,
+    });
+
+    const member = localUserToTeamMember(localUser, {
+      position,
+      mobile,
+      area,
+      country,
+      countryName,
+    });
+
+    return {
+      ...member,
+      groupId,
+      authEmail: "",
+    };
+  }
+
   assertFirebaseReady(true);
 
   const authEmail = buildLocalAuthEmail(username, shopId, email);

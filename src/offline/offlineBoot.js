@@ -31,6 +31,8 @@ import {
 } from "../auth/licenseService";
 
 function exposeLicenseHelpers() {
+  if (!import.meta.env.DEV) return;
+
   try {
     window.S4License = {
       getStatus: getLocalLicenseStatus,
@@ -41,7 +43,6 @@ function exposeLicenseHelpers() {
       trialStatus: getOrCreateTrialStatus,
       accessStatus: getLocalAccessStatus,
     };
-
   } catch (error) {
     console.warn("[S4 License] Developer helpers unavailable", error);
   }
@@ -84,22 +85,32 @@ function assertOfflineEngineReady(bootResult) {
 export async function startOfflineEngine() {
   try {
     console.log("[S4 Offline] Starting offline engine...");
-    
+
     const boot = await bootOfflineSqlite();
-    
-    // Validate boot success
+
     assertOfflineEngineReady(boot);
-    
+
     const status = await getOfflineStatus();
+
+    await getLocalLicenseStatus().catch(() => {});
 
     const autoSync = startAutoFirebaseSync({
       intervalMs: 10000,
     });
 
-    window.S4Offline = {
+    const productionApi = {
       ready: true,
-      boot,
+      boot: { ok: boot.ok },
       autoSync,
+      syncNow: syncPendingQueueToFirebase,
+      syncCollectionNow,
+      pauseCollectionSync,
+      resumeCollectionSync,
+      isCollectionSyncPaused,
+    };
+
+    const devApi = {
+      ...productionApi,
       status: offlineEngineStatus,
       create: offlineCreate,
       update: offlineUpdate,
@@ -108,11 +119,6 @@ export async function startOfflineEngine() {
       list: offlineList,
       search: offlineSearch,
       clearCollection: offlineClearCollection,
-      syncNow: syncPendingQueueToFirebase,
-      syncCollectionNow,
-      pauseCollectionSync,
-      resumeCollectionSync,
-      isCollectionSyncPaused,
       test: async () => {
         const created = await offlineCreate("offline_test", {
           name: "S4 Offline Test",
@@ -145,6 +151,8 @@ export async function startOfflineEngine() {
       },
     };
 
+    window.S4Offline = import.meta.env.DEV ? devApi : productionApi;
+
     exposeLicenseHelpers();
     exposeDevLicenseHelpers();
 
@@ -157,19 +165,14 @@ export async function startOfflineEngine() {
 
     console.log("[S4 Offline] SQLite engine ready", status);
 
-    return { ok: true, boot, status };
-  } catch (error) {
-    const errorMsg = error?.message || String(error);
-    
-    window.__S4_OFFLINE_ENGINE__ = {
-      ready: false,
-      error: errorMsg,
-      startedAt: new Date().toISOString(),
+    return {
+      ok: true,
+      boot,
+      status,
+      autoSync,
     };
-
-    console.error("[S4 Offline] SQLite engine failed", error);
-
-    // Re-throw to allow caller to handle
+  } catch (error) {
+    console.error("[S4 Offline] Engine start failed", error);
     throw error;
   }
 }

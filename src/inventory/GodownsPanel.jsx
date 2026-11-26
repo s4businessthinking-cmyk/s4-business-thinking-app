@@ -16,6 +16,7 @@ import {
   LOCATION_KINDS, MAIN_LOCATION_ID, MAX_LOCATION_DEPTH, cancelBlockers, depthOf, liveMoves, locationItems, locationName, locationPath, locationStock, locationSummary,
   locationTree, moveBlockers, moveDoc, negativeAtLocations, nextMoveNo, normalizeLocations, qtyIn, toSavedLocations, usedLocationIds, validateLocation,
 } from "./stockLocations.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => (Math.round(((Number(v) || 0) + Number.EPSILON) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qf = (v) => (Math.round((Number(v) || 0) * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
@@ -189,7 +190,7 @@ export default function GodownsPanel({ lang = "en", shopId, shop, user, profile,
         <div className="pm-panel" style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
           {productList}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "end" }}>
-            <label>{L("তারিখ", "Date")}<input type="date" className="pm-input" max={today} value={move.moveDate} onChange={(e) => setMove((m) => ({ ...m, moveDate: e.target.value }))} /></label>
+            <label>{L("তারিখ", "Date")}<DateField className="pm-input" max={today} value={move.moveDate} onChange={(e) => setMove((m) => ({ ...m, moveDate: e.target.value }))} /></label>
             <label>{L("যেখান থেকে", "From")}<select className="pm-input" value={move.fromId} onChange={(e) => setMove((m) => ({ ...m, fromId: e.target.value }))}>{locationTree(locations).map(({ loc, depth }) => <option key={loc.id} value={loc.id}>{`${"- ".repeat(depth)}${locationName(loc, bn)}`}</option>)}</select></label>
             <label>{L("যেখানে", "To")}<select className="pm-input" value={move.toId} onChange={(e) => setMove((m) => ({ ...m, toId: e.target.value }))}><option value="">-</option>{locOptions}</select></label>
             <label style={{ flex: 1, minWidth: 160 }}>{L("নোট", "Note")}<input className="pm-input" value={move.note} onChange={(e) => setMove((m) => ({ ...m, note: e.target.value }))} /></label>

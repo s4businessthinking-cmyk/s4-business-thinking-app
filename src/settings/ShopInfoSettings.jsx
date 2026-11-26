@@ -5,6 +5,7 @@ import { saveShopRecord } from "../offline/shopService";
 import { normUrl, openLink } from "../utils/openLink.js";
 import { CURRENCIES, TAX_PRESETS, UAE_EMIRATES, countryKey } from "../reports/taxDomain.js";
 import { getLocalAccessStatus } from "../auth/licenseService.js";
+import { entitiesTextOf, parseEntitiesText } from "./entityGroup.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const COUNTRY_NAMES = { ae: "UAE", sa: "Saudi Arabia", om: "Oman", bh: "Bahrain", qa: "Qatar", kw: "Kuwait", bd: "Bangladesh", in: "India", custom: "Other" };
@@ -27,6 +28,8 @@ const fromShop = (shop) => ({
   trnNumber: shop.trnNumber || "",
   vatNumber: shop.vatNumber || "",
   tradeLicenseNumber: shop.tradeLicenseNumber || "",
+  groupName: shop.entityGroup?.name || "",
+  entitiesText: entitiesTextOf(shop.entityGroup),
 });
 
 export default function ShopInfoSettings({ localShop, shopId, profile, user, th, s, lang, toast, onShopUpdated, readOnly = false }) {
@@ -75,8 +78,16 @@ export default function ShopInfoSettings({ localShop, shopId, profile, user, th,
         country: f.country, emirate: f.emirate.trim(),
         mobile: f.mobile.trim(), fax: f.fax.trim(), email, website: normUrl(f.website),
         currency: f.currency, fyStartMonth: Number(f.fyStartMonth) || 1, taxApplicable: f.taxApplicable,
-        trnNumber: f.trnNumber.trim(), vatNumber: f.vatNumber.trim(), tradeLicenseNumber: f.tradeLicenseNumber.trim(),
+        trnNumber: f.trnNumber.trim(), vatNumber: f.vatNumber.trim(),         tradeLicenseNumber: f.tradeLicenseNumber.trim(),
         ownerName: localShop.ownerName || profile?.personName || "",
+        ...(f.groupName.trim() || f.entitiesText.trim()
+          ? {
+            entityGroup: {
+              name: f.groupName.trim(),
+              entities: parseEntitiesText(f.entitiesText, { companyName: f.companyName.trim() }),
+            },
+          }
+          : { entityGroup: null }),
       }, { ownerUid: user?.uid || localShop.ownerUid, profile, user });
       onShopUpdated?.(updated);
       toast(L("দোকানের তথ্য আপডেট হয়েছে!", "Shop info updated!"));
@@ -120,6 +131,20 @@ export default function ShopInfoSettings({ localShop, shopId, profile, user, th,
   const left = (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {field(L("দোকানের নাম (Company Name)", "Company Name"), text("companyName", { style: { fontWeight: 800 } }))}
+      {field(L("গ্রুপের নাম (ঐচ্ছিক — একাধিক আইনি সত্তা)", "Group name (optional — several legal entities)"), text("groupName", {
+        placeholder: L("যেমন: Al Noor Group", "e.g. Al Noor Group"),
+      }))}
+      <div>
+        {field(L("আইনি সত্তা (প্রিন্ট / PDF হেডার)", "Legal entities (print / PDF header)"), (
+          <textarea style={{ ...inp, minHeight: 72, resize: "vertical" }} {...dis} value={f.entitiesText} onChange={(e) => set("entitiesText", e.target.value)}
+            placeholder={L("প্রতি লাইনে একটা: নাম | TRN (ঐচ্ছিক) — এই দোকানে * চিহ্ন\nAl Noor Trading LLC | 100000000000003 *\nGulf Parts FZCO | 100000000000099",
+              "One per line: Name | TRN (optional) — mark this shop with *\nAl Noor Trading LLC | 100000000000003 *\nGulf Parts FZCO | 100000000000099")} />
+        ))}
+        <div style={{ fontSize: 11, color: th.txtMuted, marginTop: 4 }}>
+          {L("শুধু দেখানোর জন্য — এক দোকানের হিসাব আগের মতোই। * বাদ দিলেও Company Name মিললে '(this shop)' বসতে পারে।",
+            "Display only — this shop still keeps one set of books. Without *, Company Name match may still mark (this shop).")}
+        </div>
+      </div>
       {field(L("আরবি নাম (Arabic Company Name)", "Arabic Company Name"), text("companyNameAr", { dir: "rtl", placeholder: "اسم الشركة" }))}
       {field(L("বিল প্রিন্টের ভাষা (ইনভয়েস / কোটেশন / ডেলিভারি)", "Bill print language (invoice / quotation / delivery)"), (
         <select style={inp} {...dis} value={f.invoiceArabic} onChange={(e) => set("invoiceArabic", e.target.value)}

@@ -10,6 +10,7 @@ import { readDocFile, readProfilePhoto, openDocFile } from "../utils/docFiles.js
 import { saveShopRecord } from "../offline/shopService";
 import { alertText } from "./employeeAlerts.js";
 import { NATIONALITIES, SALARY_PARTS, countryRule, isExpat, grossSalary, expiringItems, serviceLength } from "./employeeProfile.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const r2 = (v) => Math.round((n(v) + Number.EPSILON) * 100) / 100;
@@ -469,7 +470,7 @@ export default function EmployeesTab({ lang = "en", shopId, user, profile, isOwn
                 <div className="si-field"><span className="pm-label">{L("ধরন", "Type")}</span><select className="pm-input"value={docForm.docType} onChange={(e) => setDocForm((d) => ({ ...d, docType: e.target.value }))}>{DOC_TYPES.map((t) => <option key={t[0]} value={t[0]}>{bn ? t[1] : t[2]}</option>)}</select></div>
                 <div className="si-field"><span className="pm-label">{L("নাম / বিবরণ", "Label")}</span><input className="pm-input"value={docForm.label} placeholder={L("যেমন: পাসপোর্ট ১ম পাতা", "e.g. Passport first page")} onChange={(e) => setDocForm((d) => ({ ...d, label: e.target.value }))} /></div>
                 <div className="si-field"><span className="pm-label">{L("নম্বর", "Number")}</span><input className="pm-input"value={docForm.number} onChange={(e) => setDocForm((d) => ({ ...d, number: e.target.value }))} /></div>
-                <div className="si-field"><span className="pm-label">{L("মেয়াদ শেষ", "Expiry date")}</span><input type="date"className="pm-input"value={docForm.expiryDate} onChange={(e) => setDocForm((d) => ({ ...d, expiryDate: e.target.value }))} /></div>
+                <div className="si-field"><span className="pm-label">{L("মেয়াদ শেষ", "Expiry date")}</span><DateField className="pm-input"value={docForm.expiryDate} onChange={(e) => setDocForm((d) => ({ ...d, expiryDate: e.target.value }))} /></div>
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
                 <input ref={docFileRef} type="file"accept="image/*,application/pdf"style={{ display: "none" }} onChange={(e) => { pickDocFile(e.target.files?.[0]); e.target.value = ""; }} />

@@ -8,6 +8,7 @@ import { loadHandoverDocs } from "../vouchers/chequeHandoverStore.js";
 import { useFirebaseAuthReady } from "../auth/useFirebaseAuthReady.js";
 import { localIsoDate } from "../utils/localIsoDate.js";
 import { UAE_BANKS, amountToWordsAED, CHEQUE_POSITIONS, DATE_FORMAT_OPTIONS, getChequeTemplateDefault } from "./chequeConfig.js";
+import DateField from "../components/DateField.jsx";
 
 // ─── CHEQUE PRINTER TAB ───────────────────────────────────────────────────────
 export default function ChequePrinterTab({ t, lang, th, s, isDesktop, shopName, shopAccount, shopIban, shopId, user, shop, prefill=null, onPrefillDone, onOpenHandover, syncRefreshKey=0, foldersVisible=false, onUnlockFolders, onLockFolders }) {
@@ -420,9 +421,7 @@ html,body{margin:0;padding:0;background:transparent}
             {/* Date */}
             <div style={{ marginBottom:10 }}>
               <span style={lbl}>{lang==="bn" ? "তারিখ" : "Date"}</span>
-              <input
-                style={inp} type="date"value={dateVal}
-                onChange={e => setDateVal(e.target.value)}
+              <DateField style={inp}value={dateVal} onChange={e=> setDateVal(e.target.value)}
               />
             </div>
 

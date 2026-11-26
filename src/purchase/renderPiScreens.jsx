@@ -31,6 +31,8 @@ import WhatsAppButton from "../share/WhatsAppButton.jsx";
 import { docMessage, partyPhone, pdfFileName, voucherShareDoc } from "../share/whatsappDocShare.js";
 import { settleLeftoverVendorReturnCredits } from "../returns/returnsCreditSettle.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
+import DateField from "../components/DateField.jsx";
+import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
 
 export function renderPiScreens({ listFilter = null, onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
   const applyVendorReturnCreditSettle = async (p) => {
@@ -45,7 +47,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
       const byId = new Map(plan.invoicePatches.map((x) => [x.id, x]));
       setInvoices((prev) => prev.map((inv) => {
         const hit = byId.get(inv.id);
-        return hit ? { ...inv, amountPaid: hit.amountPaid, balanceDue: hit.balanceDue, status: hit.status } : inv;
+        return hit ? { ...inv, amountPaid: hit.amountPaid, balanceDue: hit.balanceDue, status: hit.status, settleKind: hit.settleKind ?? inv.settleKind } : inv;
       }));
     }
     if (plan.returnPatches?.length && setBillReturns) {
@@ -325,7 +327,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
                       <button key={inv.id} type="button"className="si-mrow"onClick={()=>piOpenInvoice(inv)}>
                         <div className="si-mrow-top">
                           <span style={{ color:piAccent }}>{inv.invoiceNo}{piBtTag(inv)}</span>
-                          <span>{piBadge(inv.status)}</span>
+                          <span>{piBadge(inv)}</span>
                         </div>
                         <div className="si-mrow-sub"><span>{inv.vendorName||"—"}</span><b>{t.cur} {piFmt2(inv.grandTotal)}</b></div>
                         <div className="si-mrow-sub">
@@ -363,7 +365,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
                               <td title={inv.supplierInvoiceNo||""}>{inv.supplierInvoiceNo||"-"}</td>
                               {Object.keys(PI_STATUSES).map(st=>(
                                 <td key={st} className="si-center">
-                                  {inv.status===st && <span style={{ color:PI_STATUSES[st]?.color, fontWeight:900, fontSize:12 }}>{PI_STATUSES[st]?.[lang]||st}</span>}
+                                  {inv.status===st && <span style={{ color:PI_STATUSES[st]?.color, fontWeight:900, fontSize:12 }}>{invoiceStatusLabel(inv, lang, PI_STATUSES) || PI_STATUSES[st]?.[lang]||st}</span>}
                                 </td>
                               ))}
                               <td className="si-num">{inv.items?.length||0}</td>
@@ -426,7 +428,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
 
         <div className="pm-reference-title">
           <strong style={{ color:piAccent }}>{bnL?"ক্রয় ইনভয়েস":"PURCHASE INVOICE"} — {inv.invoiceNo}</strong>
-          <span>{piBadge(inv.status)}</span>
+          <span>{piBadge(inv)}</span>
         </div>
 
         <div className="si-body">
@@ -480,7 +482,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
               <div className="si-panel-body">
                 <div className="si-total-row"><span>{t.pi_paymentMethod}</span><b>{PI_PAY_METHODS[inv.paymentMethod]?.icon} {PI_PAY_METHODS[inv.paymentMethod]?.[lang]||"-"}</b></div>
                 <div className="si-total-row"><span>{t.pi_amountPaid}</span><b style={{ color:"#15803d" }}>{t.cur} {piFmt2(inv.amountPaid)}</b></div>
-                <div className={`si-paid-box${bal>0.01?" is-due":""}`}><span>{bal>0.01?t.pi_balanceDue:t.pi_alreadyFullyPaid}</span><span>{t.cur} {piFmt2(Math.max(0,bal))}</span></div>
+                <div className={`si-paid-box${bal>0.01?" is-due":""}`}><span>{bal>0.01?t.pi_balanceDue:((inv.settleKind==="return"||inv.settleKind==="warranty")?invoiceStatusLabel(inv,lang):t.pi_alreadyFullyPaid)}</span><span>{t.cur} {piFmt2(Math.max(0,bal))}</span></div>
                 {related.length>0&&(
                   <div className="pm-table-wrap"style={{ marginTop:3 }}>
                     <table className="pm-table">
@@ -603,7 +605,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
         {fPanel(`${t.pi_invoiceNo} & ${t.pi_date}`, <>
           <div className="si-grid2">
             {fField(t.pi_invoiceNo, <div className="si-val is-strong"style={{ color:piAccent, fontFamily:"Consolas, monospace" }}>{piInvoiceNo}</div>)}
-            {fField(bnL?"এন্ট্রি তারিখ":"Entry Date", <input type="date"lang="en-GB" className="pm-input"value={piForm.entryDate||piToday()} onChange={e=>piUpd("entryDate",e.target.value)} />)}
+            {fField(bnL?"এন্ট্রি তারিখ":"Entry Date", <DateField className="pm-input"value={piForm.entryDate||piToday()} onChange={e=>piUpd("entryDate",e.target.value)} />)}
           </div>
           <div className="si-grid2">
             {fField(<>{t.pi_supplierInvoiceNo} <span style={{ color:"#b91c1c" }}>*</span></>,
@@ -658,7 +660,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
             </div>
           )}
           <div className="si-grid2">
-            {fField(t.pi_date, <input type="date"lang="en-GB" className="pm-input"value={piForm.invoiceDate} onChange={e=>piUpd("invoiceDate",e.target.value)} />)}
+            {fField(t.pi_date, <DateField className="pm-input"value={piForm.invoiceDate} onChange={e=>piUpd("invoiceDate",e.target.value)} />)}
             {/* the TRN printed on the supplier's bill (input VAT falls back to it when the supplier master has none) */}
             {fField(bnL?"সাপ্লায়ারের TRN":"Supplier TRN", <input className="pm-input"inputMode="numeric"value={piForm.vendorTrn||""} placeholder={bnL?"বিলে যেমন আছে":"As on the bill"}
               style={(()=>{ const d=String(piForm.vendorTrn||"").replace(/\s/g,""); return d&&!/^\d{15}$/.test(d)?{ borderColor:"#b45309" }:undefined; })()}

@@ -102,3 +102,17 @@ test("valuation without cost rights (empty cost map) holds no cost: every value 
   assert.deepEqual(v.rows.map((r) => [r.cost, r.value]), [[0, 0], [0, 0]]);
   assert.deepEqual([v.total, v.unpriced], [0, 2]);
 });
+
+test("BW07: replaced warranty movement carries claim locationId for godown stock", () => {
+  const claim = {
+    id: "w-g", shopId: S, status: "replaced", claimNo: "WC-G",
+    claimDate: "2026-11-01", replacedDate: "2026-11-10",
+    productId: "p3", qty: 1, locationId: "gA", locationName: "Godown A",
+  };
+  const m = stockMovements(products, { extras: { warrantyClaims: [claim] } }, S);
+  const hit = m.find((x) => x.docId === "w-g");
+  assert.ok(hit);
+  assert.equal(hit.locationId, "gA");
+  assert.equal(hit.qtyIn, 1);
+  assert.equal(hit.kind, "warranty");
+});

@@ -21,6 +21,7 @@ import { r2 } from "./reportFilters.js";
 import {
   COST_CENTRE_TYPES, buildCostCentreReport, costCentreFileName, costCentreProblem, costCentreRequired, costCentreRows, costCentresOf,
 } from "../accounts/costCentres.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -177,8 +178,8 @@ export default function CostCentreReport({ lang = "en", shopId, shop = null, use
         <span className="si-toolbar-gap" />
         {view === "report" && (
           <>
-            <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
-            <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
           </>
         )}
       </div>

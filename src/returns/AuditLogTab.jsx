@@ -3,6 +3,7 @@ import { subscribeShopCollection } from "../offline/realtimeSync";
 import { AUDIT_ACTIONS, AUDIT_COLLECTION_LABELS } from "../utils/auditLog.js";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
+import DateField from "../components/DateField.jsx";
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtWhen = (iso) => {
@@ -128,8 +129,8 @@ export default function AuditLogTab({ lang = "en", th, shopId, cur = "৳", isDe
             {people.map(([uid, name]) => <option key={uid} value={uid}>{name}</option>)}
           </select>
         </div>
-        <div><div style={lbl}>{L("থেকে", "From")}</div><input type="date"value={from} onChange={(e) => setFrom(e.target.value)} style={inp} /></div>
-        <div><div style={lbl}>{L("পর্যন্ত", "To")}</div><input type="date"value={to} onChange={(e) => setTo(e.target.value)} style={inp} /></div>
+        <div><div style={lbl}>{L("থেকে", "From")}</div><DateField value={from} onChange={(e) => setFrom(e.target.value)} style={inp} /></div>
+        <div><div style={lbl}>{L("পর্যন্ত", "To")}</div><DateField value={to} onChange={(e) => setTo(e.target.value)} style={inp} /></div>
       </div>
 
       {isDesktop ? (

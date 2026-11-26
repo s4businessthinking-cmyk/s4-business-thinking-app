@@ -3,6 +3,7 @@ import { BranchStockView } from "./BtBranchStockView.jsx";
 import { NewTransferForm } from "./BtNewTransferForm.jsx";
 import { TransferDetail } from "./BtTransferDetail.jsx";
 import { statusLabel } from "./branchTransferDomain.js";
+import DateField from "../components/DateField.jsx";
 
 export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete = false, canPrint = false, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting }) {
   if (view === "new" && canSendTransfer) {
@@ -69,8 +70,8 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
             <select className="pm-input"style={{ width: mobile ? "100%" : 170 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               {statusOptions.map(([key, label]) => <option key={key || "all"} value={key}>{label}</option>)}
             </select>
-            <input type="date"className="pm-input"title={t.fromDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-            <input type="date"className="pm-input"title={t.toDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateField className="pm-input"title={t.fromDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateField className="pm-input"title={t.toDate} style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
             {(search || statusFilter || from || to) && <button type="button"className="pm-btn-secondary"onClick={() => { setSearch(""); setStatusFilter(""); setFrom(""); setTo(""); }}>{t.clearFilter}</button>}
         </div>
           <div className="si-main is-all">

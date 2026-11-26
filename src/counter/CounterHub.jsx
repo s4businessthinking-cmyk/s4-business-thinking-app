@@ -19,6 +19,7 @@ import { isMember, loyaltyBalances, memberCsvRows, normalizeLoyalty, rateOn, wit
 import { billSnapshot, closeCustomerDisplay, isDisplayOpen, openCustomerDisplay } from "./customerDisplay.js";
 import { kickCashDrawer, loadPrintSettings } from "../print/printSettings.js";
 import { normalizeDrawerSettings, drawerPrinterName } from "./cashDrawer.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -346,7 +347,7 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
                       <input className="pm-input" style={{ width: 120 }} inputMode="decimal" value={rateForm.per} onChange={(e) => setRateForm((f) => ({ ...f, per: e.target.value }))} />
                     </label>
                     <label>{L("যে তারিখ থেকে", "From date")}
-                      <input type="date" className="pm-input" style={{ width: 140 }} value={rateForm.from} onChange={(e) => setRateForm((f) => ({ ...f, from: e.target.value }))} />
+                      <DateField className="pm-input" style={{ width: 140 }} value={rateForm.from} onChange={(e) => setRateForm((f) => ({ ...f, from: e.target.value }))} />
                     </label>
                     <button type="button" className="pm-btn pm-btn--primary" onClick={saveRate} disabled={busy}>{L("নিয়ম সেভ", "Save rule")}</button>
                   </div>

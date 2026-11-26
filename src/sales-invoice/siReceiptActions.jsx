@@ -47,7 +47,8 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
         const grand = siN2(invoice.grandTotal);
         const newBalance = Math.max(0, parseFloat(siFmt2(grand - newAmountPaid)));
         const newStatus = newBalance < 0.01 ? "paid" : (newAmountPaid > 0 ? "partial" : "confirmed");
-        const result = await offlinePatch("salesInvoices", invoice.id, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, updatedAt:nowIso, updatedBy:user?.uid || "" }, invoice, { deferPersist:true });
+        // Cash/receipt close clears return-settle mark so the badge says Paid again.
+        const result = await offlinePatch("salesInvoices", invoice.id, { amountPaid:newAmountPaid, balanceDue:newBalance, status:newStatus, settleKind: "", updatedAt:nowIso, updatedBy:user?.uid || "" }, invoice, { deferPersist:true });
         updatedById.set(invoice.id, { ...invoice, ...result.data, id: invoice.id });
       }
     } finally {

@@ -41,7 +41,8 @@ export function useProductForm({ isOwner, lang, setSelOrder, setSettingsPage, sh
     openingStock:"", openingRate:"", openingWarehouse:"", unit:"Pcs", customUnits:[], unitDefinitions:[],
     customerTypes:[], unitPrices:[], multiCustomerRatesEnabled:true,
     defaultDiscount:"", reorderMin:"", reorderMax:"", reorderQty:"", rackLocation:"",
-    specificationText:"", specShowInSales:false, photoUrl:"", description:""
+    specificationText:"", specShowInSales:false, photoUrl:"", description:"",
+    manufacturingBom: [],
   });
   const [pmSearch,setPmSearch]=useState("");
   const [pmCatFilter,setPmCatFilter]=useState("ALL");
@@ -155,6 +156,7 @@ export function useProductForm({ isOwner, lang, setSelOrder, setSettingsPage, sh
     customerTypes:Array.isArray(p.customerTypes)?p.customerTypes:[],
     unitPrices:Array.isArray(p.unitPrices)?p.unitPrices:[],
     multiCustomerRatesEnabled:productRatesEnabled(p),
+    manufacturingBom:Array.isArray(p.manufacturingBom)?p.manufacturingBom:[],
   });
 
   const startProductEdit = (p) => {

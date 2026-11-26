@@ -12,6 +12,7 @@ import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
 import { r2 } from "./reportFilters.js";
 import { AGE_BUCKETS, buildAging } from "./partyAging.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -161,7 +162,7 @@ export default function PartyAgingReport({ lang = "en", shopId, customers = [], 
           {AGE_BUCKETS.slice(1).map((b, i) => <option key={b[2]} value={i + 1}>{L(`${b[0] - 1} দিনের বেশি পুরনো বাকি আছে`, `Has dues over ${b[0] - 1} days`)}</option>)}
         </select>
         <button type="button" className={`pm-btn-secondary${day === localDay() ? " is-active" : ""}`} onClick={() => setAsOf(localDay())}>{L("আজ", "Today")}</button>
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
       </div>
       {aging && (
         <div className="si-kpis ag-kpis">

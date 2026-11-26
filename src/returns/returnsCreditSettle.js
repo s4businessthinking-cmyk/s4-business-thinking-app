@@ -34,6 +34,7 @@ export async function settleLeftoverVendorReturnCredits({
         amountPaid: p.amountPaid,
         balanceDue: p.balanceDue,
         status: p.status,
+        settleKind: p.settleKind || "",
         updatedAt: nowIso,
         updatedBy: uid,
       },

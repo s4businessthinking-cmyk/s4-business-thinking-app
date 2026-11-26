@@ -2,6 +2,7 @@ import { collection, onSnapshot, query, where } from "../backend/firestore";
 import { onAuthStateChanged } from "../backend/auth";
 import { db, auth } from "../firebase-config";
 import { offlineCacheCloudRecords, offlineList } from "./offlineRepository";
+import { isCloudAccessAllowedSync } from "./cloudAccessPolicy.js";
 
 // Shared real-time (onSnapshot) subscription layer for shopId-scoped Firestore
 // collections. Generalizes the pattern originally written for
@@ -113,6 +114,29 @@ export function subscribeShopCollection({
 }) {
   if (typeof onRows !== "function") {
     throw new Error("subscribeShopCollection: onRows is required");
+  }
+
+  if (!isCloudAccessAllowedSync()) {
+    let cancelled = false;
+    const defaultLoadLocalRows = async () => {
+      const result = await offlineList(cacheCollectionName);
+      return sortRows(
+        normalizeOfflineRows(result).filter((row) => String(row.shopId || "") === String(shopId))
+      );
+    };
+    const runLocalLoad = async () => {
+      try {
+        const rows = await (loadLocalRows ? loadLocalRows() : defaultLoadLocalRows());
+        if (!cancelled) onRows(rows || []);
+      } catch (error) {
+        console.warn(`[S4 Realtime] ${collectionName} local load failed`, error);
+      }
+    };
+    runLocalLoad();
+    if (typeof onStatus === "function") onStatus({ state: "offline" });
+    return () => {
+      cancelled = true;
+    };
   }
 
   let cancelled = false;

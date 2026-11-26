@@ -23,6 +23,7 @@ import MonthEndPackPanel from "./MonthEndPackPanel.jsx";
 import YearEndPanel from "./YearEndPanel.jsx";
 import ForexPanel from "./ForexPanel.jsx";
 import { yearEndDocIds } from "./yearEnd.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const drCr = (v) => (Math.abs(v) < 0.005 ? "" : `${money(Math.abs(v))} ${v > 0 ? "Dr" : "Cr"}`);
@@ -191,8 +192,8 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>)}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} title={L("শুরুর তারিখ", "From")} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} title={L("শেষ তারিখ", "To")} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} title={L("শুরুর তারিখ", "From")} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} title={L("শেষ তারিখ", "To")} />
       </div>
       <div className="si-toolbar">
         <input className="pm-input" style={{ width: mobile ? "100%" : 200 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={L("খাত বা কোড খুঁজুন", "Search account or code")} />

@@ -16,6 +16,7 @@ import { r2 } from "./reportFilters.js";
 import {
   BANK_ACCOUNT, buildBankBook, buildCashBook, buildDayBook, moneyAccounts,
 } from "./booksHub.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -201,8 +202,8 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
             <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={from} onChange={(e) => setFrom(e.target.value)} title={L("থেকে", "From")} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={to} onChange={(e) => setTo(e.target.value)} title={L("পর্যন্ত", "To")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={from} onChange={(e) => setFrom(e.target.value)} title={L("থেকে", "From")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={to} onChange={(e) => setTo(e.target.value)} title={L("পর্যন্ত", "To")} />
       </div>
 
       {mode === "day" && dayBook && (

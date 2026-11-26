@@ -5,6 +5,7 @@
 // Rules in vat201.js.
 import React, { useState } from "react";
 import { VAT201_MANUAL_BOXES } from "./vat201.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -182,7 +183,7 @@ export default function Vat201Panel({ lang = "en", ret, vat, cur = "AED", isOwne
               <select className="pm-input" style={{ width: mobile ? "100%" : 250 }} value={form.box} disabled={saving} onChange={(e) => setF("box", e.target.value)}>
                 {VAT201_MANUAL_BOXES.map((b) => <option key={b.id} value={b.id}>{`Box ${b.id} - ${bn ? b.bn : b.en}`}</option>)}
               </select>
-              <input type="date" className="pm-input" style={{ width: 130 }} value={form.date} disabled={saving} onChange={(e) => setF("date", e.target.value)} />
+              <DateField className="pm-input" style={{ width: 130 }} value={form.date} disabled={saving} onChange={(e) => setF("date", e.target.value)} />
               <input className="pm-input" style={{ width: mobile ? "100%" : 170 }} value={form.ref} disabled={saving} onChange={(e) => setF("ref", e.target.value)} placeholder={L("কাস্টমস ডিক্লারেশন / বিল নং", "Customs declaration / bill no.")} />
               <input className="pm-input" style={{ width: 110, textAlign: "right" }} inputMode="decimal" value={form.amount} disabled={saving} onChange={(e) => setF("amount", e.target.value)} placeholder={L(`মূল্য (${cur})`, `Amount (${cur})`)} />
               <input className="pm-input" style={{ width: 100, textAlign: "right" }} inputMode="decimal" value={form.vat} disabled={saving} onChange={(e) => setF("vat", e.target.value)} placeholder={`VAT (${cur})`} />

@@ -1,29 +1,32 @@
 // Automatic payment reminders: once a local day, after the owner's hour, the overdue queue (accounts/overdueReminders.js)
-// is handed to the owner's own HTTPS SMS / email provider (share/reminderChannels.js sendViaProvider) without a person
-// pressing Send. Rules:
-// - only SMS and email through an https:// provider run on their own; WhatsApp, sms: and mailto: links need a person
-//   (they only open an app), so they are never automatic;
-// - it runs inside the open S4 app on the one device the owner picked (no service runs while S4 is closed), so two
-//   devices never remind the same customer twice;
+// is handed to the owner's own HTTPS SMS / email / WhatsApp provider (share/reminderChannels.js sendViaProvider) without a
+// person pressing Send. Rules:
+// - only channels with https:// provider run on their own; sms: / mailto: / wa.me links need a person;
+// - device mode: runs inside the open S4 app on the one device the owner picked (no service while S4 is closed);
+// - server mode: the sync server (erp-server) runs once a day after the hour using synced data (app may be closed);
+//   two devices never remind the same customer twice on the same day (reminders collection);
 // - a customer already reminded today (any channel, any device that has synced) is skipped;
 // - a 2xx reply is saved as "accepted by your provider" (handedOffSms / handedOffEmail), never "delivered"; a refused
 //   or failed call saves nothing and is reported with its real error.
-// Settings: shop.overdueReminders.auto = { on, sms, email, hour, deviceId, deviceName }.
-import { reminderRecord, reminderText, fillReminder, lastReminders } from "../accounts/overdueReminders.js";
-import { sendViaProvider } from "./reminderChannels.js";
+// Settings: shop.overdueReminders.auto = { on, whatsapp, sms, email, hour, when, deviceId, deviceName, lastServerRun? }.
+import { reminderRecord, reminderProviderMessage, fillReminder, lastReminders } from "../accounts/overdueReminders.js";
+import { providerConfigForChannel, sendViaProvider } from "./reminderChannels.js";
 
 const clean = (v) => String(v ?? "").trim();
 const https = (url) => /^https:\/\//i.test(clean(url));
-export const AUTO_CHANNELS = ["sms", "email"];
+export const AUTO_CHANNELS = ["whatsapp", "sms", "email"];
 export const AUTO_DEFAULT_HOUR = 10;
 
 export function autoSettingsOf(shop) {
   const a = shop?.overdueReminders?.auto || {};
   const hour = Number(a.hour);
+  const when = clean(a.when) === "server" ? "server" : "device";
+  const last = a.lastServerRun && typeof a.lastServerRun === "object" ? a.lastServerRun : null;
   return {
-    on: a.on === true, sms: a.sms === true, email: a.email === true,
+    on: a.on === true, whatsapp: a.whatsapp === true, sms: a.sms === true, email: a.email === true, when,
     hour: Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : AUTO_DEFAULT_HOUR,
     deviceId: clean(a.deviceId), deviceName: clean(a.deviceName),
+    lastServerRun: last,
   };
 }
 
@@ -34,16 +37,16 @@ export function autoSettingsOf(shop) {
 export function autoProblems(auto, channels) {
   if (!auto?.on) return [];
   const out = [];
-  if (!auto.sms && !auto.email) out.push({ id: "noChannel", en: "Pick SMS and/or email for automatic sending", bn: "স্বয়ংক্রিয়ভাবে পাঠাতে SMS আর/অথবা ইমেইল বাছুন" });
+  if (!auto.whatsapp && !auto.sms && !auto.email) out.push({ id: "noChannel", en: "Pick WhatsApp, SMS and/or email for automatic sending", bn: "স্বয়ংক্রিয়ভাবে পাঠাতে WhatsApp, SMS আর/অথবা ইমেইল বাছুন" });
   for (const ch of AUTO_CHANNELS) {
     if (!auto[ch]) continue;
-    const name = ch === "sms" ? "SMS" : "email";
-    const nameBn = ch === "sms" ? "SMS" : "ইমেইল";
+    const name = ch === "whatsapp" ? "WhatsApp" : ch === "sms" ? "SMS" : "email";
+    const nameBn = ch === "whatsapp" ? "WhatsApp" : ch === "sms" ? "SMS" : "ইমেইল";
     if (!channels?.[ch]) out.push({ id: `${ch}Off`, en: `Switch the ${name} channel on first`, bn: `আগে ${nameBn} চালু করুন` });
-    const url = clean((ch === "sms" ? channels?.smsProvider : channels?.emailProvider)?.url);
+    const url = clean(providerConfigForChannel(channels, ch)?.url);
     if (!https(url)) out.push({ id: `${ch}Provider`, en: `Automatic ${name} needs your ${name} provider's https:// address`, bn: `স্বয়ংক্রিয় ${nameBn}-এর জন্য ${nameBn} প্রোভাইডারের https:// ঠিকানা লাগবে` });
   }
-  if (!auto.deviceId) out.push({ id: "device", en: "Pick the device that runs it", bn: "কোন ডিভাইস চালাবে তা বাছুন" });
+  if (auto.when !== "server" && !auto.deviceId) out.push({ id: "device", en: "Pick the device that runs it", bn: "কোন ডিভাইস চালাবে তা বাছুন" });
   return out;
 }
 
@@ -53,6 +56,7 @@ export function autoProblems(auto, channels) {
  */
 export function autoDue({ auto, channels, enabled, deviceId, today, hour, lastRunDay = "" }) {
   if (!auto?.on) return { due: false, reason: "off" };
+  if (auto.when === "server") return { due: false, reason: "serverMode" };
   if (!enabled) return { due: false, reason: "remindersOff" };
   if (autoProblems(auto, channels).length) return { due: false, reason: "problems" };
   if (!deviceId || deviceId !== auto.deviceId) return { due: false, reason: "otherDevice" };
@@ -61,9 +65,19 @@ export function autoDue({ auto, channels, enabled, deviceId, today, hour, lastRu
   return { due: true, reason: "" };
 }
 
+/** Server job (erp-server): same day/hour rules, no device pick. */
+export function autoDueServer({ auto, channels, enabled, today, hour, lastRunDay = "" }) {
+  if (!auto?.on || auto.when !== "server") return { due: false, reason: "off" };
+  if (!enabled) return { due: false, reason: "remindersOff" };
+  if (autoProblems(auto, channels).length) return { due: false, reason: "problems" };
+  if (Number(hour) < auto.hour) return { due: false, reason: "early" };
+  if (lastRunDay === today) return { due: false, reason: "doneToday" };
+  return { due: true, reason: "" };
+}
+
 /**
  * Which rows go to which provider: ready rows (not reminded today) with at least one automatic channel that can reach
- * them through a provider, in the order SMS then email. -> { send: [{ row, channels: ["sms", ...] }], skipped: [{ row, reason }] }
+ * them through a provider, in the order WhatsApp then SMS then email. -> { send: [{ row, channels: [...] }], skipped: [...] }
  */
 export function autoPlan(queue, auto, { remindedToday = new Set() } = {}) {
   const send = [], skipped = [];
@@ -92,11 +106,11 @@ export async function runAutoReminders({ queue, auto, channels, settings, remind
   const { send, skipped } = autoPlan(queue, auto, { remindedToday: remindedOn(reminders, today) });
   const result = { handedOff: [], failed: [], skipped: skipped.map(({ row, reason }) => ({ name: row.name, reason })) };
   for (const { row, channels: chans } of send.slice(0, limit)) {
-    const text = reminderText(row, { settings, shopName, cur });
     for (const ch of chans) {
       const opt = row.options.find((o) => o.channel === ch);
+      const text = reminderProviderMessage(row, { settings, shopName, cur, channel: ch, via: opt?.via });
       const subject = ch === "email" ? fillReminder(settings?.language === "bn" ? channels.emailSubjectBn : channels.emailSubjectEn, { shop: shopName, name: row.name }) : "";
-      const res = await sendViaProvider(ch, ch === "sms" ? channels.smsProvider : channels.emailProvider, { to: opt.to, message: text, subject, ...(transport ? { transport } : {}) });
+      const res = await sendViaProvider(ch, providerConfigForChannel(channels, ch), { to: opt.to, message: text, subject, ...(transport ? { transport } : {}) });
       if (!res.ok) { result.failed.push({ name: row.name, channel: ch, message: `${res.httpStatus || res.error}: ${res.message}` }); continue; }
       const rec = reminderRecord(row, { shopId, user, profile, cur, mode: "auto", channel: ch, status: res.status, providerId: res.providerId, now: now() });
       await save({ ...rec, title: `Auto ${rec.title.charAt(0).toLowerCase()}${rec.title.slice(1)}`, auto: true, doneByName: rec.doneByName ? `${rec.doneByName} (auto)` : "Auto" });

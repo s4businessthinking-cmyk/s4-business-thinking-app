@@ -198,6 +198,7 @@ import s4LogoUrl from "./assets/s4-logo.png";
 import { TR } from "./i18n/translations.js";
 import { takeFreshRunSignOut } from "./auth/sessionPerRun.js";
 import { touchOfflineSession, SESSION_IDLE_MS } from "./auth/authSession.js";
+import { isCloudAccessAllowedSync } from "./offline/cloudAccessPolicy.js";
 import { useFirebaseAuthReady } from "./auth/useFirebaseAuthReady.js";
 import { localIsoDate } from "./utils/localIsoDate.js";
 import { UAE_BANKS, amountToWordsAED } from "./cheque/chequeConfig.js";
@@ -538,7 +539,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const overdueReminders = useOverdueReminders({ shop: localShop, shopId, customers, enabled: isOwner || can("manageCustomers") || can("manageSales") });
   // automatic payment reminders through the owner's HTTPS SMS / email provider, once a day while S4 is open on the chosen device
   useAutoReminders({ shop: localShop, shopId, reminders: overdueReminders, user, profile, cur: t.cur || "AED", shopName: localShop?.companyName || "", lang, toast,
-    enabled: isOwner || can("manageCustomers") || can("manageSales") });
+    enabled: isOwner || can("manageCustomers") || can("manageSales"),
+    // Mobile: check every 5 min (was 60s). Still runs once/day when due; less wake-up work on phones.
+    checkMs: (typeof window !== "undefined" && (window.Capacitor?.isNativePlatform?.() || window.matchMedia?.("(pointer: coarse)")?.matches)) ? 5 * 60 * 1000 : 60 * 1000 });
   const taxAlertList = useTaxAlerts({
     shopId: isOwner ? shopId : null, shop: localShop, products, customers, vendors, lang, toast,
     onOpen: () => { setSettingsPage(null); setTab("tax"); },
@@ -599,6 +602,12 @@ export default function App() {
   const [authReady,setAuthReady]=useState(false);
   const [authScreen,setAuthScreen]=useState("login");
   const [signupRole,setSignupRole]=useState(null);
+
+  useEffect(() => {
+    if (!isCloudAccessAllowedSync() && (authScreen === "signupRole" || authScreen === "signupForm")) {
+      setAuthScreen("login");
+    }
+  }, [authScreen]);
   const [notif,setNotif]=useState(null);
   const [profileError,setProfileError]=useState(null);
   const toastTimer=useRef(null);

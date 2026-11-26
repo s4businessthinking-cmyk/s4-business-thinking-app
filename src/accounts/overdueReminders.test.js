@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DEFAULT_REMINDER_TEXT, fillReminder, lastReminders, reminderQueue, reminderRecord, reminderRows, reminderSettingsOf, reminderText } from "./overdueReminders.js";
+import { DEFAULT_REMINDER_TEXT, fillReminder, lastReminders, reminderProviderSmsText, reminderQueue, reminderRecord, reminderRows, reminderSettingsOf, reminderText } from "./overdueReminders.js";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
 import { buildAging } from "../reports/partyAging.js";
 
@@ -24,7 +24,7 @@ const ASOF = "2026-11-25";
 const settings = reminderSettingsOf({ overdueReminders: { enabled: true, minDays: 7 } });
 
 test("settings: off, 7 days, English unless set", () => {
-  assert.deepEqual(reminderSettingsOf({}), { enabled: false, minDays: 7, minAmount: 0, language: "en", textEn: DEFAULT_REMINDER_TEXT.en, textBn: DEFAULT_REMINDER_TEXT.bn });
+  assert.deepEqual(reminderSettingsOf({}), { enabled: false, minDays: 7, minAmount: 0, language: "en", textEn: DEFAULT_REMINDER_TEXT.en, textBn: DEFAULT_REMINDER_TEXT.bn, smsProviderBilingual: true });
   assert.equal(reminderSettingsOf({ overdueReminders: { language: "BN" } }).language, "bn", "read in any case");
 });
 
@@ -47,6 +47,11 @@ test("message: placeholders filled in the chosen language", () => {
     "Dear Al Noor, this is a reminder from Gulf Parts: AED 1000.00 is overdue on 1 bill(s), the oldest due on 01/10/2026 (55 days). Kindly arrange the payment. Thank you.");
   assert.match(reminderText(row, { settings: { ...settings, language: "bn" }, shopName: "Gulf Parts" }), /প্রিয় Al Noor/);
   assert.equal(fillReminder("{name} {unknown}", { name: "A" }), "A {unknown}", "unknown words are left as typed");
+  const pair = reminderProviderSmsText(row, { settings, shopName: "Gulf Parts" });
+  assert.match(pair, /Dear Al Noor/);
+  assert.match(pair, /প্রিয় Al Noor/);
+  assert.match(pair, /---/);
+  assert.equal(reminderProviderSmsText(row, { settings: { ...settings, smsProviderBilingual: false }, shopName: "Gulf Parts" }), reminderText(row, { settings: { ...settings, smsProviderBilingual: false }, shopName: "Gulf Parts" }));
 });
 
 test("once a day: a reminder record today marks the customer as reminded", () => {

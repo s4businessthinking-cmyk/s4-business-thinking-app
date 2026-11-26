@@ -6,6 +6,7 @@ import { saveShopRecord } from "../offline/shopService";
 import { logAudit } from "../utils/auditLog.js";
 import { cancelSalesFxPatch, salesFxPosition, salesRealisedJournal } from "./salesForex.js";
 import { rateApiOf } from "./fxRates.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -118,7 +119,7 @@ export default function SalesForexSection({ lang = "en", shopId, shop, user, pro
             </select>
             <input className="pm-input" inputMode="decimal" value={settle.value} onChange={(e) => setSettle((s) => ({ ...s, value: e.target.value }))} />
           </label>
-          <label>{L("তারিখ (টাকা পাওয়ার দিন)", "Date (day received)")}<input type="date" className="pm-input" max={today} value={settle.date} onChange={(e) => setSettle((s) => ({ ...s, date: e.target.value }))} /></label>
+          <label>{L("তারিখ (টাকা পাওয়ার দিন)", "Date (day received)")}<DateField className="pm-input" max={today} value={settle.date} onChange={(e) => setSettle((s) => ({ ...s, date: e.target.value }))} /></label>
           {res && !res.error && <span style={{ alignSelf: "center", color: colorOf(res.amount), fontWeight: 700 }}>{res.kind === "gain" ? L("লাভ", "Gain") : L("ক্ষতি", "Loss")} {base} {money(Math.abs(res.amount))}</span>}
           <button type="button" className="pm-btn pm-btn--primary" onClick={post} disabled={busy || blockers.length > 0}>{L("লিখুন", "Record")}</button>
           <button type="button" className="pm-btn-secondary" onClick={() => setSettle(null)}>{L("বাতিল", "Cancel")}</button>

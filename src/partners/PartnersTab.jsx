@@ -19,6 +19,7 @@ import {
   distributionsOf, liveEntries, partnerLedger, computeDistribution, partnerAlertText, partnerDirectoryFrom, partnerDirectoryOf,
   PARTNER_FIELDS, PARTNER_SECTIONS, PARTNER_DOC_TYPES,
 } from "./partners.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -347,7 +348,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
                 {fField(L("ধরন", "Type"), <select className="pm-input"value={docForm.docType} onChange={(e) => setDocForm((d) => ({ ...d, docType: e.target.value }))}>{PARTNER_DOC_TYPES.map((t) => <option key={t[0]} value={t[0]}>{bn ? t[1] : t[2]}</option>)}</select>)}
                 {fField(L("নাম / বিবরণ", "Label"), <input className="pm-input"value={docForm.label} placeholder={L("যেমন: আইডি সামনের দিক", "e.g. ID front side")} onChange={(e) => setDocForm((d) => ({ ...d, label: e.target.value }))} />)}
                 {fField(L("নম্বর", "Number"), <input className="pm-input"value={docForm.number} onChange={(e) => setDocForm((d) => ({ ...d, number: e.target.value }))} />)}
-                {fField(L("মেয়াদ শেষ", "Expiry date"), <input type="date"className="pm-input"value={docForm.expiryDate} onChange={(e) => setDocForm((d) => ({ ...d, expiryDate: e.target.value }))} />)}
+                {fField(L("মেয়াদ শেষ", "Expiry date"), <DateField className="pm-input"value={docForm.expiryDate} onChange={(e) => setDocForm((d) => ({ ...d, expiryDate: e.target.value }))} />)}
               </div>
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
                 <input ref={docFileRef} type="file"accept="image/*,application/pdf"style={{ display: "none" }} onChange={(e) => { pickDocFile(e.target.files?.[0]); e.target.value = ""; }} />
@@ -446,7 +447,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
             <div className="si-grid2">
               {fField(L("পার্টনার *", "Partner *"), <select className="pm-input"value={entryForm.partnerId} onChange={(e) => { const p = all.find((x) => x.id === e.target.value); setEntryForm((f) => ({ ...f, partnerId: e.target.value, method: p?.payMethod || f.method })); }}><option value="">—</option>{activeList.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>)}
               {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input className="pm-input"inputMode="decimal"value={entryForm.amount} onChange={(e) => setEntryForm((f) => ({ ...f, amount: e.target.value }))} />)}
-              {fField(`${L("তারিখ", "Date")} *`, <input type="date"className="pm-input"value={entryForm.date} onChange={(e) => setEntryForm((f) => ({ ...f, date: e.target.value }))} />)}
+              {fField(`${L("তারিখ", "Date")} *`, <DateField className="pm-input"value={entryForm.date} onChange={(e) => setEntryForm((f) => ({ ...f, date: e.target.value }))} />)}
               {ENTRY_KINDS[entryForm.kind].cash && fField(L("মাধ্যম", "Method"), <select className="pm-input"value={entryForm.method} onChange={(e) => setEntryForm((f) => ({ ...f, method: e.target.value }))}>{PAY_METHODS.map((m) => <option key={m[0]} value={m[0]}>{bn ? m[1] : m[2]}</option>)}</select>)}
               {fField(L("রেফারেন্স / চেক নং", "Reference / cheque no"), <input className="pm-input"value={entryForm.refNo} onChange={(e) => setEntryForm((f) => ({ ...f, refNo: e.target.value }))} />)}
               {fField(L("নোট", "Note"), <input className="pm-input"value={entryForm.note} onChange={(e) => setEntryForm((f) => ({ ...f, note: e.target.value }))} />)}
@@ -563,8 +564,8 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
             {range && !periodOptions.some((p) => p.from === range.from && p.to === range.to) && <option value={`${range.from}|${range.to}`}>{periodLabel(range, bn)}</option>}
           </select>)}
           {fField(L("রিজার্ভ %", "Reserve %"), <input className="pm-input"inputMode="decimal"value={reservePct} onChange={(e) => setReservePct(e.target.value)} />)}
-          {fField(L("থেকে", "From"), <input type="date"className="pm-input"value={range?.from || ""} onChange={(e) => e.target.value && setRange((r) => ({ ...r, from: e.target.value }))} />)}
-          {fField(L("পর্যন্ত", "To"), <input type="date"className="pm-input"value={range?.to || ""} onChange={(e) => e.target.value && setRange((r) => ({ ...r, to: e.target.value }))} />)}
+          {fField(L("থেকে", "From"), <DateField className="pm-input"value={range?.from || ""} onChange={(e) => e.target.value && setRange((r) => ({ ...r, from: e.target.value }))} />)}
+          {fField(L("পর্যন্ত", "To"), <DateField className="pm-input"value={range?.to || ""} onChange={(e) => e.target.value && setRange((r) => ({ ...r, to: e.target.value }))} />)}
         </div>
         <div style={{ marginTop: 8 }}>
           {line(L("হিসাব নিকাশ অনুযায়ী নিট লাভ", "Net profit as per Accounts"), autoProfit ? `${cur} ${money(autoProfit.netProfit)}` : L("লোড হচ্ছে…", "Loading…"))}

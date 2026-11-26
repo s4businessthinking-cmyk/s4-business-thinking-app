@@ -8,6 +8,7 @@ import { generateStatementHTML } from "../print/printDesign.js";
 import PayrollPanel from "./PayrollPanel.jsx";
 import { grossSalary } from "./employeeProfile.js";
 import { ATTENDANCE_STATUSES, statusInfo, monthDates, marksByDate, summarizeMonth, payableFor, hoursBetween, wagesPaidByEmployee } from "./attendance.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => (Math.round((n(v) + Number.EPSILON) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -163,7 +164,7 @@ export default function AttendanceTab({ lang = "en", shopId, user, profile, canM
     <>
       <div className="si-toolbar">
         <button type="button"className="pm-btn-secondary"onClick={() => shiftDate(-1)}></button>
-        <input type="date"className="pm-input"style={{ width: 140 }} value={date} onChange={(e) => pickDate(e.target.value)} />
+        <DateField className="pm-input"style={{ width: 140 }} value={date} onChange={(e) => pickDate(e.target.value)} />
         <button type="button"className="pm-btn-secondary"onClick={() => shiftDate(1)}></button>
         <button type="button"className="pm-btn-secondary"onClick={() => pickDate(localDay())}>{L("আজ", "Today")}</button>
         <span className="si-toolbar-gap" />

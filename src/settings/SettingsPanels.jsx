@@ -2,6 +2,12 @@ import { useState, useEffect } from "react";
 import { getFailingSyncSamples } from "../offline/cloudPullService";
 import { isAcceptablePassword } from "../auth/passwordRules.js";
 import { updateOwnPassword } from "../auth/userManagementService";
+import { licenseActivationErrorText } from "../auth/licensePayloadRules.js";
+import {
+  activateLicenseOffline,
+  getLocalAccessStatus,
+  getLocalLicenseStatus,
+} from "../auth/licenseService.js";
 
 export const SUPPORT_CONTACTS = {
   whatsapp: "8801860531723",
@@ -24,7 +30,100 @@ export function buildSupportWhatsappUrl(lang) {
   return `https://wa.me/${SUPPORT_CONTACTS.whatsapp}?text=${encodeURIComponent(text)}`;
 }
 
-export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onActivated }) {
+export function buildLicenseSupportWhatsappUrl(lang, { deviceId = "", accessReason = "", licenseStatus = "" } = {}) {
+  const bits = [
+    lang === "bn"
+      ? "S4 Business Thinking — লাইসেন্স/ট্রায়াল নিয়ে সাহায্য চাই।"
+      : "S4 Business Thinking — need help with license/trial.",
+    deviceId ? `${lang === "bn" ? "ডিভাইস আইডি" : "Device ID"}: ${deviceId}` : "",
+    accessReason ? `${lang === "bn" ? "স্ট্যাটাস" : "Status"}: ${accessReason}${licenseStatus ? ` / ${licenseStatus}` : ""}` : "",
+  ].filter(Boolean);
+  return `https://wa.me/${SUPPORT_CONTACTS.whatsapp}?text=${encodeURIComponent(bits.join("\n"))}`;
+}
+
+/** Shown when trial/license blocks the app — same contacts as Settings → Help. */
+export function LicenseSupportContactsPanel({ t, lang, th, s, licenseAccess, toast }) {
+  const isBn = lang === "bn";
+  const deviceId = licenseAccess?.trial?.deviceId || licenseAccess?.license?.deviceId || "";
+  const accessReason = licenseAccess?.accessReason || "";
+  const licenseStatus = licenseAccess?.licenseStatus || "";
+
+  const contactBtn = {
+    ...s.stBtn,
+    width: "100%",
+    textAlign: "left",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "12px 14px",
+    marginBottom: 8,
+  };
+
+  const copyDevice = async () => {
+    if (!deviceId) return;
+    try {
+      await navigator.clipboard.writeText(deviceId);
+      toast?.(isBn ? "ডিভাইস আইডি কপি হয়েছে" : "Device ID copied");
+    } catch {
+      toast?.(isBn ? "কপি হয়নি" : "Copy failed", "err");
+    }
+  };
+
+  return (
+    <div style={{ ...s.card, marginTop: 12, border: "1px solid rgba(249,115,22,0.35)" }}>
+      <div style={s.settingsLbl}>{t?.helpTitle || (isBn ? "সাহায্য ও সাপোর্ট" : "Help & Support")}</div>
+      <div style={{ fontSize: 12, color: th.txtMuted, lineHeight: 1.55, marginBottom: 12 }}>
+        {isBn
+          ? "নতুন লাইসেন্স বা রিনিউ করতে, অথবা ডিভাইস আইডি পাঠাতে — নিচের যেকোনো উপায়ে আমাদের লিখুন।"
+          : "For a new license, renewal, or to send your device ID — contact us using any option below."}
+      </div>
+
+      <button
+        type="button"
+        style={{ ...contactBtn, background: "rgba(34,197,94,0.12)", borderColor: "#22c55e", color: "#22c55e" }}
+        onClick={() => openExternalLink(buildLicenseSupportWhatsappUrl(lang, { deviceId, accessReason, licenseStatus }))}
+      >
+        <span>{t?.helpWhatsappBtn || "WhatsApp Message"}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.9 }}>{SUPPORT_CONTACTS.whatsappDisplay}</span>
+      </button>
+      {t?.helpWhatsappNote && (
+        <div style={{ fontSize: 10, color: "#f59e0b", margin: "-4px 0 10px", lineHeight: 1.4 }}>{t.helpWhatsappNote}</div>
+      )}
+
+      <button
+        type="button"
+        style={contactBtn}
+        onClick={() => openExternalLink(`mailto:${SUPPORT_CONTACTS.email}?subject=${encodeURIComponent("S4 Business Thinking - License renewal")}&body=${encodeURIComponent(deviceId ? `Device ID: ${deviceId}\n` : "")}`)}
+      >
+        <span>{t?.helpEmailBtn || "Email"}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.85 }}>{SUPPORT_CONTACTS.email}</span>
+      </button>
+
+      <button
+        type="button"
+        style={contactBtn}
+        onClick={() => openExternalLink(SUPPORT_CONTACTS.website)}
+      >
+        <span>{t?.helpWebsiteBtn || (isBn ? "ওয়েবসাইট" : "Website")}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, opacity: 0.85 }}>{SUPPORT_CONTACTS.websiteDisplay}</span>
+      </button>
+
+      {deviceId && (
+        <div style={{ marginTop: 4, padding: 10, borderRadius: 10, background: th.bgInp, border: `1px solid ${th.border}` }}>
+          <div style={{ fontSize: 10, color: th.txtMuted, fontWeight: 800, textTransform: "uppercase", marginBottom: 4 }}>
+            {isBn ? "ডিভাইস আইডি (সাপোর্টে পাঠান)" : "Device ID (send to support)"}
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <code style={{ flex: 1, fontSize: 11, wordBreak: "break-all", color: th.txtPrimary }}>{deviceId}</code>
+            <button type="button" style={s.addCoBtn} onClick={copyDevice}>{isBn ? "কপি" : "Copy"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onActivated, localShop = null, profile = null }) {
   const isBn = lang === "bn";
   const [licenseKey, setLicenseKey] = useState("");
   const [status, setStatus] = useState(null);
@@ -61,19 +160,22 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
     note: isBn
       ? "লাইসেন্স স্ট্যাটাস দেখুন অথবা নতুন লাইসেন্স অ্যাক্টিভ করুন।"
       : "Check license status or activate a new license.",
+    bindTitle: isBn ? "কী বানানোর সময় বসতেছে (অবশ্যই মিলতে হবে)" : "Required in the license key (must match)",
+    company: isBn ? "কোম্পানি" : "Company",
+    mobile: isBn ? "মোবাইল" : "Mobile",
+    bindHint: isBn
+      ? "কী generator-এ Company Name, Mobile, Device ID ও Fingerprint বসিয়ে কী বানান। অন্য ডিভাইসে কাজ করবে না।"
+      : "Generate the key with company name, mobile, device ID and fingerprint. It will not work on another device.",
   };
+
+  const companyForKey = String(localShop?.companyName || "").trim();
+  const mobileForKey = String(profile?.mobile || localShop?.mobile || "").trim();
 
   const loadStatus = async () => {
     setLoading(true);
     try {
-      const helper = typeof window !== "undefined" ? window.S4License : null;
-      if (!helper?.getStatus) {
-        setStatus({ ok: false, status: "UNKNOWN", reason: "LICENSE_HELPERS_NOT_READY" });
-        setAccessStatus(null);
-        return;
-      }
-      const latestLicense = await helper.getStatus();
-      const latestAccess = helper.accessStatus ? await helper.accessStatus() : null;
+      const latestLicense = await getLocalLicenseStatus();
+      const latestAccess = await getLocalAccessStatus();
       setStatus(latestLicense);
       setAccessStatus(latestAccess);
     } catch (error) {
@@ -110,20 +212,18 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
     setMessage(null);
 
     try {
-      const helper = typeof window !== "undefined" ? window.S4License : null;
-      if (!helper?.activateOffline) {
-        setMessage({ type: "err", text: txt.unavailable });
-        return;
-      }
-
-      const result = await helper.activateOffline(key);
+      const result = await activateLicenseOffline(key, {
+        shopName: companyForKey,
+        phone: mobileForKey,
+      });
       const latestLicense = helper.getStatus ? await helper.getStatus() : result;
       const latestAccess = helper.accessStatus ? await helper.accessStatus() : null;
       setStatus(latestLicense);
       setAccessStatus(latestAccess);
+      const failText = licenseActivationErrorText(result?.reason, lang) || txt.invalid;
       setMessage({
         type: result?.ok ? "ok" : "err",
-        text: result?.ok ? txt.activated : txt.invalid,
+        text: result?.ok ? txt.activated : failText,
       });
       if (result?.ok) onActivated?.(latestAccess);
       if (result?.ok) setLicenseKey("");
@@ -215,6 +315,15 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
         </div>
       ))}
 
+      <div style={{ background:th.bgInp, borderRadius:10, padding:12, marginBottom:12, border:`1px solid ${th.border}` }}>
+        <div style={{ fontSize:10, color:th.txtMuted, textTransform:"uppercase", fontWeight:800, marginBottom:6 }}>{txt.bindTitle}</div>
+        <div style={{ fontSize:12, color:th.txtPrimary, lineHeight:1.55 }}>
+          <div>{txt.company}: <b>{companyForKey || "—"}</b></div>
+          <div>{txt.mobile}: <b>{mobileForKey || "—"}</b></div>
+        </div>
+        <div style={{ fontSize:11, color:th.txtMuted, marginTop:8, lineHeight:1.45 }}>{txt.bindHint}</div>
+      </div>
+
       <form onSubmit={activate}>
         <div style={{ fontSize:10, color:th.txtMuted, fontWeight:800, textTransform:"uppercase", marginBottom:4 }}>{txt.keyLabel}</div>
         <textarea
@@ -250,7 +359,7 @@ export function ProfilePasswordSettings({ t, lang, profile, toast, th, s }) {
       return toast(lang==="bn"?"সব password field পূরণ করুন":"Fill all password fields","err");
     }
     if (!isAcceptablePassword(newPw)) {
-      return toast(lang==="bn"?"নতুন password অন্তত ৬ অক্ষর":"New password must be at least 6 characters","err");
+      return toast(lang==="bn"?"নতুন password অন্তত ৮ অক্ষর":"New password must be at least 8 characters","err");
     }
     if (newPw !== newPw2) {
       return toast(lang==="bn"?"নতুন password match করছে না":"New passwords do not match","err");
@@ -361,6 +470,8 @@ export function HelpSettingsPanel({ t, lang, th, s }) {
 }
 
 // ─── SYNC SETTINGS ───────────────────────────────────────────
+import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
+
 export function SyncSettingsPanel({
   t,
   lang,
@@ -383,6 +494,22 @@ export function SyncSettingsPanel({
   const [showFailingDetails, setShowFailingDetails] = useState(false);
   const [failingSamples, setFailingSamples] = useState(null);
   const [failingLoading, setFailingLoading] = useState(false);
+
+  const cloudLicensed = isCloudAccessAllowedSync();
+
+  if (!cloudLicensed) {
+    return (
+      <div style={s.card}>
+        <div style={s.settingsLbl}>{t.syncStatus}</div>
+        <div style={{ fontSize:13, fontWeight:700, color:"#22c55e", marginBottom:10 }}>{t.localOnlyLoginHint}</div>
+        <div style={{ fontSize:12, color:th.txtMuted, lineHeight:1.55 }}>
+          {lang === "bn"
+            ? "এই লাইসেন্সে Cloud চালু নেই। হিসাব, স্টক ও ব্যাকআপ শুধু এই কম্পিউটার/ফোনে local থাকবে।"
+            : "Cloud is not enabled on this license. Books, stock, and backups stay on this device only."}
+        </div>
+      </div>
+    );
+  }
 
   const toggleFailingDetails = async () => {
     const next = !showFailingDetails;

@@ -634,7 +634,9 @@ const startEditOrder = (order) => {
           ? (lang==="bn"
             ? `কর্মী যোগ হয়েছে। অন্য device-এ username "${member.username}" + password দিয়ে login করুন (প্রথমবার internet লাগবে)`
             : `Staff added. On another device login with username "${member.username}" + password (internet needed once)`)
-          : t.staffAddedOk
+          : lang==="bn"
+            ? `কর্মী যোগ হয়েছে। একই দোকানের অন্য PC-তে username "${member.username}" + password দিয়ে login করুন (local only)`
+            : `Staff added. On another PC in this shop, log in with username "${member.username}" and password (local only).`
       );
     } catch(e) {
       if (e?.code === "OFFLINE_REQUIRED") {

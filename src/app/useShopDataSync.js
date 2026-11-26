@@ -18,6 +18,7 @@ import { useReminderAlerts } from "../reminders/useReminderAlerts.js";
 import { useWarrantyAlerts } from "../returns/useWarrantyAlerts.js";
 import { useShopFinance } from "../dashboard/shopFinance.js";
 import { backupBeforeExit } from "../backup/backupOnExit.js";
+import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
 export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors }) {
   useEffect(() => {
@@ -62,7 +63,12 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
     };
 
     runAutoUpload();
-    const timer = window.setInterval(runAutoUpload, 15000);
+    // Desktop: 15s keeps cloud fresh. Mobile/native: 90s — syncNow every 15s was a main lag source on phones.
+    const mobile = (() => {
+      try { return !!window.Capacitor?.isNativePlatform?.() || !!window.matchMedia?.("(pointer: coarse)").matches; }
+      catch { return false; }
+    })();
+    const timer = window.setInterval(runAutoUpload, mobile ? 90_000 : 15_000);
 
     return () => window.clearInterval(timer);
   }, [shopId, user?.uid]);
@@ -150,13 +156,18 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
   };
 
   useEffect(() => {
-    if (!shopId || !isOwner || !authSyncReady) return;
+    if (!shopId || !isOwner) return;
     return startAutoBackup(shopId, {
-      onReminder: () => toast(lang==="bn"
-        ? "অনেকদিন ব্যাকআপ নেওয়া হয়নি — সেটিংস › ব্যাকআপ ও রিস্টোর থেকে Google Drive-এ ব্যাকআপ নিন"
-        : "No recent backup — go to Settings › Backup & restore to save one to Google Drive"),
+      onSaved: (result) => {
+        if (result?.ok) {
+          console.log("[S4 Backup] periodic local auto backup", result.fileName, result.documentCount);
+        }
+      },
+      onReminder: () => toast(lang === "bn"
+        ? "অনেকদিন ব্যাকআপ নেওয়া হয়নি — সেটিংস › ব্যাকআপ ও রিস্টোর থেকে কপি নিন"
+        : "No recent backup — go to Settings › Backup & restore and save a copy"),
     });
-  }, [shopId, isOwner, authSyncReady]);
+  }, [shopId, isOwner, lang, toast]);
 
   // Desktop window close button: offer the owner a backup first (electron/main.cjs waits for closeNow / cancelClose).
   useEffect(() => {
@@ -207,7 +218,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
   }, [shopId]);
 
   useEffect(() => {
-    if (!auth || !shopId) return;
+    if (!isCloudAccessAllowedSync() || !auth || !shopId) return;
 
     return onAuthStateChanged(auth, (fbUser) => {
       if (!fbUser) return;
@@ -235,6 +246,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
   }, [settingsPage]);
 
   useEffect(() => {
+    if (!isCloudAccessAllowedSync()) return;
     if (settingsPage !== "team" || !isOwner || !shopId || !team.length) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) return;
 

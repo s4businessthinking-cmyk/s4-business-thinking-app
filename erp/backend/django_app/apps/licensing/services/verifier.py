@@ -88,6 +88,7 @@ def validate_license_payload(payload: dict) -> dict:
         "licenseId",
         "customerName",
         "shopName",
+        "phone",
         "plan",
         "status",
         "issuedAt",
@@ -96,6 +97,8 @@ def validate_license_payload(payload: dict) -> dict:
         "features",
         "appId",
         "version",
+        "deviceId",
+        "deviceFingerprint",
     ]
     missing = [k for k in required if k not in payload or payload[k] in (None, "")]
     if missing:

@@ -1,5 +1,5 @@
-// Offers the shop owner a data backup before logging out or closing the desktop app.
-import { BackupCancelled, saveShopBackupFromLocal } from "./backupService.js";
+// Close: silent full local backup. Logout: optional prompt.
+import { BackupCancelled, runAutoLocalBackup, saveShopBackupFromLocal } from "./backupService.js";
 
 // Local SQLite backup (offline). Large shops with photos may need a bit of time.
 const CLOSE_BACKUP_MS = 60000;
@@ -27,8 +27,43 @@ function deskApp() {
   return typeof window !== "undefined" ? window.S4Desktop?.app : null;
 }
 
+/** Desktop close: always try full local SQLite backup (no server), then close. */
+export async function silentBackupBeforeClose({ shopId, lang, toast }) {
+  if (!shopId) return true;
+  const bn = lang === "bn";
+  const deskApp = window.S4Desktop?.app;
+  deskApp?.hide?.();
+  try {
+    const result = await withTimeout(
+      runAutoLocalBackup(shopId, { force: true }),
+      CLOSE_BACKUP_MS,
+    );
+    if (result?.ok) {
+      console.log("[S4 Backup] auto backup on close", result.fileName, result.documentCount);
+      return true;
+    }
+    deskApp?.show?.();
+    return window.confirm(bn
+      ? `অটো ব্যাকআপ সম্পূর্ণ হয়নি (${result?.reason || "unknown"}).\n\nতবুও বন্ধ করবেন?`
+      : `Auto backup did not finish (${result?.reason || "unknown"}).\n\nClose anyway?`);
+  } catch (error) {
+    deskApp?.show?.();
+    const reason = error instanceof BackupCancelled
+      ? (bn ? "বাতিল" : "cancelled")
+      : String(error?.message || error) === "timeout"
+        ? (bn ? "সময় শেষ" : "timed out")
+        : String(error?.message || error);
+    return window.confirm(bn
+      ? `অটো ব্যাকআপ হয়নি (${reason}).\n\nতবুও বন্ধ করবেন?`
+      : `Auto backup failed (${reason}).\n\nClose anyway?`);
+  }
+}
+
 // Resolves true when the logout / close should go ahead, false when the user cancelled it.
 export async function backupBeforeExit({ shopId, lang, toast, action }) {
+  if (action === "close") {
+    return silentBackupBeforeClose({ shopId, lang, toast });
+  }
   const bn = lang === "bn";
   const closing = action === "close";
   const what = closing ? (bn ? "সফটওয়্যার বন্ধ" : "closing the software") : (bn ? "লগআউট" : "logging out");

@@ -10,6 +10,7 @@ import { normalizeAllowances, rowName } from "../masters/simpleMasters.js";
 import { taxSettingsOf } from "../reports/taxDomain.js";
 import { partnerDirectoryOf, matchPartnerName, PARTNER_BLOCKED_EXPENSE_CATEGORIES } from "../partners/partners.js";
 import { activeCostCentres, costCentreLabel, costCentreRequired, costCentresOf, expenseCentreProblem } from "../accounts/costCentres.js";
+import DateField from "../components/DateField.jsx";
 
 export const EXPENSE_CATEGORIES = [
   { key: "rent", bn: "দোকান ভাড়া", en: "Rent", icon: "" },
@@ -401,8 +402,8 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
           <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
         ))}
       </div>
-      <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-      <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+      <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+      <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
     </div>
   );
 
@@ -630,7 +631,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       {formForEmployee && !activeEmployees.length && <div className="si-hint"style={{ marginLeft: 0 }}> {L("কোনো কর্মচারী নেই — আগে Employees মাস্টারে যোগ করুন", "No employees yet — add them in the Employees master first")}</div>}
       <div className="si-grid2">
         {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input autoFocus={!mobile && !readOnly} className="pm-input"inputMode="decimal"disabled={readOnly} value={form.amount} placeholder="0.00"onChange={(e) => setAmount(e.target.value)} style={{ fontWeight: 700, color: "#b91c1c" }} />)}
-        {fField(`${L("তারিখ", "Date")} *`, <input type="date"className="pm-input"disabled={readOnly} value={form.expenseDate} onChange={(e) => setF("expenseDate", e.target.value)} />)}
+        {fField(`${L("তারিখ", "Date")} *`, <DateField className="pm-input"disabled={readOnly} value={form.expenseDate} onChange={(e) => setF("expenseDate", e.target.value)} />)}
       </div>
       {(vatOn || form.hasVat) && (
         <div className="si-entry">
@@ -675,7 +676,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
             {fField(L("চেক নং", "Cheque No"), <input className="pm-input"disabled={readOnly} value={form.chequeNo} onChange={(e) => setF("chequeNo", e.target.value)} />)}
             {fField(L("ব্যাংক", "Bank"), <input className="pm-input"disabled={readOnly} value={form.chequeBank} onChange={(e) => setF("chequeBank", e.target.value)} />)}
           </div>
-          {fField(`${L("চেকের তারিখ", "Cheque date")} *`, <input type="date"className="pm-input"disabled={readOnly} value={form.chequeDate} onChange={(e) => setF("chequeDate", e.target.value)} />)}
+          {fField(`${L("চেকের তারিখ", "Cheque date")} *`, <DateField className="pm-input"disabled={readOnly} value={form.chequeDate} onChange={(e) => setF("chequeDate", e.target.value)} />)}
           {editRow?.method === "cheque" && <div className="si-hint"style={{ marginLeft: 0 }}>{L("চেকের অবস্থা", "Cheque status")}: <b style={{ color: chequeColor(editRow.chequeStatus) }}>{chequeLabel(editRow.chequeStatus)}</b> — {L("ক্লিয়ার/বাউন্স চেক পেজ থেকে করুন", "mark cleared/bounced from the Cheque page")}</div>}
           {!readOnly && <div className="si-hint"style={{ marginLeft: 0 }}> {L("চেকের তারিখের ৭, ২ আর ১ দিন আগে নোটিফিকেশন আসবে", "You'll be reminded 7, 2 and 1 day before the cheque date")}</div>}
         </div>

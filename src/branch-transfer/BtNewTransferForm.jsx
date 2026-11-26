@@ -3,6 +3,7 @@ import { useId, useState, useEffect, useMemo } from "react";
 import { filterProducts, findExactProductMatch } from "../utils/productSearch.js";
 import { unitFactorFor, rescaleForUnit } from "../inventory/unitConversion.js";
 import { numberValue, BRANCH_TRANSFER_STATUSES } from "./branchTransferDomain.js";
+import DateField from "../components/DateField.jsx";
 
 export const localDay = () => {
   const d = new Date();
@@ -194,7 +195,7 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
           })}
         </select>
             ))}
-            {field(t.expectedDate, <input type="date"className="pm-input"value={expectedDate} min={localDay()} onChange={(e) => setExpectedDate(e.target.value)} />)}
+            {field(t.expectedDate, <DateField className="pm-input"value={expectedDate} min={localDay()} onChange={(e) => setExpectedDate(e.target.value)} />)}
             {field(t.note, <input className="pm-input"value={note} onChange={(e) => setNote(e.target.value)} />)}
       </div>
           {!activeBranches.length && <div className="si-hint"style={{ marginLeft: 0 }}> {L("আগে Settings → Branch Transfer থেকে Branch তৈরি করুন", "Create a branch first in Settings → Branch Transfer")}</div>}

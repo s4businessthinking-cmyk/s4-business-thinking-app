@@ -67,7 +67,7 @@ export function useAutoReminders({ shop, shopId, reminders, user = null, profile
   }, []);
 
   useEffect(() => {
-    if (!enabled || !auto.on) return undefined;
+    if (!enabled || !auto.on || auto.when === "server") return undefined;
     const tick = () => {
       const c = latest.current;
       const now = new Date();

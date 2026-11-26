@@ -16,6 +16,7 @@ import {
   ASSET_CATEGORIES, OPENING, PAID_FROM, REGISTER_COLS, buyJournalId, chargeFor, depreciationBlockers, depreciationJournal, depreciationPosted,
   disposalBlockers, disposalJournal, disposalJournalId, monthOf, normalizeAssets, purchaseJournal, registerCsvRows, registerRows, unpostedMonths, validateAsset,
 } from "./fixedAssets.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => (Math.round((n(v) + Number.EPSILON) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -185,7 +186,7 @@ export default function FixedAssetsPanel({ lang = "en", shopId, shop, user, prof
           <div className="pm-panel" style={{ padding: 8, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 6 }}>
             <label>{L("সম্পদের নাম", "Asset name")}<input className="pm-input" value={form.name} onChange={set("name")} /></label>
             <label>{L("ধরন", "Category")}<select className="pm-input" value={form.category} disabled={formLocked} onChange={set("category")}>{ASSET_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{bn ? c.bn : c.key}</option>)}</select></label>
-            <label>{L("বুকিং তারিখ (ব্যবহার শুরু)", "Booked on (in use from)")}<input type="date" className="pm-input" max={today} value={form.purchaseDate} disabled={formLocked} onChange={set("purchaseDate")} /></label>
+            <label>{L("বুকিং তারিখ (ব্যবহার শুরু)", "Booked on (in use from)")}<DateField className="pm-input" max={today} value={form.purchaseDate} disabled={formLocked} onChange={set("purchaseDate")}  /></label>
             <label>{L("টাকা কোথা থেকে", "Paid from")}<select className="pm-input" value={form.paidFrom} disabled={formLocked} onChange={set("paidFrom")}>
               {paidFromOptions.map((p) => <option key={p} value={p}>{p === OPENING ? L("আগে থেকেই আছে (Opening Balance)", "Already owned (Opening Balance)") : p}</option>)}
             </select></label>
@@ -209,7 +210,7 @@ export default function FixedAssetsPanel({ lang = "en", shopId, shop, user, prof
         {dispose && (
           <div className="pm-panel" style={{ padding: 8, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "end" }}>
             <strong style={{ alignSelf: "center" }}>{assets.find((a) => a.id === dispose.id)?.name}</strong>
-            <label>{L("তারিখ", "Date")}<input type="date" className="pm-input" max={today} value={dispose.date} onChange={(e) => setDispose((d) => ({ ...d, date: e.target.value }))} /></label>
+            <label>{L("তারিখ", "Date")}<DateField className="pm-input" max={today} value={dispose.date} onChange={(e) => setDispose((d) => ({ ...d, date: e.target.value }))} /></label>
             <label>{L("বিক্রির টাকা (০ = বাদ / নষ্ট)", "Sale proceeds (0 = written off)")}<input className="pm-input" inputMode="decimal" value={dispose.proceeds} onChange={(e) => setDispose((d) => ({ ...d, proceeds: e.target.value }))} /></label>
             <label>{L("টাকা এলো", "Received in")}<select className="pm-input" value={dispose.receivedIn} onChange={(e) => setDispose((d) => ({ ...d, receivedIn: e.target.value }))}>{[...new Set([CASH_ACCOUNT, "Bank", ...moneyAccounts])].map((p) => <option key={p} value={p}>{p}</option>)}</select></label>
             <button type="button" className="pm-btn pm-btn--danger" onClick={saveDisposal} disabled={busy || disposeBlk.length > 0}>{L("বিক্রি / বাদ লিখুন", "Record disposal")}</button>

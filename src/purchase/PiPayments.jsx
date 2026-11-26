@@ -3,6 +3,7 @@ import { PI_VOUCHER_METHODS, piFmt2, piN2, AutoTA } from "../shared/appShared.js
 import { useState, useRef, useEffect } from "react";
 import { UAE_BANKS } from "../cheque/chequeConfig.js";
 import { fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
+import DateField from "../components/DateField.jsx";
 
 function paymentMethodKey(v) {
   return String(v?.method || "cash").toLowerCase();
@@ -285,6 +286,21 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
     });
   };
 
+  const savePaymentRef = useRef(handleSave);
+  savePaymentRef.current = handleSave;
+  useEffect(() => {
+    if (!isDesktop) return undefined;
+    const onKey = (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase() !== "s") return;
+      if (saving || totalPayment <= 0) return;
+      e.preventDefault();
+      savePaymentRef.current();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [isDesktop, saving, totalPayment]);
+
   return (
     <div>
       <button onClick={onCancel} style={{ display:"flex", alignItems:"center", gap:6, background:"transparent", border:"none", color:"#f97316", cursor:"pointer", fontSize:13, fontWeight:700, padding:"0 0 14px 0", fontFamily:"inherit" }}>{t.pi_backToPayments}</button>
@@ -337,7 +353,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
 
           <div style={{ marginBottom:14 }}>
             <div style={lbl}>{t.pi_paymentDate}</div>
-            <input type="date"lang="en-GB" style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
+            <DateField style={inp()} value={paymentDate} onChange={e=>setPaymentDate(e.target.value)} />
           </div>
 
           {method==="cheque"&&(
@@ -357,7 +373,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
                 </div>
                 <div>
                   <div style={lbl}>{t.pi_chequeDate}</div>
-                  <input type="date"lang="en-GB" style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
+                  <DateField style={inp()} value={chequeDate} onChange={e=>setChequeDate(e.target.value)} />
                 </div>
               </div>
               <div style={{ marginTop:8 }}>
@@ -440,7 +456,7 @@ export function PiNewPaymentForm({ vendors, prefillVendorId, prefillVoucher, get
             <span style={{ fontSize:13, fontWeight:700, color:th.txtMuted }}>{piN2(discount)>0?(lang==="bn"?"নেট পরিশোধ":"Net Payment"):t.pi_totalPayment}</span>
             <span style={{ fontSize:20, fontWeight:900, color:"#22c55e" }}>{t.cur} {piFmt2(Math.max(0, totalPayment-piN2(discount)))}</span>
           </div>
-          <button onClick={handleSave} disabled={saving||totalPayment<=0} style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:(saving||totalPayment<=0)?"#1e3a5f":"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:(saving||totalPayment<=0)?"not-allowed":"pointer" }}>
+          <button onClick={handleSave} title="Ctrl+S" disabled={saving||totalPayment<=0} style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:(saving||totalPayment<=0)?"#1e3a5f":"linear-gradient(135deg,#15803d,#16a34a)", color:"#fff", fontSize:15, fontWeight:800, cursor:(saving||totalPayment<=0)?"not-allowed":"pointer" }}>
             {saving?"...":t.pi_newPayment}
           </button>
         </div>

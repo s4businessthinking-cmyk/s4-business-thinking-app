@@ -4,6 +4,12 @@
   persistOfflineDb,
   queryRows,
 } from "../offline/sqliteDb";
+import { validateLicensePayload } from "./licensePayloadRules.js";
+import { API_BASE } from "../backend/config.js";
+import { defaultAuth } from "../backend/auth.js";
+import { syncCloudAccessCacheFromLicense, setCloudAccessCache } from "../offline/cloudAccessPolicy.js";
+
+export { validateLicensePayload, licenseActivationErrorText } from "./licensePayloadRules.js";
 
 const LICENSE_KEY_PREFIX = "S4-LIC-v1";
 const LICENSE_APP_ID = "com.s4businessthinking.app";
@@ -15,13 +21,26 @@ const CONFIRM_EXPIRE_TRIAL = "EXPIRE_TRIAL_FOR_TEST";
 const CONFIRM_RESET_TRIAL = "RESET_TRIAL_FOR_TEST";
 const CONFIRM_CLEAR_LICENSE = "CLEAR_LICENSE_FOR_TEST";
 
-// Development public key only. Never store the private signing key in this app.
-const LICENSE_PUBLIC_KEY_JWK = {
+const DEFAULT_LICENSE_PUBLIC_KEY_JWK = {
   kty: "EC",
   x: "WiSfAOqBS1xH9jSSkapz39DiY1VZSp79KIGoq1LQ24E",
   y: "85tpm-ntlp8d4-tuekifXYG5pjPtxzKQ_mpGbBvJCHo",
   crv: "P-256",
 };
+
+function resolveLicensePublicKeyJwk() {
+  const raw = String(import.meta.env?.VITE_S4_LICENSE_PUBLIC_KEY_JWK || "").trim();
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      console.warn("[S4 License] VITE_S4_LICENSE_PUBLIC_KEY_JWK is invalid JSON; using default public key");
+    }
+  }
+  return DEFAULT_LICENSE_PUBLIC_KEY_JWK;
+}
+
+const LICENSE_PUBLIC_KEY_JWK = resolveLicensePublicKeyJwk();
 
 export const LICENSE_STATUS = {
   ACTIVE: "ACTIVE",
@@ -264,119 +283,6 @@ function requireDevConfirm(actual, expected) {
   };
 }
 
-function validateRequiredPayloadFields(payload) {
-  if (!payload || typeof payload !== "object") {
-    return { ok: false, reason: "INVALID_PAYLOAD" };
-  }
-
-  const required = [
-    "licenseId",
-    "customerName",
-    "shopName",
-    "plan",
-    "status",
-    "issuedAt",
-    "notBefore",
-    "maxDevices",
-    "features",
-    "appId",
-    "version",
-  ];
-
-  const missing = required.filter((key) => {
-    if (key === "features") return !Array.isArray(payload.features);
-    return payload[key] == null || payload[key] === "";
-  });
-
-  if (missing.length > 0) {
-    return { ok: false, reason: "MISSING_PAYLOAD_FIELDS", missing };
-  }
-
-  return { ok: true };
-}
-
-function validateLicensePayload(payload, { deviceId = "", deviceFingerprint = "" } = {}) {
-  const required = validateRequiredPayloadFields(payload);
-  if (!required.ok) return required;
-
-  const plan = normalizePlan(payload.plan);
-  if (!LICENSE_PLANS.has(plan)) {
-    return { ok: false, reason: "INVALID_LICENSE_PLAN" };
-  }
-
-  if (payload.status !== LICENSE_STATUS.ACTIVE) {
-    return { ok: false, reason: "LICENSE_STATUS_NOT_ACTIVE" };
-  }
-
-  if (payload.appId !== LICENSE_APP_ID) {
-    return { ok: false, reason: "LICENSE_APP_MISMATCH" };
-  }
-
-  if (!Number.isInteger(Number(payload.version)) || Number(payload.version) < 1) {
-    return { ok: false, reason: "INVALID_LICENSE_VERSION" };
-  }
-
-  if (!Number.isInteger(Number(payload.maxDevices)) || Number(payload.maxDevices) < 1) {
-    return { ok: false, reason: "INVALID_MAX_DEVICES" };
-  }
-
-  if (!Array.isArray(payload.features) || payload.features.some((item) => typeof item !== "string")) {
-    return { ok: false, reason: "INVALID_FEATURES" };
-  }
-
-  const issuedAt = readPayloadDate(payload, "issuedAt");
-  const notBefore = readPayloadDate(payload, "notBefore");
-  const expiresAt = readPayloadDate(payload, "expiresAt");
-
-  if (!Number.isFinite(issuedAt) || !Number.isFinite(notBefore)) {
-    return { ok: false, reason: "INVALID_LICENSE_DATES" };
-  }
-
-  if (plan !== "LIFETIME" && !Number.isFinite(expiresAt)) {
-    return { ok: false, reason: "EXPIRES_AT_REQUIRED" };
-  }
-
-  if (plan === "LIFETIME" && payload.expiresAt && !Number.isFinite(expiresAt)) {
-    return { ok: false, reason: "INVALID_LICENSE_DATES" };
-  }
-
-  const now = Date.now();
-
-  if (issuedAt > now) {
-    return { ok: false, reason: "LICENSE_NOT_YET_VALID" };
-  }
-
-  if (notBefore > now) {
-    return { ok: false, reason: "LICENSE_NOT_BEFORE" };
-  }
-
-  if (plan !== "LIFETIME" && expiresAt <= now) {
-    return { ok: false, reason: "LICENSE_EXPIRED", status: LICENSE_STATUS.EXPIRED };
-  }
-
-  const payloadDeviceId = readPayloadString(payload, "deviceId");
-  const payloadDeviceFingerprint = readPayloadString(payload, "deviceFingerprint");
-
-  if (payloadDeviceId && deviceId && payloadDeviceId !== deviceId) {
-    return { ok: false, reason: "LICENSE_DEVICE_MISMATCH" };
-  }
-
-  if (
-    payloadDeviceFingerprint &&
-    deviceFingerprint &&
-    payloadDeviceFingerprint !== deviceFingerprint
-  ) {
-    return { ok: false, reason: "LICENSE_DEVICE_FINGERPRINT_MISMATCH" };
-  }
-
-  return {
-    ok: true,
-    reason: "VALID_PAYLOAD",
-    status: LICENSE_STATUS.ACTIVE,
-    plan,
-  };
-}
-
 async function verifySignature(signingInput, signatureBytes) {
   try {
     if (!LICENSE_PUBLIC_KEY_JWK) {
@@ -466,7 +372,7 @@ export async function createDeviceFingerprint(deviceId) {
   return sha256Hex(`${LICENSE_APP_ID}:${deviceId}`);
 }
 
-export async function verifyOfflineLicensePayload(licenseKey) {
+export async function verifyOfflineLicensePayload(licenseKey, partyContext = {}) {
   try {
     const parsed = parseLicenseKey(licenseKey);
 
@@ -483,6 +389,9 @@ export async function verifyOfflineLicensePayload(licenseKey) {
     const payloadValidation = validateLicensePayload(parsed.payload, {
       deviceId,
       deviceFingerprint,
+      shopName: partyContext.shopName || "",
+      phone: partyContext.phone || "",
+      requirePartyMatch: true,
     });
 
     if (!payloadValidation.ok) {
@@ -498,10 +407,7 @@ export async function verifyOfflineLicensePayload(licenseKey) {
     }
 
     const signatureBytes = base64UrlToBytes(parsed.signaturePart);
-    const signature =
-      (await verifySignature(parsed.payloadPart, signatureBytes)).ok
-        ? { ok: true, reason: "SIGNATURE_VALID" }
-        : await verifySignature(parsed.signingInput, signatureBytes);
+    const signature = await verifySignature(parsed.signingInput, signatureBytes);
 
     if (!signature.ok) {
       return {
@@ -582,6 +488,11 @@ export async function storeLicenseMetadata({
 
   await persistOfflineDb();
 
+  syncCloudAccessCacheFromLicense({
+    status: status || LICENSE_STATUS.INVALID,
+    payload,
+  });
+
   return {
     ok: true,
     status: status || LICENSE_STATUS.INVALID,
@@ -594,10 +505,10 @@ export async function storeLicenseMetadata({
   };
 }
 
-export async function activateLicenseOffline(licenseKey) {
+export async function activateLicenseOffline(licenseKey, partyContext = {}) {
   try {
     const fingerprint = await createLicenseFingerprint(licenseKey);
-    const verification = await verifyOfflineLicensePayload(licenseKey);
+    const verification = await verifyOfflineLicensePayload(licenseKey, partyContext);
 
     if (!verification.ok) {
       return {
@@ -661,16 +572,20 @@ export async function getLocalLicenseStatus() {
         deviceFingerprint &&
         boundDeviceFingerprint !== deviceFingerprint);
 
+    const resolvedStatus =
+      status === LICENSE_STATUS.NOT_FOUND
+        ? LICENSE_STATUS.NOT_FOUND
+        : expired
+          ? LICENSE_STATUS.EXPIRED
+          : deviceMismatch || payloadValidation?.ok === false
+            ? LICENSE_STATUS.INVALID
+            : status;
+
+  syncCloudAccessCacheFromLicense({ status: resolvedStatus, payload });
+
     return {
       ok: true,
-      status:
-        status === LICENSE_STATUS.NOT_FOUND
-          ? LICENSE_STATUS.NOT_FOUND
-          : expired
-            ? LICENSE_STATUS.EXPIRED
-            : deviceMismatch || payloadValidation?.ok === false
-              ? LICENSE_STATUS.INVALID
-              : status,
+      status: resolvedStatus,
       reason:
         deviceMismatch
           ? "LICENSE_DEVICE_MISMATCH"
@@ -691,6 +606,7 @@ export async function getLocalLicenseStatus() {
       lastError: readMetaValue("license_last_error") || "",
     };
   } catch (error) {
+    setCloudAccessCache(false);
     return {
       ok: false,
       status: LICENSE_STATUS.INVALID,
@@ -810,10 +726,23 @@ export async function getOrCreateTrialStatus() {
 }
 
 export async function getLocalAccessStatus() {
-  const license = await getLocalLicenseStatus();
+  let license = await getLocalLicenseStatus();
 
   if (license.status === LICENSE_STATUS.ACTIVE) {
+    await applyOnlineLicenseRevocationIfNeeded();
+    license = await getLocalLicenseStatus();
     const trial = await getOrCreateTrialStatus();
+    if (license.status !== LICENSE_STATUS.ACTIVE) {
+      return {
+        ok: true,
+        accessAllowed: false,
+        accessReason: "LICENSE_REVOKED_ONLINE",
+        licenseStatus: license.status,
+        trialStatus: trial.status,
+        license,
+        trial,
+      };
+    }
     return {
       ok: true,
       accessAllowed: true,
@@ -865,8 +794,8 @@ export async function getLocalAccessStatus() {
 
   return {
     ok: true,
-    accessAllowed: true,
-    accessReason: "TRIAL_ACTIVE",
+    accessAllowed: false,
+    accessReason: "TRIAL_STATE_UNKNOWN",
     licenseStatus: license.status,
     trialStatus: trial.status,
     license,
@@ -995,12 +924,63 @@ export async function getDebugStatus() {
   }
 }
 
+async function applyOnlineLicenseRevocationIfNeeded() {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return { ok: true, skipped: true, reason: "OFFLINE" };
+  }
+
+  const license = await getLocalLicenseStatus();
+  const licenseId = license?.payload?.licenseId || readMetaValue("license_id");
+  if (license.status !== LICENSE_STATUS.ACTIVE || !licenseId) {
+    return { ok: true, skipped: true, reason: "NO_ACTIVE_LICENSE" };
+  }
+
+  const user = defaultAuth.currentUser;
+  if (!user) {
+    return { ok: false, skipped: true, reason: "AUTH_REQUIRED" };
+  }
+
+  let token;
+  try {
+    token = await user.getIdToken();
+  } catch {
+    return { ok: false, skipped: true, reason: "AUTH_TOKEN_FAILED" };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/v1/license/check`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ licenseId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, skipped: true, reason: json?.error?.code || `HTTP_${res.status}` };
+    }
+    if (json.revoked) {
+      await storeLicenseMetadata({
+        status: LICENSE_STATUS.EXPIRED,
+        payload: license.payload,
+        fingerprint: readMetaValue("license_key_fingerprint"),
+        reason: "LICENSE_REVOKED_ONLINE",
+        deviceId: license.deviceId,
+        deviceFingerprint: license.deviceFingerprint,
+      });
+      return { ok: true, revoked: true, licenseId };
+    }
+    writeMetaValue("license_last_offline_check", nowIso());
+    await persistOfflineDb();
+    return { ok: true, revoked: false, licenseId };
+  } catch (error) {
+    return { ok: false, skipped: true, reason: error?.message || String(error) };
+  }
+}
+
 export async function refreshLicenseOnline() {
-  return {
-    ok: false,
-    skipped: true,
-    reason: "ONLINE_LICENSE_REFRESH_NOT_CONNECTED_YET",
-  };
+  return applyOnlineLicenseRevocationIfNeeded();
 }
 
 export async function recordLicenseActivationOnline() {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { periodLockOf } from "./periodLock.js";
+import DateField from "../components/DateField.jsx";
 
 const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -76,7 +77,7 @@ export default function PeriodLockPanel({ lang = "bn", th, s, shop, user, profil
           {quick(L(`গত মাস শেষ (${lastMonthEnd})`, `Last month end (${lastMonthEnd})`), lastMonthEnd)}
           {quick(L(`গত বছর শেষ (${lastYearEnd})`, `Last year end (${lastYearEnd})`), lastYearEnd)}
         </div>
-        <input type="date"style={{ ...s.inp, marginBottom: 8 }} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
+        <DateField style={{ ...s.inp, marginBottom: 8 }} value={date} max={today} onChange={(e) => setDate(e.target.value)} />
         <input style={{ ...s.inp, marginBottom: 10 }} placeholder={L("নোট (যেমন: ২০২৫ সালের হিসাব অডিট শেষ)", "Note (e.g. 2025 audit finished)")} value={note} onChange={(e) => setNote(e.target.value)} />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button type="button"style={{ ...s.sendBtn, flex: 1 }} disabled={busy || !date} onClick={() => save(date)}> {L("হিসাব বন্ধ / লক করুন", "Close / lock books")}</button>

@@ -2,6 +2,7 @@
 // one-line summary of what the filtered list adds up to, with drafts and cancelled bills kept out of the money.
 import React from "react";
 import { LIVE } from "../utils/docStatusFilter.js";
+import DateField from "./DateField.jsx";
 
 export function DocStatusPills({ statuses = {}, value = "ALL", onChange, counts = null, lang = "en", allLabel }) {
   const bn = lang === "bn";
@@ -25,8 +26,8 @@ export function DocDateRange({ from = "", to = "", onFrom, onTo, lang = "en", mo
   const w = mobile ? "calc(50% - 2px)" : 118;
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-      <input type="date" className="pm-input" style={{ width: w, borderColor: bad ? "#b91c1c" : undefined }} value={from} onChange={(e) => onFrom?.(e.target.value)} title={bn ? "এই তারিখ থেকে" : "From date"} />
-      <input type="date" className="pm-input" style={{ width: w, borderColor: bad ? "#b91c1c" : undefined }} value={to} onChange={(e) => onTo?.(e.target.value)} title={bn ? "এই তারিখ পর্যন্ত" : "To date"} />
+      <DateField className="pm-input" style={{ width: w, borderColor: bad ? "#b91c1c" : undefined }} value={from} onChange={(e) => onFrom?.(e.target.value)} title={bn ? "এই তারিখ থেকে" : "From date"} />
+      <DateField className="pm-input" style={{ width: w, borderColor: bad ? "#b91c1c" : undefined }} value={to} onChange={(e) => onTo?.(e.target.value)} title={bn ? "এই তারিখ পর্যন্ত" : "To date"} />
       {(from || to) && <button type="button" className="pm-btn-secondary" onClick={() => { onFrom?.(""); onTo?.(""); }}>{bn ? "সব তারিখ" : "All dates"}</button>}
     </div>
   );

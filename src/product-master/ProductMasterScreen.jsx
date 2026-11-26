@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { PM_CSS, PM_MOBILE_QUERY } from "./pmStyles";
 import ProductDetailsForm from "./ProductDetailsForm";
+import ManufacturingBomPanel from "./ManufacturingBomPanel.jsx";
 import PricingPanel from "./PricingPanel";
 import SellingRatesPanel from "./SellingRatesPanel";
 import ActionButtonsRow from "./ActionButtonsRow";
@@ -146,6 +147,7 @@ export default function ProductMasterScreen({
   notify,
   search = "",
   onSearchChange,
+  lang = "en",
 }) {
   const [activeModal, setActiveModal] = useState(null);
   const mobileQuery = PM_MOBILE_QUERY;
@@ -445,6 +447,14 @@ export default function ProductMasterScreen({
             onValidateIdentityCode={validateIdentityCode}
             onOpenSpecification={() => setActiveModal("specification")}
             onOpenPhoto={() => setActiveModal("photo")}
+          />
+          <ManufacturingBomPanel
+            form={form}
+            upd={upd}
+            products={products}
+            finishedProductId={selectedId || ""}
+            lang={lang}
+            disabled={!canEdit}
           />
           </fieldset>
         </div>

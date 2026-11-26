@@ -11,6 +11,7 @@ import { activePeriodLock } from "../accounts/periodLock.js";
 import { csvText } from "./vatExport.js";
 import SalesForexSection from "./SalesForexSection.jsx";
 import { FX_COLS, fxBlockers, fxCsvRows, fxPosition, liveFx, openCurrencies, realisedJournal, revalJournalId, revaluationJournal, revaluationLines } from "./forex.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => (Math.round((n(v) + Number.EPSILON) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -120,7 +121,7 @@ export default function ForexPanel({ lang = "en", shopId, shop, user, profile, i
       <div className="si-panel-body" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <span className="si-muted">{L("পুনর্মূল্যায়নের তারিখ", "Revaluation date")}</span>
-          <input type="date" className="pm-input" style={{ width: 140 }} max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
+          <DateField className="pm-input" style={{ width: 140 }} max={today} value={day} onChange={(e) => e.target.value && setDay(e.target.value)} />
           {currencies.map((c) => (
             <label key={c} style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>{c} → {base}
               <input className="pm-input" style={{ width: 90, textAlign: "right" }} inputMode="decimal" value={rateOf(c)} onChange={(e) => setRates((r) => ({ ...r, [c]: e.target.value }))} disabled={!!existing} />
@@ -185,7 +186,7 @@ export default function ForexPanel({ lang = "en", shopId, shop, user, profile, i
             <strong style={{ alignSelf: "center" }}>{settleBill.no} · {settleBill.vendorName}</strong>
             <label>{L(`পরিশোধ (${settleBill.currency})`, `Paid (${settleBill.currency})`)}<input className="pm-input" inputMode="decimal" value={settle.fc} onChange={(e) => setSettle((s) => ({ ...s, fc: e.target.value }))} /></label>
             <label>{L(`আসল রেট (${settleBill.currency} → ${base})`, `Actual rate (${settleBill.currency} to ${base})`)}<input className="pm-input" inputMode="decimal" value={settle.rate} onChange={(e) => setSettle((s) => ({ ...s, rate: e.target.value }))} /></label>
-            <label>{L("তারিখ (পরিশোধের দিন)", "Date (day paid)")}<input type="date" className="pm-input" max={today} value={settle.date} onChange={(e) => setSettle((s) => ({ ...s, date: e.target.value }))} /></label>
+            <label>{L("তারিখ (পরিশোধের দিন)", "Date (day paid)")}<DateField className="pm-input" max={today} value={settle.date} onChange={(e) => setSettle((s) => ({ ...s, date: e.target.value }))} /></label>
             {settleRes && !settleRes.error && <span style={{ alignSelf: "center", color: colorOf(settleRes.amount), fontWeight: 700 }}>{settleRes.amount > 0 ? L("ক্ষতি", "Loss") : L("লাভ", "Gain")} {base} {money(Math.abs(settleRes.amount))}</span>}
             <button type="button" className="pm-btn pm-btn--primary" onClick={postSettle} disabled={busy || settleBlk.length > 0}>{L("লিখুন", "Record")}</button>
             <button type="button" className="pm-btn-secondary" onClick={() => setSettle(null)}>{L("বাতিল", "Cancel")}</button>

@@ -61,25 +61,30 @@ export default function PriceListScreen({ lang = "en", products = [], customers 
   const sourceLabel = (s) => (s === "special" ? L(`${custType}-এর বিশেষ রেট`, `Special rate for ${custType}`) : s === "default" ? L("সাধারণ রেট", "Default rate") : L("প্রোডাক্টের মূল দাম", "Product base price"));
   const unitLabel = (r) => (r.factor > 1 ? `${r.unit} (${r.factor})` : r.unit);
 
-  // ── export / print: fixed English headers, plain-number amounts ──
   const listSheet = () => ({
-    cols: ["Code", "Name", "Brand", "Category", "Barcode", "Unit", "Base units per unit", "VAT %", "Price excl VAT", "Price incl VAT", "MRP", ...types.map((t) => `${t} price excl VAT`), "Special rate for"],
+    cols: [L("কোড", "Code"), L("নাম", "Name"), L("ব্র্যান্ড", "Brand"), L("ক্যাটাগরি", "Category"), L("বারকোড", "Barcode"), L("ইউনিট", "Unit"), L("ইউনিটে মৌলিক", "Base units per unit"), "VAT %",
+      L("দাম VAT ছাড়া", "Price excl VAT"), L("দাম VAT সহ", "Price incl VAT"), "MRP", ...types.map((t) => `${t} ${L("দাম VAT ছাড়া", "price excl VAT")}`), L("বিশেষ রেট", "Special rate for")],
     rows: list.map((r) => [r.code, r.name, r.brand, r.category, r.barcode, r.unit, String(r.factor), num(r.vat), num(r.price), num(r.priceIncl), r.mrp ? num(r.mrp) : "",
       ...types.map((t) => num(r.byType[t].price)), types.filter((t) => r.byType[t].special).join(" / ")]),
   });
   const customerSheet = () => ({
-    head: [["Customer", customer?.customerName || ""], ["Customer code", customer?.customerCode || ""], ["Customer type", custType || "-"], ["Customer discount %", num(customer?.discountPerc)], ["Date", today()], []],
-    cols: ["Code", "Name", "Brand", "Unit", "Rate from", "List price excl VAT", "Discount %", "Net price excl VAT", "VAT %", "Net price incl VAT"],
-    rows: custRows.map((r) => [r.code, r.name, r.brand, r.unit, r.source === "special" ? `Special (${custType})` : r.source === "default" ? "Default rate" : "Base price", num(r.list), num(r.discount), num(r.net), num(r.vat), num(r.netIncl)]),
+    head: [[L("কাস্টমার", "Customer"), customer?.customerName || ""], [L("কাস্টমার কোড", "Customer code"), customer?.customerCode || ""], [L("কাস্টমার ধরন", "Customer type"), custType || "-"],
+      [L("কাস্টমার ছাড় %", "Customer discount %"), num(customer?.discountPerc)], [L("তারিখ", "Date"), today()], []],
+    cols: [L("কোড", "Code"), L("নাম", "Name"), L("ব্র্যান্ড", "Brand"), L("ইউনিট", "Unit"), L("রেট কোথা থেকে", "Rate from"), L("তালিকার দাম VAT ছাড়া", "List price excl VAT"),
+      L("ছাড় %", "Discount %"), L("নিট দাম VAT ছাড়া", "Net price excl VAT"), "VAT %", L("নিট দাম VAT সহ", "Net price incl VAT")],
+    rows: custRows.map((r) => [r.code, r.name, r.brand, r.unit, sourceLabel(r.source), num(r.list), num(r.discount), num(r.net), num(r.vat), num(r.netIncl)]),
   });
   const exportCsv = async () => {
     try {
+      const bom = "\uFEFF";
       if (view === "list") {
         const s = listSheet();
-        await saveTextFile(`price-list-${today()}.csv`, csvText([s.cols, ...s.rows]));
+        await saveTextFile(`price-list-${today()}.csv`, bom + csvText([s.cols, ...s.rows]));
+        toast?.(L("মূল্য তালিকা এক্সেল/CSV সেভ হয়েছে", "Price list saved as Excel/CSV"));
       } else if (customer) {
         const s = customerSheet();
-        await saveTextFile(`price-list-${slug(customer.customerName) || "customer"}-${today()}.csv`, csvText([...s.head, s.cols, ...s.rows]));
+        await saveTextFile(`price-list-${slug(customer.customerName) || "customer"}-${today()}.csv`, bom + csvText([...s.head, s.cols, ...s.rows]));
+        toast?.(L(`${customer.customerName}-এর দাম এক্সেল/CSV সেভ হয়েছে`, `Customer price list saved for ${customer.customerName}`));
       }
     } catch (e) { toast?.(e.message || String(e), "err"); }
   };
@@ -120,7 +125,7 @@ export default function PriceListScreen({ lang = "en", products = [], customers 
         </div>
         <span className="si-toolbar-gap" />
         {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!ready}> {L("প্রিন্ট", "Print")}</button>}
-        {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!ready}> Excel</button>}
+        {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!ready}> {L("এক্সেল", "Excel")}</button>}
       </div>
       <div className="si-toolbar">
         <input className="pm-input" style={{ width: mobile ? "100%" : 220 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("কোড, নাম, বারকোড বা ব্র্যান্ড", "Code, name, barcode or brand")} />

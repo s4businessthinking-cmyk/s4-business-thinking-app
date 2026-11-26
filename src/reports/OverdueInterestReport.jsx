@@ -20,6 +20,7 @@ import { r2 } from "./reportFilters.js";
 import {
   INTEREST_DAY_BASIS, interestBlockers, interestFileName, interestJournal, interestJournalId, interestRows, interestSettingsOf, interestSettingsProblem, overdueInterest,
 } from "../accounts/overdueInterest.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -177,7 +178,7 @@ export default function OverdueInterestReport({ lang = "en", shopId, shop = null
         {isOwner && <button type="button" className="pm-btn-secondary" onClick={() => setEdit(edit ? null : { ...settings })} disabled={busy}>{L("সুদের সেটিং", "Interest settings")}</button>}
         <span className="si-toolbar-gap" />
         <button type="button" className={`pm-btn-secondary${day === today ? " is-active" : ""}`} onClick={() => setAsOf(today)}>{L("আজ", "Today")}</button>
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
       </div>
       {rep && (
         <div className="si-kpis">

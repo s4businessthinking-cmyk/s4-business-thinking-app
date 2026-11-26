@@ -13,6 +13,7 @@ import {
   getProductCatalogMaintenance,
   stampProductCatalogEpoch,
 } from "./productCatalogSync.js";
+import { isCloudAccessAllowedSync } from "./cloudAccessPolicy.js";
 
 const QUEUED_SYNC_DEBOUNCE_MS = 150;
 
@@ -318,6 +319,9 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
  * lands on the specific bad document instead of the whole chunk.
  */
 export async function syncPendingQueueToFirebase() {
+  if (!isCloudAccessAllowedSync()) {
+    return { ok: false, skipped: true, reason: "CLOUD_NOT_LICENSED" };
+  }
   if (syncRunning) {
     syncRequestedWhileRunning = true;
     return {
@@ -456,6 +460,7 @@ export async function syncPendingQueueToFirebase() {
 
 // Pushes one collection's pending writes right away, even while a full sync pass is busy.
 export async function syncCollectionNow(collectionName) {
+  if (!isCloudAccessAllowedSync()) return { ok: false, skipped: true, reason: "CLOUD_NOT_LICENSED" };
   if (!collectionName || !isOnline() || pausedCollections.has(collectionName)) return { ok: false, skipped: true };
   const queue = await getPendingSyncQueue();
   const items = queue.filter((item) => (item.payload?.collectionName || item.collection_name) === collectionName);
@@ -489,9 +494,14 @@ export function isCollectionSyncPaused(collectionName) {
 }
 
 export function startAutoFirebaseSync(options = {}) {
+  if (!isCloudAccessAllowedSync()) {
+    return () => {};
+  }
+
   const intervalMs = Number(options.intervalMs || 30000);
 
   const run = () => {
+    if (!isCloudAccessAllowedSync()) return;
     syncPendingQueueToFirebase()
       .then((result) => {
         if (result?.total || result?.done || result?.failed) {

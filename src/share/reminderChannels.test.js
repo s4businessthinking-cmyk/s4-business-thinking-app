@@ -19,7 +19,7 @@ const queue = (shop) => reminderQueue(ledger, { asOf: "2026-11-25", salesInvoice
 
 test("channels: WhatsApp on, SMS and email off unless switched on", () => {
   const c = channelSettingsOf({});
-  assert.deepEqual([c.whatsapp, c.sms, c.email, c.smsProvider.url, c.emailProvider.url], [true, false, false, "", ""]);
+  assert.deepEqual([c.whatsapp, c.sms, c.email, c.whatsappProvider.url, c.smsProvider.url, c.emailProvider.url], [true, false, false, "", "", ""]);
   assert.deepEqual(queue({}).map((r) => [r.name, r.status]), [["Al Noor", "ready"], ["Mail Only", "noPhone"], ["Nothing", "noPhone"]], "WhatsApp only: as before");
 });
 
@@ -27,7 +27,7 @@ test("gating: each switched-on channel needs its own contact; email reaches a cu
   const shop = { overdueReminders: { channels: { whatsapp: true, sms: true, email: true } } };
   const rows = queue(shop);
   const opt = (name, ch) => rows.find((r) => r.name === name).options.find((o) => o.channel === ch);
-  assert.deepEqual([opt("Al Noor", "whatsapp").ok, opt("Al Noor", "sms").ok, opt("Al Noor", "email").ok, opt("Al Noor", "sms").via], [true, true, true, "open"]);
+  assert.deepEqual([opt("Al Noor", "whatsapp").ok, opt("Al Noor", "sms").ok, opt("Al Noor", "email").ok, opt("Al Noor", "whatsapp").via, opt("Al Noor", "sms").via], [true, true, true, "open", "open"]);
   assert.deepEqual([rows.find((r) => r.name === "Mail Only").status, opt("Mail Only", "email").ok, opt("Mail Only", "sms").reason], ["ready", true, "noPhone"]);
   assert.equal(rows.find((r) => r.name === "Nothing").status, "noPhone");
   assert.match(rows.find((r) => r.name === "Nothing").reason, /switched-on channels/);
@@ -57,9 +57,18 @@ test("provider: only a 2xx reply is a hand-off; errors come back as they are; ne
   assert.equal(JSON.parse(mail.body).subject, "Reminder");
 });
 
+test("WhatsApp https provider: provider via and auto hand-off", async () => {
+  const shop = { overdueReminders: { channels: { whatsapp: true }, whatsappProvider: { url: "https://waba.example/send", token: "w1" } } };
+  const ch = channelSettingsOf(shop);
+  const opt = queue(shop).find((r) => r.name === "Al Noor").options.find((o) => o.channel === "whatsapp");
+  assert.deepEqual([opt.ok, opt.via], [true, "provider"]);
+  const res = await sendViaProvider("whatsapp", ch.whatsappProvider, { to: "971501234567", message: "Due", transport: async () => ({ status: 200, text: JSON.stringify({ id: "w-1" }) }) });
+  assert.deepEqual(res, { ok: true, status: "handedOffWhatsApp", httpStatus: 200, providerId: "w-1" });
+});
+
 test("status words never say delivered or sent; the record keeps channel, status and provider id", () => {
-  assert.deepEqual([statusWord("whatsapp", "open"), statusWord("sms", "open"), statusWord("sms", "provider"), statusWord("email", "open"), statusWord("email", "provider")],
-    ["openedWhatsApp", "openedSms", "handedOffSms", "openedEmail", "handedOffEmail"]);
+  assert.deepEqual([statusWord("whatsapp", "open"), statusWord("whatsapp", "provider"), statusWord("sms", "open"), statusWord("sms", "provider"), statusWord("email", "open"), statusWord("email", "provider")],
+    ["openedWhatsApp", "handedOffWhatsApp", "openedSms", "handedOffSms", "openedEmail", "handedOffEmail"]);
   Object.values(REMINDER_STATUS).forEach((t) => { assert.doesNotMatch(t.en, /delivered|\bsent\b/i); });
   const row = queue({ overdueReminders: { channels: { email: true } } }).find((r) => r.name === "Al Noor");
   const rec = reminderRecord(row, { shopId: S, user: { uid: "u1" }, channel: "email", status: "handedOffEmail", providerId: "m-1" });

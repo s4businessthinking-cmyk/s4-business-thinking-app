@@ -6,6 +6,7 @@ import { generateStatementHTML } from "../print/printDesign.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { csvText } from "../reports/vatExport.js";
 import { NOT_DUE, NOT_SET, PENDING_BUCKETS, SOON_DAYS, filterPending, pendingCsvRows, pendingFileName, pendingRows, pendingSummary } from "../utils/pendingBills.js";
+import DateField from "./DateField.jsx";
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -66,7 +67,7 @@ export default function PendingBillsPanel({
         <span className="si-toolbar-gap" />
         <input className="pm-input" style={{ width: mobile ? "100%" : 200 }} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={isSales ? L("বিল নং, কাস্টমার, মোবাইল", "Bill no, customer, mobile") : L("বিল নং, সাপ্লায়ার, মোবাইল", "Bill no, supplier, mobile")} />
         <span className="pm-label" style={{ margin: 0 }}>{L("যে তারিখ পর্যন্ত", "As at")}</span>
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 125 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 125 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} />
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={print} disabled={!rows.length}> {L("প্রিন্ট", "Print")}</button>}
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!rows.length}> Excel</button>}
       </div>

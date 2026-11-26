@@ -137,3 +137,23 @@ test("same-day events order the same whatever order the documents load in", () =
   assert.deepEqual(b[0].events.map((e) => e.no), a[0].events.map((e) => e.no));
   assert.equal(a[0].status, "salesReturn");
 });
+
+test("BW04: customer serial out and company serial in stay separate rows", () => {
+  const claim = {
+    id: "w-bw4", shopId: S, status: "delivered", claimNo: "WC-BW4",
+    claimDate: "2026-11-01", sentDate: "2026-11-02", replacedDate: "2026-11-05", deliveredDate: "2026-11-06",
+    productId: "p1", productName: "Battery 70Ah", productCode: "BAT-70",
+    replacedProductId: "p1", replacedProductName: "Battery 70Ah",
+    customerName: "Star", vendorName: "Amaron",
+    serialNo: "OUT-111", replacedSerialNo: "IN-222",
+  };
+  const reg = buildSerialRegistry({ products, warrantyClaims: [claim] }, { shopId: S });
+  const out = reg.find((r) => r.key === normSerial("OUT-111"));
+  const inn = reg.find((r) => r.key === normSerial("IN-222"));
+  assert.ok(out, "out serial row");
+  assert.ok(inn, "in serial row");
+  assert.notEqual(out.key, inn.key);
+  assert.deepEqual(out.events.map((e) => e.kind), ["warrantyReceived", "warrantySent"]);
+  assert.deepEqual(inn.events.map((e) => e.kind), ["warrantyReplaced", "warrantyDelivered"]);
+  assert.equal(inn.status, "warrantyDelivered");
+});

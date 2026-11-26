@@ -307,15 +307,23 @@ const selfProfileUpdateAllowed = (res, req) =>
 export const RULES = {
   users: {
     read: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && shopIdOf(c) === res.shopId)),
-    create: async (c, { id, req }) => isAuthenticated(c) && (
+    create: async (c, { id, req }) => isAuthenticated(c) && !has(req?.ownerPin) && (
       (has(req?.shopId) && (await isOwnerOfShop(c, req.shopId)))
       || (c.uid === id && (await selfProfileCreateAllowed(c, req)))
     ),
-    update: async (c, { id, res, req }) => isAuthenticated(c) && (
+    update: async (c, { id, res, req }) => isAuthenticated(c) && !has(req?.ownerPin) && (
       (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)) && (!has(req?.shopId) || req.shopId === res.shopId))
       || (c.uid === id && selfProfileUpdateAllowed(res, req))
     ),
     delete: async (c, { id, res }) => isAuthenticated(c) && (c.uid === id || (has(res?.shopId) && (await isOwnerOfShop(c, res.shopId)))),
+  },
+
+  ownerPinSecrets: {
+    read: async (c, { id }) => isAuthenticated(c) && c.uid === id,
+    create: async (c, { id, req }) =>
+      isAuthenticated(c) && c.uid === id && (!req || !has(req.shopId)),
+    update: async (c, { id }) => isAuthenticated(c) && c.uid === id,
+    delete: async (c, { id }) => isAuthenticated(c) && c.uid === id,
   },
 
   shops: {
@@ -736,4 +744,4 @@ export async function allowed(ctx, op, collection, args) {
 
 // Collections whose read rule does not depend on shop membership; listing
 // them without a shopId filter is allowed (results are still rule-filtered).
-export const UNSCOPED_LIST_COLLECTIONS = new Set(["shops", "inviteCodes", "staffLoginIndex", "users", "productMaintenance"]);
+export const UNSCOPED_LIST_COLLECTIONS = new Set(["shops", "inviteCodes", "staffLoginIndex", "users", "productMaintenance", "ownerPinSecrets"]);

@@ -83,8 +83,35 @@ describe("party return settlement → cheque/last balance", () => {
     assert.equal(plan.invoicePatches[0].id, "due");
     assert.equal(plan.invoicePatches[0].amountPaid, 40);
     assert.equal(plan.invoicePatches[0].balanceDue, 20);
+    assert.equal(plan.invoicePatches[0].settleKind, "");
     assert.equal(plan.returnPatches[0].refundAmount, 0);
     assert.equal(plan.returnPatches[0].appliedToInvoice, 40);
     assert.equal(plan.returnPatches[0].clearRefundVoucher, true);
+  });
+
+  it("purchase return that clears a PI marks settleKind return (not cash Paid)", () => {
+    const source = { id: "pi1", vendorId: "v1", vendorName: "V", status: "confirmed", grandTotal: 100, amountPaid: 0, invoiceDate: "2026-01-01" };
+    const plan = planPartyReturnSettlement({
+      sourceInvoice: source,
+      returnTotal: 100,
+      invoices: [source],
+      partyIdKey: "vendorId",
+      partyNameKey: "vendorName",
+    });
+    assert.equal(plan.appliedToInvoice, 100);
+    assert.equal(plan.refundAmount, 0);
+
+    const invoices = [
+      { id: "paid", vendorId: "v1", vendorName: "V", status: "paid", grandTotal: 50, amountPaid: 50, balanceDue: 0, invoiceDate: "2026-01-01" },
+      { id: "due", vendorId: "v1", vendorName: "V", status: "confirmed", grandTotal: 40, amountPaid: 0, balanceDue: 40, invoiceDate: "2026-01-10" },
+    ];
+    const returns = [
+      { id: "pr1", status: "confirmed", partyId: "v1", partyName: "V", invoiceId: "paid", invoiceNo: "PI1", appliedToInvoice: 0, refundAmount: 40, returnDate: "2026-01-15" },
+    ];
+    const leftover = planSettleLeftoverReturnCredits({ returns, invoices, vendorId: "v1", vendorName: "V" });
+    assert.equal(leftover.invoicePatches[0].id, "due");
+    assert.equal(leftover.invoicePatches[0].balanceDue, 0);
+    assert.equal(leftover.invoicePatches[0].status, "paid");
+    assert.equal(leftover.invoicePatches[0].settleKind, "return");
   });
 });

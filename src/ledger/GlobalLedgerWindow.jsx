@@ -14,6 +14,9 @@ import { generateStatementHTML } from "../print/printDesign.js";
 import { accountNatureOf } from "./accountNature.js";
 import { buildGlobalLedger, balances, accountStatement, GROUPS } from "./globalLedger.js";
 import { groupPath, normalizeGroups } from "./coaGroups.js";
+import DateField from "../components/DateField.jsx";
+import { useFindShortcut, usePrintShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintFind, hintPrint } from "../utils/desktopFormShortcuts.js";
 
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const drCr = (v) => (Math.abs(v) < 0.005 ? "0.00" : `${money(Math.abs(v))} ${v > 0 ? "Dr" : "Cr"}`);
@@ -133,6 +136,8 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
       }), { lang });
     }
   };
+  useFindShortcut({ active: !win.min, onFind: () => searchRef.current?.focus() });
+  usePrintShortcut({ active: canPrint, disabled: !ledger, onPrint: print });
 
   const th = { padding: "5px 6px", background: C.head, color: "#fff", fontSize: 12, fontWeight: 700, position: "sticky", top: 0, textAlign: "left", whiteSpace: "nowrap" };
   const td = { padding: "4px 6px", borderBottom: `1px solid ${C.border}`, fontSize: 12.5, verticalAlign: "top" };
@@ -144,16 +149,16 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderBottom: `1px solid ${C.border}` }}>
             <span style={lbl}>From</span>
-            <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateField style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
             <span style={lbl}>To</span>
-            <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateField style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
             {(from || to !== localDay()) && <button type="button"onClick={() => { setFrom(""); setTo(localDay()); }} style={btn()}>{L("আজ পর্যন্ত সব", "All till today")}</button>}
             <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>
               <input type="checkbox"checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} /> {L("শূন্য ব্যালেন্স লুকান", "Hide zero balances")}
             </label>
             <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
               {selected && <button type="button"onClick={() => setSelKey("")} style={btn()}> {L("ট্রায়াল ব্যালেন্স", "Trial balance")}</button>}
-              {canPrint && <button type="button"onClick={print} disabled={!ledger} style={btn("#dbeafe", "#1e40af")}> {L("প্রিন্ট", "Print")}</button>}
+              {canPrint && <button type="button"title="Ctrl+P" onClick={print} disabled={!ledger} style={btn("#dbeafe", "#1e40af")}> {L("প্রিন্ট", "Print")}{hintPrint()}</button>}
             </span>
           </div>
 
@@ -166,7 +171,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
               <div style={{ display: "flex", flexDirection: "column", minHeight: 0, ...(mobile ? { maxHeight: 220, flexShrink: 0 } : {}), background: "#fff", border: `1px solid ${C.border}` }}>
                 <div style={{ padding: 6, borderBottom: `1px solid ${C.border}` }}>
                   <input ref={searchRef} style={inp()} value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={onSearchKey}
-                    placeholder={L("খাত / পার্টির নাম (↑ ↓ দিয়ে বাছুন)", "Account / party name (↑ ↓ to pick)")} />
+                    placeholder={L(`খাত / পার্টির নাম${hintFind()} (↑ ↓ দিয়ে বাছুন)`, `Account / party name${hintFind()} (↑ ↓ to pick)`)} />
                 </div>
                 <div ref={listRef} style={{ overflow: "auto", flex: 1 }}>
                   {groups.map((g) => (

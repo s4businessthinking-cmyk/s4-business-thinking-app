@@ -16,6 +16,7 @@ import { fyStartDate } from "./balanceSheet.js";
 import { r2 } from "./reportFilters.js";
 import { csvText } from "./vatExport.js";
 import { TALLY_KINDS, TALLY_VCH, buildTallyVouchers, exportCheck, ledgerList, tallyCsvExport, tallyFileName, tallyXml } from "./tallyExport.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -120,8 +121,8 @@ export default function TallyExportReport({ lang = "en", shopId, shop = null, cu
             <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} title={L("শুরুর তারিখ", "From")} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} title={L("শেষ তারিখ", "To")} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} title={L("শুরুর তারিখ", "From")} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} title={L("শেষ তারিখ", "To")} />
       </div>
       <div className="si-toolbar">
         <div className="si-pills">

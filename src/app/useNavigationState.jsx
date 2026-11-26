@@ -278,8 +278,9 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     salesReturn: lang==="bn"?"সেলস রিটার্ন":"Sales Return",
     purchaseReturn: lang==="bn"?"পারচেজ রিটার্ন":"Purchase Return",
     stockAdjust: lang==="bn"?"স্টক সমন্বয়":"Stock Adjustment",
-    productExchange: lang==="bn"?"পণ্য বদল (Exchange)":"Product Exchange",
-    warrantyClaim: lang==="bn"?"গ্যারান্টি / চেঞ্জ ক্লেইম":"Warranty / Change Claim",
+    // Names must not overlap: Exchange = in-shop stock swap; Warranty = company/battery guarantee path.
+    productExchange: lang==="bn"?"দোকানে পণ্য বদল":"Shop Stock Swap",
+    warrantyClaim: lang==="bn"?"ব্যাটারি / কোম্পানি গ্যারান্টি":"Battery / Company Guarantee",
     loosen: lang==="bn"?"পণ্য খোলা (Loosening)":"Product Loosening",
     bundle: lang==="bn"?"পণ্য জোড়া / কিট":"Product Bundling",
     auditLog: lang==="bn"?"অডিট লগ":"Audit Log",

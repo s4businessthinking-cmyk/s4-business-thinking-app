@@ -33,8 +33,13 @@ export function reminderSettingsOf(shop) {
     language: String(s.language || "").toLowerCase() === "bn" ? "bn" : "en",
     textEn: clean(s.textEn) || DEFAULT_REMINDER_TEXT.en,
     textBn: clean(s.textBn) || DEFAULT_REMINDER_TEXT.bn,
+    smsProviderBilingual: s.smsProviderBilingual !== false,
   };
 }
+
+const reminderValues = (row, { shopName = "", cur = "AED" } = {}) => ({
+  name: row.name, amount: `${cur} ${r2(row.amount).toFixed(2)}`, due: fmtDay(row.oldestDue), days: row.days, bills: row.bills, shop: shopName,
+});
 
 /** Message with its placeholders filled; unknown {words} are left as typed. */
 export const fillReminder = (text, values = {}) => String(text || "").replace(/\{(\w+)\}/g, (m, k) => (REMINDER_VARS.includes(k.toLowerCase()) ? String(values[k.toLowerCase()] ?? "") : m));
@@ -76,7 +81,7 @@ export function reminderQueue(ledger, { asOf, salesInvoices = [], customers = []
     const c = byId.get(g.customerId);
     const phone = c ? normalizeWaPhone(partyPhone(c), countryCode) : "";
     const lastAt = last.get(g.customerId) || "";
-    const options = channelOptions(c, channels || { whatsapp: true, sms: false, email: false, smsProvider: {}, emailProvider: {} }, { countryCode });
+    const options = channelOptions(c, channels || { whatsapp: true, sms: false, email: false, whatsappProvider: {}, smsProvider: {}, emailProvider: {} }, { countryCode });
     const reachable = !!c && options.some((o) => o.ok);
     const status = !reachable ? "noPhone" : lastAt.slice(0, 10) === asOf ? "done" : "ready";
     const onlyWhatsApp = !channels || (!channels.sms && !channels.email);
@@ -89,9 +94,24 @@ export function reminderQueue(ledger, { asOf, salesInvoices = [], customers = []
 /** The text for one customer. */
 export function reminderText(row, { settings, shopName = "", cur = "AED" } = {}) {
   const s = settings || reminderSettingsOf(null);
-  return fillReminder(s.language === "bn" ? s.textBn : s.textEn, {
-    name: row.name, amount: `${cur} ${r2(row.amount).toFixed(2)}`, due: fmtDay(row.oldestDue), days: row.days, bills: row.bills, shop: shopName,
-  });
+  return fillReminder(s.language === "bn" ? s.textBn : s.textEn, reminderValues(row, { shopName, cur }));
+}
+
+/** HTTPS SMS provider: English + Bangla in one message (G08). WhatsApp / sms: links keep reminderText. */
+export function reminderProviderSmsText(row, { settings, shopName = "", cur = "AED" } = {}) {
+  const s = settings || reminderSettingsOf(null);
+  if (s.smsProviderBilingual === false) return reminderText(row, { settings: s, shopName, cur });
+  const vals = reminderValues(row, { shopName, cur });
+  const en = fillReminder(s.textEn, vals);
+  const bn = fillReminder(s.textBn, vals);
+  if (!bn || en === bn) return en;
+  return `${en}\n\n---\n\n${bn}`;
+}
+
+/** Provider hand-off uses bilingual SMS when enabled; other channels use reminderText. */
+export function reminderProviderMessage(row, { settings, shopName = "", cur = "AED", channel = "", via = "" } = {}) {
+  if (channel === "sms" && via === "provider") return reminderProviderSmsText(row, { settings, shopName, cur });
+  return reminderText(row, { settings, shopName, cur });
 }
 
 /** The done record saved after WhatsApp was opened for a customer (Reminders collection; audit + once a day). */
@@ -99,7 +119,9 @@ export function reminderText(row, { settings, shopName = "", cur = "AED" } = {})
 export function reminderRecord(row, { shopId, user, profile, cur = "AED", mode = "", channel = "whatsapp", status = "openedWhatsApp", providerId = "", now = new Date() } = {}) {
   const at = new Date(now).toISOString();
   const by = profile?.personName || profile?.username || "";
-  const how = channel === "whatsapp" ? "opened in WhatsApp" : REMINDER_STATUS[status]?.en?.split(" (")[0]?.toLowerCase() || status;
+  const how = channel === "whatsapp" && status === "openedWhatsApp"
+    ? "opened in WhatsApp"
+    : REMINDER_STATUS[status]?.en?.split(" (")[0]?.toLowerCase() || status;
   return {
     title: `Payment reminder ${how} - ${row.name}`, note: `${cur} ${r2(row.amount).toFixed(2)} overdue on ${row.bills} bill(s), oldest due ${row.oldestDue} (${row.days} days)`,
     dueDate: at.slice(0, 10), dueTime: "", repeat: "none", remindBefore: 0, assignedTo: "", assignedToName: "", private: false,

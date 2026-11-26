@@ -49,14 +49,14 @@ test("client shim: auth, writes, queries, transactions, realtime", async () => {
   const states = [];
   const stopAuth = au.onAuthStateChanged(auth, (u) => states.push(u?.uid || null));
 
-  await assert.rejects(au.signInWithEmailAndPassword(auth, "none@x.com", "secret1"), { code: "auth/invalid-credential" });
-  const cred = await au.createUserWithEmailAndPassword(auth, "owner@shop.com", "secret1");
+  await assert.rejects(au.signInWithEmailAndPassword(auth, "none@x.com", "secret11"), { code: "auth/invalid-credential" });
+  const cred = await au.createUserWithEmailAndPassword(auth, "owner@shop.com", "secret11");
   const uid = cred.user.uid;
   assert.equal(auth.currentUser.uid, uid);
   await waitFor(() => states.includes(uid));
 
   const provisioner = au.getSecondaryAuth("prov");
-  const staff = await au.createUserWithEmailAndPassword(provisioner, "staff@shop.com", "secret2");
+  const staff = await au.createUserWithEmailAndPassword(provisioner, "staff@shop.com", "secret22");
   assert.notEqual(staff.user.uid, uid);
   assert.equal(auth.currentUser.uid, uid, "creating staff must not switch the owner session");
 

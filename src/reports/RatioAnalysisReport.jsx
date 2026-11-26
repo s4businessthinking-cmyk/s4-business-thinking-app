@@ -19,6 +19,7 @@ import { stockValueAt } from "./MonthEndPackPanel.jsx";
 import { valuationMethodOf } from "./stockValuation.js";
 import { csvText } from "./vatExport.js";
 import { buildRatios, ratioFileName, ratioRows, ratioText } from "./ratioAnalysis.js";
+import DateField from "../components/DateField.jsx";
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -128,8 +129,8 @@ export default function RatioAnalysisReport({ lang = "en", shopId, shop = null, 
         <div className="si-pills">
           {quick.map(([key, label, f, t]) => <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>)}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       {rep && (
         <div className="si-kpis">

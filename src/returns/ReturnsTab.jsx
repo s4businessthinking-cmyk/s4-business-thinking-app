@@ -16,8 +16,14 @@ import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { RETURN_KINDS, RETURNABLE_STATUSES, billHaystack, billVatPerc, grnLabel, planPartyReturnSettlement, poGrnFieldsFromInvoice, returnedQtyByLine, validateReturnItems, validateValueNote, valueNoteRoom, valueNoteTotals } from "./returnsDomain.js";
 import { normalizeAdjustments, reasonsFor, rowName } from "../masters/simpleMasters.js";
 import { cancelReturnRefundVoucher, createReturnRefundVoucher } from "./returnsRefundVoucher.js";
+import { SETTLE_BY_RETURN, settleStatusPatch } from "../invoices/invoiceSettleKind.js";
+import BillLocationPicker from "../inventory/BillLocationPicker.jsx";
+import { billLocationFields, billLocationId, billLocationsOf, hasGodowns } from "../inventory/billLocation.js";
 
 export { RETURN_KINDS, returnedQtyByLine, returnsAsLedgerVouchers } from "./returnsDomain.js";
+import DateField from "../components/DateField.jsx";
+import { useFormSaveShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintSave } from "../utils/desktopFormShortcuts.js";
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const r2 = (v) => Math.round((n2(v) + Number.EPSILON) * 100) / 100;
@@ -82,6 +88,9 @@ export default function ReturnsTab({
   const [noteMode, setNoteMode] = useState("goods");
   const [valueAmt, setValueAmt] = useState("");
   const [valueVat, setValueVat] = useState("");
+  const [returnLocationId, setReturnLocationId] = useState("");
+  const locations = useMemo(() => billLocationsOf(shop), [shop]);
+  const godownsOn = hasGodowns(locations);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile, view);
@@ -228,6 +237,15 @@ export default function ReturnsTab({
     setDate(localDay()); setInvQ(""); setItemQ(""); setInv(null); setQtys({}); setSerials({});
     setReason(""); setRefundMethod("cash"); setEditOf(null);
     setNoteMode("goods"); setValueAmt(""); setValueVat("");
+    setReturnLocationId("");
+  };
+  const pickInvoice = (bill) => {
+    setInv(bill);
+    setReturnLocationId(bill.locationId || "");
+    setQtys({});
+    setSerials(Object.fromEntries((bill.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v)));
+    setItemQ("");
+    setEditOf(null);
   };
   const openNew = () => { resetForm(); setView("form"); };
 
@@ -249,6 +267,7 @@ export default function ReturnsTab({
     setValueVat(r.noteType === "value" ? String(r.vatPerc ?? "") : "");
     setReason(r.reason || "");
     setRefundMethod(r.refundMethod || "cash");
+    setReturnLocationId(r.locationId || bill.locationId || "");
     setEditOf(r);
     setSel(null);
     setView("form");
@@ -293,8 +312,12 @@ export default function ReturnsTab({
       if (!fresh || fresh.status === "cancelled") continue;
       const newPaid = Math.max(0, r2(n2(fresh.amountPaid) - amt));
       const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
-      const status = balance < 0.01 ? "paid" : newPaid > 0.009 ? "partial" : "confirmed";
-      await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
+      const settle = settleStatusPatch(balance, newPaid, { byReturn: false });
+      // Undo return: if bill opens again, clear return-settle mark; if still closed, keep prior settleKind.
+      const patch = { amountPaid: newPaid, balanceDue: balance, status: settle.status, updatedAt: nowIso, updatedBy: user?.uid || "" };
+      if (settle.status !== "paid") patch.settleKind = "";
+      else if (fresh.settleKind === SETTLE_BY_RETURN) patch.settleKind = "";
+      await offlinePatch(K.invCol, fresh.id, patch, fresh);
     }
     await cancelReturnRefundVoucher(r, user);
   };
@@ -323,9 +346,9 @@ export default function ReturnsTab({
       if (!fresh || fresh.status === "cancelled") continue;
       const newPaid = r2(n2(fresh.amountPaid) + amt);
       const balance = Math.max(0, r2(n2(fresh.grandTotal) - newPaid));
-      const status = balance < 0.01 ? "paid" : "partial";
-      await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
-      if (id === bill.id) nextBill = { ...fresh, amountPaid: newPaid, balanceDue: balance, status };
+      const settle = settleStatusPatch(balance, newPaid, { byReturn: true });
+      await offlinePatch(K.invCol, fresh.id, { amountPaid: newPaid, balanceDue: balance, status: settle.status, settleKind: settle.settleKind, updatedAt: nowIso, updatedBy: user?.uid || "" }, fresh);
+      if (id === bill.id) nextBill = { ...fresh, amountPaid: newPaid, balanceDue: balance, status: settle.status, settleKind: settle.settleKind };
       if (progress) progress.ret = nextRet;
     }
     if (refundAmt > 0.009) {
@@ -476,6 +499,7 @@ export default function ReturnsTab({
         refundAmount: refundNow, refundMethod: refundNow > 0 ? refundMethod : "",
         reason: reason.trim(), status: "confirmed",
         refundVoucherId: null, refundVoucherNo: "", refundVoucherCol: "",
+        ...(!isValueNote && godownsOn ? billLocationFields(returnLocationId, locations, { prior: editing }) : {}),
         updatedAt: nowIso, updatedBy: user?.uid || "",
       };
 
@@ -539,6 +563,12 @@ export default function ReturnsTab({
       setSaving(false);
     }
   };
+  const returnDateBad = useMemo(() => {
+    if (!inv) return true;
+    const billDay = String(inv.invoiceDate || "").slice(0, 10);
+    return !date || (billDay && date < billDay);
+  }, [inv, date]);
+  useFormSaveShortcut({ active: view === "form", saving, disabled: saving || !inv || total <= 0 || returnDateBad, onSave: save });
 
   const canCancel = (r) => r.status !== "cancelled" && (isOwner || (canManage && r.createdBy === user?.uid));
 
@@ -686,7 +716,7 @@ export default function ReturnsTab({
               <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? { padding: 0 } : { gridTemplateColumns: "150px minmax(0,1fr)" }}>
                 <div className="si-field">
                   <span className="pm-label">{L("রিটার্নের তারিখ", "Return date")} *</span>
-                  <input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} style={dateBad ? { borderColor: "#b91c1c" } : undefined} />
+                  <DateField className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} style={dateBad ? { borderColor: "#b91c1c" } : undefined} />
                 </div>
                 <div className="si-field">
                   <span className="pm-label">{L("কোন বিলের মাল ফেরত", "Return against bill")} *</span>
@@ -715,7 +745,7 @@ export default function ReturnsTab({
           {!inv && (
             <div className="si-box"style={{ flex: mobile ? undefined : 1, minHeight: 160 }}>
               {mobile ? invMatches.map((i) => (
-                <button key={i.id} type="button"className="si-mrow"onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
+                <button key={i.id} type="button"className="si-mrow"onClick={() => pickInvoice(i)}>
                   <div className="si-mrow-top"><span>{i.invoiceNo}{i.supplierInvoiceNo ? ` (${i.supplierInvoiceNo})` : ""}</span><span>{cur} {f2(i.grandTotal)}</span></div>
                   <div className="si-mrow-sub"><span>{i[K.partyName] || "—"}</span><span>{fmtDay(i.invoiceDate)}</span></div>
                 </button>
@@ -733,7 +763,7 @@ export default function ReturnsTab({
                     {invMatches.map((i) => {
                       const iDue = Math.max(0, r2(n2(i.grandTotal) - n2(i.amountPaid)));
                       return (
-                        <tr key={i.id} className="pm-clickable"onClick={() => { setInv(i); setQtys({}); setSerials(Object.fromEntries((i.items || []).map((it, idx) => [idx, it.serialNo || ""]).filter(([, v]) => v))); setItemQ(""); setEditOf(null); }}>
+                        <tr key={i.id} className="pm-clickable"onClick={() => pickInvoice(i)}>
                           <td>{fmtDay(i.invoiceDate)}</td>
                           <td className="si-strong">{i.invoiceNo}{i.supplierInvoiceNo ? ` (${i.supplierInvoiceNo})` : ""}</td>
                           <td>{i[K.partyName] || "—"}</td>
@@ -750,6 +780,24 @@ export default function ReturnsTab({
             </div>
           )}
 
+          {inv && !isValueNote && godownsOn && (
+            <fieldset className="pm-panel" style={{ margin: 0 }}>
+              <legend className="pm-panel-legend">{L("মাল কোন গুদামে ফিরবে", "Goods return to which godown")}</legend>
+              <div className="si-panel-body">
+                <BillLocationPicker
+                  side={kind === "purchase" ? "purchase" : "sale"}
+                  bn={bn}
+                  locations={locations}
+                  value={billLocationId({ locationId: returnLocationId }, locations)}
+                  onChange={(v) => setReturnLocationId(v)}
+                />
+                <div className="si-hint" style={{ marginLeft: 0 }}>
+                  {L("খালি রেখে দিলে স্টক যে গুদাম থেকে বিক্রি হয়েছিল সেখানেই ফিরবে। অন্য গুদাম বেছে দিলে সেখানে যাবে।",
+                    "Leave as picked from the bill to return stock to the same godown it left. Choose another godown to receive it there instead.")}
+                </div>
+              </div>
+            </fieldset>
+          )}
           {inv && (
             <div className="si-pills" style={{ margin: "2px 0" }}>
               {[["goods", L("মাল ফেরত", "Goods return")], ["value", L("শুধু দামের নোট (মাল ছাড়া)", "Value note (no goods)")]].map(([k, label]) => (
@@ -888,8 +936,8 @@ export default function ReturnsTab({
         <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !inv || total <= 0 || dateBad} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${editOf ? L("এডিট সেভ", "Save Edit") : isValueNote ? L("নোট সেভ", "Save Note") : L("রিটার্ন সেভ", "Save Return")}`}
+          <button type="button"title="Ctrl+S" className="pm-btn pm-btn--primary"disabled={saving || !inv || total <= 0 || dateBad} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${editOf ? L("এডিট সেভ", "Save Edit") : isValueNote ? L("নোট সেভ", "Save Note") : L("রিটার্ন সেভ", "Save Return")}${hintSave(saving)}`}
           </button>
         </div>
       </>
@@ -1003,8 +1051,8 @@ export default function ReturnsTab({
             <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+        <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className="si-kpis">
         <div className="si-kpi"><span>{L("রিটার্ন", "Returns")}</span><b>{liveShown.length}</b></div>

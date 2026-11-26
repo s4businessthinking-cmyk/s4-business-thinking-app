@@ -17,6 +17,7 @@ import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { buildBalanceSheet, openingStockValue, stockDocsUpTo } from "./balanceSheet.js";
 import { csvText } from "./vatExport.js";
 import { fundsCsvRows, fundsFileName, fundsFromSheet, fundsLines } from "./fundsSummary.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -153,8 +154,8 @@ export default function FundsSummaryReport({ lang = "en", shopId, shop = null, p
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
         <span className="si-toolbar-gap" />
         <button type="button" className={`pm-btn-secondary${day === localDay() ? " is-active" : ""}`} onClick={() => setAsOf(localDay())}>{L("আজ", "Today")}</button>
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={compareAsOf} onChange={(e) => setCompareAsOf(e.target.value)} title={L("তুলনা তারিখ (ঐচ্ছিক)", "Compare date (optional)")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={compareAsOf} onChange={(e) => setCompareAsOf(e.target.value)} title={L("তুলনা তারিখ (ঐচ্ছিক)", "Compare date (optional)")} />
         {compareAsOf && <button type="button" className="pm-btn-secondary" onClick={() => setCompareAsOf("")}>{L("তুলনা সরান", "Clear compare")}</button>}
       </div>
       {f && (

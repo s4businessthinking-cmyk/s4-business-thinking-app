@@ -7,6 +7,7 @@ import WhatsAppButton from "../share/WhatsAppButton.jsx";
 import { docMessage, pdfFileName } from "../share/whatsappDocShare.js";
 import { loadPrintDesign, renderLayoutDocument, generateStatementHTML } from "../print/printDesign.js";
 import { invMeta, statementRefValue } from "./partyLedgerMeta.js";
+import DateField from "../components/DateField.jsx";
 
 const n2 = (v) => parseFloat(v) || 0;
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
@@ -593,9 +594,9 @@ export default function PartyLedgerWindow({
             </div>
             {party && <button type="button"onClick={() => pickPartyKey(null)} style={btn()}>{bn ? "← সবাই" : "← All"}</button>}
             <span style={lbl}>From</span>
-            <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateField style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
             <span style={lbl}>To</span>
-            <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateField style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
             {(from || to) && <button type="button"onClick={() => { setFrom(""); setTo(""); }} style={btn()}>Clear</button>}
             {!party && (
               <label style={{ ...lbl, fontWeight: 600, display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}>

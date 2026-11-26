@@ -18,6 +18,9 @@ import InvoiceScanWindow from "./scan/InvoiceScanWindow.jsx";
 import { applyPurchaseScan } from "./scan/applyPurchaseScan.js";
 import { printPurchaseInvoice } from "./purchasePrint.js";
 import { piToday } from "./purchaseShared.js";
+import { runDesktopBillShortcuts } from "../utils/desktopFormShortcuts.js";
+import DateField from "../components/DateField.jsx";
+import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
 
 const ACCENT = "#c2410c";
 
@@ -253,6 +256,32 @@ export default function PurchaseInvoiceDesktopForm({
     else if (!String(form.supplierInvoiceNo || "").trim()) setTimeout(() => supInvRef.current?.focus(), 30);
   };
 
+  const shortcutsRef = useRef({});
+  shortcutsRef.current = {
+    saving,
+    locked,
+    savedInvoice,
+    canDraft: () => (!savedInvoice || savedInvoice.status === "draft") && !locked && !saving,
+    onSaveDraft: () => { focusMissingHeader(); onSaveDraft(); },
+    onConfirm: () => { focusMissingHeader(); onConfirm(); },
+    onNew: () => onNew(),
+    canNew: () => !saving,
+    onSearch: () => setShowSearch(true),
+    onOptions: () => setOptionsOpen(true),
+    canOptions: () => !!onSaveOptions && !saving,
+    canEdit: () => !!(locked && savedInvoice && canEditInvoice(savedInvoice) && !saving),
+    onEdit: () => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); },
+    canPrint: () => !!(purchaseOptions.enablePrint && savedInvoice && canPrint && !saving),
+    onPrint: () => {
+      const vm = vendors.find((v) => v.id === savedInvoice.vendorId);
+      printPurchaseInvoice({
+        ...savedInvoice,
+        vendorAddress: savedInvoice.vendorAddress || vm?.address || "",
+        vendorTrn: savedInvoice.vendorTrn || vm?.trnNumber || "",
+      }, shop, lang);
+    },
+  };
+
   const handlersRef = useRef({});
   handlersRef.current = {
     locked,
@@ -269,7 +298,22 @@ export default function PurchaseInvoiceDesktopForm({
 
   useEffect(() => {
     const onKey = (e) => {
-      if (document.querySelector("[data-si-modal-open]")) return;
+      const s = shortcutsRef.current;
+      if (runDesktopBillShortcuts(e, {
+        canSaveDraft: () => s.canDraft(),
+        onSaveDraft: s.onSaveDraft,
+        canConfirm: () => !s.locked && !s.saving,
+        onConfirm: s.onConfirm,
+        canNew: () => s.canNew(),
+        onNew: s.onNew,
+        onSearch: s.onSearch,
+        canOptions: () => s.canOptions(),
+        onOptions: s.onOptions,
+        canEdit: () => s.canEdit(),
+        onEdit: s.onEdit,
+        canPrint: () => s.canPrint(),
+        onPrint: s.onPrint,
+      })) return;
       const h = handlersRef.current;
       if (h.locked && ["F9", "F10", "Home"].includes(e.key)) return;
       const tag = String(e.target?.tagName || "").toLowerCase();
@@ -319,7 +363,8 @@ export default function PurchaseInvoiceDesktopForm({
         <div style={{ position: "relative", border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
           {status && (
             <span style={{ position: "absolute", left: 10, fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: status.color, color: "#fff" }}>
-              {status[lang] || savedInvoice.status}{locked ? ` ·  ${bn ? "শুধু দেখা" : "View only"}` : ""}
+              {invoiceStatusLabel(savedInvoice, lang, { [savedInvoice.status]: status }) || (status[lang] || savedInvoice.status)}
+              {locked ? ` ·  ${bn ? "শুধু দেখা" : "View only"}` : ""}
             </span>
           )}
           <div style={{ textAlign: "center", lineHeight: 1.1 }}>
@@ -329,7 +374,7 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>{bn ? "এন্ট্রি তারিখ" : "Entry Date"}</div>
-          <input type="date"lang="en-GB" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
+          <DateField style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
         </div>
       </div>
 
@@ -365,7 +410,7 @@ export default function PurchaseInvoiceDesktopForm({
         </div>
         <div>
           <div style={lbl}>Invoice Date</div>
-          <input type="date"lang="en-GB" style={inp()} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
+          <DateField style={inp()} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -410,7 +455,7 @@ export default function PurchaseInvoiceDesktopForm({
           <button type="button"onClick={() => setScanOpen(true)} title={bn ? "সাপ্লায়ারের বিলের PDF / ছবি থেকে বসান" : "Fill from the supplier bill PDF / picture"}
             style={btn("#ecfdf5", "#15803d", { height: 26, whiteSpace: "nowrap", marginRight: 6 })}> {bn ? "বিল স্ক্যান" : "Scan Bill"}</button>
           {onSaveOptions && (
-            <button type="button"onClick={() => setOptionsOpen(true)} style={btn("#e7eef9", C.label, { height: 26, whiteSpace: "nowrap" })}> Options</button>
+            <button type="button"title={bn ? "Ctrl+Shift+O" : "Ctrl+Shift+O"} onClick={() => setOptionsOpen(true)} style={btn("#e7eef9", C.label, { height: 26, whiteSpace: "nowrap" })}> Options</button>
           )}
         </div>
       </div>
@@ -564,7 +609,7 @@ export default function PurchaseInvoiceDesktopForm({
                     {it.batchNo && (
                       <label onClick={(e) => e.stopPropagation()} style={{ marginLeft: 6, fontSize: 10.5, color: "#5b21b6", whiteSpace: "nowrap" }} title={bn ? "এই ব্যাচ শেষ যেদিন বিক্রি করা যাবে (ঐচ্ছিক)" : "Last day this batch may be sold (optional)"}>
                         {bn ? "মেয়াদ" : "Expiry"}{" "}
-                        <input type="date" lang="en-GB" disabled={locked} value={it.expiryDate || ""} onChange={(e) => { const v = e.target.value; setLines((prev) => prev.map((x) => (x.id === it.id ? { ...x, expiryDate: v } : x))); }}
+                        <DateField disabled={locked} value={it.expiryDate || ""} onChange={(e) => { const v = e.target.value; setLines((prev) => prev.map((x) => (x.id === it.id ? { ...x, expiryDate: v } : x))); }}
                           style={{ fontSize: 10.5, height: 18, padding: "0 2px", border: "1px solid #c4b5fd", borderRadius: 3 }} />
                       </label>
                     )}
@@ -683,13 +728,13 @@ export default function PurchaseInvoiceDesktopForm({
       {/* Action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button"onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
-          <button type="button"onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন" : "Search"}</button>
+          <button type="button"title="Ctrl+N" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন (Ctrl+N)" : "New (Ctrl+N)"}</button>
+          <button type="button"title="F7" onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন (F7)" : "Search (F7)"}</button>
           {purchaseOptions.enablePrint && savedInvoice && canPrint && (
             <button type="button"onClick={() => {
               const vm = vendors.find((v) => v.id === savedInvoice.vendorId);
               printPurchaseInvoice({ ...savedInvoice, vendorAddress: savedInvoice.vendorAddress || vm?.address || "", vendorTrn: savedInvoice.vendorTrn || vm?.trnNumber || "" }, shop, lang);
-            }} style={btn()}> {bn ? "প্রিন্ট" : "Print"}</button>
+            }} title="Ctrl+P" style={btn()}> {bn ? "প্রিন্ট (Ctrl+P)" : "Print (Ctrl+P)"}</button>
           )}
           {onCancelInvoice && savedInvoice && ["draft", "confirmed", "partial", "paid"].includes(savedInvoice.status) && (
             <button type="button"onClick={() => onCancelInvoice(savedInvoice)} disabled={saving}
@@ -705,7 +750,7 @@ export default function PurchaseInvoiceDesktopForm({
           {locked ? (
             canEditInvoice(savedInvoice) ? (
               <button type="button"onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
-                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}> {bn ? "এডিট" : "Edit"}</button>
+                title="Ctrl+E" style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}> {bn ? "এডিট (Ctrl+E)" : "Edit (Ctrl+E)"}</button>
             ) : (
               <button type="button"disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / ওপেনিং / ট্রান্সফার / অনুমতি নেই)" : "This bill cannot be edited (cancelled / opening / transfer / no permission)"}
                 style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}> {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
@@ -713,10 +758,10 @@ export default function PurchaseInvoiceDesktopForm({
           ) : (
             <>
               {(!savedInvoice || savedInvoice.status === "draft") && (
-                <button type="button"onClick={() => { focusMissingHeader(); onSaveDraft(); }} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
+                <button type="button"title="Ctrl+Shift+S" onClick={() => { focusMissingHeader(); onSaveDraft(); }} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট (Ctrl+Shift+S)" : "Draft (Ctrl+Shift+S)"}</button>
               )}
-              <button type="button"onClick={() => { focusMissingHeader(); onConfirm(); }} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
-                {saving ? "…" : (bn ? "সেভ" : "Save")}
+              <button type="button"title="Ctrl+S" onClick={() => { focusMissingHeader(); onConfirm(); }} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
+                {saving ? "…" : (bn ? "সেভ (Ctrl+S)" : "Save (Ctrl+S)")}
               </button>
             </>
           )}
@@ -931,9 +976,9 @@ function PurchaseSearchModal({ invoices, piFmt2, PI_PAY_METHODS, lang, onClose, 
     <Modal title="Search"onClose={onClose} width={800}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={lbl}><u>F</u>rom</span>
-        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <DateField style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}><u>T</u>o</span>
-        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+        <DateField style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
         <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { width: 80, marginLeft: "auto" })}>Close</button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px 4px" }}>

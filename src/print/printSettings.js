@@ -1,4 +1,7 @@
 import { registerPlugin } from "@capacitor/core";
+import { injectEntityGroupHeader } from "../settings/entityGroup.js";
+
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 // Device-level print settings (like the old desktop ERP: each PC/printer keeps its own).
 const KEY = "s4-print-settings-v1";
@@ -189,11 +192,12 @@ export async function printHtmlDocument(html, { preview = true, lang = "en", pri
 
 // Any document (report, ledger, voucher…) printed per the device print settings.
 // kind "barcode" uses the barcode printer; everything else uses the bill printer.
-export function printWithSettings(html, { lang = "en", kind = "bill" } = {}) {
+export function printWithSettings(html, { lang = "en", kind = "bill", shop = null } = {}) {
   const settings = loadPrintSettings();
   const printer = kind === "barcode" ? settings.barcodePrinter : settings.billPrinter;
   const preview = kind === "barcode" ? !(printer && canPickPrinter()) : settings.showPreview;
-  return printHtmlDocument(html, { preview, lang, printer });
+  const doc = shop ? injectEntityGroupHeader(html, shop, esc, lang === "bn") : html;
+  return printHtmlDocument(doc, { preview, lang, printer });
 }
 
 function bytesToBase64(bytes) {

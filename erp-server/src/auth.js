@@ -62,7 +62,7 @@ const LOCAL_EMAIL_DOMAIN = "@s4local.app";
 
 function acceptablePassword(password) {
   const s = String(password || "");
-  return s.length >= 6 && /[A-Za-z]/.test(s) && /\d/.test(s);
+  return s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
 }
 const SIGNUP_CODE_TTL_MS = 10 * 60 * 1000;
 const SIGNUP_RESEND_GAP_MS = 60 * 1000;

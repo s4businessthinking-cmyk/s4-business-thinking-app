@@ -32,6 +32,7 @@ import {
 } from "./authSession";
 import { loadShopRecord, saveShopRecord } from "../offline/shopService";
 import { offlineGetById } from "../offline/offlineRepository";
+import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
 function isDisabledMember(data = {}) {
   const status = String(data.status || "active").toLowerCase();
@@ -383,6 +384,7 @@ function isOnline() {
 }
 
 async function ensureFirebaseSignedInAfterLocalLogin(localUser, password) {
+  if (!isCloudAccessAllowedSync()) return localUser;
   if (!isOnline() || !auth || !db) return localUser;
 
   let currentUser = localUser;
@@ -648,6 +650,9 @@ export async function loginWithLocalCredentials(username, password) {
 }
 
 async function loginWithRemoteStaffUsername(username, password) {
+  if (!isCloudAccessAllowedSync()) {
+    return { ok: false, reason: "CLOUD_NOT_LICENSED" };
+  }
   if (!isOnline() || !auth || !db) {
     return { ok: false, reason: "OFFLINE_STAFF_LOGIN" };
   }
@@ -718,6 +723,11 @@ export async function loginWithCredentials(identifier, password) {
   }
 
   if (looksLikeEmail(trimmed)) {
+    if (!isCloudAccessAllowedSync()) {
+      return localResult.reason === "USER_NOT_FOUND"
+        ? { ok: false, reason: "LOCAL_LOGIN_ONLY" }
+        : localResult;
+    }
     if (!isOnline()) {
       if (localResult.reason === "INVALID_PASSWORD") {
         return { ok: false, reason: "OFFLINE_EMAIL" };
@@ -890,6 +900,9 @@ export async function registerLocalOwnerAccount({
   emailCode = "",
 } = {}) {
   await bootOfflineSqlite();
+  if (!isCloudAccessAllowedSync()) {
+    return { ok: false, reason: "CLOUD_NOT_LICENSED" };
+  }
   assertFirebaseReady(true);
 
   if (await isUsernameTaken(username)) return USERNAME_TAKEN;
@@ -1014,6 +1027,9 @@ export async function registerLocalSalesmanAccount({
   permissions = null,
 } = {}) {
   await bootOfflineSqlite();
+  if (!isCloudAccessAllowedSync()) {
+    return { ok: false, reason: "CLOUD_NOT_LICENSED" };
+  }
   assertFirebaseReady(true);
 
   const inviteInfo = await resolveInviteCode(inviteCode);
@@ -1154,6 +1170,12 @@ export function friendlyLocalAuthError(result, lang = "bn") {
     FIREBASE_UNAVAILABLE: isBn
       ? "Firebase প্রস্তুত নয়"
       : "Firebase is not ready",
+    CLOUD_NOT_LICENSED: isBn
+      ? "এই লাইসেন্সে online/cloud সুবিধা নেই — শুধু local username/password দিয়ে কাজ করুন"
+      : "This license has no online/cloud access — use local username and password only",
+    LOCAL_LOGIN_ONLY: isBn
+      ? "শুধু দোকানের local username/password দিয়ে login করুন (email signup বন্ধ)"
+      : "Log in with the shop's local username and password only (email signup is disabled)",
     OFFLINE_REQUIRED: isBn
       ? "অ্যাকাউন্ট তৈরি/যোগদানের জন্য ইন্টারনেট লাগবে"
       : "Internet is required to create or join an account",

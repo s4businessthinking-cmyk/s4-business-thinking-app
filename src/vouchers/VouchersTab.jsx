@@ -12,6 +12,7 @@ import { activeNames, moneyNames, normalizeChart } from "../ledger/chartOfAccoun
 import { CHART_EXPENSE_NAMES } from "../ledger/ChartOfAccountsScreen.jsx";
 import { ACCOUNT_VOUCHER_TYPES, CASH_ACCOUNT, checkContra, checkJournal, r2, voucherParticulars } from "./accountVoucherDomain.js";
 import VoucherRegister from "./VoucherRegister.jsx";
+import DateField from "../components/DateField.jsx";
 
 const COL = "accountVouchers";
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -360,7 +361,7 @@ export default function VouchersTab({
           {readOnly && editRow?.status !== "cancelled" && <div className="si-hint"style={{ marginLeft: 0 }}> {L("শুধু দেখতে পারবেন", "View only")}</div>}
           <div className="si-panel-body"style={{ gap: 6 }}>
             <div className="si-grid2">
-              {fField(`${L("তারিখ", "Date")} *`, <input type="date"className="pm-input"disabled={readOnly} value={form.voucherDate} onChange={(e) => setF("voucherDate", e.target.value)} />)}
+              {fField(`${L("তারিখ", "Date")} *`, <DateField className="pm-input"disabled={readOnly} value={form.voucherDate} onChange={(e) => setF("voucherDate", e.target.value)} />)}
               {fField(L("রেফারেন্স নং", "Ref No"), <input className="pm-input"disabled={readOnly} value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} />)}
             </div>
             {view === "contra" ? contraFields : journalFields}
@@ -441,8 +442,8 @@ export default function VouchersTab({
             <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
           ))}
         </div>
-        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-        <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+        <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div className="si-filters">
         <div className="si-search">

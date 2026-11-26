@@ -37,7 +37,7 @@ export function useReminderAlerts({ shopId, uid, isOwner, enabled = true, lang =
 
   useEffect(() => {
     if (!enabled) return undefined;
-    const id = setInterval(() => setClock({ day: ymd(new Date()), time: hm() }), 60 * 1000);
+    const id = setInterval(() => setClock({ day: ymd(new Date()), time: hm() }), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [enabled]);
 

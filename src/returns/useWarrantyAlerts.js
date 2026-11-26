@@ -21,7 +21,7 @@ export function useWarrantyAlerts({ shopId, enabled = true, lang = "en", toast, 
 
   useEffect(() => {
     if (!enabled) return undefined;
-    const id = setInterval(() => setToday(ymd(new Date())), 60 * 1000);
+    const id = setInterval(() => setToday(ymd(new Date())), 5 * 60 * 1000);
     return () => clearInterval(id);
   }, [enabled]);
 

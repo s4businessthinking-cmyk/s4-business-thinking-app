@@ -13,6 +13,7 @@ import {
   emptySecurityCheque, validateSecurityCheque, liveSecurityCheques, isStale, r2,
   openInvoicesFor, outstandingBalanceFor, securityChequeStatusPatch,
 } from "./securityCheque.js";
+import DateField from "../components/DateField.jsx";
 
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -487,12 +488,12 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                   <div><span style={lblStyle}>{bn ? "চেকের পরিমাণ *" : "Cheque amount *"}</span><input type="number"min="0.01"step="0.01"style={fieldStyle} value={form.amount} onChange={(e) => set("amount", e.target.value)} /></div>
                   <div>
                     <span style={lblStyle}>{bn ? "হস্তান্তর / গ্রহণের তারিখ *" : "Handover / received date *"}</span>
-                    <input type="date"style={fieldStyle} value={form.handoverDate} onChange={(e) => set("handoverDate", e.target.value)} />
+                    <DateField style={fieldStyle} value={form.handoverDate} onChange={(e) => set("handoverDate", e.target.value)} />
                     <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 3 }}>
                       {bn ? "এটা শুধু রেকর্ডের তারিখ (কবে চেক হাতবদল হলো) — সিকিউরিটি চেকের নিজের কোনো তারিখ থাকে না, এটা আনডেটেড।" : "This is only the internal record date (when the cheque changed hands) — a security cheque itself is undated, it has no cheque date."}
                     </div>
                   </div>
-                  <div><span style={lblStyle}>{bn ? "সর্বশেষ লেনদেনের তারিখ *" : "Last transaction date *"}</span><input type="date"style={fieldStyle} value={form.lastTxn} onChange={(e) => set("lastTxn", e.target.value)} /></div>
+                  <div><span style={lblStyle}>{bn ? "সর্বশেষ লেনদেনের তারিখ *" : "Last transaction date *"}</span><DateField style={fieldStyle} value={form.lastTxn} onChange={(e) => set("lastTxn", e.target.value)} /></div>
                   <div><span style={lblStyle}>{bn ? "দায়িত্বে থাকা কর্মী" : "Responsible staff"}</span><input style={fieldStyle} value={form.staff} onChange={(e) => set("staff", e.target.value)} /></div>
                   <div><span style={lblStyle}>{bn ? "রিমাইন্ডার (মাস)" : "Reminder (months)"}</span><input type="number"min="1"max="24"style={fieldStyle} value={form.reminderMonths} onChange={(e) => set("reminderMonths", e.target.value)} /></div>
                 </div>
@@ -552,7 +553,7 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                 <div style={{ fontWeight: 800, fontSize: 12.5, marginBottom: 6 }}>{bn ? "রসিদের কাগজপত্র (ভেন্ডর/কাস্টমারের রসিদ + সই করা A4 কপি, একই জায়গায়)" : "Receipt documents (vendor/customer receipt + signed A4 copy, kept together)"}</div>
                 <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                   <div><span style={lblStyle}>{bn ? "রসিদ নম্বর" : "Receipt number"}</span><input style={fieldStyle} value={form.receiptNo} onChange={(e) => set("receiptNo", e.target.value)} /></div>
-                  <div><span style={lblStyle}>{bn ? "রসিদের তারিখ" : "Receipt date"}</span><input type="date"style={fieldStyle} value={form.receiptDate} onChange={(e) => set("receiptDate", e.target.value)} /></div>
+                  <div><span style={lblStyle}>{bn ? "রসিদের তারিখ" : "Receipt date"}</span><DateField style={fieldStyle} value={form.receiptDate} onChange={(e) => set("receiptDate", e.target.value)} /></div>
                 </div>
                 <div style={{ marginTop: 8 }}>
                   <span style={lblStyle}>{bn ? "শিরোনাম / বিবরণ (ঐচ্ছিক)" : "Title / description (optional)"}</span>

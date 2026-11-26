@@ -1,8 +1,9 @@
 import { hashPassword, verifyPassword } from "./passwordService";
 import { getLocalUserById, getLocalUserByFirebaseUid, verifyLocalUserPassword } from "./localAuthService";
-import { doc, getDoc, setDoc, callServer } from "../backend/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteField, callServer } from "../backend/firestore";
 import { db, auth } from "../firebase-config";
 
+const PIN_SECRETS_COLLECTION = "ownerPinSecrets";
 const cacheKey = (uid) => `s4_owner_pin_${uid}`;
 
 function readCached(uid) {
@@ -34,13 +35,24 @@ export async function loadOwnerPin(uid) {
   let record = readCached(uid);
   if (canReachCloud(uid)) {
     try {
-      const snap = await getDoc(doc(db, "users", uid));
-      const cloud = snap.exists() ? snap.data()?.ownerPin : null;
+      let cloud = null;
+      const secretSnap = await getDoc(doc(db, PIN_SECRETS_COLLECTION, uid));
+      if (secretSnap.exists()) {
+        cloud = secretSnap.data();
+      } else {
+        const userSnap = await getDoc(doc(db, "users", uid));
+        cloud = userSnap.exists() ? userSnap.data()?.ownerPin : null;
+      }
       if (cloud?.passwordHash && String(cloud.setAt || "") >= String(record?.setAt || "")) {
         record = cloud;
         writeCached(uid, cloud);
       } else if (record?.passwordHash) {
-        await setDoc(doc(db, "users", uid), { ownerPin: record }, { merge: true });
+        await setDoc(doc(db, PIN_SECRETS_COLLECTION, uid), record, { merge: true });
+        try {
+          await updateDoc(doc(db, "users", uid), { ownerPin: deleteField() });
+        } catch {
+          /* legacy field may not exist */
+        }
       }
     } catch (error) {
       console.warn("[S4 PIN] cloud read failed", error);
@@ -68,15 +80,20 @@ export async function verifyOwnerLoginPassword(localUserId, password, uid = "") 
   return !!result.ok;
 }
 
-export const isValidPin = (pin) => /^\d{4,6}$/.test(String(pin || ""));
+export const isValidPin = (pin) => /^\d{6}$/.test(String(pin || ""));
 
 export async function saveOwnerPin(uid, pin) {
-  if (!isValidPin(pin)) throw new Error("PIN must be 4-6 digits");
+  if (!isValidPin(pin)) throw new Error("PIN must be 6 digits");
   const record = { ...(await hashPassword(String(pin))), setAt: new Date().toISOString() };
   writeCached(uid, record);
   if (canReachCloud(uid)) {
     try {
-      await setDoc(doc(db, "users", uid), { ownerPin: record }, { merge: true });
+      await setDoc(doc(db, PIN_SECRETS_COLLECTION, uid), record, { merge: true });
+      try {
+        await updateDoc(doc(db, "users", uid), { ownerPin: deleteField() });
+      } catch {
+        /* legacy field may not exist */
+      }
     } catch (error) {
       console.warn("[S4 PIN] cloud save failed", error);
     }

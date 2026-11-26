@@ -16,6 +16,9 @@ import { MinimizedChip, useEscapeKey, useWindowState, WindowButtons } from "../c
 import { C, btn, inp, lbl, td, th, productBarcodeUnit } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { nsq } from "../utils/productSearch";
 import { orderLines, orderProgress, billOfReceipt, docTotals, pendingProductCount, orderLineKey, applyBackorderToOrder, backorderItemsFromShortage } from "./purchaseDocs.js";
+import DateField from "../components/DateField.jsx";
+import { useFormSaveShortcut, useFindShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintFind, hintSave } from "../utils/desktopFormShortcuts.js";
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const fq = (v) => String(parseFloat(n2(v).toFixed(4)));
@@ -83,6 +86,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
   const [codeOpenSignal, setCodeOpenSignal] = useState(0);
   const mobile = usePmMobile();
   const rootRef = useRef(null);
+  const listSearchRef = useRef(null);
   const nameRef = useRef(null);
   const codeRef = useRef(null);
   const qtyRef = useRef(null);
@@ -242,6 +246,8 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
       setSaving(false);
     }
   };
+  useFormSaveShortcut({ active: view === "form", saving, disabled: saving || !lines.length, onSave: save });
+  useFindShortcut({ active: view === "list", onFind: () => listSearchRef.current?.focus() });
 
   const mine = (r) => isOwner || (canManage && r.createdBy === user?.uid);
   const setStatus = async (r, status, msg) => {
@@ -416,7 +422,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
               </div>
               <DocDateRange from={dFrom} to={dTo} onFrom={setDFrom} onTo={setDTo} lang={lang} mobile={mobile} />
               <div className="si-search"style={{ minWidth: mobile ? "100%" : 240 }}>
-                <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, সাপ্লায়ার বা পণ্য…", "Number, supplier or item…")} />
+                <input ref={listSearchRef} className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L(`নম্বর, সাপ্লায়ার বা পণ্য…${hintFind()}`, `Number, supplier or item…${hintFind()}`)} />
                 {search && <button type="button"onClick={() => setSearch("")}>✕</button>}
               </div>
             </div>
@@ -516,14 +522,14 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: C.panel, border: `1px solid ${C.border}`, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 140px 140px 1fr", gap: 8 }}>
-            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date"lang="en-GB" style={inp()} value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
+            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><DateField style={inp()} value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
             <div>
               <div style={lbl}>{L("সাপ্লায়ার", "Supplier")} *</div>
               <input style={inp()} list={`vendors-${kind}-wd`} value={form.vendorName || ""} onChange={(e) => pickVendorByName(e.target.value)} placeholder={L("নাম লিখুন বা বাছুন", "Type or pick")} />
               <datalist id={`vendors-${kind}-wd`}>{activeVendors.map((v) => <option key={v.id} value={v.vendorName} />)}</datalist>
             </div>
             {isPO
-              ? <div><div style={lbl}>{L("কবে আসবে", "Expected on")}</div><input type="date"lang="en-GB" style={inp()} value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
+              ? <div><div style={lbl}>{L("কবে আসবে", "Expected on")}</div><DateField style={inp()} value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
               : <div><div style={lbl}>{L("সাপ্লায়ারের DN নং", "Supplier DN No")}</div><input style={inp()} value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>}
             <div><div style={lbl}>Ref.Number</div><input style={inp()} value={form.refNo || ""} onChange={(e) => setF("refNo", e.target.value)} /></div>
             <div><div style={lbl}>{L("নোট", "Note")}</div><input style={inp()} value={form.note || ""} onChange={(e) => setF("note", e.target.value)} /></div>
@@ -592,7 +598,7 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
               <span>{L("পণ্য", "Lines")}: {lines.length}</span>
               {isPO && <span>VAT: {fm(totals.tax)}</span>}
               <span>{L("মোট", "Total")}: {cur} {fm(isPO ? totals.grand : totals.sub)}</span>
-              <button type="button"disabled={saving || !lines.length} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ", "Save")}`}</button>
+              <button type="button"title="Ctrl+S" disabled={saving || !lines.length} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ", "Save")}${hintSave(saving)}`}</button>
             </div>
           </div>
         </div>
@@ -614,9 +620,9 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
                 <input className="pm-input"list={`vendors-${kind}`} value={form.vendorName || ""} onChange={(e) => pickVendorByName(e.target.value)} placeholder={L("নাম লিখুন বা বাছুন", "Type or pick")} />
                 <datalist id={`vendors-${kind}`}>{activeVendors.map((v) => <option key={v.id} value={v.vendorName} />)}</datalist>
               </div>
-              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"lang="en-GB" className="pm-input"value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><DateField className="pm-input"value={form.date || ""} onChange={(e) => setF("date", e.target.value)} /></div>
               {isPO
-                ? <div className="si-field"><span className="pm-label">{L("কবে আসবে", "Expected on")}</span><input type="date"lang="en-GB" className="pm-input"value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
+                ? <div className="si-field"><span className="pm-label">{L("কবে আসবে", "Expected on")}</span><DateField className="pm-input"value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>
                 : <div className="si-field"><span className="pm-label">{L("সাপ্লায়ারের DN নং", "Supplier DN No")}</span><input className="pm-input"value={form.extra || ""} onChange={(e) => setF("extra", e.target.value)} /></div>}
               <div className="si-field"><span className="pm-label">Ref.Number</span><input className="pm-input"value={form.refNo || ""} onChange={(e) => setF("refNo", e.target.value)} /></div>
               <div className="si-field"style={mobile ? { gridColumn: "1 / -1" } : undefined}><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input"value={form.note || ""} onChange={(e) => setF("note", e.target.value)} /></div>
@@ -717,8 +723,8 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
         <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !lines.length} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}`}
+          <button type="button"title="Ctrl+S" className="pm-btn pm-btn--primary"disabled={saving || !lines.length} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}${hintSave(saving)}`}
           </button>
         </div>
       </>

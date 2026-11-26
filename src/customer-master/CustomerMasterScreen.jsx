@@ -4,10 +4,13 @@ import { VM_CSS } from "../vendor-master/VendorMasterScreen.jsx";
 import { offlineCreate, offlineList, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { syncOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
+import { useFindShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintFind } from "../utils/desktopFormShortcuts.js";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { syncBothSidesParty } from "../utils/bothSidesParty.js";
 import { memberNoIssue } from "../counter/loyalty.js";
+import DateField from "../components/DateField.jsx";
 
 export const EMPTY_CUSTOMER = {
   customerName:"", customerCode:"", customerType:"", status:"active",
@@ -98,6 +101,7 @@ export default function CustomerMasterScreen({
   const [form, setForm] = useState(() => toForm(null));
   const [baseline, setBaseline] = useState(() => JSON.stringify(toForm(null)));
   const [search, setSearch] = useState("");
+  const listSearchRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [payFilter, setPayFilter] = useState("ALL");
   const [saving, setSaving] = useState(false);
@@ -383,6 +387,7 @@ export default function CustomerMasterScreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  useFindShortcut({ active: !(isMobile && mobileTab !== "list"), onFind: () => listSearchRef.current?.focus() });
 
   const row = (label, key, opts = {}) => (
     <div className="pm-form-row">
@@ -530,7 +535,7 @@ export default function CustomerMasterScreen({
               {form.loyaltyMember && (
                 <div className="pm-form-row">
                   <label className="pm-label">{L("সদস্য হওয়ার তারিখ", "Member Since")}</label>
-                  <input type="date" className="pm-input" value={form.loyaltySince} onChange={(e) => upd("loyaltySince", e.target.value)} />
+                  <DateField className="pm-input" value={form.loyaltySince} onChange={(e) => upd("loyaltySince", e.target.value)} />
                 </div>
               )}
               {row(L("নোট", "Notes"), "notes", { multiline: true })}
@@ -576,7 +581,7 @@ export default function CustomerMasterScreen({
 
         <div className="vm-col vm-col-list">
           <div className="pm-list">
-            <input className="pm-input"style={{ marginBottom: 4 }} placeholder={t.cm_searchPh}
+            <input ref={listSearchRef} className="pm-input"style={{ marginBottom: 4 }} placeholder={`${t.cm_searchPh}${hintFind()}`}
               value={search} onChange={(e) => setSearch(e.target.value)} />
             <div className="vm-pills">
               {["ALL", "active", "inactive", "blocked"].map((st) => (

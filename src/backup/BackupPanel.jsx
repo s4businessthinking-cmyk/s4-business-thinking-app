@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { BackupCancelled, backupPlatform, getLastBackupAt, prepareFirebaseImport, readBackupFile, restoreShopBackup, saveShopBackup } from "./backupService.js";
+import { BackupCancelled, backupPlatform, getLastBackupAt, prepareFirebaseImport, readBackupFile, restoreShopBackup, saveShopBackupFromLocal } from "./backupService.js";
 import { buildFirebaseImport, DEFAULT_SELECTED, matchSummary } from "./firebaseImport.js";
 
 const COLLECTION_LABELS = {
@@ -98,7 +98,7 @@ export default function BackupPanel({ lang, th, s, toast, shopId, userId }) {
   const runBackup = async () => {
     setBusy(true);
     try {
-      const result = await saveShopBackup(shopId);
+      const result = await saveShopBackupFromLocal(shopId);
       setLastAt(result.at);
       toast(bn ? `ব্যাকআপ তৈরি হয়েছে (${result.documentCount} রেকর্ড, ${fmtSize(result.sizeBytes)})` : `Backup created (${result.documentCount} records, ${fmtSize(result.sizeBytes)})`);
     } catch (error) {

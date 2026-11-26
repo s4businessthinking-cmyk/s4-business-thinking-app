@@ -3,6 +3,8 @@ import { PM_CSS, PM_MOBILE_QUERY } from "../product-master/pmStyles";
 import { offlineCreate, offlineList, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { syncOpeningBill as syncPartyOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
+import { useFindShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintFind } from "../utils/desktopFormShortcuts.js";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { syncBothSidesParty } from "../utils/bothSidesParty.js";
@@ -136,6 +138,7 @@ export default function VendorMasterScreen({
   const [form, setForm] = useState(() => toForm(null));
   const [baseline, setBaseline] = useState(() => JSON.stringify(toForm(null)));
   const [search, setSearch] = useState("");
+  const listSearchRef = useRef(null);
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [saving, setSaving] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -396,6 +399,7 @@ export default function VendorMasterScreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+  useFindShortcut({ active: !(isMobile && mobileTab !== "list"), onFind: () => listSearchRef.current?.focus() });
 
   const row = (label, key, opts = {}) => (
     <div className="pm-form-row">
@@ -560,7 +564,7 @@ export default function VendorMasterScreen({
 
         <div className="vm-col vm-col-list">
           <div className="pm-list">
-            <input className="pm-input"style={{ marginBottom: 4 }} placeholder={t.vm_searchPh}
+            <input ref={listSearchRef} className="pm-input"style={{ marginBottom: 4 }} placeholder={`${t.vm_searchPh}${hintFind()}`}
               value={search} onChange={(e) => setSearch(e.target.value)} />
             <div className="vm-pills">
               {["ALL", "active", "inactive", "blocked"].map((st) => (

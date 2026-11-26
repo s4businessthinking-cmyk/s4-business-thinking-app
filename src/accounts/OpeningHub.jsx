@@ -16,6 +16,7 @@ import { shopAccountNature } from "../ledger/accountNature.js";
 import { normalizeChart, toSaved, validateAccount } from "../ledger/chartOfAccounts.js";
 import { CHART_EXPENSE_NAMES } from "../ledger/ChartOfAccountsScreen.jsx";
 import { OPENING_ACCOUNT, currentOpenings, matchImport, natureLabel, openingAccounts, parseOpeningRows, parseTallyLedgers, planOpenings, reconcileOpenings } from "./openingHub.js";
+import DateField from "../components/DateField.jsx";
 
 const lc = (v) => String(v || "").trim().toLowerCase();
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -235,7 +236,7 @@ export default function OpeningHub({ lang = "en", shopId, shop, user, profile, i
       </div>
       <div className="si-toolbar">
         <label style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{L("শুরুর তারিখ", "Opening as on")}
-          <input type="date" className="pm-input" style={{ width: 140 }} value={date} onChange={(e) => setDate(e.target.value)} />
+          <DateField className="pm-input" style={{ width: 140 }} value={date} onChange={(e) => setDate(e.target.value)} />
         </label>
         <button type="button" className="pm-btn pm-btn--primary" onClick={save} disabled={busy || !plan || !!plan.blockers.length || !changes}>{busy ? "..." : L(`সেভ (${changes})`, `Save (${changes})`)}</button>
         <button type="button" className="pm-btn-secondary" onClick={() => { setValues(null); setTick((v) => v + 1); }} disabled={busy}>{L("সেভ করা অবস্থায় ফেরত", "Reload saved")}</button>

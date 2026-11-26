@@ -20,11 +20,7 @@ function getRandomBytes(size) {
     return bytes;
   }
 
-  for (let i = 0; i < bytes.length; i += 1) {
-    bytes[i] = Math.floor(Math.random() * 256);
-  }
-
-  return bytes;
+  throw new Error("Secure random is not available on this device.");
 }
 
 function bytesToBase64(bytes) {

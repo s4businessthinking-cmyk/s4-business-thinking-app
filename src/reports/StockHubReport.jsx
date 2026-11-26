@@ -21,6 +21,7 @@ import { stockDocsUpTo } from "./balanceSheet.js";
 import { batchStockByProduct } from "../inventory/batchStock.js";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { branchStock, itemLedger, movementByProduct, onHandAt, productMatches, stockMovements, valuation } from "./stockHub.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qf = (v) => (Math.round((Number(v) || 0) * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
@@ -323,15 +324,15 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
         {usesAsOf && (
           <>
             <button type="button" className={`pm-btn-secondary${day === localDay() ? " is-active" : ""}`} onClick={() => setAsOf(localDay())}>{L("আজ", "Today")}</button>
-            <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
+            <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
           </>
         )}
         {usesRange && (
           <>
             <button type="button" className={`pm-btn-secondary${from === monthStart() && to === localDay() ? " is-active" : ""}`} onClick={() => { setFrom(monthStart()); setTo(localDay()); }}>{L("এই মাস", "This month")}</button>
             <button type="button" className={`pm-btn-secondary${!from && !to ? " is-active" : ""}`} onClick={() => { setFrom(""); setTo(""); }}>{L("সব সময়", "All time")}</button>
-            <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
-            <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setTo(e.target.value)} />
           </>
         )}
       </div>

@@ -1,7 +1,7 @@
 // The overdue reminder list (accounts/overdueReminders.js) for the Payment Reminders page and the bell. Built from the
 // saved documents with the same ledger as the ageing report, only while the owner has switched reminders on, when the
 // window comes back into focus and every few minutes.
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { offlineList } from "../offline/offlineRepository";
 import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
@@ -10,6 +10,7 @@ import { reminderQueue, reminderSettingsOf } from "../accounts/overdueReminders.
 import { channelSettingsOf } from "./reminderChannels.js";
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const FOCUS_MIN_MS = 60 * 1000;
 
 export function useOverdueReminders({ shop, shopId, customers = [], enabled = true, intervalMs = 10 * 60 * 1000 } = {}) {
   const settings = useMemo(() => reminderSettingsOf(shop), [shop?.overdueReminders]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -18,11 +19,15 @@ export function useOverdueReminders({ shop, shopId, customers = [], enabled = tr
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [nudge, setNudge] = useState(0);
+  const lastLoad = useRef(0);
 
   useEffect(() => {
     if (!on) { setData(null); return undefined; }
     let cancelled = false;
-    const load = async () => {
+    const load = async (force = false) => {
+      const now = Date.now();
+      if (!force && lastLoad.current && now - lastLoad.current < FOCUS_MIN_MS) return;
+      lastLoad.current = now;
       try {
         const [rows, rc, pm, av, pe, br, rem] = await Promise.all([
           loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("accountVouchers").catch(() => []),
@@ -42,10 +47,11 @@ export function useOverdueReminders({ shop, shopId, customers = [], enabled = tr
         if (!cancelled) setError(String(err?.message || err));
       }
     };
-    load();
-    window.addEventListener("focus", load);
-    const timer = window.setInterval(load, intervalMs);
-    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", load); };
+    load(true);
+    const onFocus = () => load(false);
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(() => load(true), intervalMs);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", onFocus); };
   }, [on, shopId, intervalMs, nudge]);
 
   const day = localDay();

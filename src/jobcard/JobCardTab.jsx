@@ -15,6 +15,7 @@ import { jobSettingsOf, statusOf, isClosed, jobTotals, warrantyUntil, jobToInvoi
 import { buildJobReport, jobReportFileName, jobReportRows, serviceIssues } from "./jobReport.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { csvText } from "../reports/vatExport.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -493,8 +494,8 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
                   {fField(L("মোবাইল", "Mobile"), <input className="pm-input"inputMode="tel"value={form.customerMobile} onChange={(e) => setF("customerMobile", e.target.value)} />)}
                 </div>
                 <div className="si-grid2">
-                  {fField(L("তারিখ", "Date"), <input type="date"className="pm-input"value={form.jobDate} onChange={(e) => setF("jobDate", e.target.value)} />)}
-                  {fField(L("ডেলিভারির তারিখ", "Expected by"), <input type="date"className="pm-input"value={form.expectedDate} onChange={(e) => setF("expectedDate", e.target.value)} />)}
+                  {fField(L("তারিখ", "Date"), <DateField className="pm-input"value={form.jobDate} onChange={(e) => setF("jobDate", e.target.value)} />)}
+                  {fField(L("ডেলিভারির তারিখ", "Expected by"), <DateField className="pm-input"value={form.expectedDate} onChange={(e) => setF("expectedDate", e.target.value)} />)}
                 </div>
                 {settings.showVehicle && (
                   <div className="si-grid2">
@@ -595,8 +596,8 @@ export default function JobCardTab({ lang = "en", shopId, user, profile, isOwner
         <div className="si-pills">
           {rQuick.map(([key, label, f, t]) => <button key={key} type="button" className={`pm-btn-secondary${rActive === key ? " is-active" : ""}`} onClick={() => { setRFrom(f); setRTo(t); }}>{label}</button>)}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: rBad ? "#b91c1c" : undefined }} value={rFrom} onChange={(e) => setRFrom(e.target.value)} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: rBad ? "#b91c1c" : undefined }} value={rTo} onChange={(e) => setRTo(e.target.value)} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: rBad ? "#b91c1c" : undefined }} value={rFrom} onChange={(e) => setRFrom(e.target.value)} />
+        <DateField className="pm-input" style={{ width: mobile ? "calc(50% - 2px)" : 130, borderColor: rBad ? "#b91c1c" : undefined }} value={rTo} onChange={(e) => setRTo(e.target.value)} />
         <span className="si-toolbar-gap" />
         {canPrint && <button type="button" className="pm-btn pm-btn--primary" onClick={printReport} disabled={!report.rows.length}> {L("প্রিন্ট", "Print")}</button>}
         {canPrint && <button type="button" className="pm-btn-secondary" onClick={exportReport} disabled={!report.rows.length}> Excel</button>}

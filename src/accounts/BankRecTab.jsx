@@ -12,6 +12,7 @@ import { lockedLines, parseStatementRows, reconciliationFileName, reconciliation
 import { activePeriodLock, periodLockMessage } from "./periodLock.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { csvText } from "../reports/vatExport.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -311,7 +312,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
             </div>
             <div className="si-grid2">
               {fField(`${L("শুরুর ব্যালেন্স", "Opening balance")} (${cur})`, <input className="pm-input"inputMode="decimal"value={settingsForm.openingBalance} onChange={(e) => setSettingsForm((f) => ({ ...f, openingBalance: e.target.value }))} />)}
-              {fField(L("যে তারিখ থেকে", "From date"), <input type="date"className="pm-input"value={settingsForm.openingDate} onChange={(e) => setSettingsForm((f) => ({ ...f, openingDate: e.target.value }))} />)}
+              {fField(L("যে তারিখ থেকে", "From date"), <DateField className="pm-input"value={settingsForm.openingDate} onChange={(e) => setSettingsForm((f) => ({ ...f, openingDate: e.target.value }))} />)}
             </div>
             <div className="si-hint"style={{ marginLeft: 0 }}>{L("এই তারিখের আগের লেনদেন বাদ যাবে; শুরুর ব্যালেন্স হলো ঐ দিনের ব্যাংক স্টেটমেন্টের ব্যালেন্স।", "Transactions before this date are ignored; the opening balance is the bank statement balance on that date.")}</div>
           </div>
@@ -336,7 +337,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
             </div>
             <div className="si-grid2">
               {fField(`${L("টাকা", "Amount")} (${cur}) *`, <input autoFocus className="pm-input"inputMode="decimal"value={entryForm.amount} onChange={(e) => setEntryForm((f) => ({ ...f, amount: e.target.value }))} />)}
-              {fField(`${L("তারিখ", "Date")} *`, <input type="date"className="pm-input"value={entryForm.date} onChange={(e) => setEntryForm((f) => ({ ...f, date: e.target.value }))} />)}
+              {fField(`${L("তারিখ", "Date")} *`, <DateField className="pm-input"value={entryForm.date} onChange={(e) => setEntryForm((f) => ({ ...f, date: e.target.value }))} />)}
             </div>
             <div className="si-grid2">
               {fField(L("রেফারেন্স", "Reference"), <input className="pm-input"value={entryForm.refNo} onChange={(e) => setEntryForm((f) => ({ ...f, refNo: e.target.value }))} />)}
@@ -360,7 +361,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
     return (
       <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
         <input type="checkbox"disabled={!canManage || busy === t.key} checked={!!c} onChange={(e) => setCleared(t, e.target.checked ? (t.date > asOf ? t.date : asOf) : "")} />
-        {c && <input type="date"className="pm-input"style={{ width: 126 }} disabled={!canManage} value={c} onChange={(e) => e.target.value && setCleared(t, e.target.value)} />}
+        {c && <DateField className="pm-input"style={{ width: 126 }} disabled={!canManage} value={c} onChange={(e) => e.target.value && setCleared(t, e.target.value)} />}
       </span>
     );
   };
@@ -380,7 +381,7 @@ export default function BankRecTab({ lang = "en", shopId, user, profile, isOwner
         {canManage && <button type="button"className="pm-btn-secondary"onClick={() => setEntryForm({ entryType: "charge", amount: "", date: asOf, refNo: "", note: "" })}> {L("চার্জ / সুদ এন্ট্রি", "Charge / interest")}</button>}
         <span className="si-toolbar-gap" />
         <span className="pm-label"style={{ margin: 0 }}>{L("স্টেটমেন্টের তারিখ", "Statement date")}</span>
-        <input type="date"className="pm-input"style={{ width: 140 }} value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} />
+        <DateField className="pm-input"style={{ width: 140 }} value={asOf} onChange={(e) => e.target.value && setAsOf(e.target.value)} />
         <input className="pm-input"inputMode="decimal"style={{ width: 150 }} placeholder={L("স্টেটমেন্টের ব্যালেন্স", "Statement balance")} value={stmt} onChange={(e) => setStmt(e.target.value)} />
         {canManage && <button type="button"className="pm-btn pm-btn--primary"disabled={!!busy || stmt === ""} onClick={saveStatement}> {L("সেভ", "Save")}</button>}
         {canPrint && <button type="button"className="pm-btn-secondary"onClick={print}> {L("প্রিন্ট", "Print")}</button>}

@@ -17,6 +17,7 @@ import { printWithSettings } from "../print/printSettings.js";
 import { loadHandoverDocs, saveHandoverDocs, handoverSummary } from "../vouchers/chequeHandoverStore.js";
 import { logAudit } from "../utils/auditLog.js";
 import { isOpeningBill } from "../utils/openingBill.js";
+import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
 import { inDateRange, listSummary, matchesStatus, statusCounts } from "../utils/docStatusFilter.js";
 import { pendingRows } from "../utils/pendingBills.js";
 import { loadInvoiceRows, computeStockMap } from "../inventory/stockFromInvoices";
@@ -219,7 +220,12 @@ export function PurchaseInvoiceTab({ t, lang, th, s, shopId, user, profile, vend
   // ══════ LIST VIEW ══════
   const bnL = lang==="bn";
   const piAccent = "#c2410c";
-  const piBadge = (st) => <span className="si-badge"style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{PI_STATUSES[st]?.[lang]||st}</span>;
+  const piBadge = (invOrSt) => {
+    const inv = invOrSt && typeof invOrSt === "object" ? invOrSt : { status: invOrSt };
+    const st = inv.status;
+    const label = invoiceStatusLabel(inv, lang, PI_STATUSES) || (PI_STATUSES[st]?.[lang] || st);
+    return <span className="si-badge"style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{label}</span>;
+  };
   const piRowDue = (inv) => ["cancelled","draft"].includes(inv.status) || isBranchTransferBill(inv) ? 0 : Math.max(0, piN2(inv.grandTotal) - piN2(inv.amountPaid));
   const piBtTag = (inv) => isBranchTransferBill(inv) ? <span className="si-badge"style={{ color:"#0e7490", marginLeft:4 }} title={bnL?"Branch Transfer — মোট/বাকিতে ধরা হয় না":"Branch Transfer — not in totals/dues"}> Branch</span> : null;
   const piOpenInvoice = (inv) => { if (!piLeaveMinOk()) return; setSelInvoice(inv); setPiView("detail"); };

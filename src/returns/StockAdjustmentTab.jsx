@@ -11,6 +11,9 @@ import { logAudit } from "../utils/auditLog.js";
 import { MinimizedChip, useEscapeKey, useWindowState, WindowButtons } from "../components/WindowChrome.jsx";
 import { C, btn, inp, lbl, td, th } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { countDraftKey, countSheetRows, countSummary, groupValues } from "./stockCount.js";
+import DateField from "../components/DateField.jsx";
+import { useFormSaveShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintSave } from "../utils/desktopFormShortcuts.js";
 
 function readCountDraft(shopId) {
   try { return JSON.parse(localStorage.getItem(countDraftKey(shopId)) || "null") || null; } catch { return null; }
@@ -248,6 +251,10 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
       setSaving(false);
     }
   };
+  const countSumShortcut = useMemo(() => countSummary(products, counted, stockOf), [products, counted, stockOf]);
+  const formHasCountLines = lines.some((l) => l.mode === "count" && String(l.counted).trim() !== "");
+  useFormSaveShortcut({ active: view === "form", saving, disabled: saving || !lines.length || (formHasCountLines && !stockMap), onSave: save });
+  useFormSaveShortcut({ active: view === "count", saving, disabled: saving || !stockMap || !countSumShortcut.entered, onSave: saveCount });
 
   const printCountSheet = (sheetRows, withNumbers) => {
     const cols = [{ label: "#" }, { label: "Item" }, { label: "Code" }, { label: "Rack" }, { label: "System", align: "right" }, { label: "Counted", align: "right" }, { label: "Diff", align: "right" }];
@@ -375,8 +382,8 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
                   <button key={key} type="button"className={`pm-btn-secondary${activeQuick === key ? "is-active" : ""}`} onClick={() => { setFrom(f); setTo(t); }}>{label}</button>
                 ))}
               </div>
-              <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
-              <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
+              <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={from} onChange={(e) => setFrom(e.target.value)} />
+              <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120 }} value={to} onChange={(e) => setTo(e.target.value)} />
             </div>
             <div className="si-kpis">
               <div className="si-kpi"><span>{L("সমন্বয়", "Adjustments")}</span><b>{liveShown.length}</b></div>
@@ -469,7 +476,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: C.panel, border: `1px solid ${C.border}`, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "120px 220px 1fr", gap: 8 }}>
-            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><input type="date"style={inp()} value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div><div style={lbl}>{L("তারিখ", "Date")} *</div><DateField style={inp()} value={date} onChange={(e) => setDate(e.target.value)} /></div>
             <div><div style={lbl}>{L("কারণ", "Reason")}</div>
               <select style={inp()} value={reason} onChange={(e) => setReason(e.target.value)}>{ADJUST_REASONS.map((r) => <option key={r.key} value={r.key}>{bn ? r.bn : r.en}</option>)}</select>
             </div>
@@ -542,7 +549,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
             <button type="button"style={btn()} onClick={backToList}>{L("তালিকা", "List")}</button>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
               {counting && !stockMap && <span style={{ color: C.label }}> {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
-              <button type="button"disabled={saving || !lines.length || (counting && !stockMap)} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সমন্বয় সেভ", "Save Adjustment")}`}</button>
+              <button type="button"title="Ctrl+S" disabled={saving || !lines.length || (counting && !stockMap)} style={btn("#15803d", "#fff")} onClick={save}>{saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সমন্বয় সেভ", "Save Adjustment")}${hintSave(saving)}`}</button>
             </div>
           </div>
         </div>
@@ -570,7 +577,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
           <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "140px 220px minmax(0,1fr)", paddingTop: 3 }}>
-              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><DateField className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
               <div className="si-field"><span className="pm-label">{L("কারণ", "Reason")}</span>
                 <select className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)}>{ADJUST_REASONS.map((r) => <option key={r.key} value={r.key}>{bn ? r.bn : r.en}</option>)}</select>
               </div>
@@ -680,8 +687,8 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           {counting && !stockMap && <span className="si-hint"> {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
           <span className="si-toolbar-gap" />
-          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !lines.length || (counting && !stockMap)} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সমন্বয় সেভ", "Save Adjustment")}`}
+          <button type="button"title="Ctrl+S" className="pm-btn pm-btn--primary"disabled={saving || !lines.length || (counting && !stockMap)} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সমন্বয় সেভ", "Save Adjustment")}${hintSave(saving)}`}
           </button>
         </div>
       </>
@@ -722,7 +729,7 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
     return shell(L("ফিজিক্যাল স্টক গণনা", "Physical Stock Count"), L("স্টক সমন্বয়", "Stock Adjustment"), (
       <>
         <div className="si-toolbar">
-          <input type="date"className="pm-input"style={{ width: 130 }} value={countDate} onChange={(e) => setCountDate(e.target.value)} />
+          <DateField className="pm-input"style={{ width: 130 }} value={countDate} onChange={(e) => setCountDate(e.target.value)} />
           <select className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 130 }} value={countBy} onChange={(e) => { setCountBy(e.target.value); setCountVal(""); }}>
             <option value="">{L("সব পণ্য", "All products")}</option>
             <option value="company">{L("কোম্পানি / ব্র্যান্ড ধরে", "By company / brand")}</option>
@@ -806,8 +813,8 @@ export default function StockAdjustmentTab({ lang = "en", th, shopId, user, prof
           )}
           <span className="si-hint"> {L("গোনা সংখ্যা এই ডিভাইসে নিজে থেকে সেভ থাকে — পরে এসে বাকিটা গুনতে পারবেন", "Counts are kept on this device — you can come back and finish later")}</span>
           <span className="si-toolbar-gap" />
-          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !stockMap || !sum.entered} onClick={saveCount}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L(`গণনা শেষ — ${sum.diffs.length}টি পার্থক্য সমন্বয় করুন`, `Finish — adjust ${sum.diffs.length} difference(s)`)}`}
+          <button type="button"title="Ctrl+S" className="pm-btn pm-btn--primary"disabled={saving || !stockMap || !sum.entered} onClick={saveCount}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L(`গণনা শেষ — ${sum.diffs.length}টি পার্থক্য সমন্বয় করুন`, `Finish — adjust ${sum.diffs.length} difference(s)`)}${hintSave(saving)}`}
           </button>
         </div>
       </>

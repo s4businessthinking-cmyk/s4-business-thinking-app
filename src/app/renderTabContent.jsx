@@ -167,6 +167,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
             onGenerateWeighingFile={()=>exportWeighingBarcodeCsv(getFilteredProducts())}
             onPrintBarcodes={(isOwner||can("printProducts")) ? printProductBarcodes : undefined}
             notify={(message,kind)=>toast(message, kind==="err"?"err":"ok")}
+            lang={lang}
           />
         </div>
       )}
@@ -454,7 +455,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
       {tab==="warrantyClaim"&&(isOwner||can("stockAdjust")||can("manageReturns"))&&(
         <WarrantyClaimTab lang={lang} shopId={shopId} user={user} profile={profile} products={products}
-          customers={customers} vendors={vendors}
+          customers={customers} vendors={vendors} shop={localShop}
           isOwner={isOwner} canManage={isOwner||can("stockAdjust")||can("manageReturns")}
           canDelete={isOwner||can("deleteStock")} canPrint={isOwner||can("printStock")||can("printReturns")} toast={toast}
           shopName={localShop?.companyName||""} makeNo={makeShopNo} leaveGuard={billLeaveGuard}

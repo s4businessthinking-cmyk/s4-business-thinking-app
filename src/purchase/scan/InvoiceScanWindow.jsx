@@ -4,6 +4,9 @@ import { readInvoiceFile, fileFromDataUrl } from "./invoiceText.js";
 import { parseInvoice } from "./parseInvoice.js";
 import { buildProductIndex, matchLine, matchVendor, nameScore, aliasKey } from "./matchInvoice.js";
 import { offlinePatch } from "../../offline/offlineRepository";
+import DateField from "../../components/DateField.jsx";
+import { useApplyShortcut } from "../../utils/useDesktopFormShortcuts.js";
+import { hintApply } from "../../utils/desktopFormShortcuts.js";
 
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
 const n2 = (v) => parseFloat(v) || 0;
@@ -108,6 +111,7 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
       lines: used.map((l) => ({ product: productById.get(l.productId) || null, name: l.line.name, code: l.line.code, unit: l.line.unit, qty: n2(l.qty), rate: n2(l.rate), discount: n2(l.discount), vatPerc: n2(l.vatPerc) })),
     });
   };
+  useApplyShortcut({ active: phase === "review", disabled: !used.length, onApply: apply });
 
   const stepText = { pdf: bn ? "PDF পড়া হচ্ছে…" : "Reading the PDF…", ocr: bn ? "ছবি থেকে লেখা পড়া হচ্ছে (প্রথমবার একটু সময় লাগে)…" : "Reading text from the picture (the first time takes a little longer)…" };
 
@@ -164,7 +168,7 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
                   )}
                 </div>
                 <div><div style={lbl}>Supplier Inv. No</div><input style={inp({ borderColor: head.invoiceNo ? C.border : C.red })} value={head.invoiceNo} onChange={(e) => setHead((h) => ({ ...h, invoiceNo: e.target.value }))} /></div>
-                <div><div style={lbl}>{bn ? "বিলের তারিখ" : "Bill date"}</div><input type="date"lang="en-GB" style={inp()} value={head.date} onChange={(e) => setHead((h) => ({ ...h, date: e.target.value }))} /></div>
+                <div><div style={lbl}>{bn ? "বিলের তারিখ" : "Bill date"}</div><DateField style={inp()} value={head.date} onChange={(e) => setHead((h) => ({ ...h, date: e.target.value }))} /></div>
                 <button type="button"onClick={() => { setPhase("pick"); setLines([]); setError(""); }} style={btn()}>↺ {bn ? "অন্য ফাইল" : "Other file"}</button>
               </div>
               {error && <div style={{ color: C.red, fontWeight: 700, fontSize: 12.5 }}>{error}</div>}
@@ -224,7 +228,7 @@ export default function InvoiceScanWindow({ lang = "en", products = [], vendors 
                   {head.grandTotal != null && <> · {bn ? "বিলে" : "On bill"}: <b>{f2(head.grandTotal)}</b> {totalDiff < 0.06 ? <span style={{ color: C.green, fontWeight: 800 }}> {bn ? "মিলেছে" : "matches"}</span> : <span style={{ color: C.red, fontWeight: 800 }}> {bn ? "পার্থক্য" : "difference"} {f2(total - head.grandTotal)}</span>}</>}
                 </span>
                 <button type="button"onClick={onClose} style={btn()}>{bn ? "বাতিল" : "Cancel"}</button>
-                <button type="button"onClick={apply} disabled={!used.length} style={btn("#15803d", "#fff", { padding: "0 18px" })}> {bn ? "Purchase ফর্মে বসাও" : "Fill the purchase form"}</button>
+                <button type="button"onClick={apply} disabled={!used.length} style={btn("#15803d", "#fff", { padding: "0 18px" })} title="Ctrl+Enter"> {bn ? "Purchase ফর্মে বসাও" : "Fill the purchase form"}{hintApply()}</button>
               </div>
             </div>
             {preview && (

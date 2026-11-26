@@ -11,6 +11,8 @@ import { periodLockOf } from "../accounts/periodLock.js";
 import { logAudit } from "../utils/auditLog.js";
 import { MERGE_COLLECTIONS, PARTY_KINDS, mergePlan, splitCandidates, splitPlan } from "./partyMerge.js";
 import { ADJUSTMENT_SIDES, normalizeAdjustments, normalizeAllowances, rowName, saveMasterRow, savedAdjustments, savedAllowances } from "./simpleMasters.js";
+import { useFormSaveShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintSave } from "../utils/desktopFormShortcuts.js";
 
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -140,6 +142,7 @@ export default function MastersHub({ lang = "en", shopId, shop, user, profile, i
       toast?.(L("সেভ হয়েছে", "Saved"));
     } catch (e) { toast?.(e.message || String(e), "err"); } finally { setBusy(false); }
   };
+  useFormSaveShortcut({ active: !!draft, saving: busy, disabled: busy || !draft || !isOwner, onSave: saveDraft });
   const editor = (master) => draft && draft.master === master && (
     <div className="mh-form" style={{ border: "1px solid #8797a9", padding: 6, background: "#fffdf6", marginBottom: 6 }}>
       <label>{L("কোড", "Code")}<input className="pm-input" style={{ width: 90 }} value={draft.row.code || ""} onChange={(e) => setDraft((d) => ({ ...d, row: { ...d.row, code: e.target.value } }))} /></label>
@@ -153,7 +156,7 @@ export default function MastersHub({ lang = "en", shopId, shop, user, profile, i
         </label>
       )}
       {!draft.row.system && <label style={{ flexDirection: "row", alignItems: "center", gap: 4 }}><input type="checkbox" checked={draft.row.active !== false} onChange={(e) => setDraft((d) => ({ ...d, row: { ...d.row, active: e.target.checked } }))} /> {L("চালু", "Active")}</label>}
-      <button type="button" className="pm-btn pm-btn--primary" onClick={saveDraft} disabled={busy}>{L("সেভ", "Save")}</button>
+      <button type="button" title="Ctrl+S" className="pm-btn pm-btn--primary" onClick={saveDraft} disabled={busy}>{L("সেভ", "Save")}{hintSave(busy)}</button>
       <button type="button" className="pm-btn-secondary" onClick={() => setDraft(null)}>{L("বাতিল", "Cancel")}</button>
     </div>
   );

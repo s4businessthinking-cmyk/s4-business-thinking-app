@@ -212,7 +212,7 @@ export function useShopFinance(shopId, { enabled = true, live = true } = {}) {
         )
       : [];
 
-    const dayTimer = setInterval(() => setToday(localDateString()), 60 * 1000);
+    const dayTimer = setInterval(() => setToday(localDateString()), 5 * 60 * 1000);
     return () => {
       cancelled = true;
       window.removeEventListener(SYNC_QUEUED_EVENT, onQueued);

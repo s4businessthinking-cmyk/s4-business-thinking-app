@@ -4,6 +4,7 @@ import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineCreate, offlinePatch, offlineRemove } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { REPEATS, addDays, canSee, donePatch, dueState, nextDue, ymd } from "./reminders.js";
+import DateField from "../components/DateField.jsx";
 
 const ACCENT = "#db2777";
 const emptyForm = () => ({ title: "", note: "", dueDate: ymd(new Date()), dueTime: "", repeat: "none", remindBefore: "0", assignedTo: "", private: false });
@@ -170,7 +171,7 @@ export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwn
               <input className="pm-input"autoFocus value={form.title} onChange={(e) => set("title", e.target.value)} placeholder={L("যেমন: দোকান ভাড়া দিতে হবে / ট্রেড লাইসেন্স নবায়ন", "e.g. Pay shop rent / renew trade licence")} />
               <textarea className="pm-input"rows={3} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder={L("বিস্তারিত (ঐচ্ছিক)", "Details (optional)")} style={{ resize: "vertical", minHeight: 60 }} />
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <label className="si-field"style={{ minWidth: 140 }}><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"className="pm-input"value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} /></label>
+                <label className="si-field"style={{ minWidth: 140 }}><span className="pm-label">{L("তারিখ", "Date")} *</span><DateField className="pm-input"value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} /></label>
                 <label className="si-field"style={{ minWidth: 100 }}><span className="pm-label">{L("সময় (ঐচ্ছিক)", "Time (optional)")}</span><input type="time"className="pm-input"value={form.dueTime} onChange={(e) => set("dueTime", e.target.value)} /></label>
                 <label className="si-field"style={{ minWidth: 120 }}><span className="pm-label">{L("পুনরাবৃত্তি", "Repeat")}</span>
                   <select className="pm-input"value={form.repeat} onChange={(e) => set("repeat", e.target.value)}>{REPEATS.map((r) => <option key={r.key} value={r.key}>{r[lang] || r.en}</option>)}</select>

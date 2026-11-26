@@ -21,6 +21,7 @@ import {
   alignSides, buildBalanceSheet, excludedDocs, fyStartDate, moneyBreakdown, negativeStock, openingBsAsOf, openingStockValue, profitReconcile, stockDocsUpTo,
 } from "./balanceSheet.js";
 import { computeAccounts } from "./accountsCalc.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qtyFmt = (v) => (Math.round((Number(v) || 0) * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
@@ -207,7 +208,7 @@ export default function BalanceSheetReport({
 
   const print = () => {
     if (!sheet) return;
-    printWithSettings(generateStatementHTML({ shopName, title: title.toUpperCase(), subtitle, cols: [{ label: L("বিবরণ", "Particulars") }, ...amountCols], rows: reportRows() }), { lang });
+    printWithSettings(generateStatementHTML({ shopName, shop, lang, title: title.toUpperCase(), subtitle, cols: [{ label: L("বিবরণ", "Particulars") }, ...amountCols], rows: reportRows() }), { lang, shop });
   };
 
   const save = async (name, rows) => {
@@ -323,8 +324,8 @@ export default function BalanceSheetReport({
             <button key={key} type="button" className={`pm-btn-secondary${activeQuick === key ? " is-active" : ""}`} onClick={() => setAsOf(d)} title={fmtDay(d)}>{label}</button>
           ))}
         </div>
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
-        <input type="date" className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={compareAsOf} onChange={(e) => setCompareAsOf(e.target.value)} title={L("তুলনা তারিখ (ঐচ্ছিক)", "Compare date (optional)")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={asOf} onChange={(e) => setAsOf(e.target.value)} title={L("যে তারিখ পর্যন্ত", "As at date")} />
+        <DateField className="pm-input" style={{ width: mobile ? "48%" : 130 }} value={compareAsOf} onChange={(e) => setCompareAsOf(e.target.value)} title={L("তুলনা তারিখ (ঐচ্ছিক)", "Compare date (optional)")} />
         {openBs && !compareAsOf && <button type="button" className="pm-btn-secondary" onClick={() => setCompareAsOf(openBs)}>{L("ওপেনিং BS-এর সাথে তুলনা", "Compare with opening BS")}</button>}
         {compareAsOf && <button type="button" className="pm-btn-secondary" onClick={() => setCompareAsOf("")}>{L("তুলনা সরান", "Clear compare")}</button>}
       </div>

@@ -8,6 +8,8 @@ const disablePwa = process.env.DISABLE_PWA === "1";
 export default defineConfig({
   base: "./",
   server: {
+    // localhost + 127.0.0.1 both work (Windows often opens 127.0.0.1 bookmark).
+    host: true,
     proxy: {
       "/api": {
         target: "http://127.0.0.1:8000",
@@ -28,7 +30,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      disable: disablePwa,
+      // Dev: no service worker — otherwise refresh keeps the old precached bundle.
+      disable: disablePwa || process.env.NODE_ENV !== "production",
       registerType: "autoUpdate",
       includeAssets: ["ocr/**", "sql-wasm.wasm"],
       workbox: {

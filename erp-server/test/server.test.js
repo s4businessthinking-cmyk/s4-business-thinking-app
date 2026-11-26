@@ -49,9 +49,9 @@ before(async () => {
   app = await startServer(cfg);
   base = `http://127.0.0.1:${app.port}`;
 
-  owner = await signup("Owner@Shop.com", "secret1");
-  sales = await signup("sales@shop.com", "secret2");
-  outsider = await signup("x@other.com", "secret3");
+  owner = await signup("Owner@Shop.com", "secret11");
+  sales = await signup("sales@shop.com", "secret22");
+  outsider = await signup("x@other.com", "secret33");
 
   assert.equal((await commit(owner.idToken, [
     set("users", owner.uid, { shopId: "shop1", role: "owner", personName: "Owner" }),
@@ -68,7 +68,7 @@ after(async () => {
 });
 
 test("auth: login, wrong password, refresh, duplicate email", async () => {
-  const ok = await api("/v1/auth/login", { email: "owner@shop.com", password: "secret1" });
+  const ok = await api("/v1/auth/login", { email: "owner@shop.com", password: "secret11" });
   assert.equal(ok.status, 200);
   assert.equal(ok.uid, owner.uid);
 
@@ -82,22 +82,22 @@ test("auth: login, wrong password, refresh, duplicate email", async () => {
 
   assert.equal((await api("/v1/auth/signup-code", { email: "owner@shop.com" })).status, 409, "no code for a taken email");
 
-  const noCode = await api("/v1/auth/signup", { email: "new@shop.com", password: "secret9" });
+  const noCode = await api("/v1/auth/signup", { email: "new@shop.com", password: "secret99" });
   assert.equal(noCode.status, 400);
   assert.equal(noCode.error.message, "auth/email-code-expired");
   assert.equal((await api("/v1/auth/signup-code", { email: "new@shop.com" })).status, 200);
   const realCode = lastCode();
   assert.equal(sentMail.at(-1).to, "new@shop.com");
-  const wrongCode = await api("/v1/auth/signup", { email: "new@shop.com", password: "secret9", code: realCode === "000000" ? "111111" : "000000" });
+  const wrongCode = await api("/v1/auth/signup", { email: "new@shop.com", password: "secret99", code: realCode === "000000" ? "111111" : "000000" });
   assert.equal(wrongCode.error.message, "auth/invalid-email-code");
-  assert.equal((await api("/v1/auth/signup", { email: "new@shop.com", password: "secret9", code: realCode })).status, 200);
+  assert.equal((await api("/v1/auth/signup", { email: "new@shop.com", password: "secret99", code: realCode })).status, 200);
 
-  const usernameOnly = await api("/v1/auth/signup", { email: "rahim.shop1@s4local.app", password: "secret9" });
+  const usernameOnly = await api("/v1/auth/signup", { email: "rahim.shop1@s4local.app", password: "secret99" });
   assert.equal(usernameOnly.status, 200, "placeholder addresses cannot receive a code");
 
-  const byOwner = await api("/v1/auth/signup", { email: "staff@shop.com", password: "secret9" }, owner.idToken);
+  const byOwner = await api("/v1/auth/signup", { email: "staff@shop.com", password: "secret99" }, owner.idToken);
   assert.equal(byOwner.status, 200, "an owner adding staff needs no code");
-  const byStaff = await api("/v1/auth/signup", { email: "staff2@shop.com", password: "secret9" }, sales.idToken);
+  const byStaff = await api("/v1/auth/signup", { email: "staff2@shop.com", password: "secret99" }, sales.idToken);
   assert.equal(byStaff.status, 400, "staff cannot skip the code");
 
   const noToken = await commit(undefined, [set("products", "p0", { shopId: "shop1", name: "x" })]);
@@ -129,7 +129,7 @@ test("users: no self-promotion, no joining a shop without an invite", async () =
   assert.equal((await commit(sales.idToken, [set("users", sales.uid, { personName: "Ali" }, true)])).status, 200);
   assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { printCheques: true } }, true)])).status, 200);
 
-  const intruder = await signup("intruder@x.com", "secret4");
+  const intruder = await signup("intruder@x.com", "secret44");
   const join = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "salesman" })]);
   assert.equal(join.status, 403);
   const reuse = await commit(intruder.idToken, [set("users", intruder.uid, { shopId: "shop1", role: "salesman", inviteCode: "JOIN1" })]);

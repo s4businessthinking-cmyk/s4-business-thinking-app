@@ -82,7 +82,7 @@ export const PERMISSIONS_LIST = [
   { key: "giveDiscount",     bn: "বিক্রয়ে ডিসকাউন্ট দেওয়া",     en: "Give Discount on Sales" },
   { key: "cancelInvoices",   bn: "ইনভয়েস / রিসিট বাতিল ও ডিলিট", en: "Cancel / Delete Invoices & Receipts" },
   { key: "manageReturns",    bn: "সেলস / পারচেজ রিটার্ন করা",   en: "Sales / Purchase Returns" },
-  { key: "stockAdjust",      bn: "স্টক সমন্বয় / পণ্য বদল / খোলা-কিট", en: "Stock Adjust / Product Exchange / Loosen-Bundle" },
+  { key: "stockAdjust",      bn: "স্টক সমন্বয় / দোকানে বদল / খোলা-কিট", en: "Stock Adjust / Shop Stock Swap / Loosen-Bundle" },
   { key: "accountVouchers",  bn: "জার্নাল / কন্ট্রা ভাউচার",      en: "Journal / Contra Vouchers" },
   { key: "manageEmployees",  bn: "কর্মচারী ও হাজিরা",              en: "Employees & Attendance" },
   { key: "bankReconcile",    bn: "ব্যাংক হিসাব মেলানো",            en: "Bank Reconciliation" },
@@ -405,6 +405,8 @@ export async function backfillPartyCodes(shopId, kind, records = []) {
 }
 
 // Global keyboard shortcuts per menu tab, shown beside the name in the desktop sidebar.
+// Desktop PI/SI bill window (wide form): Ctrl+S save · Ctrl+Shift+S draft · F7 search bill · Ctrl+N new · Ctrl+P print · Ctrl+E edit · F8–F10 line tools · Home party · Purchase Options Ctrl+Shift+O.
+// Against-invoice receipt/payment window: Ctrl+S save · F7 find voucher.
 export const TAB_SHORTCUT_KEYS = { products:"F2", purchase:"F3", sales:"F4", vendors:"Ctrl+O", customers:"Ctrl+U", globalLedger:"Ctrl+L" };
 
 export function pushOrdersNow() {

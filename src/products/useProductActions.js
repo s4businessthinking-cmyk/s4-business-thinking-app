@@ -8,6 +8,7 @@ import { nsmatch } from "../shared/appShared.jsx";
 import { offlineBulkUpsert, offlineClearShopCollection, offlineCreate, offlineGetById, offlineList, offlinePurgeLocal, offlineUpdate } from "../offline/offlineRepository";
 import { printWithSettings } from "../print/printSettings.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
+import { normalizeManufacturingBom, validateManufacturingBom } from "../inventory/manufacturingBom.js";
 import { useMemo } from "react";
 
 export function useProductActions({ canManageProducts, canSeeProductCost, clearingProducts, createEmptyPmForm, hErr, isOwner, lang, pmCatFilter, pmEditId, pmForm, pmOverSales, pmReset, pmSearch, productBulkDeleteRef, productMaintenanceId, productMaintenanceRef, productReplacementActive, products, profile, setClearingProducts, setPmEditId, setPmForm, setPmOverSales, setPmPickForSales, setPmShowAdd, setProductMaintenance, setProductReplacementActive, setProducts, setSavingProduct, setSyncRefreshKey, shopId, t, toast, user }) {
@@ -42,6 +43,18 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       ...(Array.isArray(p.unitPrices)?p.unitPrices.map(r=>r.barcode):[]),
     ].map(v=>String(v||"").trim().toLowerCase()).filter(Boolean).some(code=>currentCodes.has(code)));
     if (duplicate) return lang==="bn"?`Barcode/EAN আগে থেকেই আছে: ${duplicate.name}`:`Barcode/EAN already exists: ${duplicate.name}`;
+    const productById = new Map(products.filter(isActiveProduct).map((p) => [p.id, p]));
+    const bom = validateManufacturingBom(pmForm.manufacturingBom, {
+      productId: skipId || "",
+      productById,
+    });
+    if (!bom.ok) {
+      const missing = productById.get(bom.productId);
+      const label = missing?.name || bom.productId;
+      return lang === "bn"
+        ? `BOM-এ পণ্য পাওয়া যায়নি বা মুছে ফেলা হয়েছে: ${label}`
+        : `BOM lists a missing or deleted product: ${label}`;
+    }
     return "";
   };
 
@@ -62,6 +75,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       customUnits: Array.isArray(pmForm.customUnits) ? pmForm.customUnits : [],
       unitDefinitions: Array.isArray(pmForm.unitDefinitions) ? pmForm.unitDefinitions : [],
       customerTypes: Array.isArray(pmForm.customerTypes) ? pmForm.customerTypes : [],
+      manufacturingBom: normalizeManufacturingBom(pmForm.manufacturingBom, { productId: productId || "" }),
       updatedBy: user.uid,
       updatedAt: now,
       ...(created ? { createdBy:user.uid, createdAt:now } : {}),

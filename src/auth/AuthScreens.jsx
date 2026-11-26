@@ -7,6 +7,7 @@ import { registerLocalOwnerAccount, registerLocalSalesmanAccount, friendlyLocalA
 import { saveShopRecord } from "../offline/shopService";
 import { isAcceptablePassword } from "./passwordRules.js";
 import { updateLocalUserPassword } from "./localAuthService";
+import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
 // ─── SETUP ───────────────────────────────────────────────────
 export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
@@ -25,6 +26,7 @@ export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
 // ─── LOGIN ───────────────────────────────────────────────────
 export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, onLoginSuccess, onSwitchToSignup, onEmailVerificationRequired }) {
   const _s = sp||_globalS;
+  const cloudSignupAllowed = isCloudAccessAllowedSync();
   const [username,setUsername]=useState("");
   const [pw,setPw]=useState("");
   const [busy,setBusy]=useState(false);
@@ -80,10 +82,17 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
           <button type="submit"style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
         </form>
         <div style={{ ..._s.authSub, marginTop:14, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginOfflineHint}</div>
-        <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginStaffHint}</div>
-        <div style={{ ..._s.authFooter, marginTop:16 }}>{t.noAccount}{" "}
-          <button type="button"style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
-        </div>
+        {!cloudSignupAllowed && (
+          <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.localOnlyLoginHint}</div>
+        )}
+        {cloudSignupAllowed && (
+          <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginStaffHint}</div>
+        )}
+        {cloudSignupAllowed && (
+          <div style={{ ..._s.authFooter, marginTop:16 }}>{t.noAccount}{" "}
+            <button type="button"style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
+          </div>
+        )}
       </div>
     </div>
   );

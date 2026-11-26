@@ -54,12 +54,29 @@ export function buildSerialRegistry(data, { shopId = "" } = {}) {
   lines(data?.purchaseReturns, "purchaseReturns", "purchaseReturn", (d) => d.status !== "cancelled", (d) => d.returnDate, (d) => d.partyName, (d) => d.returnNo || "");
 
   (data?.warrantyClaims || []).forEach((c) => {
-    if (!isLive(c, shopId) || c.status === "cancelled" || !c.serialNo) return;
-    const base = { col: "warrantyClaims", docId: c.id, no: c.claimNo || "", productId: c.productId || "", productName: c.productName || "", productCode: c.productCode || "" };
-    add(c.serialNo, { ...base, kind: "warrantyReceived", date: c.claimDate, party: c.customerName || "" });
-    if (c.sentDate || ["sent", "replaced", "delivered"].includes(c.status)) add(c.serialNo, { ...base, kind: "warrantySent", date: c.sentDate || c.claimDate, party: c.vendorName || "" });
-    if (c.replacedDate || ["replaced", "delivered"].includes(c.status)) add(c.serialNo, { ...base, kind: "warrantyReplaced", date: c.replacedDate || c.sentDate || c.claimDate, party: c.vendorName || "" });
-    if (c.deliveredDate || c.status === "delivered") add(c.serialNo, { ...base, kind: "warrantyDelivered", date: c.deliveredDate || c.replacedDate || c.claimDate, party: c.customerName || "" });
+    if (!isLive(c, shopId) || c.status === "cancelled") return;
+    // BW04: serial out = customer unit; serial in = company replacement (may differ).
+    const outSerial = c.serialNo;
+    const inSerial = c.replacedSerialNo || c.serialNo;
+    const outBase = { col: "warrantyClaims", docId: c.id, no: c.claimNo || "", productId: c.productId || "", productName: c.productName || "", productCode: c.productCode || "" };
+    const inBase = {
+      col: "warrantyClaims", docId: c.id, no: c.claimNo || "",
+      productId: c.replacedProductId || c.productId || "",
+      productName: c.replacedProductName || c.productName || "",
+      productCode: c.replacedProductCode || c.productCode || "",
+    };
+    if (outSerial) {
+      add(outSerial, { ...outBase, kind: "warrantyReceived", date: c.claimDate, party: c.customerName || "" });
+      if (c.sentDate || ["sent", "replaced", "delivered"].includes(c.status)) {
+        add(outSerial, { ...outBase, kind: "warrantySent", date: c.sentDate || c.claimDate, party: c.vendorName || "" });
+      }
+    }
+    if (inSerial && (c.replacedDate || ["replaced", "delivered"].includes(c.status))) {
+      add(inSerial, { ...inBase, kind: "warrantyReplaced", date: c.replacedDate || c.sentDate || c.claimDate, party: c.vendorName || "" });
+    }
+    if (inSerial && (c.deliveredDate || c.status === "delivered")) {
+      add(inSerial, { ...inBase, kind: "warrantyDelivered", date: c.deliveredDate || c.replacedDate || c.claimDate, party: c.customerName || "" });
+    }
   });
 
   (data?.jobOrders || []).forEach((j) => {

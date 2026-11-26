@@ -15,6 +15,7 @@ import { saveShopRecord } from "../offline/shopService";
 import UserGroupsPanel from "../team/UserGroupsPanel.jsx";
 import BackupPanel from "../backup/BackupPanel.jsx";
 import { getCloudSyncBlockReason } from "../offline/cloudPullService";
+import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 import { TILE_CSS, monogram, tileVars } from "../dashboard/dashTiles.js";
 
 // Same accent language as dashboard cards (dashTiles.js) — one colour per settings row after emoji icons were removed.
@@ -26,6 +27,7 @@ const SETTING_ACCENTS = {
 };
 
 export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSettings, closeTeamMember, cloudPullBusy, cloudUploadBusy, createStaffMember, deleteInviteCode, generateNewCode, handleLogout, inviteCodes, isDesktop, isOwner, lang, lastCloudPullAt, localShop, mergeShopRecord, orderModuleEnabled, orderSettingsSaving, periodLock, products, profile, refreshSyncDashboard, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, setBranchTransferSettings, setLang, setLocalShop, setPinModal, setPrintSettingsOpen, setSettingsPage, setStaffForm, setStaffPwReset, setTheme, setWaStyle, settingsPage, shopId, stPage, staffForm, staffPwReset, staffSaving, syncDashboard, syncState, t, team, teamEmployees, th, theme, toast, user, userGroups, waStyle }) {
+        const cloudLicensed = isCloudAccessAllowedSync();
         const bnS = lang==="bn";
         const plain = (v)=>String(v||"").replace(/^[^\p{L}\p{N}]+/u,"");
         const btCopy = isOwner ? branchTransferSettingsCopy(lang, branchTransferSettings.enabled) : null;
@@ -37,7 +39,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
           isOwner && itemOf("period", { label:bnS?"হিসাব বছর বন্ধ / লক":"Accounting period lock", sub:periodLock.lockDate?(bnS?`${periodLock.lockDate} পর্যন্ত বন্ধ`:`Closed up to ${periodLock.lockDate}`):(bnS?"লক নেই — পুরোনো এন্ট্রি বন্ধ করুন":"Not locked — close old entries") }),
           isOwner && itemOf("pin", { label:bnS?"মালিকের পিন":"Owner PIN", sub:bnS?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN", action:()=>setPinModal("reset") }),
           localShop && itemOf("shop", { label:plain(t.shopInfoTitle), sub:`${localShop.companyName||""}${!isOwner?(bnS?" · শুধু দেখা":" · View only"):""}` }),
-          isOwner && itemOf("invite", { label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` }),
+          isOwner && cloudLicensed && itemOf("invite", { label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` }),
           (isOwner || team.length>0) && itemOf("team", { label:plain(t.teamTitle), sub:`${team.length} ${bnS?"জন সদস্য":"members"}` }),
           isOwner && itemOf("groups", { label:bnS?"ইউজার গ্রুপ ও অনুমতি":"User groups & privileges", sub:`${userGroups.length} ${bnS?"টি গ্রুপ · দেখা / যোগ / এডিট / বাতিল / প্রিন্ট":"groups · view / add / edit / delete / print"}` }),
           isOwner && itemOf("orderModule", { label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") }),
@@ -46,7 +48,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
           itemOf("theme", { label:bnS?"থিম / রঙ":"Theme", sub:theme==="dark"?(bnS?"ডার্ক মোড":"Dark Mode"):(bnS?"লাইট মোড":"Light Mode") }),
           itemOf("language", { label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" }),
           itemOf("print", { label:bnS?"প্রিন্ট সেটিংস":"Print Settings", sub:bnS?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview", action:()=>setPrintSettingsOpen(true) }),
-          itemOf("sync", { label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." }),
+          cloudLicensed && itemOf("sync", { label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." }),
           (isOwner || may("manageBackup")) && itemOf("backup", { label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" }),
           itemOf("license", { label:bnS?"লাইসেন্স স্ট্যাটাস":"License status", sub:bnS?"ঐচ্ছিক লাইসেন্স অ্যাক্টিভেশন":"Optional license activation" }),
           itemOf("update", { label:plain(t.updateTitle), sub:`v${APP_VERSION} · ${t.updateSub}` }),
@@ -186,6 +188,8 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
               th={th}
               s={s}
               toast={toast}
+              localShop={localShop}
+              profile={profile}
             />
           )}
 

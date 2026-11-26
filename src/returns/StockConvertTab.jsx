@@ -10,6 +10,10 @@ import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 import { buildConvertItems, lastRecipe, CONVERT_KINDS } from "./stockConvert.js";
+import { bomRecipeLines } from "../inventory/manufacturingBom.js";
+import DateField from "../components/DateField.jsx";
+import { useFormSaveShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintSave } from "../utils/desktopFormShortcuts.js";
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const fq = (v) => String(parseFloat(n2(v).toFixed(4)));
@@ -97,7 +101,8 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
   const lineOf = (p, per = "") => ({ productId: p.id, name: p.name || "", code: p.code || "", unit: p.unit || "Pcs", per: String(per) });
   const pickSingle = (p) => {
     setSingle(lineOf(p));
-    const recipe = lastRecipe(rows, kind, p.id);
+    const fromBom = kind === "bundle" ? bomRecipeLines(p) : [];
+    const recipe = fromBom.length ? fromBom : lastRecipe(rows, kind, p.id);
     if (recipe.length && !lines.length) {
       setLines(recipe.map((r) => { const prod = productOf(r.productId); return prod ? lineOf(prod, r.per) : null; }).filter(Boolean));
     }
@@ -149,6 +154,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
       setSaving(false);
     }
   };
+  useFormSaveShortcut({ active: view === "form", saving, disabled: saving || !single || !lines.length, onSave: save });
 
   const canCancel = (r) => r.status !== "cancelled" && (isOwner || (canManage && r.createdBy === user?.uid));
   const cancelDoc = async (r) => {
@@ -237,7 +243,7 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
           <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "140px minmax(0,1fr)", paddingTop: 3 }}>
-              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
+              <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span><DateField className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
               <div className="si-field"><span className="pm-label">{L("নোট", "Note")}</span><input className="pm-input"value={note} onChange={(e) => setNote(e.target.value)} /></div>
             </div>
           </fieldset>
@@ -309,8 +315,8 @@ export default function StockConvertTab({ kind = "loosen", lang = "en", shopId, 
         <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !single || !lines.length} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}`}
+          <button type="button"title="Ctrl+S" className="pm-btn pm-btn--primary"disabled={saving || !single || !lines.length} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}${hintSave(saving)}`}
           </button>
         </div>
       </>

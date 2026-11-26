@@ -24,6 +24,7 @@ import {
   getProductCatalogMaintenance,
   stampProductCatalogEpoch,
 } from "./productCatalogSync.js";
+import { CLOUD_NOT_LICENSED, isCloudAccessAllowedSync } from "./cloudAccessPolicy.js";
 
 const CLOUD_PULL_META_PREFIX = "s4-cloud-pull-v1";
 
@@ -80,6 +81,7 @@ function isOnline() {
 }
 
 export function getCloudSyncBlockReason() {
+  if (!isCloudAccessAllowedSync()) return CLOUD_NOT_LICENSED;
   if (!db) return "FIREBASE_NOT_READY";
   if (!isOnline()) return "OFFLINE";
   if (!auth?.currentUser) return "FIREBASE_AUTH_REQUIRED";

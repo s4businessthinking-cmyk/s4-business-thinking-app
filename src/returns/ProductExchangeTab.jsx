@@ -12,6 +12,9 @@ import { useEscapeKey } from "../components/WindowChrome.jsx";
 import {
   EXCHANGE_META, EXCHANGE_REASONS, buildExchangeItems, exchangeReasonLabel, exchangeSummary,
 } from "./productExchange.js";
+import DateField from "../components/DateField.jsx";
+import { useFormSaveShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintSave } from "../utils/desktopFormShortcuts.js";
 
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const fq = (v) => String(parseFloat(n2(v).toFixed(4)));
@@ -152,6 +155,7 @@ export default function ProductExchangeTab({
       setSaving(false);
     }
   };
+  useFormSaveShortcut({ active: view === "form", saving, disabled: saving || !out || !into, onSave: save });
 
   const canCancel = (r) => r.status !== "cancelled" && (isOwner || (canManage && r.createdBy === user?.uid));
   const cancelDoc = async (r) => {
@@ -248,19 +252,21 @@ export default function ProductExchangeTab({
 
   if (view === "form") {
     const exclude = [out?.productId, into?.productId].filter(Boolean);
-    return shell(L("নতুন পণ্য বদল", "New Product Exchange"), L("পণ্য বদল (Exchange)", "Product Exchange"), (
+    return shell(L("নতুন দোকানে বদল", "New shop stock swap"), L("দোকানে পণ্য বদল", "Shop Stock Swap"), (
       <>
         <div className="si-body">
-          <div className="si-hint"style={{ padding: "6px 8px", background: "#fff7ed", border: "1px solid #fdba74", borderRadius: 8 }}>
-             {L("দোকানের ভুল/নষ্ট পণ্য  সঠিক পণ্য স্টক বদল।", "Shop stock swap: wrong/damaged  correct product.")}
-            <br />
-            <b style={{ color: "#9a3412" }}>{L("ব্যাটারি গ্যারান্টি / কোম্পানি চেঞ্জ এখানে নয় — মেনু › গ্যারান্টি ক্লেইম ব্যবহার করুন (নইলে স্টক ডাবল হবে)।", "Battery guarantee / company change: use menu › Warranty Claim (or stock will double).")}</b>
+          <div className="si-hint"style={{ padding: "8px 10px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 8, lineHeight: 1.45 }}>
+            <b>{L("এখানে কী করবেন", "Use this when")}:</b>{" "}
+            {L("ভুল/নষ্ট/ফিটিং পণ্য দোকানেই সঠিক পণ্যে বদলাবেন — সঙ্গে সঙ্গে স্টক −/+।", "Wrong/damaged/fitting item swapped in the shop — stock −/+ immediately.")}
+            <div style={{ marginTop: 4, color: "#9a3412", fontWeight: 700 }}>
+              {L("না: ব্যাটারি বা কোম্পানি গ্যারান্টি → মেনু “ব্যাটারি / কোম্পানি গ্যারান্টি”।", "Not for: battery / company guarantee → menu “Battery / Company Guarantee”.")}
+            </div>
           </div>
           <fieldset className="pm-panel"style={{ margin: 0 }}>
             <legend className="pm-panel-legend">{L("তথ্য", "Details")}</legend>
             <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "140px 180px minmax(0,1fr)", paddingTop: 3 }}>
               <div className="si-field"><span className="pm-label">{L("তারিখ", "Date")} *</span>
-                <input type="date"className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
+                <DateField className="pm-input"value={date} onChange={(e) => setDate(e.target.value)} /></div>
               <div className="si-field"><span className="pm-label">{L("কারণ", "Reason")} *</span>
                 <select className="pm-input"value={reason} onChange={(e) => setReason(e.target.value)}>
                   {EXCHANGE_REASONS.map((r) => <option key={r.key} value={r.key}>{r[bn ? "bn" : "en"]}</option>)}
@@ -302,8 +308,8 @@ export default function ProductExchangeTab({
         <div className={`si-actions${mobile ? "si-sticky-actions" : ""}`}>
           <button type="button"className="pm-btn-secondary"disabled={saving} onClick={backToList}>← {L("তালিকা", "List")}</button>
           <span className="si-toolbar-gap" />
-          <button type="button"className="pm-btn pm-btn--primary"disabled={saving || !out || !into} onClick={save}>
-            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}`}
+          <button type="button"title="Ctrl+S" className="pm-btn pm-btn--primary"disabled={saving || !out || !into} onClick={save}>
+            {saving ? L("সেভ হচ্ছে…", "Saving…") : ` ${L("সেভ করুন", "Save")}${hintSave(saving)}`}
           </button>
         </div>
       </>
@@ -312,7 +318,7 @@ export default function ProductExchangeTab({
 
   if (view === "detail" && sel) {
     const r = rows.find((x) => x.id === sel.id) || sel;
-    return shell(<>{r.adjustNo} {badge(r)}</>, L("পণ্য বদল", "Product Exchange"), (
+    return shell(<>{r.adjustNo} {badge(r)}</>, L("দোকানে পণ্য বদল", "Shop Stock Swap"), (
       <>
         <div className="si-body">
           <fieldset className="pm-panel"style={{ margin: 0 }}>
@@ -360,10 +366,15 @@ export default function ProductExchangeTab({
     ));
   }
 
-  return shell(L("পণ্য বদল (Exchange)", "Product Exchange"), `${liveCount} ${L("টি", "entries")}`, (
+  return shell(L("দোকানে পণ্য বদল", "Shop Stock Swap"), `${liveCount} ${L("টি", "entries")}`, (
     <>
+      <div className="si-hint"style={{ margin: "0 8px 8px", padding: "8px 10px", background: "#f8fafc", border: "1px solid #cbd5e1", borderRadius: 8, lineHeight: 1.45 }}>
+        <b>{L("দোকানেই বদল", "In-shop swap")}</b>
+        {" — "}
+        {L("ভুল পণ্য বের, সঠিক পণ্য ঢোকে। কোম্পানিতে পাঠানো গ্যারান্টি এখানে নয়।", "Wrong item out, correct item in. Company guarantee is a different menu.")}
+      </div>
       <div className="si-toolbar">
-        {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন বদল", "New Exchange")}</button>}
+        {canManage && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {L("নতুন বদল", "New Swap")}</button>}
         <span className="si-toolbar-gap" />
         <div className="si-search"style={{ minWidth: mobile ? "100%" : 260 }}>
           <input className="pm-input"value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("নম্বর, নোট বা পণ্য…", "Number, note or item…")} />
@@ -409,14 +420,14 @@ export default function ProductExchangeTab({
             <div className="si-empty">
               {rows.length
                 ? L("এই ফিল্টারে কিছু নেই", "Nothing matches")
-                : L("এখনো কোনো পণ্য বদল হয়নি — ভুল/নষ্ট/ফিটিং বদলাতে নতুন বদল চাপুন", "No exchanges yet — tap New Exchange for wrong / damaged / fitting swaps")}
+                : L("এখনো কোনো দোকানে বদল নেই — ভুল/নষ্ট/ফিটিং হলে নতুন বদল চাপুন", "No shop swaps yet — tap New Swap for wrong / damaged / fitting")}
             </div>
           )}
         </div>
       </div>
       <div className="si-statusbar">
         <span>{L("দেখাচ্ছে", "Showing")} <b>{filtered.length}</b> / {rows.length}</span>
-        <span>{L("স্টক থেকে ভুলটা বের, সঠিকটা ঢোকে", "Wrong item leaves stock; correct item enters")}</span>
+        <span>{L("১) ভুল বের  ২) সঠিক ঢোকে — সাথে সাথে স্টক", "1) Wrong out  2) Correct in — stock updates now")}</span>
       </div>
     </>
   ));

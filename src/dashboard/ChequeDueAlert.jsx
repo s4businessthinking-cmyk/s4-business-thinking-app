@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { bounceVoucher, clearVoucher, postponeCheque } from "../vouchers/PdcWindow.jsx";
 import { bounceExpenseCheque, clearExpenseCheque, postponeExpenseCheque } from "../expenses/expenseCheques.js";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => (Math.round((parseFloat(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? d.split("-").reverse().join("/") : "");
@@ -127,7 +128,7 @@ export default function ChequeDueAlert({ lang, th, cur = "AED", cheques = [], up
                 {postponeKey === c.key ? (
                   <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: th.txtSecondary, fontWeight: 700 }}>{bn ? "নতুন তারিখ:" : "New date:"}</span>
-                    <input type="date"value={postponeDate} min={addDays(today, 1)} onChange={(e) => setPostponeDate(e.target.value)}
+                    <DateField value={postponeDate} min={addDays(today, 1)} onChange={(e) => setPostponeDate(e.target.value)}
                       style={{ padding: "5px 8px", borderRadius: 8, border: `1px solid ${th.borderMid || th.border}`, background: th.bgInp, color: th.txtPrimary, fontFamily: "inherit" }} />
                     <button type="button"disabled={busy} onClick={() => onPostpone(c)} style={btn("#2563eb", "#fff")}>{bn ? "সেভ" : "Save"}</button>
                     <button type="button"onClick={() => setPostponeKey(null)} style={btn("transparent", th.txtSecondary)}>{bn ? "বাতিল" : "Cancel"}</button>

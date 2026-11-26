@@ -23,6 +23,8 @@ import { normalizeAdjustments, reasonsFor, rowName } from "../masters/simpleMast
 import { salesSpecs } from "../product-master/productSpecs";
 import { billLocationId, hasGodowns } from "../inventory/billLocation.js";
 import { locationPath } from "../inventory/stockLocations.js";
+import DateField from "../components/DateField.jsx";
+import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
 
 export function renderSiScreens({ listFilter = null, siLocations = [], siLocStock = null, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, canViewAllInvoices = false, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siCodeRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty = null, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
   // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
@@ -238,7 +240,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
                     <button key={inv.id} type="button"className="si-mrow"onClick={()=>siOpenInvoice(inv)}>
                       <div className="si-mrow-top">
                         <span style={{ color:siAccent }}>{inv.invoiceNo}</span>
-                        <span>{siExpiredBadge(inv)}{siBadge(inv.status)}</span>
+                        <span>{siExpiredBadge(inv)}{siBadge(inv)}</span>
                       </div>
                       <div className="si-mrow-sub"><span>{inv.customerName||"—"}</span><b>{t.cur} {siFmt2(inv.grandTotal)}</b></div>
                       <div className="si-mrow-sub">
@@ -278,7 +280,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
                             <td title={inv.customerName||""}>{inv.customerName||"—"}{matches}</td>
                             {Object.keys(STATUSES).map(st=>(
                               <td key={st} className="si-center">
-                                {inv.status===st && <span style={{ color:STATUSES[st]?.color, fontWeight:900, fontSize:12 }}>{STATUSES[st]?.[lang]||st}</span>}
+                                {inv.status===st && <span style={{ color:STATUSES[st]?.color, fontWeight:900, fontSize:12 }}>{invoiceStatusLabel(inv, lang, STATUSES) || STATUSES[st]?.[lang]||st}</span>}
                                 {st==="open" && siExpiredBadge(inv)}
                               </td>
                             ))}
@@ -357,7 +359,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
 
         <div className="pm-reference-title">
           <strong style={{ color:siAccent }}>{siDocTitle} — {inv.invoiceNo}</strong>
-          <span>{siExpiredBadge(inv)}{siBadge(inv.status)}</span>
+          <span>{siExpiredBadge(inv)}{siBadge(inv)}</span>
         </div>
 
         <div className="si-body">
@@ -477,7 +479,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
             <legend className="pm-panel-legend"> {bnL?"রিমাইন্ডার সেট করুন":"Set a reminder"}</legend>
             <div className="si-panel-body"style={{ gap:6 }}>
               <div className="si-grid2">
-                <input type="date"lang="en-GB" className="pm-input"value={siReminderForm.date} onChange={e=>setSiReminderForm(p=>({ ...p, date:e.target.value }))} />
+                <DateField className="pm-input"value={siReminderForm.date} onChange={e=>setSiReminderForm(p=>({ ...p, date:e.target.value }))} />
                 <input type="time"className="pm-input"value={siReminderForm.time} onChange={e=>setSiReminderForm(p=>({ ...p, time:e.target.value }))} />
               </div>
               <input className="pm-input"placeholder={bnL?"নোট (ঐচ্ছিক)":"Note (optional)"} value={siReminderForm.note} onChange={e=>setSiReminderForm(p=>({ ...p, note:e.target.value }))} />
@@ -605,7 +607,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
         {fPanel(`${t.si_invoiceNo} & ${t.si_date}`, <>
           <div className="si-grid2">
             {fField(t.si_invoiceNo, <div className="si-val is-strong"style={{ color:siAccent, fontFamily:"Consolas, monospace" }}>{siInvoiceNo}</div>)}
-            {fField(t.si_date, <input type="date"lang="en-GB" className="pm-input"value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />)}
+            {fField(t.si_date, <DateField className="pm-input"value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />)}
           </div>
           {/* which godown the goods leave from (W01) - only when the shop has one besides the main location */}
           {!isQuote&&hasGodowns(siLocations)&&(()=>{ const locId=billLocationId(siForm, siLocations); const here=siCurrent.productId?siLocStock?.qtyAt(locId, siCurrent.productId):null; return fRow(bnL?"কোন গুদাম থেকে যাবে":"From warehouse / godown", <>
@@ -616,7 +618,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
           </>); })()}
           {isQuote&&(
             <div className="si-grid2">
-              {fField(isSO?(bnL?"ডেলিভারির তারিখ":"Delivery by"):(bnL?"মেয়াদ":"Valid Until"), <input type="date"lang="en-GB" className="pm-input"value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
+              {fField(isSO?(bnL?"ডেলিভারির তারিখ":"Delivery by"):(bnL?"মেয়াদ":"Valid Until"), <DateField className="pm-input"value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
               <div />
             </div>
           )}
@@ -832,7 +834,7 @@ export function renderSiScreens({ listFilter = null, siLocations = [], siLocStoc
           <legend className="pm-panel-legend"> {bnL?"রিমাইন্ডার সেট করুন":"Set a reminder"}</legend>
           <div className="si-panel-body"style={{ gap:6 }}>
             <div className="si-grid2">
-              <input type="date"lang="en-GB" className="pm-input"value={siReminderForm.date} onChange={e=>setSiReminderForm(p=>({ ...p, date:e.target.value }))} />
+              <DateField className="pm-input"value={siReminderForm.date} onChange={e=>setSiReminderForm(p=>({ ...p, date:e.target.value }))} />
               <input type="time"className="pm-input"value={siReminderForm.time} onChange={e=>setSiReminderForm(p=>({ ...p, time:e.target.value }))} />
             </div>
             <input className="pm-input"placeholder={bnL?"নোট (ঐচ্ছিক)":"Note (optional)"} value={siReminderForm.note} onChange={e=>setSiReminderForm(p=>({ ...p, note:e.target.value }))} />

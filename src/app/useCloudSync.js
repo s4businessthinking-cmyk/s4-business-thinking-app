@@ -7,6 +7,8 @@ import { saveCachedShop, saveShopRecord } from "../offline/shopService";
 import { extractShopPrintDesign, hydratePrintDesignFromShop } from "../print/printDesign.js";
 import { updateLocalUserProfile } from "../auth/localAuthService";
 import { useEffect } from "react";
+import { getLocalAccessStatus, refreshLicenseOnline } from "../auth/licenseService.js";
+import { CLOUD_NOT_LICENSED, isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
 export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, isOwner, lang, localShop, onLogout, onProfileUpdate, profile, profileSyncRef, setCloudPullBusy, setCloudUploadBusy, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setLicenseAccess, setLicenseAccessLoading, setLocalShop, setOrders, setProducts, setSyncDashboard, setSyncRefreshKey, setSyncState, setTeam, setVendors, shopId, syncDashboard, t, toast, user }) {
   const mergeShopRecord = (previous, next) => {
@@ -71,7 +73,7 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
   };
 
   useEffect(() => {
-    if (!user?.uid || isOwner || !db) return;
+    if (!isCloudAccessAllowedSync() || !user?.uid || isOwner || !db) return;
 
     let cancelled = false;
 
@@ -173,6 +175,10 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
   const runCloudDownloadOnce = async ({ silent = false } = {}) => {
     if (!shopId) return null;
     const blockReason = getCloudSyncBlockReason();
+    if (blockReason === CLOUD_NOT_LICENSED) {
+      if (!silent) toast(t.syncCloudNotLicensed, "err");
+      return null;
+    }
     if (blockReason === "FIREBASE_AUTH_REQUIRED") {
       if (!silent) toast(t.syncNeedEmailLogin, "err");
       return null;
@@ -228,6 +234,10 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
   const runCloudUpload = async () => {
     if (!shopId) return;
     const blockReason = getCloudSyncBlockReason();
+    if (blockReason === CLOUD_NOT_LICENSED) {
+      toast(t.syncCloudNotLicensed, "err");
+      return;
+    }
     if (blockReason === "OFFLINE" || (typeof navigator !== "undefined" && !navigator.onLine)) {
       toast(t.syncNeedInternet, "err");
       return;
@@ -300,21 +310,15 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
   const refreshLicenseAccess = async () => {
     setLicenseAccessLoading(true);
     try {
-      const helper = typeof window !== "undefined" ? window.S4License : null;
-      if (!helper?.accessStatus) {
-        setLicenseAccess({
-          ok: false,
-          accessAllowed: true,
-          accessReason: "LICENSE_HELPERS_NOT_READY",
-        });
-        return;
+      if (isCloudAccessAllowedSync()) {
+        await refreshLicenseOnline();
       }
-      setLicenseAccess(await helper.accessStatus());
+      setLicenseAccess(await getLocalAccessStatus());
     } catch (error) {
       console.warn("[S4 License] access status check failed", error);
       setLicenseAccess({
         ok: false,
-        accessAllowed: true,
+        accessAllowed: false,
         accessReason: "LICENSE_ACCESS_CHECK_FAILED",
         error: error?.message || String(error),
       });

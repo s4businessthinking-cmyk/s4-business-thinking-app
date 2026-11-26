@@ -21,6 +21,7 @@ import { periodLockOf } from "../accounts/periodLock.js";
 import { logAudit } from "../utils/auditLog.js";
 import Vat201Panel from "./Vat201Panel.jsx";
 import EInvoicePanel from "../tax/EInvoicePanel.jsx";
+import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -482,7 +483,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
                 {periodChoices.map((c) => <option key={c.from} value={c.from}>{c.label}</option>)}
               </select>
             ))}
-            {fField(L("তারিখ", "Date"), <input type="date"className="pm-input"value={payForm.paidDate} onChange={(e) => setPayForm((p) => ({ ...p, paidDate: e.target.value }))} />)}
+            {fField(L("তারিখ", "Date"), <DateField className="pm-input"value={payForm.paidDate} onChange={(e) => setPayForm((p) => ({ ...p, paidDate: e.target.value }))} />)}
             {fField(`${L("পরিমাণ", "Amount")} (${cur})`, <input type="number"className="pm-input"value={payForm.amount} onChange={(e) => setPayForm((p) => ({ ...p, amount: e.target.value }))} />)}
             {fField(L("নোট (ঐচ্ছিক)", "Note (optional)"), <input className="pm-input"value={payForm.note} onChange={(e) => setPayForm((p) => ({ ...p, note: e.target.value }))} />)}
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -670,8 +671,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
                 <button key={key} type="button"className={`pm-btn-secondary${range.key === key ? " is-active" : ""}`} onClick={() => setRange({ key, ...p })}>{label}</button>
               ))}
             </div>
-            <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setRange({ key: "custom", from: e.target.value, to })} />
-            <input type="date"className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setRange({ key: "custom", from, to: e.target.value })} />
+            <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={from} onChange={(e) => setRange({ key: "custom", from: e.target.value, to })} />
+            <DateField className="pm-input"style={{ width: mobile ? "calc(50% - 2px)" : 120, borderColor: badRange ? "#b91c1c" : undefined }} value={to} onChange={(e) => setRange({ key: "custom", from, to: e.target.value })} />
           </>
         ) : (
           <div className="si-pills">

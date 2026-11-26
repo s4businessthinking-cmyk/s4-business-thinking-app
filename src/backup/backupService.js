@@ -1,4 +1,4 @@
-// Per-shop backup files (.s4backup = gzip JSON from /v1/backup/export).
+// Per-shop backup files (.s4backup = gzip JSON of local SQLite data; no server required).
 // Desktop: saved into a folder (put it inside Google Drive to sync offsite).
 // Android: shared via the system share sheet (e.g. "Save to Drive").
 // Browser: plain download.
@@ -8,7 +8,13 @@ import { getLocalRecords, listLocalCollectionNames } from "../offline/sqliteDb.j
 import { FIREBASE_EXPORT_FORMAT, planFirebaseImport } from "./firebaseImport.js";
 import { BACKUP_FORMAT, buildLocalBackupPayload, docsFromLocalRecords, localBackupCollectionNames } from "./backupLocal.js";
 
-const DESKTOP_AUTO_INTERVAL_MS = 24 * 60 * 60 * 1000;
+import { saveWebAutoBackupBlob } from "./localAutoBackupStore.js";
+
+const DESKTOP_AUTO_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const WEB_AUTO_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const MOBILE_AUTO_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const AUTO_BACKUP_FIRST_DELAY_MS = 5 * 60 * 1000;
+const MIN_AUTO_BACKUP_GAP_MS = 20 * 60 * 1000;
 const MOBILE_REMIND_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 const lastBackupKey = (shopId) => `s4-last-backup:${shopId}`;
 
@@ -82,14 +88,33 @@ async function shareOnMobile(fileName, bytes) {
   return uri;
 }
 
-async function writeBackupFile(shopId, backup) {
+async function saveMobileAutoBackup(fileName, bytes) {
+  const [{ Filesystem, Directory }] = await Promise.all([import("@capacitor/filesystem")]);
+  const { uri } = await Filesystem.writeFile({
+    path: `S4Backups/${fileName}`,
+    data: toBase64(bytes),
+    directory: Directory.Documents,
+    recursive: true,
+  });
+  return uri;
+}
+
+async function writeBackupFile(shopId, backup, options = {}) {
   const bytes = await gzip(JSON.stringify(backup));
   const fileName = backupFileName(shopId, new Date());
   const platform = backupPlatform();
+  const auto = options.auto === true;
   let savedTo = null;
-  if (platform === "desktop") savedTo = await window.S4Desktop.backup.save(fileName, bytes);
-  else if (platform === "mobile") savedTo = await shareOnMobile(fileName, bytes);
-  else downloadInBrowser(fileName, bytes);
+  if (platform === "desktop") {
+    savedTo = await window.S4Desktop.backup.save(fileName, bytes);
+  } else if (platform === "mobile") {
+    savedTo = auto ? await saveMobileAutoBackup(fileName, bytes) : await shareOnMobile(fileName, bytes);
+  } else if (auto) {
+    savedTo = (await saveWebAutoBackupBlob(shopId, fileName, bytes)).savedTo || "indexeddb";
+  } else {
+    downloadInBrowser(fileName, bytes);
+    savedTo = "download";
+  }
   const at = new Date().toISOString();
   setLastBackupAt(shopId, at);
   return { fileName, savedTo, at, documentCount: backup.documentCount, sizeBytes: bytes.length };
@@ -100,8 +125,8 @@ export async function saveShopBackup(shopId) {
   return writeBackupFile(shopId, backup);
 }
 
-// Close/logout backup: everything this PC already has in SQLite — works offline.
-export async function saveShopBackupFromLocal(shopId) {
+// Full shop snapshot from SQLite only (no server). Safe when erp-server is down.
+export async function buildFullLocalShopBackup(shopId) {
   const discovered = await listLocalCollectionNames().catch(() => []);
   const names = localBackupCollectionNames(
     ["shops", ...SHOP_PULL_COLLECTIONS, ...SHOP_PULL_ONLY_COLLECTIONS],
@@ -113,7 +138,31 @@ export async function saveShopBackupFromLocal(shopId) {
     const docs = docsFromLocalRecords(lists[i], shopId, name);
     if (docs.length) collectionDocs[name] = docs;
   });
-  return writeBackupFile(shopId, buildLocalBackupPayload(shopId, collectionDocs, new Date().toISOString()));
+  return buildLocalBackupPayload(shopId, collectionDocs, new Date().toISOString());
+}
+
+export async function saveShopBackupFromLocal(shopId, options = {}) {
+  const backup = await buildFullLocalShopBackup(shopId);
+  return writeBackupFile(shopId, backup, { auto: options.auto === true });
+}
+
+let autoBackupBusy = false;
+let lastAutoBackupAt = 0;
+
+export async function runAutoLocalBackup(shopId, { force = false } = {}) {
+  if (!shopId || autoBackupBusy) return { ok: false, skipped: true, reason: "BUSY_OR_NO_SHOP" };
+  const gap = Date.now() - lastAutoBackupAt;
+  if (!force && lastAutoBackupAt && gap < MIN_AUTO_BACKUP_GAP_MS) {
+    return { ok: false, skipped: true, reason: "TOO_SOON" };
+  }
+  autoBackupBusy = true;
+  try {
+    const result = await saveShopBackupFromLocal(shopId, { auto: true });
+    lastAutoBackupAt = Date.now();
+    return { ok: true, ...result };
+  } finally {
+    autoBackupBusy = false;
+  }
 }
 
 // Parses a picked file; plain (un-gzipped) JSON backups are accepted too.
@@ -151,41 +200,47 @@ export async function restoreShopBackup(parsed) {
   return result;
 }
 
-// Desktop: silent daily backup into the backup folder.
-// Mobile: a reminder when the last backup is older than a week.
+// Periodic silent local backup (SQLite → .s4backup). No cloud server required.
 export function startAutoBackup(shopId, { onSaved, onReminder } = {}) {
   const platform = backupPlatform();
+  const intervalMs =
+    platform === "desktop" ? DESKTOP_AUTO_INTERVAL_MS
+      : platform === "mobile" ? MOBILE_AUTO_INTERVAL_MS
+        : WEB_AUTO_INTERVAL_MS;
   const age = () => {
     const last = getLastBackupAt(shopId);
     return last ? Date.now() - new Date(last).getTime() : Infinity;
   };
-  let busy = false;
   const tick = async () => {
-    if (busy || (typeof navigator !== "undefined" && !navigator.onLine)) return;
-    if (platform === "desktop" && age() >= DESKTOP_AUTO_INTERVAL_MS) {
-      busy = true;
-      try {
-        onSaved?.(await saveShopBackup(shopId));
-      } catch (error) {
-        console.warn("[S4 Backup] automatic backup failed", error);
-      } finally {
-        busy = false;
-      }
+    if (age() < intervalMs) return;
+    try {
+      onSaved?.(await runAutoLocalBackup(shopId));
+    } catch (error) {
+      console.warn("[S4 Backup] automatic local backup failed", error);
     }
   };
-  if (platform === "desktop") {
-    const first = setTimeout(tick, 2 * 60 * 1000);
-    const every = setInterval(tick, 60 * 60 * 1000);
+  const first = setTimeout(tick, AUTO_BACKUP_FIRST_DELAY_MS);
+  const every = setInterval(tick, Math.max(60 * 60 * 1000, Math.floor(intervalMs / 2)));
+  const onHide = () => {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      runAutoLocalBackup(shopId).catch((error) => console.warn("[S4 Backup] hidden-tab backup failed", error));
+    }
+  };
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", onHide);
+  if (platform === "mobile") {
+    const remind = setTimeout(() => {
+      if (age() >= MOBILE_REMIND_AFTER_MS) onReminder?.();
+    }, 60 * 1000);
     return () => {
       clearTimeout(first);
       clearInterval(every);
+      clearTimeout(remind);
+      document.removeEventListener("visibilitychange", onHide);
     };
   }
-  if (platform === "mobile") {
-    const t = setTimeout(() => {
-      if (age() >= MOBILE_REMIND_AFTER_MS) onReminder?.();
-    }, 60 * 1000);
-    return () => clearTimeout(t);
-  }
-  return () => {};
+  return () => {
+    clearTimeout(first);
+    clearInterval(every);
+    document.removeEventListener("visibilitychange", onHide);
+  };
 }

@@ -1,13 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { AUTO_RUN_EVENT, autoDue, autoPlan, autoProblems, autoRunText, autoSettingsOf, readAutoRun, remindedOn, runAutoReminders, writeAutoRun } from "./autoReminders.js";
+import { AUTO_RUN_EVENT, autoDue, autoDueServer, autoPlan, autoProblems, autoRunText, autoSettingsOf, readAutoRun, remindedOn, runAutoReminders, writeAutoRun } from "./autoReminders.js";
 import { REMINDER_STATUS, channelOptions, channelSettingsOf } from "./reminderChannels.js";
 import { reminderSettingsOf } from "../accounts/overdueReminders.js";
 
 const SHOP = (over = {}) => ({ overdueReminders: {
   enabled: true, channels: { whatsapp: true, sms: true, email: true },
+  whatsappProvider: { url: "https://waba.example/send", token: "W-1" },
   smsProvider: { url: "https://sms.example.ae/send", token: "T-1" }, emailProvider: { url: "https://mail.example.ae/send" },
-  auto: { on: true, sms: true, email: true, hour: 9, deviceId: "dev-A" }, ...over,
+  auto: { on: true, whatsapp: true, sms: true, email: true, hour: 9, deviceId: "dev-A" }, ...over,
 } });
 const customers = [
   { id: "c1", customerName: "Al Noor", mobile: "0501234567", email: "accounts@alnoor.ae" },
@@ -20,7 +21,7 @@ const queueOf = (channels) => customers.map((c) => rowFor(c, channels));
 const ok = (id) => async () => ({ status: 202, text: JSON.stringify({ id }) });
 
 test("settings: off by default, hour 0-23 with a default, unknown values ignored", () => {
-  assert.deepEqual(autoSettingsOf(null), { on: false, sms: false, email: false, hour: 10, deviceId: "", deviceName: "" });
+  assert.deepEqual(autoSettingsOf(null), { on: false, whatsapp: false, sms: false, email: false, when: "device", hour: 10, deviceId: "", deviceName: "", lastServerRun: null });
   assert.equal(autoSettingsOf({ overdueReminders: { auto: { on: "yes", hour: 25 } } }).on, false);
   assert.equal(autoSettingsOf({ overdueReminders: { auto: { on: true, hour: 25 } } }).hour, 10);
   assert.equal(autoSettingsOf({ overdueReminders: { auto: { on: true, hour: 0 } } }).hour, 0);
@@ -33,8 +34,17 @@ test("cannot switch on without an https provider, a channel, or a device", () =>
   assert.deepEqual(bad({ smsProvider: { url: "http://sms.example.ae" } }, { email: false }), ["smsProvider"], "http:// is refused");
   assert.deepEqual(bad({ smsProvider: {} }, { email: false }), ["smsProvider"], "no provider = the phone app, which needs a person");
   assert.deepEqual(bad({ channels: { whatsapp: true, sms: false, email: true } }, { email: false }), ["smsOff"]);
-  assert.deepEqual(bad({}, { sms: false, email: false }), ["noChannel"]);
+  assert.deepEqual(bad({}, { whatsapp: false, sms: false, email: false }), ["noChannel"]);
   assert.deepEqual(bad({}, { deviceId: "" }), ["device"]);
+  assert.deepEqual(bad({}, { deviceId: "", when: "server" }), [], "server: no device pick");
+});
+
+test("server mode: due without device; device timer treats server as off", () => {
+  const shop = SHOP({ auto: { on: true, sms: true, email: false, hour: 9, when: "server", deviceId: "" } });
+  const channels = channelSettingsOf(shop);
+  const auto = autoSettingsOf(shop);
+  assert.deepEqual(autoDueServer({ auto, channels, enabled: true, today: "2026-11-26", hour: 9 }), { due: true, reason: "" });
+  assert.equal(autoDue({ auto, channels, enabled: true, deviceId: "dev-A", today: "2026-11-26", hour: 9 }).reason, "serverMode");
 });
 
 test("due only once a day, after the hour, on the chosen device, with reminders on", () => {
@@ -56,9 +66,10 @@ test("auto off or no https provider: nothing is planned or sent", async () => {
   let calls = 0;
   const transport = async () => { calls += 1; return { status: 200, text: "{}" }; };
   // the sms: / mailto: path (no provider) is never automatic
-  const linkCh = channelSettingsOf(SHOP({ smsProvider: {}, emailProvider: {} }));
-  assert.deepEqual(autoPlan(queueOf(linkCh), autoSettingsOf(SHOP())).send, []);
-  const res = await runAutoReminders({ queue: queueOf(linkCh), auto: autoSettingsOf(SHOP()), channels: linkCh, settings: reminderSettingsOf(SHOP()), today: "2026-11-26", shopId: "s1", save: async () => { throw new Error("must not save"); }, transport });
+  const linkCh = channelSettingsOf(SHOP({ whatsappProvider: {}, smsProvider: {}, emailProvider: {} }));
+  const linkAuto = autoSettingsOf(SHOP({ auto: { ...SHOP().overdueReminders.auto, whatsapp: false } }));
+  assert.deepEqual(autoPlan(queueOf(linkCh), linkAuto).send, []);
+  const res = await runAutoReminders({ queue: queueOf(linkCh), auto: linkAuto, channels: linkCh, settings: reminderSettingsOf(SHOP()), today: "2026-11-26", shopId: "s1", save: async () => { throw new Error("must not save"); }, transport });
   assert.equal(calls, 0);
   assert.equal(res.handedOff.length, 0);
   assert.equal(autoPlan(queueOf(ch), autoSettingsOf(offShop)).send.length, 0, "auto off: no channel picked");
@@ -77,8 +88,8 @@ test("2xx hand-off saves an honest record; failure saves nothing and tries the n
   };
   const res = await runAutoReminders({ queue: queueOf(ch), auto: autoSettingsOf(shop), channels: ch, settings: reminderSettingsOf(shop), today: "2026-11-26",
     shopId: "s1", user: { uid: "owner" }, profile: { personName: "Owner" }, shopName: "S4 Parts", save: async (r) => { saved.push(r); }, transport, now: () => new Date("2026-11-26T09:05:00Z") });
-  // Al Noor: SMS refused (503) then email accepted; Gulf Motors: no phone, email accepted; Walk-in: no contact
-  assert.deepEqual(res.failed.map((x) => [x.name, x.channel]), [["Al Noor", "sms"]]);
+  // Al Noor: WhatsApp + SMS refused (503) then email accepted; Gulf Motors: email accepted; Walk-in: no contact
+  assert.deepEqual(res.failed.map((x) => [x.name, x.channel]), [["Al Noor", "whatsapp"], ["Al Noor", "sms"]]);
   assert.match(res.failed[0].message, /503: Gateway busy/);
   assert.deepEqual(res.handedOff.map((x) => [x.name, x.channel, x.status, x.providerId]), [["Al Noor", "email", "handedOffEmail", "m-accounts@alnoor.ae"], ["Gulf Motors", "email", "handedOffEmail", "m-pay@gulf.ae"]]);
   assert.deepEqual(res.skipped.map((x) => x.name), ["Walk-in Ali"]);

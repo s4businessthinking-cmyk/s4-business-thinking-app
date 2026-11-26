@@ -3,6 +3,9 @@ import { C, inp, lbl, btn, th, td, todayIso, fmtDate } from "../sales-invoice/Sa
 import { offlineGetById, offlinePatch, offlineRemove } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
+import DateField from "../components/DateField.jsx";
+import { useFormSaveShortcut, usePrintShortcut } from "../utils/useDesktopFormShortcuts.js";
+import { hintPrint, hintSave } from "../utils/desktopFormShortcuts.js";
 
 const n2 = (v) => parseFloat(v) || 0;
 const f2 = (n) => (Math.round((parseFloat(n) || 0) * 100) / 100).toFixed(2);
@@ -161,6 +164,8 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
       failed.length ? (bn ? `হয়নি: ${failed.join(", ")}` : `Failed: ${failed.join(", ")}`) : "",
     ].filter(Boolean).join("\n"));
   };
+  useFormSaveShortcut({ saving, disabled: saving || !changed.length, onSave: save });
+  usePrintShortcut({ active: canPrint, disabled: !rows.length, onPrint: printList });
 
   const canDeleteSel = !!selId && (() => {
     const r = rows.find((x) => x.id === selId);
@@ -222,11 +227,11 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
           </div>
           <div>
             <div style={lbl}>Cheque Date From</div>
-            <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+            <DateField style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div>
             <div style={lbl}>To</div>
-            <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+            <DateField style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 5, cursor: "pointer", marginBottom: 4 }}>
             <input type="checkbox"checked={includePosted} onChange={(e) => setIncludePosted(e.target.checked)} /> Include Posted Cheques
@@ -238,8 +243,8 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
           )}
           <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
             {onOpenVoucher && <button type="button"onClick={() => sel && onOpenVoucher(sel.raw)} disabled={!sel} style={btn()}><u>V</u>iew</button>}
-            <button type="button"onClick={save} disabled={saving || !changed.length} style={btn("#15803d", "#fff")}>{saving ? "…" : <><u>S</u>ave</>}</button>
-            {canPrint && <button type="button"onClick={printList} disabled={!rows.length} style={btn()}><u>P</u>rint</button>}
+            <button type="button"title="Ctrl+S" onClick={save} disabled={saving || !changed.length} style={btn("#15803d", "#fff")}>{saving ? "…" : (bn ? `সেভ${hintSave(saving)}` : `Save${hintSave(saving)}`)}</button>
+            {canPrint && <button type="button"title="Ctrl+P" onClick={printList} disabled={!rows.length} style={btn()}>{bn ? `প্রিন্ট${hintPrint()}` : `Print${hintPrint()}`}</button>}
             {canDelete && <button type="button"onClick={deleteSelected} disabled={!canDeleteSel} style={btn("#7f1d1d", "#fff")}>{bn ? "মুছুন" : "Delete"}</button>}
             {onClose && <button type="button"onClick={onClose} style={btn()}><u>C</u>lose</button>}
           </div>
@@ -288,7 +293,7 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
                     </td>
                     <td style={td}>
                       {pending
-                        ? <input type="date"style={cellIn} disabled={e.status !== "cleared"} value={e.postDate} onChange={(ev) => setEdit(r, { postDate: ev.target.value })} onClick={(ev) => ev.stopPropagation()} />
+                        ? <DateField style={cellIn} disabled={e.status !== "cleared"} value={e.postDate} onChange={(ev) => setEdit(r, { postDate: ev.target.value })} onClick={(ev) => ev.stopPropagation()} />
                         : (r.clearedAt ? fmtDate(r.clearedAt) : "")}
                     </td>
                     <td style={td}>

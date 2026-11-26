@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
+import DateField from "../components/DateField.jsx";
 
 const n2 = (v) => Number.parseFloat(v) || 0;
 const f2 = (v) => n2(v).toFixed(2);
@@ -204,8 +205,8 @@ export default function VendorChequeWizard({
           {basis === "month" && <input type="month"style={{ ...field, marginTop: 8 }} value={month} onChange={(e) => setMonth(e.target.value)} />}
           {basis === "range" && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
-              <div><span style={lbl}>{bn ? "থেকে" : "From"}</span><input type="date"style={field} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-              <div><span style={lbl}>{bn ? "পর্যন্ত" : "To"}</span><input type="date"style={field} value={to} onChange={(e) => setTo(e.target.value)} /></div>
+              <div><span style={lbl}>{bn ? "থেকে" : "From"}</span><DateField style={field} value={from} onChange={(e) => setFrom(e.target.value)} /></div>
+              <div><span style={lbl}>{bn ? "পর্যন্ত" : "To"}</span><DateField style={field} value={to} onChange={(e) => setTo(e.target.value)} /></div>
             </div>
           )}
         </div>
@@ -243,7 +244,7 @@ export default function VendorChequeWizard({
         <div style={card}>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: 8 }}>
             <div><span style={lbl}>{bn ? "চেক নম্বর *" : "Cheque No *"}</span><input style={{ ...field, fontFamily: "monospace" }} value={chequeNo} onChange={(e) => setChequeNo(e.target.value)} /></div>
-            <div><span style={lbl}>{bn ? "চেকের তারিখ" : "Cheque date"}</span><input type="date"style={field} value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} /></div>
+            <div><span style={lbl}>{bn ? "চেকের তারিখ" : "Cheque date"}</span><DateField style={field} value={chequeDate} onChange={(e) => setChequeDate(e.target.value)} /></div>
             <div style={{ gridColumn: mobile ? "1 / -1" : "auto" }}><span style={lbl}>{bn ? "ব্যাংক" : "Bank"}</span>
               <select style={field} value={chequeBank} onChange={(e) => setChequeBank(e.target.value)}>
                 <option value="">—</option>

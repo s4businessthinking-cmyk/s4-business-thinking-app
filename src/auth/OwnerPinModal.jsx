@@ -78,7 +78,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
   };
 
   const newPinError = () => {
-    if (!isValidPin(newPin)) return bn ? "নতুন পিন ৪-৬ সংখ্যার হতে হবে" : "New PIN must be 4-6 digits";
+    if (!isValidPin(newPin)) return bn ? "নতুন পিন অবশ্যই ৬ সংখ্যার হতে হবে" : "New PIN must be exactly 6 digits";
     if (newPin !== newPin2) return bn ? "দুইবার একই পিন দিন" : "PINs do not match";
     return "";
   };
@@ -105,7 +105,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
     e?.preventDefault();
     const locked = lockedMessage();
     if (locked) return setError(locked);
-    if (!isValidPin(pin)) return setError(bn ? "৪-৬ সংখ্যার পিন দিন" : "Enter your 4-6 digit PIN");
+    if (!isValidPin(pin)) return setError(bn ? "৬ সংখ্যার পিন দিন" : "Enter your 6 digit PIN");
     run(async () => {
       if (await checkPin(pin)) onUnlocked?.();
       else setPin("");
@@ -169,7 +169,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
   );
   const newPinFields = (
     <>
-      <span style={lbl}>{bn ? "নতুন পিন (৪-৬ সংখ্যা)" : "New PIN (4-6 digits)"}</span>
+      <span style={lbl}>{bn ? "নতুন পিন (৬ সংখ্যা)" : "New PIN (6 digits)"}</span>
       {pinField(newPin, setNewPin, null, "new-password")}
       <span style={lbl}>{bn ? "আবার পিন দিন" : "Confirm PIN"}</span>
       {pinField(newPin2, setNewPin2, null, "new-password")}

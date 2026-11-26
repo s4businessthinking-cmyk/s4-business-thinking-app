@@ -9,6 +9,7 @@ import { offlineCacheCloudRecords, offlineList, offlineCreate, offlineUpdate, of
 import { query, collection, where, orderBy, onSnapshot, runTransaction, doc } from "../backend/firestore";
 import { db } from "../firebase-config";
 import { isOpeningBill } from "../utils/openingBill.js";
+import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
 import { inDateRange, listSummary, matchesStatus, statusCounts } from "../utils/docStatusFilter.js";
 import { pendingRows } from "../utils/pendingBills.js";
 import { loadInvoiceRows, computeStockMap } from "../inventory/stockFromInvoices";
@@ -134,9 +135,13 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
         return { ...l, vatPerc: vat!=null && String(vat).trim()!=="" ? String(vat) : "5" };
       }));
     }
-    setSiForm(p=>({ ...p, invoiceDate:siToday(), validUntil:"", refNo:p.refNo||quoteToConvert.invoiceNo||"",
-      invoiceType:isDN?"delivery":quoteToConvert.invoiceType==="regular"?"regular":"tax",
-      ...(!isDN && p.invoiceType==="delivery" ? { deliveryNoteNo:quoteToConvert.invoiceNo||"" } : {}) }));
+    const srcIsDn = quoteToConvert.docKind === "delivery" || quoteToConvert.invoiceType === "delivery";
+    setSiForm((p) => ({
+      ...p, invoiceDate: siToday(), validUntil: "", refNo: p.refNo || quoteToConvert.invoiceNo || "",
+      invoiceType: isDN ? "delivery" : quoteToConvert.invoiceType === "regular" ? "regular" : "tax",
+      locationId: quoteToConvert.locationId || p.locationId || "",
+      ...(!isDN && srcIsDn ? { deliveryNoteNo: quoteToConvert.invoiceNo || "" } : {}),
+    }));
     setSiInvoiceNo(siPreviewNextInvoiceNo());
     setEditInvId(null);
     setSourceQuote(quoteToConvert);
@@ -270,7 +275,12 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   const bnL = lang==="bn";
   const siAccent = isSO ? "#0e7490" : isQuote ? "#b45309" : isDN ? "#7e22ce" : "#15803d";
   const siLightC = { "#a1a1aa":"#07101c", "#22c55e":"#15803d", "#06b6d4":"#0e7490", "#ef4444":"#b91c1c", "#a855f7":"#7e22ce", "#f59e0b":"#b45309" };
-  const siBadge = (st) => <span className="si-badge"style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{STATUSES[st]?.[lang]||st}</span>;
+  const siBadge = (invOrSt) => {
+    const inv = invOrSt && typeof invOrSt === "object" ? invOrSt : { status: invOrSt };
+    const st = inv.status;
+    const label = invoiceStatusLabel(inv, lang, STATUSES) || (STATUSES[st]?.[lang] || st);
+    return <span className="si-badge"style={{ color:SI_STATUS_COLOR[st]||"#475569" }}>{label}</span>;
+  };
   const siExpiredBadge = (inv) => isQuote && !isSO && qtIsExpired(inv) ? <span className="si-badge"style={{ color:"#b91c1c", marginRight:3 }}>{bnL?"মেয়াদ শেষ":"Expired"}</span> : null;
   const siRowDue = (inv) => (isQuote || isDN || ["cancelled","draft"].includes(inv.status)) ? 0 : Math.max(0, siN2(inv.grandTotal) - siN2(inv.amountPaid));
   const siMatchedLines = (inv) => {

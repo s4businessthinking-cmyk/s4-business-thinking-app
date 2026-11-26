@@ -142,5 +142,156 @@ export function warrantyAlertText(a, bn = false) {
 
 export function claimSummary(c) {
   const q = q4(n2(c?.qty) || 1);
-  return `${c?.productName || "?"} × ${q}${c?.vendorName ? ` → ${c.vendorName}` : ""}${c?.customerName ? ` · ${c.customerName}` : ""}`;
+  const bill = c?.invoiceNo ? ` · ${c.invoiceNo}` : "";
+  return `${c?.productName || "?"} × ${q}${c?.vendorName ? ` → ${c.vendorName}` : ""}${c?.customerName ? ` · ${c.customerName}` : ""}${bill}`;
+}
+
+/** Live sales bills that can back a warranty claim (BW01). */
+export const WARRANTY_SOURCE_INV_STATUSES = ["confirmed", "partial", "paid"];
+
+export function invoiceHasProduct(inv, productId) {
+  if (!inv || !productId) return false;
+  return (inv.items || []).some((it) => it && it.productId === productId);
+}
+
+/**
+ * Sales invoices that sold this product (optional customer filter). Newest first.
+ * Skips delivery notes / quotes / sales orders / cancelled / draft.
+ */
+export function warrantyCandidateInvoices({
+  invoices = [], productId, customerId = null, customerName = "", limit = 25,
+} = {}) {
+  if (!productId) return [];
+  const name = String(customerName || "").trim().toLowerCase();
+  return (invoices || [])
+    .filter((inv) => inv && !inv.isDeleted && !inv.deleted)
+    .filter((inv) => WARRANTY_SOURCE_INV_STATUSES.includes(inv.status))
+    .filter((inv) => {
+      const kind = String(inv.docKind || "");
+      if (kind === "quotation" || kind === "salesOrder" || kind === "delivery") return false;
+      if (inv.invoiceType === "delivery") return false;
+      return true;
+    })
+    .filter((inv) => invoiceHasProduct(inv, productId))
+    .filter((inv) => {
+      if (customerId) return inv.customerId === customerId;
+      if (name) return String(inv.customerName || "").trim().toLowerCase() === name;
+      return true;
+    })
+    .sort((a, b) => String(b.invoiceDate || "").localeCompare(String(a.invoiceDate || "")))
+    .slice(0, Math.max(1, limit))
+    .map((inv) => ({
+      invoiceId: inv.id,
+      invoiceNo: inv.invoiceNo || "",
+      invoiceDate: String(inv.invoiceDate || "").slice(0, 10),
+      customerId: inv.customerId || null,
+      customerName: inv.customerName || "",
+      customerMobile: inv.customerMobile || "",
+    }));
+}
+
+/** Short label for linked bill on claim UI / print. */
+export function claimInvoiceLabel(claim, bn = false) {
+  if (!claim?.invoiceId && !claim?.invoiceNo) return "";
+  const no = claim.invoiceNo || "—";
+  const d = String(claim.invoiceDate || "").slice(0, 10);
+  const dd = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}` : d;
+  return bn ? `বিল ${no}${dd ? ` · ${dd}` : ""}` : `Bill ${no}${dd ? ` · ${dd}` : ""}`;
+}
+
+/** Fields stored on warrantyClaims for BW01. */
+export function claimInvoiceFields(link) {
+  if (!link?.invoiceId && !link?.invoiceNo) {
+    return { invoiceId: null, invoiceNo: "", invoiceDate: "" };
+  }
+  return {
+    invoiceId: link.invoiceId || null,
+    invoiceNo: link.invoiceNo || "",
+    invoiceDate: String(link.invoiceDate || "").slice(0, 10),
+  };
+}
+
+/** BW02: common battery/product guarantee lengths (months). */
+export const WARRANTY_MONTH_PRESETS = [3, 6, 12, 18, 24, 36];
+
+export function addMonthsYmd(day, months) {
+  const [y, m, d] = String(day || "").slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const dt = new Date(y, m - 1, d);
+  const dayNum = dt.getDate();
+  dt.setMonth(dt.getMonth() + Number(months || 0));
+  // clamp end-of-month (e.g. Jan 31 + 1 month)
+  if (dt.getDate() < dayNum) dt.setDate(0);
+  return ymd(dt);
+}
+
+/** Default months from product master if set, else battery 12 / other 6. */
+export function productWarrantyMonths(product, reason = "battery") {
+  const fromProd = Number(product?.warrantyMonths ?? product?.guaranteeMonths ?? 0);
+  if (fromProd > 0) return Math.min(120, Math.round(fromProd));
+  return reason === "battery" ? 12 : 6;
+}
+
+/**
+ * Warranty window from sale (or claim) date + months.
+ * expired = asOf (claim day) is after end date.
+ */
+export function warrantyWindow({ saleDate = "", claimDate = "", months = 0 } = {}) {
+  const start = String(saleDate || claimDate || "").slice(0, 10);
+  const mo = Math.max(0, Number(months) || 0);
+  if (!start || !mo) return { start: start || "", end: "", expired: false, months: mo };
+  const end = addMonthsYmd(start, mo);
+  const asOf = String(claimDate || start).slice(0, 10);
+  const expired = !!(end && asOf && asOf > end);
+  return { start, end, expired, months: mo };
+}
+
+/** Persist BW02 fields on the claim. */
+export function claimWarrantyPeriodFields({ saleDate, claimDate, months }) {
+  const win = warrantyWindow({ saleDate, claimDate, months });
+  return {
+    warrantyMonths: win.months || 0,
+    warrantyStartDate: win.start || "",
+    warrantyEndDate: win.end || "",
+    warrantyExpiredAtOpen: !!win.expired,
+  };
+}
+
+/** BW11: parse Ah from product fields / name (e.g. "70Ah", "70 AH", specs.ah). */
+export function parseBatteryAh(...sources) {
+  for (const src of sources) {
+    if (src == null || src === "") continue;
+    if (typeof src === "number" && Number.isFinite(src) && src > 0) return Math.round(src);
+    const s = String(src);
+    const m = s.match(/(\d{1,4})\s*(?:ah|a\.?h\.?|amp(?:ere)?(?:s)?(?:[\s-]?hour)?)/i)
+      || s.match(/\bah\s*[:=]?\s*(\d{1,4})\b/i);
+    if (m) {
+      const n = Number(m[1]);
+      if (n > 0 && n <= 2000) return n;
+    }
+  }
+  return null;
+}
+
+export function productBatteryAh(product) {
+  if (!product) return null;
+  return parseBatteryAh(
+    product.batteryAh, product.ah, product.capacityAh,
+    product.specs?.ah, product.specs?.batteryAh,
+    product.name, product.code, product.model,
+  );
+}
+
+export function productBatteryBrand(product) {
+  if (!product) return "";
+  return String(product.brand || product.company || product.make || "").trim();
+}
+
+/** Fields stored on warrantyClaims for BW11. */
+export function claimBatteryFields({ ah, brand } = {}) {
+  const n = ah == null || ah === "" ? null : Number(ah);
+  return {
+    batteryAh: Number.isFinite(n) && n > 0 ? Math.min(2000, Math.round(n)) : null,
+    batteryBrand: String(brand || "").trim(),
+  };
 }

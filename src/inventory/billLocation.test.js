@@ -47,6 +47,14 @@ test("buy into Godown A, sell from A: Stock Hub location stock follows the bills
   assert.equal(qtyIn(stock, "gB", "p1"), 0);
   assert.equal(sumAt(stock, "p1"), total(rows).get("p1"), "locations = shop total");
   assert.equal(qtyIn(stock, "main", "p2"), 3, "opening 5 on main, 2 sold");
+  const rowsPickGodown = rowsOf({
+    purchaseInvoices: [pi("PI-1", "2026-11-01", [line("p1", 10)], { locationId: "gA", locationName: "Godown A" })],
+    salesInvoices: [si("SI-1", "2026-11-05", [line("p1", 4)], { locationId: "gA" })],
+    salesReturns: [{ id: "SR-2", shopId: S, status: "confirmed", returnNo: "SR-2", returnDate: "2026-11-08", invoiceId: "SI-1", locationId: "gB", items: [line("p1", 1)] }],
+  });
+  const stockPick = billLocationStock({ products, rows: rowsPickGodown, locations: locs, shopId: S, asOf: "2026-11-30" });
+  assert.equal(qtyIn(stockPick, "gA", "p1"), 6, "sold from A");
+  assert.equal(qtyIn(stockPick, "gB", "p1"), 1, "return landed in B by picker");
   // as at a date before the sale
   assert.equal(qtyIn(billLocationStock({ products, rows, locations: locs, shopId: S, asOf: "2026-11-04" }), "gA", "p1"), 10);
   // the godown side is a document move, never saved

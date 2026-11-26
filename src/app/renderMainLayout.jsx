@@ -1,7 +1,7 @@
 import AppGlobalSearch from "../dashboard/AppGlobalSearch.jsx";
 import { ERP_MOBILE_CSS, TAB_SHORTCUT_KEYS, designPreviewHtml, saveSiColor, saveSiShowCode } from "./mainAppHelpers.js";
 import { Header } from "../components/AppHeader.jsx";
-import { LicenseActivationPanel } from "../settings/SettingsPanels.jsx";
+import { LicenseActivationPanel, LicenseSupportContactsPanel } from "../settings/SettingsPanels.jsx";
 import { MinimizedChip, WindowButtons } from "../components/WindowChrome.jsx";
 import MobileMenuDrawer from "../dashboard/MobileMenuDrawer.jsx";
 import NotificationBell from "../dashboard/NotificationBell.jsx";
@@ -9,6 +9,7 @@ import PrintSettingsWindow from "../print/PrintSettingsWindow.jsx";
 import { ShopSetupWizard } from "../auth/AuthScreens.jsx";
 import SideMenuGroups from "../dashboard/SideMenuGroups.jsx";
 import { shopNeedsSetup } from "../offline/shopService";
+import DateField from "../components/DateField.jsx";
 
 export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout, isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, localShop, menuOpen, minTab, notificationItems, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs }) {
   if (licenseAccessLoading && !licenseAccess) {
@@ -23,21 +24,47 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
   }
 
   if (licenseAccess?.accessAllowed === false) {
+    const lockReason = licenseAccess?.accessReason || "";
+    const licSt = licenseAccess?.licenseStatus || "";
+    const lockTitle = (() => {
+      if (licSt === "EXPIRED" || lockReason === "LICENSE_EXPIRED") {
+        return lang === "bn" ? "লাইসেন্সের মেয়াদ শেষ" : "License expired";
+      }
+      if (lockReason === "CLOCK_ROLLBACK") {
+        return lang === "bn" ? "ডিভাইসের তারিখ/সময় ঠিক করুন" : "Fix your device date and time";
+      }
+      return lang === "bn" ? "ফ্রি ট্রায়াল শেষ" : "Free trial expired";
+    })();
+    const lockNote = (() => {
+      if (licSt === "EXPIRED" || lockReason === "LICENSE_EXPIRED") {
+        return lang === "bn"
+          ? "চালিয়ে যেতে নতুন লাইসেন্স অ্যাক্টিভ করুন, অথবা নিচে থেকে সাপোর্টে যোগাযোগ করুন।"
+          : "Activate a new license to continue, or contact support below.";
+      }
+      if (lockReason === "CLOCK_ROLLBACK") {
+        return lang === "bn"
+          ? "ফোন/পিসির তারিখ ঠিক করুন। তবুও সমস্যা থাকলে সাপোর্টে লিখুন — নিচে WhatsApp / ইমেইল আছে।"
+          : "Correct the device clock. If it still blocks you, contact support below (WhatsApp / email).";
+      }
+      return lang === "bn"
+        ? "চালিয়ে যেতে লাইসেন্স অ্যাক্টিভ করুন, অথবা নিচে থেকে আমাদের লিখুন।"
+        : "Activate your license to continue, or message us using the options below.";
+    })();
+
     return (
       <div style={s.root}>
         <Header t={t} lang={lang} setLang={setLang} isDesktop={isDesktop} s={s} theme={theme} setTheme={setTheme} />
         <div style={isDesktop?s.desktopPanel:s.panel}>
           <div style={{ ...s.card, border:"1px solid #ef4444", background:th.bgCard }}>
-            <div style={{ fontSize:34, marginBottom:8 }}></div>
             <div style={{ fontSize:22, fontWeight:900, color:"#ef4444", marginBottom:6 }}>
-              {lang==="bn"?"ফ্রি ট্রায়াল শেষ":"Free trial expired"}
+              {lockTitle}
             </div>
             <div style={{ fontSize:13, color:th.txtMuted, lineHeight:1.5 }}>
-              {lang==="bn"?"চালিয়ে যেতে লাইসেন্স অ্যাক্টিভ করুন":"Please activate your license to continue"}
+              {lockNote}
             </div>
-            {licenseAccess?.accessReason&&(
+            {lockReason && (
               <div style={{ fontSize:11, color:th.txtMuted, marginTop:8 }}>
-                {licenseAccess.accessReason}
+                {lockReason}{licSt ? ` · ${licSt}` : ""}
               </div>
             )}
           </div>
@@ -48,7 +75,18 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
             s={s}
             toast={toast}
             locked
+            localShop={localShop}
+            profile={profile}
             onActivated={refreshLicenseAccess}
+          />
+
+          <LicenseSupportContactsPanel
+            t={t}
+            lang={lang}
+            th={th}
+            s={s}
+            licenseAccess={licenseAccess}
+            toast={toast}
           />
 
           <button style={s.logoutBtn} onClick={handleLogout}>
@@ -245,8 +283,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
                   </label>
                   <label>
                     <span style={lbl}>{bn?"Invoice তারিখ":"Invoice Date"}</span>
-                    <input type="date"style={s.inp} value={orderReceive.invoiceDate}
-                      onChange={e=>setRc({ invoiceDate:e.target.value })} />
+                    <DateField style={s.inp} value={orderReceive.invoiceDate} onChange={e=>setRc({ invoiceDate:e.target.value })} />
                   </label>
                   <label>
                     <span style={lbl}>{bn?"পেমেন্ট":"Payment"}</span>

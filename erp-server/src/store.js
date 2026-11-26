@@ -3,6 +3,7 @@ import { allowed, canBackupShop, isOwnerOfShop, makeRuleContext, RULES, UNSCOPED
 import { matchesQuery, sortDocs, shopFilterValue, validateQuery } from "./query.js";
 import { fail } from "./errors.js";
 import { createMutex, deepEqual, isPlainObject } from "./util.js";
+import { redactUserDocData } from "./sanitize.js";
 
 const BACKUP_FORMAT = "s4-shop-backup";
 const SINGLE_DOC_PER_SHOP = new Set(["shops", "productMaintenance"]);
@@ -103,7 +104,13 @@ const logicalId = (row) => {
 };
 const userShopOf = (ctx) => (typeof ctx?.user?.shopId === "string" && ctx.user.shopId ? ctx.user.shopId : null);
 
-const toWire = (row) => ({ id: logicalId(row), data: row.data, version: row.version, updateTime: row.updatedAt });
+function toWire(row, { viewerUid, collection, docId } = {}) {
+  let data = row.data;
+  if (collection === "users" && data) {
+    data = redactUserDocData(data, viewerUid, docId);
+  }
+  return { id: logicalId(row), data, version: row.version, updateTime: row.updatedAt };
+}
 
 export function createStore({ db }) {
   const bus = new EventEmitter();
@@ -134,7 +141,7 @@ export function createStore({ db }) {
     const ctx = await ctxFor(uid);
     const row = await resolveReadRow(ctx, collection, String(id));
     if (!(await canRead(ctx, collection, id, row?.data ?? null))) fail("permission-denied", "Missing or insufficient permissions.");
-    return row ? toWire(row) : null;
+    return row ? toWire(row, { viewerUid: uid, collection, docId: String(id) }) : null;
   }
 
   async function candidateRows(q) {
@@ -151,7 +158,9 @@ export function createStore({ db }) {
     const visible = [];
     for (const row of rows) {
       const id = logicalId(row);
-      if (matchesQuery(q, id, row.data) && (await canRead(context, q.collection, id, row.data, true))) visible.push(toWire(row));
+      if (matchesQuery(q, id, row.data) && (await canRead(context, q.collection, id, row.data, true))) {
+        visible.push(toWire(row, { viewerUid: uid, collection: q.collection, docId: id }));
+      }
     }
     const sorted = sortDocs(q, visible);
     return q.limit ? sorted.slice(0, q.limit) : sorted;

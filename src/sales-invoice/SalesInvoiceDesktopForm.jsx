@@ -18,6 +18,9 @@ import { printWithSettings } from "../print/printSettings.js";
 import { splitRack } from "./rackLocation.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 import { siIsSettledPay } from "./salesInvoiceShared.js";
+import DateField from "../components/DateField.jsx";
+import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
+import { runDesktopBillShortcuts } from "../utils/desktopFormShortcuts.js";
 
 const CURRENCIES = ["AED", "USD", "SAR", "OMR", "QAR", "KWD", "BHD", "INR", "BDT", "EUR"];
 
@@ -337,6 +340,23 @@ export default function SalesInvoiceDesktopForm({
     setTimeout(() => codeRef.current?.focus(), 30);
   };
 
+  const shortcutsRef = useRef({});
+  shortcutsRef.current = {
+    saving,
+    locked,
+    onSaveDraft: () => onSaveDraft(),
+    canSaveDraft: () => !locked && !saving,
+    onConfirm: () => onConfirm(),
+    canConfirm: () => !locked && !saving,
+    onNew: () => onNew(),
+    canNew: () => !saving,
+    onSearch: () => setShowSearch(true),
+    canEdit: () => !!(locked && savedInvoice && canEditInvoice(savedInvoice) && !saving),
+    onEdit: () => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); },
+    canPrint: () => !!(onPrintInvoice && (!!savedInvoice || lines.some((it) => String(it.name || "").trim())) && !saving),
+    onPrint: () => onPrintInvoice(savedInvoice),
+  };
+
   const handlersRef = useRef({});
   handlersRef.current = {
     locked,
@@ -354,7 +374,20 @@ export default function SalesInvoiceDesktopForm({
 
   useEffect(() => {
     const onKey = (e) => {
-      if (document.querySelector("[data-si-modal-open]")) return;
+      const s = shortcutsRef.current;
+      if (runDesktopBillShortcuts(e, {
+        canSaveDraft: () => s.canSaveDraft(),
+        onSaveDraft: s.onSaveDraft,
+        canConfirm: () => s.canConfirm(),
+        onConfirm: s.onConfirm,
+        canNew: () => s.canNew(),
+        onNew: s.onNew,
+        onSearch: s.onSearch,
+        canEdit: () => s.canEdit(),
+        onEdit: s.onEdit,
+        canPrint: () => s.canPrint(),
+        onPrint: s.onPrint,
+      })) return;
       const h = handlersRef.current;
       if (h.locked && ["F9", "F10", "Home", "Insert"].includes(e.key)) return;
       const tag = String(e.target?.tagName || "").toLowerCase();
@@ -412,7 +445,7 @@ export default function SalesInvoiceDesktopForm({
             )}
             {savedInvoice && (
               <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: SI_STATUSES[savedInvoice.status]?.color || "#64748b", color: "#fff" }}>
-                {SI_STATUSES[savedInvoice.status]?.[lang] || savedInvoice.status}
+                {invoiceStatusLabel(savedInvoice, lang, SI_STATUSES) || savedInvoice.status}
               </span>
             )}
             {locked && (
@@ -447,7 +480,7 @@ export default function SalesInvoiceDesktopForm({
         </div>
         <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
           <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <input type="date"lang="en-GB" style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
+          <DateField style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
         </div>
       </div>
 
@@ -505,7 +538,7 @@ export default function SalesInvoiceDesktopForm({
         {isQuote ? (
           <div style={{ maxWidth: 170 }}>
             <div style={lbl}>{isSO ? "Delivery By" : "Valid Until"}</div>
-            <input type="date"lang="en-GB" style={inp()} value={form.validUntil || ""} onChange={(e) => setField("validUntil", e.target.value)} />
+            <DateField style={inp()} value={form.validUntil || ""} onChange={(e) => setField("validUntil", e.target.value)} />
           </div>
         ) : hasGodowns(billLocations) ? (
           <BillLocationPicker side="sale" bn={bn} locations={billLocations} value={billLocationId(form, billLocations)} onChange={(v) => setField("locationId", v)}
@@ -828,13 +861,13 @@ export default function SalesInvoiceDesktopForm({
       {/* Action bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
         <div style={{ display: "flex", gap: 6 }}>
-          <button type="button"onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন" : "New"}</button>
-          <button type="button"onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন" : "Search"}</button>
+          <button type="button"title="Ctrl+N" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন (Ctrl+N)" : "New (Ctrl+N)"}</button>
+          <button type="button"title="F7" onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন (F7)" : "Search (F7)"}</button>
           {onPrintInvoice && (() => {
             const canPrintNow = !!savedInvoice || lines.some((it) => String(it.name || "").trim());
             return (
-              <button type="button"disabled={!canPrintNow} onClick={() => onPrintInvoice(savedInvoice)}
-                style={btn("#e7eef9", C.label, { opacity: canPrintNow ? 1 : 0.5 })}> {bn ? "প্রিন্ট" : "Print"}</button>
+              <button type="button"disabled={!canPrintNow} title="Ctrl+P" onClick={() => onPrintInvoice(savedInvoice)}
+                style={btn("#e7eef9", C.label, { opacity: canPrintNow ? 1 : 0.5 })}> {bn ? "প্রিন্ট (Ctrl+P)" : "Print (Ctrl+P)"}</button>
             );
           })()}
           {whatsAppDoc && savedInvoice && savedInvoice.status !== "draft" && (
@@ -865,16 +898,16 @@ export default function SalesInvoiceDesktopForm({
           {locked ? (
             canEditInvoice(savedInvoice) ? (
               <button type="button"onClick={() => { setLocked(false); setTimeout(() => nameRef.current?.focus(), 0); }}
-                style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}> {bn ? "এডিট" : "Edit"}</button>
+                title="Ctrl+E" style={btn("#1d4ed8", "#fff", { padding: "0 22px" })}> {bn ? "এডিট (Ctrl+E)" : "Edit (Ctrl+E)"}</button>
             ) : (
               <button type="button"disabled title={bn ? "এই বিল এডিট করা যাবে না (বাতিল / রূপান্তরিত / রিসিট আছে / অনুমতি নেই)" : "This bill cannot be edited (cancelled / converted / has receipts / no permission)"}
                 style={btn("#e5e7eb", "#6b7280", { padding: "0 22px", cursor: "not-allowed" })}> {bn ? "এডিট বন্ধ" : "Edit locked"}</button>
             )
           ) : (
             <>
-              <button type="button"onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট সেভ" : "Save Draft"}</button>
-              <button type="button"onClick={onConfirm} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
-                {saving ? "…" : (bn ? "সেভ" : "Save")}
+              <button type="button"title="Ctrl+Shift+S" onClick={onSaveDraft} disabled={saving} style={btn("#fef3c7", "#92400e")}>{bn ? "ড্রাফট (Ctrl+Shift+S)" : "Draft (Ctrl+Shift+S)"}</button>
+              <button type="button"title="Ctrl+S" onClick={onConfirm} disabled={saving} style={btn("#15803d", "#fff", { padding: "0 22px" })}>
+                {saving ? "…" : (bn ? "সেভ (Ctrl+S)" : "Save (Ctrl+S)")}
               </button>
             </>
           )}
@@ -931,7 +964,7 @@ export default function SalesInvoiceDesktopForm({
           <div style={{ display: "grid", gap: 8 }}>
             <div style={{ fontSize: 12, color: C.label, fontWeight: 700 }}>{savedInvoice.invoiceNo}{savedInvoice.customerName ? ` — ${savedInvoice.customerName}` : ""}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-              <input type="date"lang="en-GB" style={inp()} value={reminderForm.date} onChange={(e) => onChangeReminder?.((p) => ({ ...p, date: e.target.value }))} />
+              <DateField style={inp()} value={reminderForm.date} onChange={(e) => onChangeReminder?.((p) => ({ ...p, date: e.target.value }))} />
               <input type="time"style={inp()} value={reminderForm.time} onChange={(e) => onChangeReminder?.((p) => ({ ...p, time: e.target.value }))} />
             </div>
             <input style={inp()} placeholder={bn ? "নোট (ঐচ্ছিক)" : "Note (optional)"} value={reminderForm.note} onChange={(e) => onChangeReminder?.((p) => ({ ...p, note: e.target.value }))} />
@@ -1151,9 +1184,9 @@ function InvoiceSearchModal({ invoices, siFmt2, SI_PAY, lang, onClose, onPick })
     <Modal title="Search"onClose={onClose} width={780}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={lbl}><u>F</u>rom</span>
-        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <DateField style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}><u>T</u>o</span>
-        <input type="date"lang="en-GB" style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+        <DateField style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button type="button"onClick={display} style={btn("#e7eef9", C.label, { width: 80 })}>Display</button>
           <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { width: 80 })}>Close</button>

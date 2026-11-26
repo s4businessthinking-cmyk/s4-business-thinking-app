@@ -15,6 +15,7 @@ import {
   buildPayroll, buildSif, expenseMethodOf, nextExpenseNos, payrollExpense, payrollLineBlockers, payrollPostedFor,
   payrollSheetCols, payrollSheetRows, payslipRows, wpsEmployerProblems, wpsLineProblems, WPS_HANDOFF_STEPS,
 } from "./payroll.js";
+import DateField from "../components/DateField.jsx";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const money = (v) => (Math.round((n(v) + Number.EPSILON) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -121,7 +122,7 @@ export default function PayrollPanel({ lang = "en", shopId, shop, user, profile,
     <>
       <div className="si-toolbar">
         <span className="si-muted">{L("বেতনের তারিখ", "Payment date")}</span>
-        <input type="date" className="pm-input" style={{ width: 140 }} value={payDate} max={today} onChange={(e) => setPayDate(e.target.value)} />
+        <DateField className="pm-input" style={{ width: 140 }} value={payDate} max={today} onChange={(e) => setPayDate(e.target.value)} />
         <span className="si-toolbar-gap" />
         <button type="button" className="pm-btn-secondary" onClick={printSheet} disabled={!sheet.lines.length}>{L("শিট প্রিন্ট / PDF", "Print / PDF sheet")}</button>
         <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!sheet.lines.length}>Excel</button>

@@ -27,6 +27,24 @@ export const config = {
     pass: env.SMTP_PASS || "",
     from: env.SMTP_FROM || "",
   },
+  autoRemindersEnabled: env.S4_AUTO_REMINDERS !== "0",
+  autoRemindersIntervalMs: Number(env.S4_AUTO_REMINDERS_MS || 15 * 60 * 1000),
+  autoRemindersTz: env.S4_REMINDER_TZ || "",
+  corsAllowedOrigins: (() => {
+    const raw = String(env.CORS_ALLOWED_ORIGINS || "").trim();
+    if (raw) {
+      return raw.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    if (production) {
+      return [
+        "https://erp.s4businessthinking.com",
+        "https://app.s4businessthinking.com",
+        "https://s4businessthinking.com",
+      ];
+    }
+    return ["*"];
+  })(),
+  revokedLicenseIds: env.S4_REVOKED_LICENSE_IDS || "",
 };
 
 const WEAK_JWT = /dev-only|change-me|test-secret/i;

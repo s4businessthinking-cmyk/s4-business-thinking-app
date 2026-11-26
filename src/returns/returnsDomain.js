@@ -253,6 +253,7 @@ export function planSettleLeftoverReturnCredits({
       inv.amountPaid = newPaid;
       inv.balanceDue = balance;
       inv.status = balance < 0.01 ? "paid" : newPaid > 0.009 ? "partial" : (inv.status || "confirmed");
+      inv.settleKind = balance < 0.01 ? "return" : "";
     }
 
     const prevAllocs = (r.appliedAllocations || []).length
@@ -281,6 +282,7 @@ export function planSettleLeftoverReturnCredits({
       amountPaid: next.amountPaid,
       balanceDue: next.balanceDue,
       status: next.status,
+      settleKind: next.settleKind || "",
     });
   }
   return { invoicePatches, returnPatches };

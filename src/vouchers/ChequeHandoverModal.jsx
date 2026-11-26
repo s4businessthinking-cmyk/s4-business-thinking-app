@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { compressImage } from "./chequeDocs.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
+import DateField from "../components/DateField.jsx";
 
 const todayIso = () => {
   const d = new Date();
@@ -167,7 +168,7 @@ export default function ChequeHandoverModal({ lang = "en", cur = "AED", voucher,
           <div style={card}>
             <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 170px", gap: 10 }}>
               <div><span style={lbl}>{bn ? "চেক গ্রহণকারীর নাম *" : "Receiver's name *"}</span><input style={field} value={receiverName} onChange={(e) => setReceiverName(e.target.value)} /></div>
-              <div><span style={lbl}>{bn ? "তারিখ" : "Date"}</span><input type="date"style={field} value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} /></div>
+              <div><span style={lbl}>{bn ? "তারিখ" : "Date"}</span><DateField style={field} value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} /></div>
             </div>
           </div>
 

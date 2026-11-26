@@ -3,6 +3,8 @@ import { C, inp, lbl, btn, th, td, Modal, GridTable, todayIso, fmtDate, fmtDateL
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import DateField from "../components/DateField.jsx";
+import { runVoucherFormShortcuts } from "../utils/desktopFormShortcuts.js";
 
 const METHODS = [["cash", "Cash"], ["cheque", "Cheque"], ["bank_transfer", "Bank Transfer"], ["card", "Card"]];
 const METHOD_LABEL = Object.fromEntries(METHODS);
@@ -298,6 +300,10 @@ export default function AgainstInvoiceVoucherWindow({
 
   const hasRef = method === "bank_transfer" || method === "card";
 
+  const saveRef = useRef(null);
+  const roRef = useRef(false);
+  const findRef = useRef(() => {});
+
   const save = async () => {
     if (!party) { alert(bn ? `${partyLabel} বাছাই করুন` : `Select a ${partyLabel.toLowerCase()}`); return; }
     if (!rows.length) { alert(bn ? `অন্তত একটা ${docLabel} যোগ করুন` : `Add at least one ${docLabel.toLowerCase()}`); return; }
@@ -319,10 +325,28 @@ export default function AgainstInvoiceVoucherWindow({
     if (printDetails) onPrint?.(created, { summaryOnly: summaryPrint });
     resetNew();
   };
+  saveRef.current = save;
 
   const openVoucher = (v) => { setShowFind(false); setEditing(null); setViewSnapshot(v); setViewingId(v.id); };
 
   const ro = !!viewing;
+  roRef.current = ro;
+  findRef.current = () => setShowFind(true);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (showFind) return;
+      runVoucherFormShortcuts(e, {
+        saving,
+        readOnly: roRef.current,
+        onSave: () => saveRef.current?.(),
+        onFind: () => findRef.current?.(),
+      });
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [showFind, saving]);
+
   const shownParty = ro ? { name: viewing.partyName } : party;
   const shownRows = ro ? (viewing.allocations || []).map((a) => ({ ...a, invoiceAmount: a.invoiceAmount })) : rows;
   const shownTotal = ro ? n2(viewing.totalAmount) : total;
@@ -364,7 +388,7 @@ export default function AgainstInvoiceVoucherWindow({
             </div>
             <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
               <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12, fontWeight: 800, padding: "1px 0" }}>Date</div>
-              <input type="date"disabled={ro} style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={ro ? viewing.date : date} onChange={(e) => setDate(e.target.value)} />
+              <DateField disabled={ro} style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={ro ? viewing.date : date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
 
@@ -507,7 +531,7 @@ export default function AgainstInvoiceVoucherWindow({
                   </div>
                   <div>
                     <div style={lbl}>{shownMethod === "card" ? "Swipe Date" : "Transfer Date"}</div>
-                    <input type="date"style={inp()} disabled={ro} value={ro ? (viewing.refDate || "") : refDate} onChange={(e) => setRefDate(e.target.value)} />
+                    <DateField style={inp()} disabled={ro} value={ro ? (viewing.refDate || "") : refDate} onChange={(e) => setRefDate(e.target.value)} />
                   </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
@@ -532,7 +556,7 @@ export default function AgainstInvoiceVoucherWindow({
                 </div>
                 <div>
                   <div style={lbl}>Dated</div>
-                  <input type="date"style={inp()} disabled={ro || shownMethod !== "cheque"} value={ro ? (viewing.chequeDate || "") : chequeDate} onChange={(e) => setChequeDate(e.target.value)} />
+                  <DateField style={inp()} disabled={ro || shownMethod !== "cheque"} value={ro ? (viewing.chequeDate || "") : chequeDate} onChange={(e) => setChequeDate(e.target.value)} />
                 </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
@@ -629,8 +653,8 @@ export default function AgainstInvoiceVoucherWindow({
             )}
             <div style={{ display: "flex", gap: 6, order: narrow ? 1 : 0 }}>
               <button type="button"onClick={resetNew} disabled={saving} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>N</u>ew</button>
-              {!ro && <button type="button"onClick={save} disabled={saving} style={btn("#15803d", "#fff", { width: 80, flex: narrow ? 1 : undefined })}>{saving ? "…" : <><u>S</u>ave</>}</button>}
-              <button type="button"onClick={() => setShowFind(true)} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>F</u>ind</button>
+              {!ro && <button type="button"title="Ctrl+S" onClick={save} disabled={saving} style={btn("#15803d", "#fff", { width: 80, flex: narrow ? 1 : undefined })}>{saving ? "…" : (bn ? "সেভ (Ctrl+S)" : "Save (Ctrl+S)")}</button>}
+              <button type="button"title="F7" onClick={() => setShowFind(true)} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}>{bn ? "খুঁজুন (F7)" : "Find (F7)"}</button>
               <button type="button"onClick={onClose} style={btn("#e7eef9", C.label, { width: 80, flex: narrow ? 1 : undefined })}><u>C</u>lose</button>
             </div>
           </div>
@@ -683,9 +707,9 @@ function VoucherFindModal({ vouchers, isReceipt, lang, onClose, onPick }) {
     <Modal title={isReceipt ? "Find Receipt" : "Find Payment"} onClose={onClose} width={980}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span style={lbl}>From</span>
-        <input type="date"style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
+        <DateField style={inp({ width: 140 })} value={from} onChange={(e) => setFrom(e.target.value)} />
         <span style={{ ...lbl, marginLeft: 8 }}>To</span>
-        <input type="date"style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
+        <DateField style={inp({ width: 140 })} value={to} onChange={(e) => setTo(e.target.value)} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 1fr 1fr 1fr", gap: 6, marginBottom: 8 }}>
         {box("Voucher No", "no")}
