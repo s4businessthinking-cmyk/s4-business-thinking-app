@@ -17,6 +17,8 @@ import { liveSalesOf, r2 } from "../reports/reportFilters.js";
 import { closeShiftPatch, isoOf, openShiftDoc, openShifts, shiftCash, shiftCsvRows, shiftFileName, shiftSummary } from "./counterShift.js";
 import { isMember, loyaltyBalances, memberCsvRows, normalizeLoyalty, rateOn, withRate } from "./loyalty.js";
 import { billSnapshot, closeCustomerDisplay, isDisplayOpen, openCustomerDisplay } from "./customerDisplay.js";
+import { kickCashDrawer, loadPrintSettings } from "../print/printSettings.js";
+import { normalizeDrawerSettings, drawerPrinterName } from "./cashDrawer.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -157,6 +159,20 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
     const live = liveSalesOf(data?.salesInvoices, shopId).filter((inv) => inv.source !== "openingBalance");
     return live.sort((a, b) => isoOf(b.createdAt).localeCompare(isoOf(a.createdAt)))[0] || null;
   }, [data, shopId]);
+  const doOpenDrawer = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await kickCashDrawer(lang);
+      if (result.ok) toast?.(L("ড্রয়ার খোলার সিগন্যাল পাঠানো হয়েছে", "Drawer kick sent"));
+      else toast?.(result.error || L("ড্রয়ার খোলা যায়নি", "Could not open the drawer"), "err");
+    } catch (e) {
+      toast?.(e.message || String(e), "err");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const showDisplay = () => {
     const member = lastBill ? customers.find((c) => c.id === lastBill.customerId) : null;
     const snap = lastBill
@@ -194,6 +210,18 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
           ))}
         </div>
         <span className="si-toolbar-gap" />
+        {(isOwner || canSell) && (
+          <button type="button" className="pm-btn-secondary" onClick={doOpenDrawer} disabled={busy}
+            title={(() => {
+              const s = normalizeDrawerSettings(loadPrintSettings());
+              const p = drawerPrinterName(s);
+              return p
+                ? (bn ? `ESC/POS কিক → ${p} (পিন ${s.drawerPin})` : `ESC/POS kick → ${p} (pin ${s.drawerPin})`)
+                : (bn ? "প্রিন্ট সেটিংসে ড্রয়ার/বিল প্রিন্টার বাছুন" : "Set drawer/bill printer in Print Settings");
+            })()}>
+            {L("ড্রয়ার খুলুন", "Open drawer")}
+          </button>
+        )}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
       </div>
 
@@ -291,8 +319,8 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
             </fieldset>
             <div className="si-note">
               {L(
-                "দোকানে একবারে একটাই শিফট খোলা থাকে। থাকার কথা = শুরুর ক্যাশ + ক্যাশ এসেছে − ক্যাশ গেছে। ক্যাশ এসেছে / গেছে গ্লোবাল লেজারের \"Cash in Hand\" থেকে - যে বিল, রিসিপ্ট, রিফান্ড, ক্যাশ খরচ, সাপ্লায়ার পেমেন্ট আর জার্নাল / কন্ট্রা এই শিফট খোলার পর প্রথম সেভ হয়েছে। কার্ড, ব্যাংক ও চেক ক্যাশে ধরা হয় না; বাতিল বাদ। আগে সেভ করা draft পরে confirm হলে সেটা draft সেভের সময়ের শিফটে পড়ে। বিল বা ভাউচারে কিছু লেখা বা বদলানো হয় না। বন্ধ শিফট শুধু মালিক বদলাতে পারেন।",
-                "Only one shift is open in the shop at a time. Expected = opening cash + cash in − cash out. Cash in / out come from the Global Ledger's \"Cash in Hand\": the bills, receipts, refunds, cash expenses, supplier payments and journals / contras first saved after the shift was opened. Card, bank and cheque are not cash; cancelled documents are left out. A draft saved earlier and confirmed later falls in the shift its draft was saved in. Nothing is written to or changed on the bills or vouchers. Only the owner can change a closed shift."
+                "দোকানে একবারে একটাই শিফট খোলা থাকে। থাকার কথা = শুরুর ক্যাশ + ক্যাশ এসেছে − ক্যাশ গেছে। ক্যাশ এসেছে / গেছে গ্লোবাল লেজারের \"Cash in Hand\" থেকে - যে বিল, রিসিপ্ট, রিফান্ড, ক্যাশ খরচ, সাপ্লায়ার পেমেন্ট আর জার্নাল / কন্ট্রা এই শিফট খোলার পর প্রথম সেভ হয়েছে। কার্ড, ব্যাংক ও চেক ক্যাশে ধরা হয় না; বাতিল বাদ। আগে সেভ করা draft পরে confirm হলে সেটা draft সেভের সময়ের শিফটে পড়ে। বিল বা ভাউচারে কিছু লেখা বা বদলানো হয় না। বন্ধ শিফট শুধু মালিক বদলাতে পারেন। ক্যাশ ড্রয়ার: Windows ডেস্কটপ অ্যাপে \"ড্রয়ার খুলুন\" বা প্রিন্ট সেটিংসে অটো — ESC/POS কিক বিল/ড্রয়ার প্রিন্টারে; ব্যর্থ হলে আসল এরর। বারকোড: সেলস বিলের Code বক্সে স্ক্যান + Enter; লাইন যোগের পর ফোকাস Code-এ থাকে।",
+                "Only one shift is open in the shop at a time. Expected = opening cash + cash in − cash out. Cash in / out come from the Global Ledger's \"Cash in Hand\": the bills, receipts, refunds, cash expenses, supplier payments and journals / contras first saved after the shift was opened. Card, bank and cheque are not cash; cancelled documents are left out. A draft saved earlier and confirmed later falls in the shift its draft was saved in. Nothing is written to or changed on the bills or vouchers. Only the owner can change a closed shift. Cash drawer: Windows desktop \"Open drawer\" or Print Settings auto — ESC/POS kick to the bill/drawer printer; failures show a real error. Barcode: scan into the sales bill Code box + Enter; focus stays on Code after each line."
               )}
             </div>
           </>

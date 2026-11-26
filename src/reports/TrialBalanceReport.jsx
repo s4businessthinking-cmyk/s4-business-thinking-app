@@ -11,6 +11,8 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger, accountStatement } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
+import { valuationMethodOf } from "./stockValuation.js";
 import { TYPE_LABEL } from "../ledger/GlobalLedgerWindow.jsx";
 import { groupName } from "../ledger/coaGroups.js";
 import { fyStartDate } from "./balanceSheet.js";
@@ -92,7 +94,9 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
   }, []);
 
   const badRange = !!(from && to && from > to);
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod]);
   // year-end closing journals inside the period: the trial balance can show the figures before closing
   const closeIds = useMemo(() => yearEndDocIds(data?.accountVouchers, from, to), [data, from, to]);
   const excludeDocIds = beforeClose && closeIds.size ? closeIds : null;
@@ -213,7 +217,7 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
       )}
       <div className="si-body">
         {showFx && ledger && (
-          <ForexPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data} vendors={vendors}
+          <ForexPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data} vendors={vendors} customers={customers} onShopUpdated={onShopUpdated}
             shopName={shopName} toast={toast} onSaved={() => setTick((v) => v + 1)} onClose={() => setShowFx(false)} />
         )}
         {showYear && ledger && (

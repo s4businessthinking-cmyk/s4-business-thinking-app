@@ -2,6 +2,7 @@ import { localIsoDate } from "../utils/localIsoDate.js";
 import AppGlobalSearch from "./AppGlobalSearch.jsx";
 import ChequeDueAlert from "./ChequeDueAlert.jsx";
 import DashboardQuickNav from "./DashboardQuickNav.jsx";
+import { TILE_CSS, tileVars } from "./dashTiles.js";
 
 // ─── DASHBOARD TAB ───────────────────────────────────────────
 export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orders, cos, products, team, vendors, customers, isOwner, isDesktop, setTab, unread, staffQuickNavKeys, canUseBranchTransfer, btInbox=[], orderModuleEnabled, finance, moneyLocked=false, onUnlockMoney, onLockMoney, toast, onOpenMenu, globalSearchCan, onGlobalSearchNavigate, globalSearchCur, globalSearchCanSeeCost, shopId }) {
@@ -122,10 +123,10 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
   const navItems = isOwner ? ownerNavItems : salesNavItems;
 
   const statusCards = [
-    { label:t.dashPending,    value:pending,    icon:"", color:"#f59e0b", glow:"rgba(245,158,11,0.26)" },
-    { label:t.dashInProgress, value:inProgress, icon:"", color:"#0ea5e9", glow:"rgba(14,165,233,0.26)" },
-    { label:t.dashDelivered,  value:delivered,  icon:"", color:"#22c55e", glow:"rgba(34,197,94,0.24)" },
-    { label:t.dashCancelled,  value:cancelled,  icon:"", color:"#ef4444", glow:"rgba(239,68,68,0.24)" },
+    { label:t.dashPending,    value:pending,    icon:"", color:"#f59e0b" },
+    { label:t.dashInProgress, value:inProgress, icon:"", color:"#0ea5e9" },
+    { label:t.dashDelivered,  value:delivered,  icon:"", color:"#22c55e" },
+    { label:t.dashCancelled,  value:cancelled,  icon:"", color:"#ef4444" },
   ];
 
   const bn = lang==="bn";
@@ -138,9 +139,9 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
       value:money(finance.salesMonth), sub:bn?`${finance.salesMonthCount}টি ইনভয়েস`:`${finance.salesMonthCount} invoices` },
     { key:"ct", tab:"sales",    icon:"", color:"#10b981", label:bn?"আজ টাকা আদায়":"Collected today",
       value:money(finance.collectedToday), sub:bn?"নগদ + রিসিট":"Cash + receipts" },
-    { key:"pt", tab:"purchase", icon:"", color:"#8b5cf6", label:bn?"আজকের ক্রয়":"Today's purchase",
+    { key:"pt", tab:"purchase", icon:"", color:"#4f46e5", label:bn?"আজকের ক্রয়":"Today's purchase",
       value:money(finance.purchaseToday), sub:bn?`${finance.purchaseTodayCount}টি ইনভয়েস`:`${finance.purchaseTodayCount} invoices` },
-    { key:"pm", tab:"purchase", icon:"", color:"#a855f7", label:bn?"এই মাসের ক্রয়":"This month's purchase",
+    { key:"pm", tab:"purchase", icon:"", color:"#0369a1", label:bn?"এই মাসের ক্রয়":"This month's purchase",
       value:money(finance.purchaseMonth), sub:bn?`${finance.purchaseMonthCount}টি ইনভয়েস`:`${finance.purchaseMonthCount} invoices` },
   ];
   const creditCards = [
@@ -164,14 +165,16 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
       alert:finance.chequesIssued.dueNow>0 },
   ];
 
+  // dashTiles.js: accent bar + tinted surface per card type, lift on hover
   const moneyCard = (item, idx, list) => (
     <button
       key={item.key}
+      type="button"
+      className="s4-tile is-click"
       onClick={()=>setTab(item.tab)}
       style={{
-        ...glassCard,
-        borderRadius:14,
-        padding:isDesktop?"10px 12px":"9px 10px",
+        ...tileVars(item.color),
+        padding:isDesktop?"10px 12px 10px 16px":"9px 10px 9px 14px",
         minHeight:86,
         boxSizing:"border-box",
         display:"flex",
@@ -179,7 +182,6 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
         alignItems:"flex-start",
         justifyContent:"space-between",
         gap:4,
-        borderBottom:`3px solid ${item.color}`,
         flex:isDesktop?"1 1 0":undefined,
         minWidth:0,
         width:"100%",
@@ -192,13 +194,13 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
       }}
     >
       <div style={{ display:"flex", alignItems:"center", gap:7, width:"100%" }}>
-        <span style={{ width:24, height:24, borderRadius:12, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:12, flexShrink:0 }}>{item.icon}</span>
+        <span className="s4-dot" />
         <span style={{ color:th.txtSecondary, fontSize:11, fontWeight:800, lineHeight:1.15, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.label}</span>
       </div>
       <div style={{ fontSize:isDesktop?19:16, fontWeight:900, lineHeight:1.1, letterSpacing:-0.3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>
         <span style={{ fontSize:11, fontWeight:800, color:th.txtMuted, marginRight:4 }}>{cur}</span>{item.value}
       </div>
-      <div style={{ fontSize:10, fontWeight:700, color:item.alert?"#f59e0b":th.txtMuted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>{item.sub}</div>
+      <div style={{ fontSize:10, fontWeight:700, color:item.alert?(isLightDash?"#b45309":"#fbbf24"):th.txtMuted, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%" }}>{item.sub}</div>
       {item.extra&&(
         <div style={{ width:"100%", boxSizing:"border-box", marginTop:2, padding:"4px 7px", borderRadius:8, background:`${item.color}1f`, border:`1px solid ${item.color}44`, display:"flex", flexWrap:"wrap", justifyContent:"space-between", alignItems:"baseline", columnGap:6, rowGap:1, whiteSpace:"nowrap" }}>
           <span style={{ fontSize:10, fontWeight:800, color:th.txtSecondary }}> {item.extra.label} ({item.extra.count})</span>
@@ -211,16 +213,15 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
   const statCard = (item) => (
     <div
       key={item.label}
+      className="s4-tile"
       style={{
-        ...glassCard,
-        borderRadius:14,
-        padding:isDesktop?"10px 12px":"8px 8px",
+        ...tileVars(item.color),
+        padding:isDesktop?"10px 12px 10px 16px":"8px 8px 8px 12px",
         minHeight:isDesktop?72:64,
         height:isDesktop?72:64,
         boxSizing:"border-box",
         position:"relative",
         overflow:"hidden",
-        borderBottom:`3px solid ${item.color}`,
         display:"flex",
         flexDirection:"column",
         justifyContent:"space-between",
@@ -228,21 +229,19 @@ export function DashboardTab({ t, lang, th, s, profile, userUid, localShop, orde
         minWidth:0,
       }}
     >
-      <div style={{ position:"absolute", inset:"auto -28px -32px auto", width:72, height:72, borderRadius:"50%", background:item.glow||`${item.color}22`, filter:"blur(4px)" }} />
-      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:6, position:"relative", zIndex:1 }}>
-        <div style={{ width:30, height:30, borderRadius:15, background:`linear-gradient(135deg, ${item.color}, rgba(255,255,255,0.12))`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, boxShadow:`0 6px 14px ${item.color}44`, flexShrink:0 }}>
-          {item.icon}
-        </div>
-        <div style={{ color:th.txtPrimary, fontSize:isDesktop?22:20, lineHeight:1, fontWeight:900, letterSpacing:-0.5 }}>{item.value}</div>
+      <div style={{ display:"flex", alignItems:"center", gap:6, minWidth:0 }}>
+        <span className="s4-dot" />
+        <span style={{ color:th.txtSecondary, fontSize:isDesktop?11:10, fontWeight:800, lineHeight:1.2, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{item.label}</span>
       </div>
-      <div style={{ color:th.txtSecondary, fontSize:isDesktop?11:10, fontWeight:700, marginTop:6, lineHeight:1.2, position:"relative", zIndex:1 }}>{item.label}</div>
+      <div style={{ color:th.txtPrimary, fontSize:isDesktop?22:20, lineHeight:1, fontWeight:900, letterSpacing:-0.5 }}>{item.value}</div>
     </div>
   );
 
   const globalSearchOn = onGlobalSearchNavigate && globalSearchCan && Object.values(globalSearchCan).some(Boolean);
 
   return (
-    <div style={panelStyle}>
+    <div style={panelStyle} className={isLightDash?"s4-dash-light":"s4-dash-dark"}>
+      <style>{TILE_CSS}</style>
       {!isDesktop && globalSearchOn && (
         <div style={{ marginBottom: 10 }}>
           <AppGlobalSearch

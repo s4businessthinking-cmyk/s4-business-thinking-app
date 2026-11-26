@@ -10,6 +10,7 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { TYPE_LABEL } from "../ledger/GlobalLedgerWindow.jsx";
 import { r2 } from "./reportFilters.js";
 import { moneyAccounts } from "./booksHub.js";
@@ -38,7 +39,7 @@ const CF_CSS = `
 .cf-table tfoot td { font-weight: 700; border-top: 1px solid #7d94b7; }
 `;
 
-export default function CashFlowReport({ lang = "en", shopId, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
+export default function CashFlowReport({ lang = "en", shopId, shop = null, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [from, setFrom] = useState(monthStart);
@@ -76,9 +77,11 @@ export default function CashFlowReport({ lang = "en", shopId, customers = [], ve
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, []);
 
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
   const ledger = useMemo(
-    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors],
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
+    [data, shopId, customers, vendors, natureOf],
   );
   const moneyList = useMemo(() => (ledger ? moneyAccounts(ledger.accounts) : []), [ledger]);
   const badRange = !!(from && to && from > to);

@@ -8,6 +8,8 @@ const ENUM_KEYS = new Set([
   "sourcetype", "mode", "period", "stocklocation", "defaultbilltype", "logoalign",
   "workertype", "ticketentitlement", "contracttype", "visatype", "visacostpaidby", "maritalstatus",
   "taxapplicable", "profitsource", "partnertype", "stmttype", "sheet", "dir", "tone", "voucherkind",
+  // shop settings and journal markers the reports compare to lowercase words
+  "nature", "invoicearabic", "stockvaluationmethod", "interestside", "fxkind",
 ]);
 
 // "category" is free text for products but a fixed key for expenses.
@@ -28,12 +30,16 @@ const SKIP_KEY = new Set([
   "email", "password", "username", "pin", "pinhash", "passwordhash",
   "kind", "type", "applytype", "reversetype", "referencetype", "movementtype",
   "direction", "entrytype", "collectionname", "operation",
+  // a budget line's item key ("sales", "exp:rent", "acc:office rent") is an identifier, not text
+  "key",
   "website", "filingurl",
 ]);
 
 const SKIP_BRANCH = new Set([
   "permissions", "grouppermissions", "printdesign", "printsettings", "taxsettings",
   "style", "layout", "fontdata", "printfontdata",
+  // message wording the owner types (Bulk Message templates, payment reminder text) keeps its case and {placeholders}
+  "messagetemplates", "overduereminders",
 ]);
 
 const SKIP_KEY_END = /(?:id|uid|url|hash|token|html|css)$/i;

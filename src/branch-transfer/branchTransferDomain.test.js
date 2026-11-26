@@ -150,3 +150,21 @@ test("receipt bill is recognised as a branch transfer bill, a direct purchase is
   assert.equal(isBranchTransferBill({ id: "pi-2", invoiceNo: "PI-0002", grandTotal: 100 }), false);
   assert.equal(isBranchTransferBill(null), false);
 });
+
+test("cancel after a partial receipt returns only what never arrived; a closed transfer has nothing left to return", () => {
+  const firstReceipt = buildReceiptLines(transfer, [{ lineId: "line-1", receivedQty: 7, damagedQty: 1, issueNote: "One cracked" }]);
+  const partial = { ...transfer, status: BRANCH_TRANSFER_STATUSES.PARTIALLY_RECEIVED, receipts: [{ id: "rc-1", lines: firstReceipt }] };
+  assert.equal(deriveTransferStatus(transfer, firstReceipt), BRANCH_TRANSFER_STATUSES.DISCREPANCY);
+  // the dispatch cancel movement (branchTransferService reverseDispatchMovements) puts back remainingQuantityForLine
+  assert.equal(remainingQuantityForLine(partial, partial.items[0]), 3);
+  const all = buildReceiptLines(partial, [{ lineId: "line-1", receivedQty: 3, damagedQty: 0 }]);
+  const full = { ...partial, receipts: [...partial.receipts, { id: "rc-2", lines: all }] };
+  assert.equal(remainingQuantityForLine(full, full.items[0]), 0);
+  assert.equal(deriveTransferStatus(partial, all), BRANCH_TRANSFER_STATUSES.RECEIVED, "every unit handled (6 accepted + 1 damaged + 3)");
+  // the receipt bill is a stock movement record, never a sale or a supplier due
+  const bill = buildInternalPurchaseInvoice({ transfer, receipt: { id: "rc-1", sequence: 1, lines: firstReceipt }, shop: { id: "shop-1" }, actor: { uid: "u1" }, invoiceId: "pi-bt-1", paymentMethod: "credit" });
+  assert.equal(isBranchTransferBill(bill), true);
+  assert.equal(bill.excludeFromSupplierPayable, true);
+  assert.deepEqual([bill.totalTax, bill.items.every((it) => it.taxAmt === 0)], [0, true], "no VAT on an internal move");
+  assert.equal(bill.items.reduce((t, it) => t + it.qty, 0), 6, "only accepted units go on the bill; damaged stay out");
+});

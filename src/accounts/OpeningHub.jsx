@@ -12,6 +12,7 @@ import { syncOpeningBill } from "../utils/openingBill.js";
 import { logAudit } from "../utils/auditLog.js";
 import { periodLockOf } from "./periodLock.js";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { normalizeChart, toSaved, validateAccount } from "../ledger/chartOfAccounts.js";
 import { CHART_EXPENSE_NAMES } from "../ledger/ChartOfAccountsScreen.jsx";
 import { OPENING_ACCOUNT, currentOpenings, matchImport, natureLabel, openingAccounts, parseOpeningRows, parseTallyLedgers, planOpenings, reconcileOpenings } from "./openingHub.js";
@@ -71,7 +72,7 @@ export default function OpeningHub({ lang = "en", shopId, shop, user, profile, i
     return () => { cancelled = true; };
   }, [shopId, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const chart = useMemo(() => normalizeChart(shop?.chartOfAccounts, { expenseNames: CHART_EXPENSE_NAMES }), [shop?.chartOfAccounts]);
+  const chart = useMemo(() => normalizeChart(shop?.chartOfAccounts, { expenseNames: CHART_EXPENSE_NAMES, coaGroups: shop?.coaGroups }), [shop?.chartOfAccounts, shop?.coaGroups]);
   const accounts = useMemo(() => openingAccounts(chart), [chart]);
   const custList = useMemo(() => customers.filter((c) => c?.id && !c.isDeleted && !c.mergedInto), [customers]);
   const vendList = useMemo(() => vendors.filter((v) => v?.id && !v.isDeleted && !v.mergedInto), [vendors]);
@@ -213,7 +214,7 @@ export default function OpeningHub({ lang = "en", shopId, shop, user, profile, i
   // ── reconcile (S4 balance on the opening day vs the imported figure) ──
   const recon = useMemo(() => {
     if (!imported || !data || !date) return null;
-    const ledger = buildGlobalLedger(data, { shopId, customers: custList, vendors: vendList, expenseLabel: (e) => expenseCategoryLabel(e, false) });
+    const ledger = buildGlobalLedger(data, { shopId, customers: custList, vendors: vendList, natureOf: shopAccountNature(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) });
     const bal = balances(ledger.postings, date);
     const byName = new Map();
     ledger.accounts.forEach((a) => byName.set(lc(a.name), (byName.get(lc(a.name)) || 0) + (bal.get(a.key) || 0)));

@@ -1,5 +1,6 @@
 import React from "react";
 import { groupMenuItems } from "./menuGroups.js";
+import { GROUP_ACCENTS, TILE_CSS, monogram, tileVars } from "./dashTiles.js";
 
 const MIN_CARD = 110;
 
@@ -11,24 +12,17 @@ export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDa
   const metaByKey = Object.fromEntries(navItems.map((n) => [n.key, n]));
   const groups = groupMenuItems(navItems.map((n) => [n.key, n.label]), lang).filter((g) => g.items.length);
 
-  const glassCard = {
-    background: isLightDash
-      ? "linear-gradient(145deg, rgba(255,255,255,0.98), rgba(239,246,255,0.96))"
-      : "linear-gradient(145deg, rgba(30,41,59,0.92), rgba(15,23,42,0.86))",
-    border: isLightDash ? "1px solid rgba(59,130,246,0.18)" : "1px solid rgba(148,163,184,0.25)",
-    boxShadow: isLightDash ? "0 12px 28px rgba(30,64,175,0.10)" : "0 14px 35px rgba(2,6,23,0.32)",
-    backdropFilter: "blur(14px)",
-  };
-
-  const card = (item) => (
+  // dashTiles.js: each card takes its group's accent; a lettered monogram stands where the icon would be
+  const card = (item, accent) => (
     <button
       key={item.key}
       type="button"
+      className="s4-tile is-click"
       onClick={() => setTab(item.key)}
       style={{
-        ...glassCard,
-        borderRadius: 16,
-        padding: isDesktop ? "14px 8px" : "12px 6px",
+        ...tileVars(accent),
+        borderRadius: 14,
+        padding: isDesktop ? "12px 8px 12px 12px" : "10px 6px 10px 10px",
         height: isDesktop ? 104 : 92,
         boxSizing: "border-box",
         cursor: "pointer",
@@ -48,8 +42,8 @@ export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDa
           {item.badge}
         </span>
       )}
-      <span style={{ fontSize: isDesktop ? 28 : 25, lineHeight: 1, filter: "drop-shadow(0 8px 14px rgba(96,165,250,0.28))" }}>{item.icon}</span>
-      <span style={{ fontSize: isDesktop ? 13 : 12, fontWeight: 800, color: th.txtSecondary, textAlign: "center", lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      {item.icon ? <span style={{ fontSize: isDesktop ? 28 : 25, lineHeight: 1 }}>{item.icon}</span> : <span className="s4-mono" aria-hidden="true">{monogram(item.label)}</span>}
+      <span style={{ fontSize: isDesktop ? 13 : 12, fontWeight: 800, color: th.txtPrimary, textAlign: "center", lineHeight: 1.2, maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         {item.label}
       </span>
     </button>
@@ -59,7 +53,8 @@ export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDa
   const titleInRow = isDesktop && groups.length > 0 && !groups[0].label;
 
   return (
-    <div style={{ marginBottom: isDesktop ? 0 : 18, marginTop: titleInRow ? 12 : 0 }}>
+    <div className={isLightDash ? "s4-dash-light" : "s4-dash-dark"} style={{ marginBottom: isDesktop ? 0 : 18, marginTop: titleInRow ? 12 : 0 }}>
+      <style>{TILE_CSS}</style>
       {!titleInRow && <div style={{ margin: "12px 2px 8px", color: th.txtPrimary, fontSize: isDesktop ? 12 : 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: 0.7 }}>
         {title}
       </div>}
@@ -72,14 +67,15 @@ export default function DashboardQuickNav({ navItems, lang, isDesktop, isLightDa
                 cards line up with the cards of the titled group next to it (Masters) */}
             {(g.label || isDesktop) && (
               <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "0 2px 8px" }}>
-                <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", color: g.label ? (isLightDash ? "#1e3a8a" : "#cbd5e1") : th.txtPrimary, letterSpacing: g.label ? 0.4 : 0.7, whiteSpace: "nowrap" }}>
-                  {g.label ? `${g.icon} ${g.label}` : (gi === 0 && titleInRow ? title : " ")}
+                {g.label && <span style={{ width: 4, height: 12, borderRadius: 2, background: GROUP_ACCENTS[g.key] || GROUP_ACCENTS.utilities, flexShrink: 0 }} />}
+                <span style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", color: g.label ? (isLightDash ? "#1e293b" : "#cbd5e1") : th.txtPrimary, letterSpacing: g.label ? 0.4 : 0.7, whiteSpace: "nowrap" }}>
+                  {g.label ? `${g.icon ? `${g.icon} ` : ""}${g.label}` : (gi === 0 && titleInRow ? title : " ")}
                 </span>
-                {g.label && <span style={{ flex: 1, height: 1, background: isLightDash ? "rgba(59,130,246,0.18)" : "rgba(148,163,184,0.22)" }} />}
+                {g.label && <span style={{ flex: 1, height: 1, background: isLightDash ? `${GROUP_ACCENTS[g.key] || GROUP_ACCENTS.utilities}33` : "rgba(148,163,184,0.22)" }} />}
               </div>
             )}
             <div style={{ display: "grid", gridTemplateColumns: isDesktop ? `repeat(auto-fit, minmax(${MIN_CARD}px, 1fr))` : "repeat(3, minmax(0, 1fr))", gap: isDesktop ? 10 : 8 }}>
-              {g.items.map(([key]) => (metaByKey[key] ? card(metaByKey[key]) : null))}
+              {g.items.map(([key]) => (metaByKey[key] ? card(metaByKey[key], GROUP_ACCENTS[g.key] || GROUP_ACCENTS.utilities) : null))}
             </div>
           </div>
         ))}

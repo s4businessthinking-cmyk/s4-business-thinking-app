@@ -87,3 +87,39 @@ test("like the party ledger: bills by name only join the customer, any live stat
   const cash = [...accounts.values()].find((a) => a.name === "Cash in Hand").key;
   assert.equal(b.get(cash), 10 + 15); // paid on a "credit" bill still lands in cash, the entry stays balanced
 });
+
+test("stock adjustments and warranty replacements: loss out of Purchase, surplus and warranty back in; only live ones, valued at the day's average cost", () => {
+  const products = [{ id: "p1", name: "Pad", openingStock: 0 }];
+  const buy = (id, day, qty, cost) => ({ id, shopId: S, status: "confirmed", invoiceNo: id, invoiceDate: day, vendorName: "Gulf", grandTotal: qty * cost, totalTax: 0, amountPaid: 0, paymentMethod: "credit", items: [{ productId: "p1", qty, lineTotal: qty * cost }] });
+  const adj = (id, day, qty, direction, extra = {}) => ({ id, shopId: S, status: "confirmed", adjustNo: id, adjustDate: day, reason: "damage", items: [{ productId: "p1", qty, direction }], ...extra });
+  const d = {
+    purchaseInvoices: [buy("PI-1", "2026-10-01", 10, 10), buy("PI-2", "2026-10-20", 10, 20)],
+    stockAdjustments: [
+      adj("SA-1", "2026-10-10", 2, "out"),
+      adj("SA-2", "2026-10-25", 1, "in", { reason: "count" }),
+      adj("SA-D", "2026-10-11", 5, "out", { status: "draft" }),
+      adj("SA-C", "2026-10-11", 5, "out", { status: "cancelled" }),
+      adj("SA-X", "2026-10-11", 5, "out", { isDeleted: true }),
+      adj("SA-O", "2026-10-11", 5, "out", { shopId: "other" }),
+    ],
+    warrantyClaims: [
+      { id: "w1", shopId: S, status: "replaced", claimNo: "WC-1", claimDate: "2026-10-05", replacedDate: "2026-10-26", productId: "p1", qty: 1 },
+      { id: "w2", shopId: S, status: "sent", claimNo: "WC-2", claimDate: "2026-10-05", productId: "p1", qty: 1 },
+    ],
+  };
+  const led = buildGlobalLedger(d, { shopId: S, products });
+  const stock = led.postings.filter((p) => p.col === "stockAdjustments" || p.col === "warrantyClaims");
+  const line = (no, name) => stock.find((p) => p.no === no && led.accounts.get(p.key)?.name === name);
+  assert.deepEqual([...new Set(stock.map((p) => p.no))], ["SA-1", "SA-2", "WC-1"], "draft / cancelled / deleted / other shop / not replaced are left out");
+  assert.deepEqual([line("SA-1", "Stock Adjustment").dr, line("SA-1", "Purchase").cr, line("SA-1", "Stock Adjustment").date], [20, 20, "2026-10-10"], "2 at the average of 10 on that day");
+  assert.deepEqual([line("SA-2", "Purchase").dr, line("SA-2", "Stock Adjustment").cr], [15, 15], "1 found at the average of 15 after PI-2");
+  assert.deepEqual([line("WC-1", "Purchase").dr, line("WC-1", "Warranty Replacement Stock").cr, line("WC-1", "Purchase").date], [15, 15, "2026-10-26"], "warranty on its replaced day");
+  assert.equal(line("SA-1", "Stock Adjustment").type, "stockAdjust");
+  assert.equal(line("WC-1", "Warranty Replacement Stock").type, "warrantyStock");
+  assert.equal(led.accounts.get(line("SA-1", "Stock Adjustment").key).group, "expense");
+  assert.equal(led.accounts.get(line("WC-1", "Warranty Replacement Stock").key).group, "income");
+  // without the product master nothing is valued, so nothing is posted (screens that do not pass products are unchanged)
+  assert.equal(buildGlobalLedger(d, { shopId: S }).postings.filter((p) => p.col === "stockAdjustments").length, 0);
+  // the same documents in extras / rows.extras are read too
+  assert.equal(buildGlobalLedger({ purchaseInvoices: d.purchaseInvoices, rows: { extras: { stockAdjustments: d.stockAdjustments } } }, { shopId: S, products }).postings.filter((p) => p.col === "stockAdjustments").length, 4);
+});

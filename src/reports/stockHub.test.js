@@ -95,3 +95,10 @@ test("product search covers code, name, brand, category and rack", () => {
   assert.equal(productMatches(products[0], "f-1"), true);
   assert.equal(productMatches(products[1], "filter"), false);
 });
+
+test("valuation without cost rights (empty cost map) holds no cost: every value 0 and flagged unpriced", () => {
+  const prods = [{ id: "a", name: "A", category: "Oil" }, { id: "b", name: "B" }];
+  const v = valuation(prods, new Map([["a", 4], ["b", 2]]), new Map());
+  assert.deepEqual(v.rows.map((r) => [r.cost, r.value]), [[0, 0], [0, 0]]);
+  assert.deepEqual([v.total, v.unpriced], [0, 2]);
+});

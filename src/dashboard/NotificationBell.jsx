@@ -52,7 +52,7 @@ export default function NotificationBell({ lang, theme, items = [] }) {
           cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", position: "relative",
         }}
       >
-        
+        🔔
         {count > 0 && (
           <span style={{
             position: "absolute", top: -6, right: -6, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9,

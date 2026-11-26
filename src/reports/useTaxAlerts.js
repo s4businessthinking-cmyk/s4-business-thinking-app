@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { offlineList } from "../offline/offlineRepository";
 import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
+import { shopAccountNature } from "../ledger/accountNature.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
 import { computeAccounts } from "./accountsCalc.js";
 import { computeVat, corporateTax, ctDueDate, fyRange, periodRange, taxSettingsOf, addDays } from "./taxDomain.js";
 import { taxDueAlerts } from "./taxAlerts.js";
@@ -68,7 +70,7 @@ export function useTaxAlerts({ shopId, shop, products = [], customers = [], vend
     [enabled, data, shopId, period.from, period.to, customers, vendors, shop?.emirate],
   );
   const fyAcc = useMemo(
-    () => (enabled && settings.ctEnabled && data ? computeAccounts(data, { products, shopId, from: fy.from, to: fy.to, bn }) : null),
+    () => (enabled && settings.ctEnabled && data ? computeAccounts(data, { products, shopId, from: fy.from, to: fy.to, bn, natureOf: shopAccountNature(shop), method: valuationMethodOf(shop) }) : null),
     [enabled, settings.ctEnabled, data, products, shopId, fy.from, fy.to, bn],
   );
   const ct = fyAcc ? corporateTax({ profit: fyAcc.netProfit, revenue: fyAcc.netSales, settings }) : null;

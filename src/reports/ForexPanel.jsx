@@ -9,6 +9,7 @@ import { saveTextFile } from "../utils/saveTextFile.js";
 import { logAudit } from "../utils/auditLog.js";
 import { activePeriodLock } from "../accounts/periodLock.js";
 import { csvText } from "./vatExport.js";
+import SalesForexSection from "./SalesForexSection.jsx";
 import { FX_COLS, fxBlockers, fxCsvRows, fxPosition, liveFx, openCurrencies, realisedJournal, revalJournalId, revaluationJournal, revaluationLines } from "./forex.js";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
@@ -21,7 +22,7 @@ const SET_ERR = {
   rate: ["রেট দিন", "Enter the rate"], date: ["তারিখ দিন", "Pick the date"], same: ["বিলের রেটের সমান - কোনো পার্থক্য নেই", "Same as the bill rate - no difference"],
 };
 
-export default function ForexPanel({ lang = "en", shopId, shop, user, profile, isOwner = false, canPrint = false, data, vendors = [], shopName = "", toast, onSaved, onClose }) {
+export default function ForexPanel({ lang = "en", shopId, shop, user, profile, isOwner = false, canPrint = false, data, vendors = [], customers = [], shopName = "", toast, onSaved, onClose, onShopUpdated }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const base = String(shop?.currency || "AED").trim().toUpperCase();
@@ -191,6 +192,8 @@ export default function ForexPanel({ lang = "en", shopId, shop, user, profile, i
             {settleBlk.map((b) => <div key={b.id} style={{ color: "#b91c1c", width: "100%", fontSize: 12.5 }}>{bn ? b.bn : b.en}</div>)}
           </div>
         )}
+        <SalesForexSection lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} data={data} customers={customers} base={base}
+          today={today} lockDate={lockDate} toast={toast} onSaved={onSaved} onShopUpdated={onShopUpdated} />
         {!isOwner && <div className="si-muted">{L("পুনর্মূল্যায়ন আর বিনিময় পার্থক্য শুধু মালিক লিখতে পারেন", "Only the owner can post a revaluation or an exchange difference")}</div>}
         <div className="si-note">
           {L(

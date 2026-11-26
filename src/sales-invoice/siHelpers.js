@@ -117,7 +117,7 @@ export function siEmptyForm() {
     paymentMethod:"cash", amountPaid:"", cashPartial:false,
     deliveryNoteNo:"", vehicleNo:"",
     note:"",
-    refNo:"", salesmanId:"", salesmanName:"", currency:"AED", stockLocation:"main", stockLocationName:"Main",
+    refNo:"", salesmanId:"", salesmanName:"", currency:"AED", exchangeRate:"", stockLocation:"main", stockLocationName:"Main",
     billDiscPerc:"", billDiscAmt:"", adjustment:"", adjustmentReasonId:"", adjustmentReason:"", roundOff:"", creditDays:"", hideCodeInPrint:false,
     validUntil:"",
   };

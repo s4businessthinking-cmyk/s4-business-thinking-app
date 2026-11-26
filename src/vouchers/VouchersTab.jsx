@@ -44,7 +44,7 @@ const TILE_CSS = `
 export default function VouchersTab({
   lang = "en", shopId, user, profile, isOwner, canJournal = false, canDelete = false, canPrint = false, cur = "AED", toast, shopName = "",
   makeNo, leaveGuard = null, customers = [], vendors = [], banks = [],
-  onOpenReceipts, onOpenPayments, onOpenDebitNote, onOpenCreditNote, canSeeReceipts = false, canSeePayments = false, savedChart = null,
+  onOpenReceipts, onOpenPayments, onOpenDebitNote, onOpenCreditNote, canSeeReceipts = false, canSeePayments = false, savedChart = null, savedGroups = null,
 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
@@ -63,7 +63,7 @@ export default function VouchersTab({
   const fitH = usePmFitHeight(rootRef, mobile);
   const type = ACCOUNT_VOUCHER_TYPES[view] || null;
   // Which voucher kinds the register lists: journal / contra with the journal permission, receipts / payments with theirs.
-  const registerInclude = useMemo(() => ({ journal: isOwner || canJournal, contra: isOwner || canJournal, receipt: !!canSeeReceipts, payment: !!canSeePayments }),
+  const registerInclude = useMemo(() => ({ journal: isOwner || canJournal, contra: isOwner || canJournal, memo: isOwner || canJournal, receipt: !!canSeeReceipts, payment: !!canSeePayments }),
     [isOwner, canJournal, canSeeReceipts, canSeePayments]);
   const canRegister = Object.values(registerInclude).some(Boolean);
 
@@ -74,7 +74,7 @@ export default function VouchersTab({
   }, [shopId]);
 
   // Pickers come from the chart of accounts (active accounts); until the owner has saved one, the bank list is offered too.
-  const chart = useMemo(() => normalizeChart(savedChart, { expenseNames: CHART_EXPENSE_NAMES }), [savedChart]);
+  const chart = useMemo(() => normalizeChart(savedChart, { expenseNames: CHART_EXPENSE_NAMES, coaGroups: savedGroups }), [savedChart, savedGroups]);
   const bankHints = useMemo(() => (Array.isArray(savedChart) ? [] : banks.map((b) => `Bank - ${b}`)), [savedChart, banks]);
   const accountNames = useMemo(() => {
     const names = [
@@ -205,7 +205,7 @@ export default function VouchersTab({
   // A journal / contra has no party of its own: WhatsApp asks for the number.
   const voucherWhatsApp = (r) => ({
     html: voucherHtml(r), fileName: pdfFileName(r.voucherNo), phone: "",
-    text: docMessage({ bn, shop: shopName, docType: r.voucherType === "contra" ? L("কন্ট্রা ভাউচার", "Contra voucher") : L("জার্নাল ভাউচার", "Journal voucher"),
+    text: docMessage({ bn, shop: shopName, docType: r.voucherType === "contra" ? L("কন্ট্রা ভাউচার", "Contra voucher") : r.voucherType === "memo" ? L("মেমো ভাউচার (হিসাবে যায় না)", "Memo voucher (not posted)") : L("জার্নাল ভাউচার", "Journal voucher"),
       no: r.voucherNo, date: r.voucherDate, total: r.totalAmount, cur, extra: r.narration || "" }),
   });
 
@@ -243,6 +243,7 @@ export default function VouchersTab({
     { key: "payments", icon: "", label: "Payments", hint: L("ভেন্ডরকে টাকা দেওয়া", "Money paid to vendors"), onClick: onOpenPayments },
     { key: "journal", icon: "", label: "Journal", hint: L("খাতায় সংশোধন / স্থানান্তর", "Book adjustments"), onClick: canJournal ? () => setView("journal") : null },
     { key: "contra", icon: "", label: "Contra", hint: L("ক্যাশ ⇄ ব্যাংক", "Cash ⇄ Bank"), onClick: canJournal ? () => setView("contra") : null },
+    { key: "memo", icon: "", label: "Memo", hint: L("শুধু রেকর্ড - হিসাবে যায় না", "Record only - not posted to the books"), onClick: canJournal ? () => setView("memo") : null },
     { key: "debit", icon: "", label: "Debit Note", hint: L("ভেন্ডরকে মাল ফেরত", "Purchase return"), onClick: onOpenDebitNote },
     { key: "credit", icon: "", label: "Credit Note", hint: L("কাস্টমার থেকে মাল ফেরত", "Sales return"), onClick: onOpenCreditNote },
     { key: "register", icon: "", label: "Register", hint: L("সব ভাউচারের তালিকা, প্রিন্ট ও Excel", "All vouchers: list, print, Excel"), onClick: canRegister ? () => setView("register") : null },
@@ -427,6 +428,7 @@ export default function VouchersTab({
       <style>{TILE_CSS}</style>
       <div className="pm-reference-title">
         <strong>{type.icon} {typeTitle}</strong>
+        {view === "memo" && <span className="si-muted" style={{ marginLeft: 8 }}>{L("মেমো ভাউচার লেজার, ট্রায়াল ব্যালেন্স, লাভ-ক্ষতি, ব্যালেন্স শিট বা VAT-এ যায় না - শুধু রেকর্ড আর প্রিন্টের জন্য।", "A memo voucher does not go to the ledger, trial balance, P&L, Balance Sheet or VAT - it is kept and printed for the record only.")}</span>}
         <span>{from ? fmtDay(from) : L("শুরু", "Start")} — {to ? fmtDay(to) : L("আজ", "Today")}</span>
       </div>
       <div className="si-toolbar">

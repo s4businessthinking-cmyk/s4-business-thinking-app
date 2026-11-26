@@ -2,8 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   isStale, alertsFor, securityChequeAlerts, validateSecurityCheque, emptySecurityCheque, liveSecurityCheques,
-  openInvoicesFor, outstandingBalanceFor,
-} from "./securityCheque.js";
+  openInvoicesFor, outstandingBalanceFor, securityChequeStatusPatch } from "./securityCheque.js";
 
 test("isStale: true once reminderMonths have passed since lastTxn, only while held", () => {
   const r = { status: "held", lastTxn: "2026-01-01", reminderMonths: 3 };
@@ -79,4 +78,30 @@ test("outstandingBalanceFor: sums balanceDue for that party, excluding cancelled
     { id: "i3", customerId: "c2", status: "confirmed", balanceDue: 20 },
   ];
   assert.equal(outstandingBalanceFor(invoices, "customerId", "c1"), 50);
+});
+
+test("status actions: only a held cheque moves; returned and presented are final; approval needs a request", () => {
+  const at = "2026-11-26T10:00:00.000Z";
+  const held = { id: "c1", status: "held", closureRequested: false };
+  const req = securityChequeStatusPatch(held, "requestClosure", { at, by: "u1" });
+  assert.deepEqual(req.patch, { closureRequested: true, updatedAt: at, updatedBy: "u1" });
+  assert.equal(securityChequeStatusPatch(held, "approveClosure", { at }).error, "no-request");
+  assert.equal(securityChequeStatusPatch(held, "cancelClosure", { at }).error, "no-request");
+  const requested = { ...held, ...req.patch };
+  const appr = securityChequeStatusPatch(requested, "approveClosure", { at, by: "owner" });
+  assert.deepEqual([appr.patch.closureApproved, appr.patch.closureApprovedBy], [true, "owner"]);
+  assert.equal(securityChequeStatusPatch({ ...requested, ...appr.patch }, "approveClosure", { at }).error, "already-approved");
+  const ret = securityChequeStatusPatch({ ...requested, ...appr.patch }, "returned", { at, by: "owner" });
+  assert.deepEqual([ret.patch.status, ret.patch.closureRequested, ret.patch.returnedAt], ["returned", false, at]);
+  const returned = { ...requested, ...appr.patch, ...ret.patch };
+  for (const action of ["returned", "presented", "requestClosure", "cancelClosure", "approveClosure"]) {
+    assert.equal(securityChequeStatusPatch(returned, action, { at }).error, "not-held", `returned cannot ${action}`);
+  }
+  const pres = securityChequeStatusPatch(held, "presented", { at, by: "owner" });
+  assert.deepEqual([pres.patch.status, pres.patch.presentedBy], ["presented", "owner"]);
+  assert.equal(securityChequeStatusPatch({ ...held, ...pres.patch }, "returned", { at }).error, "not-held");
+  assert.equal(securityChequeStatusPatch(held, "bounced", { at }).error, "unknown");
+  assert.equal(securityChequeStatusPatch(null, "returned").error, "not-held");
+  // a returned / presented cheque raises no reminders
+  assert.deepEqual(alertsFor({ ...returned, lastTxn: "2020-01-01" }, "2026-11-26"), []);
 });

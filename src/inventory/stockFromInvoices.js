@@ -1,8 +1,9 @@
 import { offlineList } from "../offline/offlineRepository";
 import { itemBaseQty } from "./unitConversion";
 import { beginInvoiceRowsLoad, invalidateInvoiceRowsCache } from "./stockRowsCache.js";
+import { addAdjustments, addWarrantyClaims } from "./stockMovements.js";
 
-export { invalidateInvoiceRowsCache };
+export { invalidateInvoiceRowsCache, addAdjustments, addWarrantyClaims };
 
 const STOCK_AFFECTING_STATUSES = ["confirmed", "paid", "partial"];
 const DELIVERY_NOTE_STOCK_STATUSES = ["confirmed", "invoiced"];
@@ -48,37 +49,6 @@ function addInvoices(invoices, shopId, into, sign, productById, statuses = STOCK
 
 const RETURN_STOCK_STATUSES = ["confirmed"];
 export const GOODS_RECEIPT_STOCK_STATUSES = ["confirmed", "invoiced"];
-
-function addAdjustments(adjustments, shopId, into, productById, onlyIds = null) {
-  (adjustments || []).forEach((adj) => {
-    if (!adj || adj.isDeleted || adj.deleted || adj.status !== "confirmed") return;
-    if (shopId && adj.shopId && adj.shopId !== shopId) return;
-    (adj.items || []).forEach((it) => {
-      if (!it?.productId) return;
-      if (onlyIds && !onlyIds.has(it.productId)) return;
-      const qty = itemBaseQty(it, productById.get(it.productId));
-      if (qty <= 0) return;
-      into.set(it.productId, (into.get(it.productId) || 0) + (it.direction === "out" ? -qty : qty));
-    });
-  });
-}
-
-/** Warranty: only "replaced" (company gave new unit, still at shop) adds saleable stock. */
-function addWarrantyClaims(claims, shopId, into, productById, onlyIds = null) {
-  (claims || []).forEach((c) => {
-    if (!c || c.isDeleted || c.deleted || c.status !== "replaced") return;
-    if (shopId && c.shopId && c.shopId !== shopId) return;
-    const productId = c.replacedProductId || c.productId;
-    if (!productId) return;
-    if (onlyIds && !onlyIds.has(productId)) return;
-    const qty = itemBaseQty(
-      { productId, qty: c.qty, unitFactor: c.unitFactor || 1 },
-      productById.get(productId),
-    );
-    if (qty <= 0) return;
-    into.set(productId, (into.get(productId) || 0) + qty);
-  });
-}
 
 // Stock = opening stock + purchased + goods received − sold − delivered + sales returns − purchase returns ± adjustments, in base units.
 export function computeStockMap(products, purchaseInvoices, salesInvoices, shopId, deliveryNotes = [], extras = {}) {

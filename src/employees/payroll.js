@@ -151,6 +151,18 @@ export function buildSif({ wps, ym, lines, amounts, now = new Date() }) {
   return { text: `${[...edr, scr].join("\r\n")}\r\n`, fileName: `${wps.employerId}${stamp}.SIF`, count: edr.length, total };
 }
 
+/**
+ * What the owner does with the SIF once it is saved. S4 only writes the file: it does not upload it, so it never knows
+ * whether the bank or MOHRE accepted it - each step is the owner's.
+ */
+export const WPS_HANDOFF_STEPS = [
+  { en: "Check the file: one EDR line per employee and one SCR line with the count and the total shown here (plain text, CRLF lines).", bn: "ফাইলটা দেখুন: প্রতি কর্মচারীর একটা EDR লাইন, আর শেষে একটা SCR লাইন - এখানে দেখানো জন আর মোট টাকার সাথে মেলে (সাধারণ টেক্সট, CRLF লাইন)।" },
+  { en: "Keep the file name as saved (employer ID + date and time, .SIF) - most banks reject a renamed file.", bn: "ফাইলের নাম যেমন সেভ হয়েছে তেমনই রাখুন (নিয়োগকর্তা আইডি + তারিখ-সময়, .SIF) - নাম বদলালে অনেক ব্যাংক নেয় না।" },
+  { en: "Upload it on your bank's or exchange house's WPS / payroll portal, and fund the salary account for the same total.", bn: "ব্যাংক বা এক্সচেঞ্জ হাউসের WPS / বেতন পোর্টালে আপলোড করুন, আর বেতন অ্যাকাউন্টে একই মোট টাকা রাখুন।" },
+  { en: "Wait for the bank's acceptance and MOHRE's processed status - S4 does not receive them. Fix any rejected line on the Employees master and save a new file.", bn: "ব্যাংকের গ্রহণ আর MOHRE-এর প্রসেসড স্ট্যাটাসের জন্য অপেক্ষা করুন - S4 সেগুলো পায় না। কোনো লাইন ফেরত এলে কর্মচারী মাস্টারে ঠিক করে নতুন ফাইল সেভ করুন।" },
+  { en: "Pay the run here (Pay by: WPS) on the transfer date, so the salary expense and bank lines match the bank statement.", bn: "ট্রান্সফারের তারিখে এখানে বেতন পরিশোধ করুন (WPS), যাতে বেতনের খরচ আর ব্যাংকের লাইন ব্যাংক স্টেটমেন্টের সাথে মেলে।" },
+];
+
 // ---- print / Excel ----
 
 export const payrollSheetCols = (cur) => ["Employee", "Paid days", `Fixed (${cur})`, `Overtime (${cur})`, `Bonus (${cur})`, `Deduction (${cur})`, `Earned (${cur})`, `Paid before (${cur})`, `Net due (${cur})`, "Paid by"];

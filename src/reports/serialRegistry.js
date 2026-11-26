@@ -1,12 +1,13 @@
 // Serial / IMEI registry: every product serial already saved on a document, with its lifecycle worked out from
 // those documents only. Sources (the fields that exist today):
-// - sales / purchase invoice lines: items[].serialNo (bills do not ask for it yet; older or imported bills may have it)
+// - sales / purchase invoice lines: items[].serialNo - one serial per unit, comma separated (sales-invoice/serialRules.js)
 // - sales returns / purchase returns: items[].serialNo (optional on each returned line)
 // - warranty claims: serialNo, through received / sent / replaced / delivered
 // - job cards (service): serialNo of the customer's item, with the job status
 // A serial's status is its latest event; nothing is assumed between documents (a purchased serial is not reported
 // as "in stock" unless a document says so). Invoice numbering serials (SI-0001...) are not product serials.
 import { dayOf, isLive } from "./reportFilters.js";
+import { splitSerials } from "../sales-invoice/serialRules.js";
 
 const LIVE_BILL = ["confirmed", "paid", "partial"];
 // Spaces, dashes and other separators are ignored, so "35-111 222" and "35111222" are one serial.
@@ -41,7 +42,7 @@ export function buildSerialRegistry(data, { shopId = "" } = {}) {
     if (!isLive(doc, shopId) || !okStatus(doc)) return;
     (doc.items || []).forEach((it) => {
       if (!it?.serialNo) return;
-      add(it.serialNo, { kind, date: dateOf(doc), no: noOf(doc), col, docId: doc.id, party: partyOf(doc) || "", productId: it.productId || "", productName: it.name || "", productCode: it.code || "", detail: doc.invoiceNo && col.endsWith("Returns") ? doc.invoiceNo : "" });
+      splitSerials(it.serialNo).forEach((serial) => add(serial, { kind, date: dateOf(doc), no: noOf(doc), col, docId: doc.id, party: partyOf(doc) || "", productId: it.productId || "", productName: it.name || "", productCode: it.code || "", detail: doc.invoiceNo && col.endsWith("Returns") ? doc.invoiceNo : "" }));
     });
   });
 

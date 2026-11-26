@@ -111,9 +111,16 @@ export function ctDueDate(fyEndIso) {
 }
 
 const partyRegion = (party) => String(party?.emirate || party?.city || party?.area || "").trim();
+const trnText = (v) => String(v ?? "").trim();
+
+/**
+ * The supplier TRN that makes input VAT on a purchase bill recoverable: the supplier master's TRN, else the TRN typed on
+ * the bill itself (a supplier with no master record, or one whose TRN was never added to it). Blank stays blank.
+ */
+export const supplierTrnOf = (vendor, bill) => trnText(vendor?.trnNumber) || trnText(bill?.vendorTrn);
 
 // defaultRegion: the shop's own Emirate/region, used for cash sales and customers without one.
-export function computeVat(data, { shopId, from, to, customers = [], vendors = [], defaultRegion = "" }) {
+export function computeVat(data, { shopId, from, to, customers = [], vendors = [], defaultRegion = "", natureOf = null }) {
   if (!data) return null;
   const customerById = new Map(customers.map((c) => [c.id, c]));
   const vendorById = new Map(vendors.map((v) => [v.id, v]));
@@ -123,6 +130,8 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   const purchases = livePurchasesOf(data.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance" && inPeriod(inv.invoiceDate));
   const salesRet = liveReturnsOf(data.extras?.salesReturns, shopId).filter((r) => inPeriod(r.returnDate));
   const purchRet = liveReturnsOf(data.extras?.purchaseReturns, shopId).filter((r) => inPeriod(r.returnDate));
+  // a return reverses the VAT of its bill, so it takes the bill's TRN when the supplier master has none (bill may be in an earlier period)
+  const purchaseBillById = new Map(livePurchasesOf(data.purchaseInvoices, shopId).map((inv) => [inv.id, inv]));
   // Only expense bills with VAT on them (rent, electricity, repairs…) are claimable; salary and other no-VAT costs stay out.
   const expenseBills = (data.expenses || []).filter((e) => isLive(e, shopId) && e.status !== "cancelled" && n(e.vatAmount) > 0 && inPeriod(e.expenseDate));
   // VAT on a fixed asset bought through the asset register (its booking journal carries the bill's VAT)
@@ -142,30 +151,30 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     })),
   ].sort((a, b) => a.date.localeCompare(b.date) || a.no.localeCompare(b.no));
 
-  // A vendor without a TRN on file means the bill cannot carry a valid tax invoice, so that VAT
+  // A vendor without a TRN (on file or on the bill) means the bill cannot carry a valid tax invoice, so that VAT
   // is not reclaimable — these rows stay visible (for the bill list) but are kept out of the
   // input VAT totals below via vatClaimable.
   const purchaseRows = [
     ...purchases.map((inv) => {
-      const trn = vendorById.get(inv.vendorId)?.trnNumber || "";
+      const trn = supplierTrnOf(vendorById.get(inv.vendorId), inv);
       return { id: inv.id, date: dayOf(inv.invoiceDate), no: inv.invoiceNo || "", ref: inv.supplierInvoiceNo || "", party: inv.vendorName || "",
         trn, vatClaimable: !!trn,
         taxable: r2(n(inv.grandTotal) - n(inv.totalTax)), vat: r2(inv.totalTax), total: r2(inv.grandTotal), isReturn: false };
     }),
     ...purchRet.map((r) => {
-      const trn = vendorById.get(r.partyId)?.trnNumber || "";
+      const trn = supplierTrnOf(vendorById.get(r.partyId), r) || trnText(purchaseBillById.get(r.invoiceId)?.vendorTrn);
       return { id: r.id, date: dayOf(r.returnDate), no: r.returnNo || "", ref: r.supplierInvoiceNo || r.invoiceNo || "", party: r.partyName || "",
         trn, vatClaimable: !!trn,
         taxable: -r2(n(r.total) - n(r.totalVat)), vat: -r2(r.totalVat), total: -r2(r.total), isReturn: true };
     }),
     ...expenseBills.map((e) => {
-      const trn = e.supplierTrn || "";
+      const trn = trnText(e.supplierTrn);
       return { id: e.id, date: dayOf(e.expenseDate), no: e.expenseNo || "", ref: e.refNo || "", party: e.paidTo || e.categoryName || e.category || "",
         trn, vatClaimable: !!trn,
         taxable: r2(n(e.amount) - n(e.vatAmount)), vat: r2(e.vatAmount), total: r2(e.amount), isReturn: false, isExpense: true };
     }),
     ...assetBills.map((v) => {
-      const trn = v.supplierTrn || "";
+      const trn = trnText(v.supplierTrn);
       const total = r2(n(v.totalAmount));
       return { id: v.id, date: dayOf(v.voucherDate), no: v.voucherNo || "", ref: v.refNo || "", party: v.paidTo || "",
         trn, vatClaimable: !!trn, taxable: r2(total - n(v.vatAmount)), vat: r2(v.vatAmount), total, isReturn: false, isExpense: true, isAsset: true };
@@ -196,7 +205,7 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
   });
   const regionRows = [...regionMap.values()].map((x) => ({ ...x, taxable: r2(x.taxable), vat: r2(x.vat) })).sort((a, b) => b.vat - a.vat);
 
-  // Purchases grouped per supplier — only the ones counted as recoverable (vendor has a TRN on file).
+  // Purchases grouped per supplier — only the ones counted as recoverable (vendor has a TRN on file or on the bill).
   const vendorMap = new Map();
   stdPurchRows.forEach((r) => {
     const key = r.party || "—";
@@ -252,7 +261,7 @@ export function computeVat(data, { shopId, from, to, customers = [], vendors = [
     .sort((a, b) => b.salesVat - a.salesVat || b.purchVat - a.purchVat);
 
   const journalVouchers = (data.accountVouchers || data.extras?.accountVouchers || []).filter((v) => isLive(v, shopId));
-  const journalPl = journalPlByAccount(journalVouchers, shopId, from, to);
+  const journalPl = journalPlByAccount(journalVouchers, shopId, from, to, natureOf);
   const journalExpensePl = journalPlTotal(journalPl);
 
   // which rows count as standard-rated (the VAT201 hub reads this; the totals below do not change)
@@ -288,4 +297,47 @@ export function corporateTax({ profit, revenue, settings }) {
   const atRate = Math.max(0, taxable - threshold);
   const tax = sbrApplied ? 0 : r2((atRate * rate) / 100);
   return { taxable, threshold, rate, atZero: r2(atZero), atRate: r2(atRate), tax, sbrEligible, sbrApplied, sbrLimit, isLoss: n(profit) < 0 };
+}
+
+/** Shown on the Corporate Tax view, its print and its CSV: what this figure is and is not. */
+export const CT_ESTIMATE_NOTE = {
+  en: "Estimate only, worked out from this shop's P&L in S4 (stock write-offs and journals included). It is not a filed Corporate Tax return and S4 does not submit anything to the FTA. Check it with your accountant and file and pay on EmaraTax.",
+  bn: "শুধু আনুমানিক হিসাব, S4-এর এই দোকানের লাভ-ক্ষতি থেকে (স্টক রাইট-অফ আর জার্নাল সহ)। এটা জমা দেওয়া Corporate Tax রিটার্ন নয়, S4 FTA-তে কিছু জমা দেয় না। হিসাবরক্ষকের সাথে মিলিয়ে EmaraTax-এ জমা ও পেমেন্ট করুন।",
+};
+
+/**
+ * The lines of the estimate, from the P&L (computeAccounts) and corporateTax(): every line that makes up net profit, so
+ * they add up, then the tax. -> [{ key, section: "profit" | "tax", en, bn, amount, total? }]
+ */
+export function ctEstimateLines(acc, ct, { cur = "AED" } = {}) {
+  if (!acc || !ct) return [];
+  const m = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const out = [
+    { key: "netSales", section: "profit", en: "Net sales (excl. VAT & returns)", bn: "নিট বিক্রি (VAT ও রিটার্ন বাদে)", amount: r2(acc.netSales) },
+    { key: "cogs", section: "profit", en: "Cost of goods sold", bn: "বিক্রি হওয়া মালের ক্রয়মূল্য", amount: -r2(acc.cogs) },
+  ];
+  if (r2(acc.vendorDiscount) > 0) out.push({ key: "vendorDiscount", section: "profit", en: "Supplier discounts", bn: "সাপ্লায়ারের ছাড়", amount: r2(acc.vendorDiscount) });
+  out.push({ key: "expenses", section: "profit", en: "Shop expenses (incl. journals)", bn: "দোকানের খরচ (জার্নাল সহ)", amount: -r2(acc.expenseTotal) });
+  if (r2(acc.stockAdjustLoss) !== 0) out.push({ key: "stockAdjust", section: "profit", en: "Stock adjustments / write-offs", bn: "স্টক অ্যাডজাস্টমেন্ট / রাইট-অফ", amount: -r2(acc.stockAdjustLoss) });
+  if (r2(acc.warrantyStockGain) !== 0) out.push({ key: "warrantyStock", section: "profit", en: "Warranty replacement stock received", bn: "ওয়ারেন্টিতে বদলে পাওয়া স্টক", amount: r2(acc.warrantyStockGain) });
+  out.push({ key: "netProfit", section: "profit", en: acc.netProfit >= 0 ? "Net profit" : "Net loss", bn: acc.netProfit >= 0 ? "নিট লাভ" : "নিট ক্ষতি", amount: r2(acc.netProfit), total: true });
+  out.push({ key: "atZero", section: "tax", en: `First ${cur} ${m(ct.threshold)} - 0%`, bn: `প্রথম ${cur} ${m(ct.threshold)} পর্যন্ত - 0%`, amount: ct.atZero });
+  out.push({ key: "atRate", section: "tax", en: `Profit above that - ${ct.rate}%`, bn: `তার বেশি লাভ - ${ct.rate}%`, amount: ct.atRate });
+  if (ct.sbrApplied) out.push({ key: "sbr", section: "tax", en: "Small Business Relief applied", bn: "Small Business Relief নেওয়া হয়েছে", amount: 0 });
+  out.push({ key: "tax", section: "tax", en: "Estimated Corporate Tax", bn: "আনুমানিক Corporate Tax", amount: ct.tax, total: true });
+  return out;
+}
+
+/** CSV rows for the estimate: what it is (the note), the year, every line, the due date. */
+export function ctEstimateRows(acc, ct, { fyLabel = "", from = "", to = "", cur = "AED", bn = false } = {}) {
+  const lines = ctEstimateLines(acc, ct, { cur });
+  const L = (x) => (bn ? x.bn : x.en);
+  return [
+    [bn ? "Corporate Tax - আনুমানিক হিসাব (জমা দেওয়া রিটার্ন নয়)" : "Corporate Tax - estimate (not a filed return)"],
+    [bn ? CT_ESTIMATE_NOTE.bn : CT_ESTIMATE_NOTE.en],
+    [`${bn ? "বছর" : "Year"} ${fyLabel}`, `${from} - ${to}`],
+    ["Particulars", `Amount (${cur})`],
+    ...lines.map((x) => [x.total ? L(x) : `   ${L(x)}`, r2(x.amount).toFixed(2)]),
+    ...(to ? [[bn ? "রিটার্ন ও পেমেন্টের শেষ তারিখ (FTA)" : "Return and payment due by (FTA)", ctDueDate(to)]] : []),
+  ];
 }

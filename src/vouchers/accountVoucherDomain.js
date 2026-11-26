@@ -3,7 +3,13 @@ export const CASH_ACCOUNT = "Cash in Hand";
 export const ACCOUNT_VOUCHER_TYPES = {
   journal: { prefix: "JV", serial: "lastJVSerial", icon: "", printTitle: "JOURNAL VOUCHER", title: { bn: "জার্নাল ভাউচার", en: "Journal Voucher" } },
   contra: { prefix: "CV", serial: "lastCVSerial", icon: "", printTitle: "CONTRA VOUCHER", title: { bn: "কন্ট্রা ভাউচার", en: "Contra Voucher" } },
+  // memorandum: written and printed like a journal, never posted - the ledger, trial balance, P&L, Balance Sheet, bank
+  // reconciliation and VAT leave it out (isMemoVoucher). For a planned or disputed entry the owner may post later.
+  memo: { prefix: "MV", serial: "lastMVSerial", icon: "", printTitle: "MEMORANDUM VOUCHER (NOT POSTED TO THE BOOKS)", title: { bn: "মেমো ভাউচার (হিসাবে যায় না)", en: "Memo Voucher (not posted)" } },
 };
+
+/** A memorandum voucher: kept for the record only, no report posts it. */
+export const isMemoVoucher = (v) => v?.voucherType === "memo";
 
 const num = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 export const r2 = (v) => Math.round((num(v) + Number.EPSILON) * 100) / 100;

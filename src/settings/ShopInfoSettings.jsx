@@ -1,3 +1,5 @@
+import IndustryPresetPanel from "./IndustryPresetPanel.jsx";
+import { invoiceArabicMode } from "../print/arabicPrint.js";
 import React, { useEffect, useState } from "react";
 import { saveShopRecord } from "../offline/shopService";
 import { normUrl, openLink } from "../utils/openLink.js";
@@ -12,6 +14,7 @@ const fromShop = (shop) => ({
   companyNameAr: shop.companyNameAr || "",
   address: shop.address || shop.area || "",
   addressAr: shop.addressAr || "",
+  invoiceArabic: invoiceArabicMode(shop),
   country: countryKey(shop.country) || countryKey(shop.taxSettings?.country) || "ae",
   emirate: shop.emirate || "",
   mobile: shop.mobile || "",
@@ -66,7 +69,7 @@ export default function ShopInfoSettings({ localShop, shopId, profile, user, th,
     try {
       const updated = await saveShopRecord(shopId, {
         companyName: f.companyName.trim(), companyNameAr: f.companyNameAr.trim(),
-        address, addressAr: f.addressAr.trim(),
+        address, addressAr: f.addressAr.trim(), invoiceArabic: f.invoiceArabic,
         // Invoices and vouchers print `area`as the shop address line.
         area: address.split("\n").join(", "),
         country: f.country, emirate: f.emirate.trim(),
@@ -118,6 +121,14 @@ export default function ShopInfoSettings({ localShop, shopId, profile, user, th,
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {field(L("দোকানের নাম (Company Name)", "Company Name"), text("companyName", { style: { fontWeight: 800 } }))}
       {field(L("আরবি নাম (Arabic Company Name)", "Arabic Company Name"), text("companyNameAr", { dir: "rtl", placeholder: "اسم الشركة" }))}
+      {field(L("বিল প্রিন্টের ভাষা (ইনভয়েস / কোটেশন / ডেলিভারি)", "Bill print language (invoice / quotation / delivery)"), (
+        <select style={inp} {...dis} value={f.invoiceArabic} onChange={(e) => set("invoiceArabic", e.target.value)}
+          title={L("আরবি নাম থাকলে পণ্য, কাস্টমার আর দোকানের আরবি নামও প্রিন্ট হয়", "Arabic names of items, customers and the shop print too where they are filled in")}>
+          <option value="en">{L("শুধু ইংরেজি", "English only")}</option>
+          <option value="both">{L("ইংরেজি + আরবি", "English + Arabic")}</option>
+          <option value="ar">{L("আরবি", "Arabic")}</option>
+        </select>
+      ))}
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", gap: 2 }}>
           <button type="button"onClick={() => setArabicAddr(false)} style={{ ...chip, border: "none", cursor: "pointer", opacity: arabicAddr ? 0.55 : 1 }}>{L("ঠিকানা (Address)", "Address")}</button>
@@ -199,6 +210,7 @@ export default function ShopInfoSettings({ localShop, shopId, profile, user, th,
           "Financial year = the months your business accounts cover (for Corporate Tax and yearly profit) — it has nothing to do with the software license. Country, currency, financial year and tax applicable are also used by the  Tax / VAT page. Arabic name, address and license no. show on printed invoices.")}
       </div>
       {licenseLine && <div style={{ fontSize: 12, fontWeight: 700, color: licenseLine.color, marginTop: 8 }}>{licenseLine.text}</div>}
+      <IndustryPresetPanel localShop={localShop} shopId={shopId} user={user} profile={profile} th={th} lang={lang} toast={toast} onShopUpdated={onShopUpdated} readOnly={readOnly} />
       {!readOnly && (
         <button type="button"onClick={save} disabled={saving} style={{ marginTop: 12, width: "100%", padding: 12, borderRadius: 10, border: "none", background: saving ? "#1e3a5f" : "linear-gradient(135deg,#f97316,#ea580c)", color: "#fff", fontSize: 14, fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}>
           {saving ? "..." : L("সেভ করুন", "Save")}

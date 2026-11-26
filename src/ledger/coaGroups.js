@@ -1,22 +1,30 @@
 // Chart of accounts groups: the shop's own groups and sub-groups (kept on the shop record as coaGroups), e.g.
-// "Fixed Assets > Furniture & Fittings" or "Indirect Expenses > Office". They are labels and a tree for the CoA,
-// the Global Ledger and the CSV / print - the ledger, Balance Sheet, Funds and ageing never read them.
-// Safety: every group has a nature, which is one of the ledger's own groups (GROUPS in globalLedger.js). An account
-// can only sit in a group of the same nature as the group the ledger already gives it (ledgerGroupOf), so a custom
-// group can never move an account to another side of the Balance Sheet. Customers and suppliers keep their own
-// party ledgers and are not grouped here.
-import { GROUPS } from "./globalLedger.js";
+// "Fixed Assets > Furniture & Fittings" or "Indirect Expenses > Office". Every group has a nature, one of the ledger's
+// own groups (GROUPS in globalLedger.js), and the nature decides where a custom account in it sits: Global Ledger group,
+// Trial Balance section, Balance Sheet side and P&L (accountNature.js reads it for the ledger and the P&L).
+// Engine accounts keep their nature whatever group they are in, so a group can only hold them when the natures match:
+// system accounts (the FIXED names - cash, bank, sales, purchase, VAT, capital, stock adjustment... - and the expense
+// categories) and every "Bank ..." account. Customers and suppliers keep their own party ledgers and are not grouped.
+import { FIXED, GROUPS } from "./globalLedger.js";
 
 const clean = (v) => String(v ?? "").trim().replace(/\s+/g, " ");
 const lc = (v) => clean(v).toLowerCase();
 const newId = () => `grp_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export const GROUP_NATURES = GROUPS.map((g) => g.id).filter((id) => id !== "customer" && id !== "vendor");
+const FIXED_LC = new Set(Object.keys(FIXED).map(lc));
+/** Can a group change this account's nature? (not an engine account and not a "Bank ..." money account) */
+export const natureEditable = (name) => !!clean(name) && !FIXED_LC.has(lc(name)) && !/^bank\b/i.test(clean(name));
+/** An account whose nature no group can change: system / engine accounts and bank accounts. */
+const natureFixed = (account) => !!account?.system || !natureEditable(account?.name);
+const baseOf = (account) => account?.baseGroup || account?.group;
 export const MAX_DEPTH = 3;
 
 /** Saved groups, cleaned: unknown natures dropped; a parent of another nature or missing is cleared. */
 export function normalizeGroups(saved) {
-  const list = (Array.isArray(saved) ? saved : []).filter((g) => g && GROUP_NATURES.includes(g.nature) && (clean(g.nameEn) || clean(g.nameBn)))
+  // nature read in any case: an older save stored it in capitals
+  const list = (Array.isArray(saved) ? saved : []).map((g) => (g && typeof g.nature === "string" ? { ...g, nature: g.nature.toLowerCase() } : g))
+    .filter((g) => g && GROUP_NATURES.includes(g.nature) && (clean(g.nameEn) || clean(g.nameBn)))
     .map((g) => ({ id: clean(g.id) || newId(), code: clean(g.code), nameEn: clean(g.nameEn), nameBn: clean(g.nameBn), nature: g.nature,
       parentId: clean(g.parentId), active: g.active !== false, createdAt: g.createdAt || "", updatedAt: g.updatedAt || "" }));
   const byId = new Map(list.map((g) => [g.id, g]));
@@ -59,23 +67,35 @@ export function groupTree(groups, nature) {
   return out;
 }
 
-/** Groups an account may go into: active, of the nature the ledger gives the account. */
-export const groupsForAccount = (groups, account) => groups.filter((g) => g.active && g.nature === account?.group);
+/** Groups an account may go into: any active group for a custom account; only its own nature for an engine account. */
+export const groupsForAccount = (groups, account) => groups.filter((g) => g.active && (!natureFixed(account) || g.nature === baseOf(account)));
 
-/** Account group check: "" fine | "group" (missing / off) | "nature" (other side of the ledger). */
+/** Account group check: "" fine | "group" (missing / off) | "nature" (an engine account into a group of another nature). */
 export function assignIssue(account, groupId, groups) {
   if (!groupId) return "";
   const g = groups.find((x) => x.id === groupId);
   if (!g || !g.active) return "group";
-  return g.nature === account?.group ? "" : "nature";
+  return !natureFixed(account) || g.nature === baseOf(account) ? "" : "nature";
 }
 
-/** The chart with each account's groupId kept only where it is valid (wrong nature or missing -> no group). */
-export const applyGroups = (chart, groups) => chart.map((a) => ({ ...a, groupId: a.groupId && groups.some((g) => g.id === a.groupId && g.nature === a.group) ? a.groupId : "" }));
+/**
+ * The chart with each account's groupId kept only where it is valid (missing group, or an engine account in a group
+ * of another nature -> no group), and group = the nature it posts with: its group's nature for a custom account in a
+ * group, else the ledger's own (baseGroup).
+ */
+export const applyGroups = (chart, groups) => chart.map((a) => {
+  const base = baseOf(a);
+  const g = a.groupId ? groups.find((x) => x.id === a.groupId) : null;
+  const keep = !!g && (!natureFixed(a) || g.nature === base);
+  return { ...a, baseGroup: base, group: keep && !natureFixed(a) ? g.nature : base, groupId: keep ? a.groupId : "" };
+});
 
 /**
  * Add / change a group. draft: { id?, code, nameEn, nameBn, nature, parentId, active }; chart: normalized accounts.
- * -> { error } | { ok, group }   errors: name, nature, duplicate, duplicateCode, parent, cycle, depth, natureLocked, busy
+ * -> { error } | { ok, group, cascade, moved }   errors: name, nature, duplicate, duplicateCode, parent, cycle, depth,
+ * natureLocked (an engine account sits in the group or a sub-group), busy.
+ * A nature change takes the sub-groups with it (cascade: their ids) and moves every account in them (moved) to the new
+ * side in every report, past dates included - the screen asks before saving.
  */
 export function validateGroup(draft, groups, chart = []) {
   const nameEn = clean(draft?.nameEn), nameBn = clean(draft?.nameBn), code = clean(draft?.code), parentId = clean(draft?.parentId);
@@ -91,11 +111,14 @@ export function validateGroup(draft, groups, chart = []) {
   const siblings = groups.filter((g) => g.id !== current?.id && g.nature === draft.nature && (g.parentId || "") === parentId);
   if (siblings.some((g) => (nameEn && lc(g.nameEn) === lc(nameEn)) || (nameBn && lc(g.nameBn) === lc(nameBn)))) return { error: "duplicate" };
   if (code && groups.some((g) => g.id !== current?.id && lc(g.code) === lc(code))) return { error: "duplicateCode" };
-  const inUse = current && (chart.some((a) => a.groupId === current.id) || groups.some((g) => g.parentId === current.id));
-  if (current && current.nature !== draft.nature && inUse) return { error: "natureLocked" };
+  const natureChange = !!current && current.nature !== draft.nature;
+  const cascade = natureChange ? [...descendantIds(groups, current.id)] : [];
+  const tree = new Set([current?.id, ...cascade]);
+  const moved = natureChange ? chart.filter((a) => a.groupId && tree.has(a.groupId)) : [];
+  if (moved.some((a) => natureFixed(a))) return { error: "natureLocked" };
   if (current && draft.active === false && current.active
     && (chart.some((a) => a.groupId === current.id) || groups.some((g) => g.parentId === current.id && g.active))) return { error: "busy" };
-  return { ok: true, group: { ...(current || {}), id: current?.id || newId(), code, nameEn, nameBn, nature: draft.nature, parentId, active: draft.active !== false } };
+  return { ok: true, group: { ...(current || {}), id: current?.id || newId(), code, nameEn, nameBn, nature: draft.nature, parentId, active: draft.active !== false }, cascade, moved };
 }
 
 /** A group can go only when no account and no sub-group is in it. */

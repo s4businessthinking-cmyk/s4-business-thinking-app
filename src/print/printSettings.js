@@ -43,14 +43,21 @@ export const DEFAULT_PRINT_SETTINGS = {
   billPrinter: "",
   barcodePrinter: "",
   chequePrinter: "",
+  // Cash drawer (Windows desktop raw ESC/POS). Empty drawerPrinter uses billPrinter.
+  drawerPrinter: "",
+  drawerPin: 2,
+  openDrawerAfterCash: false,
   retail: { ...DOC_DEFAULTS },
   tax: { ...DOC_DEFAULTS },
 };
 
 function mergePrintSettings(raw = {}) {
+  const pin = Number(raw.drawerPin) === 5 ? 5 : 2;
   return {
     ...DEFAULT_PRINT_SETTINGS,
     ...raw,
+    drawerPin: pin,
+    openDrawerAfterCash: raw.openDrawerAfterCash === true,
     retail: { ...DOC_DEFAULTS, ...(raw.retail || {}) },
     tax: { ...DOC_DEFAULTS, ...(raw.tax || {}) },
   };
@@ -187,4 +194,31 @@ export function printWithSettings(html, { lang = "en", kind = "bill" } = {}) {
   const printer = kind === "barcode" ? settings.barcodePrinter : settings.billPrinter;
   const preview = kind === "barcode" ? !(printer && canPickPrinter()) : settings.showPreview;
   return printHtmlDocument(html, { preview, lang, printer });
+}
+
+function bytesToBase64(bytes) {
+  let s = "";
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+  return btoa(s);
+}
+
+/** Desktop-only transport for cashDrawer.openCashDrawer. */
+export function desktopRawPrintTransport() {
+  const api = desktopPrinting();
+  if (!api?.printRaw) return null;
+  return async ({ printer, bytes }) => {
+    const result = await api.printRaw({ deviceName: printer, base64: bytesToBase64(bytes) });
+    if (result?.ok) return { ok: true };
+    return { ok: false, error: String(result?.error || "raw print failed") };
+  };
+}
+
+export async function kickCashDrawer(lang = "en") {
+  const { openCashDrawer } = await import("../counter/cashDrawer.js");
+  return openCashDrawer({
+    settings: loadPrintSettings(),
+    transport: desktopRawPrintTransport() || undefined,
+    lang,
+  });
 }

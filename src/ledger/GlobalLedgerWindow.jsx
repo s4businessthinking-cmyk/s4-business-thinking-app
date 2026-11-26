@@ -11,6 +11,7 @@ import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
+import { accountNatureOf } from "./accountNature.js";
 import { buildGlobalLedger, balances, accountStatement, GROUPS } from "./globalLedger.js";
 import { groupPath, normalizeGroups } from "./coaGroups.js";
 
@@ -25,9 +26,10 @@ export const TYPE_LABEL = {
   expense: ["খরচ", "Expense"], journal: ["জার্নাল", "Journal"], contra: ["কন্ট্রা", "Contra"], capitalIn: ["মূলধন জমা", "Capital in"],
   capitalOut: ["মূলধন ফেরত", "Capital out"], drawing: ["ড্রয়িং", "Drawing"], payout: ["পার্টনারকে দেওয়া", "Paid to partner"],
   distribution: ["লাভ বণ্টন", "Profit share"], bank: ["ব্যাংক এন্ট্রি", "Bank entry"],
+  stockAdjust: ["স্টক অ্যাডজাস্টমেন্ট", "Stock adjustment"], warrantyStock: ["ওয়ারেন্টি বদলি স্টক", "Warranty replacement"],
 };
 
-export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], onClose, embedded = false, canPrint = false, chartOfAccounts = null, coaGroups = null }) {
+export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], products = [], valuation = "average", onClose, embedded = false, canPrint = false, chartOfAccounts = null, coaGroups = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const win = useWindowState({ maximized: true });
@@ -53,7 +55,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
     ]).then(([rows, rc, pm, ex, av, pe, br]) => {
       if (cancelled) return;
       setData({
-        salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [],
+        salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [], stockAdjustments: rows.extras?.stockAdjustments || [], warrantyClaims: rows.extras?.warrantyClaims || [],
         receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av), partnerEntries: rowsOf(pe),
         bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
@@ -68,7 +70,8 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
     const groups = normalizeGroups(coaGroups);
     return new Map((Array.isArray(chartOfAccounts) ? chartOfAccounts : []).filter((a) => a?.groupId && a?.name).map((a) => [String(a.name).trim().toLowerCase(), groupPath(groups, a.groupId, lang === "bn")]).filter(([, p]) => p));
   }, [chartOfAccounts, coaGroups, lang]);
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
+  const natureOf = useMemo(() => accountNatureOf(chartOfAccounts, coaGroups), [chartOfAccounts, coaGroups]);
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, valuation]);
   const bal = useMemo(() => (ledger ? balances(ledger.postings, to) : new Map()), [ledger, to]);
 
   // accounts by group, filtered by the search, zero balances hidden unless asked

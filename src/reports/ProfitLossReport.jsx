@@ -6,13 +6,15 @@ import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { computeAccounts, r2 } from "./accountsCalc.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import GroupViewPanel from "./GroupViewPanel.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const monthStart = () => { const d = new Date(); return localDay(new Date(d.getFullYear(), d.getMonth(), 1)); };
 
-export default function ProfitLossReport({ lang = "en", th, s, shopId, products = [], shopName = "", cur = "AED", isDesktop, canPrint = false }) {
+export default function ProfitLossReport({ lang = "en", th, s, shopId, shop = null, products = [], shopName = "", cur = "AED", isDesktop, canPrint = false }) {
   const bn = lang === "bn";
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(() => localDay());
@@ -39,7 +41,10 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, []);
 
-  const report = useMemo(() => computeAccounts(data, { products, shopId, from, to, bn }), [data, products, shopId, from, to, bn]);
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const method = valuationMethodOf(shop);
+  const report = useMemo(() => computeAccounts(data, { products, shopId, from, to, bn, natureOf, method }), [data, products, shopId, from, to, bn, natureOf, method]);
 
   const L = (bnText, enText) => (bn ? bnText : enText);
   const sections = report ? [
@@ -56,6 +61,8 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
       ...(report.vendorDiscount > 0 ? [[L("সাপ্লায়ারের দেওয়া ছাড় (চেকে)", "Discount received from suppliers"), report.vendorDiscount]] : []),
       ...report.expenseByCat.map(([label, amt]) => [`   ${label}`, -amt]),
       [L(`মোট খরচ (${report.expenseCount}টি)`, `Total expenses (${report.expenseCount})`), -report.expenseTotal, true],
+      ...(report.stockAdjustCount ? [[L(`স্টক অ্যাডজাস্টমেন্ট / রাইট-অফ (${report.stockAdjustCount}টি, গড় খরচে)`, `Stock adjustments / write-offs (${report.stockAdjustCount}, average cost)`), -report.stockAdjustLoss]] : []),
+      ...(report.warrantyStockCount ? [[L(`ওয়ারেন্টিতে বদলে পাওয়া স্টক (${report.warrantyStockCount}টি, গড় খরচে)`, `Warranty replacement stock received (${report.warrantyStockCount}, average cost)`), report.warrantyStockGain]] : []),
       [report.netProfit >= 0 ? L("নিট লাভ", "Net profit") : L("নিট ক্ষতি", "Net loss"), report.netProfit, true, report.netProfit >= 0 ? "#16a34a" : "#dc2626"],
     ]],
     [L("ক্রয়", "Purchases"), [
@@ -146,7 +153,7 @@ export default function ProfitLossReport({ lang = "en", th, s, shopId, products 
       )}
       <div className="si-body">
         {showGroup && report && !badRange && (
-          <GroupViewPanel lang={lang} shopId={shopId} data={data} products={products} from={from} to={to} report={report} shopName={shopName} cur={cur} canPrint={canPrint} onClose={() => setShowGroup(false)} />
+          <GroupViewPanel lang={lang} shopId={shopId} data={data} products={products} from={from} to={to} report={report} method={method} shopName={shopName} cur={cur} canPrint={canPrint} onClose={() => setShowGroup(false)} />
         )}
         {badRange && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষের তারিখের পরে — তারিখ ঠিক করুন", "The start date is after the end date — fix the dates")}</div>}
         {!report ? (

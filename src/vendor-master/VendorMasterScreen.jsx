@@ -298,6 +298,7 @@ export default function VendorMasterScreen({
     payload.paymentType = form.paymentType || "cash";
 
     const openingChanged = num(form.openingBalance) !== num(JSON.parse(baseline).openingBalance);
+    const creating = !selectedId;
 
     setSaving(true);
     try {
@@ -325,18 +326,24 @@ export default function VendorMasterScreen({
       if (link.other) onCustomerSaved?.(link.other);
       if (link.removedId) onCustomerRemoved?.(link.removedId);
       if (link.keptBecauseUsed) toast(L("কাস্টমার বিল আছে, তাই কাস্টমার মাস্টারে আলাদা রেকর্ড থেকে গেছে", "Customer has bills, so it stays on Customer Master as its own record"));
-      holdId.current = savedId;
-      const saved = toForm(savedDoc);
-      setForm(saved);
-      setBaseline(JSON.stringify(saved));
-      setSelectedId(savedId);
       onPartySaved?.({ id: savedId, ...savedDoc });
-      if (openingChanged || (selectedId === null && num(savedDoc.openingBalance) > 0)) {
+      if (openingChanged || (creating && num(savedDoc.openingBalance) > 0)) {
         try { await syncOpeningBill(savedId, savedDoc); }
         catch (err) { toast(err.message || String(err), "err"); }
       }
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] vendor sync failed", err));
+      }
+      // New entry: clear for the next one. Edit: keep the saved record open.
+      if (creating) {
+        loadVendor(null);
+        if (isMobile) setMobileTab("list");
+      } else {
+        holdId.current = savedId;
+        const saved = toForm(savedDoc);
+        setForm(saved);
+        setBaseline(JSON.stringify(saved));
+        setSelectedId(savedId);
       }
     } catch (e) {
       toast(e.message || String(e), "err");

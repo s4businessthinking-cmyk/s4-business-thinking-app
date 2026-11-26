@@ -75,7 +75,7 @@ export function buildTallyVouchers(ledger, { from = "", to = "", kind = "", dayB
 // Suggested Tally group for an S4 ledger (only a hint for creating the ledger in Tally; the export never sets it).
 const TALLY_GROUP = {
   customer: "Sundry Debtors", vendor: "Sundry Creditors", tax: "Duties & Taxes", equity: "Capital Account",
-  income: "Indirect Incomes", expense: "Indirect Expenses", other: "Current Assets / Current Liabilities",
+  income: "Indirect Incomes", expense: "Indirect Expenses", asset: "Current Assets", liability: "Current Liabilities", other: "Current Assets / Current Liabilities",
 };
 export function tallyGroupOf(name, group) {
   if (group === "money") return /^bank\b/i.test(String(name || "")) ? "Bank Accounts" : "Cash-in-Hand";
@@ -139,8 +139,9 @@ function voucherXml(v) {
  * Tally XML import file. company: the Tally company name (SVCURRENTCOMPANY; left out when empty, Tally then uses the
  * company that is open). currency / from / to only go into the header comment.
  */
-export function tallyXml(result, { company = "", currency = "", from = "", to = "" } = {}) {
-  const note = `S4 voucher export${from || to ? ` ${from || "start"} to ${to || "today"}` : ""}; ${result.vouchers.length} voucher(s)${currency ? `; amounts in ${currency}` : ""}`;
+// shopName: the S4 shop the vouchers come from (header comment only). The import body is unchanged.
+export function tallyXml(result, { company = "", currency = "", from = "", to = "", shopName = "" } = {}) {
+  const note = `S4 voucher export${shopName ? ` from ${shopName}` : ""}${from || to ? ` ${from || "start"} to ${to || "today"}` : ""}; ${result.vouchers.length} voucher(s)${currency ? `; amounts in ${currency}` : ""}; one-way import file, not a live link`;
   return [
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     `<!-- ${note.replace(/--/g, "- -")} -->`,
@@ -173,3 +174,42 @@ export const tallyCsvRows = (result) => [
 
 /** voucher-export-{from}-{to}.xml / .csv (the file name does not name the target software) */
 export const tallyFileName = (from, to, ext = "xml") => `voucher-export-${from || "start"}-${to || "today"}.${ext}`;
+
+/**
+ * Can this export be downloaded, and does it agree with the books? result: buildTallyVouchers(); ledger: the same ledger.
+ * -> { ok, counts: { [kind]: n }, dr, cr, lines, heldBack, outOfPeriod, tbDifference, problems: [{ id, en, bn }] }
+ * Blocks (ok false) when the exported lines do not balance, when any entry of the period was held back as unbalanced
+ * (the file would then not agree with the books), or when a voucher falls outside the period.
+ * tbDifference: debits less credits of every ledger account up to `to` (0 in a sound ledger) - shown, not a block.
+ */
+export function exportCheck(result, { from = "", to = "", ledger = null } = {}) {
+  const vouchers = result?.vouchers || [];
+  const counts = Object.fromEntries(TALLY_KINDS.map((k) => [k, vouchers.filter((v) => v.kind === k).length]));
+  const lines = vouchers.reduce((t, v) => t + v.lines.length, 0);
+  const dr = r2(vouchers.reduce((t, v) => t + v.lines.reduce((x, l) => x + r2(l.dr), 0), 0));
+  const cr = r2(vouchers.reduce((t, v) => t + v.lines.reduce((x, l) => x + r2(l.cr), 0), 0));
+  const heldBack = result?.unbalanced || [];
+  const outOfPeriod = vouchers.filter((v) => (from && v.date < from) || (to && v.date > to));
+  let tbDifference = null;
+  if (ledger?.postings) tbDifference = r2(ledger.postings.reduce((t, p) => (!to || p.date <= to ? t + r2(p.dr) - r2(p.cr) : t), 0));
+  const problems = [];
+  if (Math.abs(dr - cr) >= 0.005) problems.push({ id: "unbalanced", en: `Debits ${dr.toFixed(2)} and credits ${cr.toFixed(2)} do not match`, bn: `ডেবিট ${dr.toFixed(2)} আর ক্রেডিট ${cr.toFixed(2)} মেলেনি` });
+  if (heldBack.length) problems.push({ id: "heldBack", en: `${heldBack.length} entr${heldBack.length === 1 ? "y does" : "ies do"} not balance and would be missing from the file: ${heldBack.slice(0, 8).map((v) => v.no || v.date).join(", ")}`, bn: `${heldBack.length}টি এন্ট্রির ডেবিট-ক্রেডিট মেলেনি, ফাইলে থাকবে না: ${heldBack.slice(0, 8).map((v) => v.no || v.date).join(", ")}` });
+  if (outOfPeriod.length) problems.push({ id: "period", en: `${outOfPeriod.length} voucher(s) fall outside the period`, bn: `${outOfPeriod.length}টি ভাউচার সময়ের বাইরে` });
+  if (!vouchers.length) problems.push({ id: "empty", en: "No vouchers in this period", bn: "এই সময়ে কোনো ভাউচার নেই" });
+  return { ok: !problems.length, counts, dr, cr, lines, heldBack, outOfPeriod, tbDifference, problems };
+}
+
+/**
+ * The CSV file: the import sheet (tallyCsvRows, unchanged), then after a blank line the totals and what the file is.
+ * meta: { shopName, currency, from, to }
+ */
+export function tallyCsvExport(result, { shopName = "", currency = "", from = "", to = "" } = {}) {
+  const check = exportCheck(result, { from, to });
+  return [
+    ...tallyCsvRows(result),
+    [],
+    ["Total", "", `${result.vouchers.length} voucher(s)`, `${check.lines} line(s)`, amt(check.dr), amt(check.cr), ""],
+    [`S4 voucher export${shopName ? ` - ${shopName}` : ""}`, `${from || "start"} to ${to || "today"}`, currency ? `Amounts in ${currency}` : "", "One-way import file, not a live link", "", "", ""],
+  ];
+}

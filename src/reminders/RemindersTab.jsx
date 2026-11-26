@@ -15,7 +15,7 @@ const STATE_STYLE = {
   done: { color: "#15803d", bn: "শেষ", en: "Done" },
 };
 
-const LINK_LABELS = { sales: { bn: "ইনভয়েস", en: "Invoice" }, quotation: { bn: "কোটেশন", en: "Quotation" }, delivery: { bn: "ডেলিভারি নোট", en: "Delivery Note" }, salesOrder: { bn: "সেলস অর্ডার", en: "Sales Order" } };
+const LINK_LABELS = { sales: { bn: "ইনভয়েস", en: "Invoice" }, quotation: { bn: "কোটেশন", en: "Quotation" }, delivery: { bn: "ডেলিভারি নোট", en: "Delivery Note" }, salesOrder: { bn: "সেলস অর্ডার", en: "Sales Order" }, customer: { bn: "বকেয়ার রিমাইন্ডার", en: "Payment Reminders" } };
 
 export default function RemindersTab({ lang = "bn", shopId, user, profile, isOwner, team = [], toast, onOpenLink }) {
   const L = (bn, en) => (lang === "bn" ? bn : en);

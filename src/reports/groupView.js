@@ -50,7 +50,7 @@ const LINES = ["grossSales", "salesReturnTotal", "vatOut", "netSales", "cogs", "
 /**
  * columns: [{ id, name, pl }] from computeAccounts(branchData(...)); group: computeAccounts(all data).
  * -> { columns: [{ id, name, grossSales, salesReturnTotal, vatOut, netSales, cogs, grossProfit, margin, count }],
- *      shopLevel: { vendorDiscount, expenseTotal, expenseByCat, net }, group: { ...same lines, netProfit }, difference }
+ *      shopLevel: { vendorDiscount, expenseTotal, expenseByCat, stockAdjustLoss, warrantyStockGain, net }, group: { ...same lines, netProfit }, difference }
  * difference: group net sales less the branch columns (0 unless a sale could not be placed).
  */
 export function groupPl(columns, group) {
@@ -64,6 +64,8 @@ export function groupPl(columns, group) {
   const branchGross = sum("grossProfit");
   const shopLevel = {
     vendorDiscount: r2(group?.vendorDiscount), expenseTotal: r2(group?.expenseTotal), expenseByCat: group?.expenseByCat || [],
+    // stock written off / found and warranty replacements are counted for the whole shop, not per branch
+    stockAdjustLoss: r2(group?.stockAdjustLoss), warrantyStockGain: r2(group?.warrantyStockGain),
     net: r2(num(group?.netProfit) - branchGross),
   };
   const g = Object.fromEntries(LINES.map((k) => [k, r2(group?.[k])]));

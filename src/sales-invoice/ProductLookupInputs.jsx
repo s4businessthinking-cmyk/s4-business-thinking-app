@@ -148,6 +148,9 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
   const [browsing, setBrowsing] = useState(false);
   const [focused, setFocused] = useState(false);
   const wrapRef = useRef(null);
+  // Keyboard-wedge scanners dump digits in <45ms bursts; opening the fuzzy list mid-scan steals focus/Enter.
+  const lastKeyAt = useRef(0);
+  const wedgeBurst = useRef(false);
 
   const q = String(value || "").trim().toLowerCase();
   const items = useMemo(() => {
@@ -189,11 +192,21 @@ export function ProductCodeLookup({ products, value, onChange, choices, onPick, 
     <div ref={wrapRef} style={{ position: "relative" }}>
       <input ref={inputRef} style={style} value={shown} placeholder={placeholder} autoComplete="off" title={shown}
         onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); setBrowsing(false); }}
-        onChange={(e) => { setBrowsing(false); navigatedRef.current = false; onChange(e.target.value); setOpen(true); }}
+        onChange={(e) => {
+          const now = Date.now();
+          wedgeBurst.current = now - lastKeyAt.current < 45;
+          lastKeyAt.current = now;
+          setBrowsing(false);
+          navigatedRef.current = false;
+          onChange(e.target.value);
+          if (!wedgeBurst.current) setOpen(true);
+          else setOpen(false);
+        }}
         onKeyDown={(e) => {
-          if (move(e)) { setBrowsing(true); return; }
+          if (move(e)) { setBrowsing(true); setOpen(true); return; }
           if (e.key === "Enter") {
             e.preventDefault();
+            wedgeBurst.current = false;
             // Arrow-navigated choice only — never the top fuzzy hit from a typo.
             if (listShown && browsing && navigatedRef.current && highlighted) { pick(highlighted); return; }
             if (selectedProduct && value === (selectedProduct.code || selectedProduct.barcode || "")) { setOpen(false); onEnterEmpty?.(); return; }

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
 import { normalizeChart } from "../ledger/chartOfAccounts.js";
-import { buildTallyVouchers, ledgerList, tallyCsvRows, tallyFileName, tallyGroupOf, tallyXml, xmlEscape } from "./tallyExport.js";
+import { buildTallyVouchers, exportCheck, ledgerList, tallyCsvExport, tallyCsvRows, tallyFileName, tallyGroupOf, tallyXml, xmlEscape } from "./tallyExport.js";
 
 const S = "s1";
 const customers = [{ id: "c1", customerName: "Al Noor & Sons" }];
@@ -115,4 +115,46 @@ test("an unbalanced entry is held back; the export never changes the ledger or t
   assert.equal(JSON.stringify(ledger.postings), before);
   assert.deepEqual([...balances(ledger.postings, "")], bal);
   assert.equal(JSON.stringify(chart), chartBefore);
+});
+
+test("readiness: a balanced period can be downloaded; an unbalanced entry blocks the file", () => {
+  const ledger = ledgerOf();
+  const res = buildTallyVouchers(ledger, { from: "2026-11-01", to: "2026-11-30" });
+  const ok = exportCheck(res, { from: "2026-11-01", to: "2026-11-30", ledger });
+  assert.equal(ok.ok, true);
+  assert.equal(ok.dr, ok.cr, "debits equal credits");
+  assert.deepEqual(ok.counts, { journal: 1, contra: 1, receipt: 1, payment: 1 });
+  assert.equal(ok.lines, res.vouchers.reduce((t, v) => t + v.lines.length, 0));
+  assert.equal(ok.tbDifference, 0, "the same ledger's trial balance agrees");
+
+  const d = data();
+  d.payments.push({ id: "p2", shopId: S, paymentNo: "PV-2", paymentDate: "2026-11-08", vendorId: "v1", method: "cash", totalAmount: 100, chequeAmount: 120 });
+  const bad = buildGlobalLedger(d, { shopId: S, customers, vendors });
+  const resBad = buildTallyVouchers(bad, { from: "2026-11-01", to: "2026-11-30" });
+  const blocked = exportCheck(resBad, { from: "2026-11-01", to: "2026-11-30", ledger: bad });
+  assert.equal(blocked.ok, false, "the file would not agree with the books");
+  assert.deepEqual(blocked.problems.map((x) => x.id), ["heldBack"]);
+  assert.match(blocked.problems[0].en, /PV-2/);
+
+  // a forced unbalanced voucher in the export itself
+  const forced = { ...res, vouchers: [...res.vouchers, { id: "x", kind: "journal", date: "2026-11-09", no: "JV-X", lines: [{ key: "a", ledger: "A", dr: 10, cr: 0 }], amount: 10, balanced: true }] };
+  assert.deepEqual(exportCheck(forced, { from: "2026-11-01", to: "2026-11-30" }).problems.map((x) => x.id), ["unbalanced"]);
+  // a voucher outside the period, and an empty period
+  const outside = { ...res, vouchers: [...res.vouchers, { ...res.vouchers[0], id: "y", date: "2026-12-01" }] };
+  assert.ok(exportCheck(outside, { from: "2026-11-01", to: "2026-11-30" }).problems.some((x) => x.id === "period"));
+  assert.deepEqual(exportCheck({ vouchers: [], unbalanced: [] }, {}).problems.map((x) => x.id), ["empty"]);
+});
+
+test("files carry the period, the currency and the shop; they say one-way and never synced", () => {
+  const res = buildTallyVouchers(ledgerOf(), { from: "2026-11-01", to: "2026-11-30" });
+  const xml = tallyXml(res, { company: "Gulf Parts", currency: "AED", from: "2026-11-01", to: "2026-11-30", shopName: "Gulf Parts Mussafah" });
+  assert.match(xml, /<!-- S4 voucher export from Gulf Parts Mussafah 2026-11-01 to 2026-11-30; 4 voucher\(s\); amounts in AED; one-way import file, not a live link -->/);
+  assert.equal((xml.match(/<VOUCHER /g) || []).length, 4, "the import body is unchanged");
+  const csv = tallyCsvExport(res, { shopName: "Gulf Parts Mussafah", currency: "AED", from: "2026-11-01", to: "2026-11-30" });
+  assert.deepEqual(csv.slice(0, tallyCsvRows(res).length), tallyCsvRows(res), "the import sheet first, as before");
+  const total = csv.find((r) => r[0] === "Total");
+  assert.equal(total[4], total[5], "debit total = credit total");
+  const meta = csv[csv.length - 1];
+  assert.deepEqual(meta, ["S4 voucher export - Gulf Parts Mussafah", "2026-11-01 to 2026-11-30", "Amounts in AED", "One-way import file, not a live link", "", "", ""]);
+  assert.doesNotMatch(`${xml} ${csv.flat().join(" ")}`, /synced|two-way|live sync/i);
 });

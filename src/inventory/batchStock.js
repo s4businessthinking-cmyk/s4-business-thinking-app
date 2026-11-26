@@ -16,7 +16,7 @@ export function batchStockByProduct(products, data, shopId, stockMap) {
   const batchOf = (productId, batchNo) => {
     if (!byProduct.has(productId)) byProduct.set(productId, new Map());
     const m = byProduct.get(productId);
-    if (!m.has(batchNo)) m.set(batchNo, { batchNo, productId, date: "", invoiceNo: "", vendorName: "", cost: 0, mrp: 0, qtyIn: 0, qtyOut: 0 });
+    if (!m.has(batchNo)) m.set(batchNo, { batchNo, productId, date: "", invoiceNo: "", vendorName: "", cost: 0, mrp: 0, qtyIn: 0, qtyOut: 0, expiry: "" });
     return m.get(batchNo);
   };
   const each = (docs, statuses, fn) => (docs || []).forEach((d) => {
@@ -34,6 +34,8 @@ export function batchStockByProduct(products, data, shopId, stockMap) {
     const factor = qty > 0 && num(it.qty) > 0 ? qty / num(it.qty) : 1;
     if (qty > 0) b.cost = r4((num(it.lineTotal) - num(it.taxAmt)) / qty);
     if (num(it.salePrice) > 0) b.mrp = r4(num(it.salePrice) / factor);
+    // optional last day the batch may be sold (inventory/batchExpiry.js)
+    if (/^\d{4}-\d{2}-\d{2}/.test(String(it.expiryDate || ""))) b.expiry = String(it.expiryDate).slice(0, 10);
   });
   // A sales invoice made from a delivery note does not move stock again; the note already did.
   each((data?.salesInvoices || []).filter((inv) => !inv.deliveryNoteId && inv.docKind !== "quotation"), STOCK_STATUSES, (inv, it, qty) => { batchOf(it.productId, it.batchNo).qtyOut += qty; });

@@ -21,6 +21,8 @@ import { UAE_BANKS, amountToWordsAED } from "../cheque/chequeConfig.js";
 import VendorChequeWizard from "../vouchers/VendorChequeWizard.jsx";
 import { groupInvoicesByParty } from "../invoices/PartyFolderList.jsx";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
+import { billLocationId, billLocationsOf, hasGodowns } from "../inventory/billLocation.js";
+import { locationPath } from "../inventory/stockLocations.js";
 import { isForeign } from "./purchaseOptions.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { generatePaymentVoucherHTML, printPaymentVoucher, siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
@@ -657,8 +659,16 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
           )}
           <div className="si-grid2">
             {fField(t.pi_date, <input type="date"lang="en-GB" className="pm-input"value={piForm.invoiceDate} onChange={e=>piUpd("invoiceDate",e.target.value)} />)}
-            <div />
+            {/* the TRN printed on the supplier's bill (input VAT falls back to it when the supplier master has none) */}
+            {fField(bnL?"সাপ্লায়ারের TRN":"Supplier TRN", <input className="pm-input"inputMode="numeric"value={piForm.vendorTrn||""} placeholder={bnL?"বিলে যেমন আছে":"As on the bill"}
+              style={(()=>{ const d=String(piForm.vendorTrn||"").replace(/\s/g,""); return d&&!/^\d{15}$/.test(d)?{ borderColor:"#b45309" }:undefined; })()}
+              title={bnL?"UAE TRN সাধারণত ১৫ সংখ্যার":"A UAE TRN is usually 15 digits"} onChange={e=>piUpd("vendorTrn",e.target.value)} />)}
           </div>
+          {/* which godown the goods go into (W01) - only when the shop has one besides the main location */}
+          {(()=>{ const locs=billLocationsOf(shop); return hasGodowns(locs)&&fRow(bnL?"কোন গুদামে ঢুকবে":"Into warehouse / godown",
+            <select className="pm-input"value={billLocationId(piForm, locs)} onChange={e=>piUpd("locationId",e.target.value)}>
+              {locs.map(l=><option key={l.id} value={l.id}>{locationPath(locs, l.id, bnL)}</option>)}
+            </select>); })()}
           {!piForm.vendorId&&fRow(<>{bnL?"নাম":"Name"} <span style={{ color:"#b91c1c" }}>*</span></>,
             <input className="pm-input"style={piForm.vendorName.trim()?undefined:{ borderColor:"#b91c1c" }} placeholder={t.pi_vendorManual} value={piForm.vendorName} onChange={e=>{ piUpd("vendorName",e.target.value); if (piForm.vendorId) piUpd("vendorId",""); }} />)}
         </>)}

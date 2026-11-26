@@ -10,10 +10,12 @@ import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
+import { valuationMethodOf } from "./stockValuation.js";
 import { fyStartDate } from "./balanceSheet.js";
 import { r2 } from "./reportFilters.js";
 import { csvText } from "./vatExport.js";
-import { TALLY_KINDS, TALLY_VCH, buildTallyVouchers, ledgerList, tallyCsvRows, tallyFileName, tallyXml } from "./tallyExport.js";
+import { TALLY_KINDS, TALLY_VCH, buildTallyVouchers, exportCheck, ledgerList, tallyCsvExport, tallyFileName, tallyXml } from "./tallyExport.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -31,7 +33,7 @@ const TX_CSS = `
 .tx-lines .num { text-align: right; font-variant-numeric: tabular-nums; }
 `;
 
-export default function TallyExportReport({ lang = "en", shopId, customers = [], vendors = [], shopName = "", cur = "AED", toast, canExport = false, chartOfAccounts = null, fyStartMonth = 1 }) {
+export default function TallyExportReport({ lang = "en", shopId, shop = null, customers = [], vendors = [], products = [], shopName = "", cur = "AED", toast, canExport = false, chartOfAccounts = null, fyStartMonth = 1 }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const today = localDay();
@@ -59,7 +61,7 @@ export default function TallyExportReport({ lang = "en", shopId, customers = [],
     ]).then(([rows, rc, pm, ex, av, pe, br]) => {
       if (cancelled) return;
       setData({
-        salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [],
+        salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [], stockAdjustments: rows.extras?.stockAdjustments || [], warrantyClaims: rows.extras?.warrantyClaims || [],
         receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av), partnerEntries: rowsOf(pe),
         bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
@@ -68,7 +70,9 @@ export default function TallyExportReport({ lang = "en", shopId, customers = [],
   }, [shopId, tick]);
 
   const badRange = !!(from && to && from > to);
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod]);
   const res = useMemo(() => (ledger && !badRange ? buildTallyVouchers(ledger, { from, to, kind, dayBook }) : null), [ledger, from, to, kind, dayBook, badRange]);
   const ledgers = useMemo(() => (res ? ledgerList(res, ledger, chartOfAccounts) : []), [res, ledger, chartOfAccounts]);
   const empty = !!res && !res.vouchers.length;
@@ -82,11 +86,14 @@ export default function TallyExportReport({ lang = "en", shopId, customers = [],
   const activeQuick = quick.find(([, , f, t]) => f === from && t === to)?.[0];
   const kindLabel = (k) => (bn ? KIND_BN[k] : TALLY_VCH[k]);
 
+  // does the file agree with the books for this period? (exportCheck) - a file that does not is never written
+  const check = useMemo(() => (res ? exportCheck(res, { from, to: toDay, ledger }) : null), [res, from, toDay, ledger]);
   const download = async (ext) => {
     if (!res || empty) return;
+    if (!check?.ok) { toast?.(`${L("ফাইল বানানো হয়নি", "The file was not made")}: ${(check?.problems || []).map((x) => (bn ? x.bn : x.en)).join(" · ")}`, "err"); return; }
     try {
-      if (ext === "xml") await saveTextFile(tallyFileName(from, toDay, "xml"), tallyXml(res, { company, currency: cur, from, to: toDay }), "application/xml;charset=utf-8");
-      else await saveTextFile(tallyFileName(from, toDay, "csv"), csvText(tallyCsvRows(res)));
+      if (ext === "xml") await saveTextFile(tallyFileName(from, toDay, "xml"), tallyXml(res, { company, currency: cur, from, to: toDay, shopName }), "application/xml;charset=utf-8");
+      else await saveTextFile(tallyFileName(from, toDay, "csv"), csvText(tallyCsvExport(res, { shopName, currency: cur, from, to: toDay })));
     } catch (e) { toast?.(e.message || String(e), "err"); }
   };
 
@@ -101,11 +108,11 @@ export default function TallyExportReport({ lang = "en", shopId, customers = [],
       <style>{TX_CSS}</style>
       <div className="pm-reference-title">
         <strong> {L("হিসাব এক্সপোর্ট", "Accounting Export")}</strong>
-        <span>{fmtDay(from) || L("শুরু থেকে", "From start")} - {fmtDay(toDay)}</span>
+        <span>{shopName ? `${shopName} · ` : ""}{fmtDay(from) || L("শুরু থেকে", "From start")} - {fmtDay(toDay)} · {cur}</span>
       </div>
       <div className="si-toolbar">
-        {canExport && <button type="button" className="pm-btn pm-btn--primary" onClick={() => download("xml")} disabled={!res || empty}> {L("XML ডাউনলোড", "Download XML")}</button>}
-        {canExport && <button type="button" className="pm-btn-secondary" onClick={() => download("csv")} disabled={!res || empty}> CSV</button>}
+        {canExport && <button type="button" className="pm-btn pm-btn--primary" onClick={() => download("xml")} disabled={!res || empty || !check?.ok}> {L("XML ডাউনলোড", "Download XML")}</button>}
+        {canExport && <button type="button" className="pm-btn-secondary" onClick={() => download("csv")} disabled={!res || empty || !check?.ok}> CSV</button>}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
         <span className="si-toolbar-gap" />
         <div className="si-pills">
@@ -142,6 +149,15 @@ export default function TallyExportReport({ lang = "en", shopId, customers = [],
         {!res && !error && !badRange && <div className="si-empty">{L("লোড হচ্ছে…", "Loading…")}</div>}
         {badRange && <div className="si-paid-box is-due">{L("শুরুর তারিখ শেষ তারিখের পরে", "The start date is after the end date")}</div>}
         {empty && <div className="si-paid-box is-due">{L("এই সময়ে এক্সপোর্ট করার মতো কোনো ভাউচার নেই", "No vouchers to export in this period")}</div>}
+        {check && !empty && (
+          <div className={`si-paid-box${check.ok ? "" : " is-due"}`} style={{ display: "block" }}>
+            <b>{check.ok ? L("ফাইল বইয়ের সাথে মেলে", "The file agrees with the books") : L("ফাইল বানানো যাবে না", "The file cannot be made")}</b>
+            {" · "}{TALLY_KINDS.filter((k) => check.counts[k]).map((k) => `${kindLabel(k)} ${check.counts[k]}`).join(", ")}
+            {" · "}{L("লাইন", "Lines")} {check.lines} · {L("ডেবিট", "Debit")} {cur} {money(check.dr)} · {L("ক্রেডিট", "Credit")} {cur} {money(check.cr)}
+            {check.tbDifference != null && ` · ${L(`${fmtDay(toDay)} পর্যন্ত ট্রায়াল ব্যালেন্সের পার্থক্য`, `Trial balance difference to ${fmtDay(toDay)}`)} ${money(check.tbDifference)}`}
+            {check.problems.filter((x) => x.id !== "empty").map((x) => <div key={x.id}>{bn ? x.bn : x.en}</div>)}
+          </div>
+        )}
         {res && res.unbalanced.length > 0 && (
           <div className="si-paid-box is-due">
             {L(`${res.unbalanced.length}টি এন্ট্রির ডেবিট-ক্রেডিট মেলেনি, তাই বাদ রাখা হয়েছে: `, `${res.unbalanced.length} entr${res.unbalanced.length === 1 ? "y does" : "ies do"} not balance and ${res.unbalanced.length === 1 ? "is" : "are"} left out: `)}
@@ -198,6 +214,10 @@ export default function TallyExportReport({ lang = "en", shopId, customers = [],
             </fieldset>
           </div>
         )}
+        <div className="si-note" style={{ fontWeight: 700 }}>
+          {L("এটা একমুখী ভাউচার ইমপোর্ট ফাইল - অন্য হিসাবের সফটওয়্যারে ইমপোর্ট করার জন্য। S4 দুই দিকে সিঙ্ক করে না, আর এই পাতা কোনো সার্ভারে কিছু পাঠায় না: ফাইলটা শুধু এই ডিভাইসে সেভ হয়।",
+            "This is a one-way voucher import file for other accounting software. S4 does not sync both ways, and this page sends nothing to any server: the file is only saved on this device.")}
+        </div>
         <div className="si-note">
           {L(
             "শুধু এক্সপোর্ট: S4-এর কিছু বদলায় না, অন্য সফটওয়্যার থেকে কিছু ফেরত আসে না। ভাউচারগুলো গ্লোবাল লেজারের পোস্টিং থেকে - draft ও বাতিল বাদ, প্রতিটি ভাউচারের ডেবিট = ক্রেডিট। জার্নাল ও কন্ট্রা একই ধরনে যায়; কাস্টমারের রিসিপ্ট ও সাপ্লায়ারের রিফান্ড Receipt, সাপ্লায়ার পেমেন্ট ও কাস্টমারকে রিফান্ড Payment। ডে বুক চালু করলে বাকি এন্ট্রি (বিল, রিটার্ন, খরচ ইত্যাদি) টাকার দিক দেখে Receipt / Payment / Contra / Journal হয় - শুধু হিসাবের লাইন, কোনো স্টক আইটেম বা গোডাউন নয়।\nলেজারের নাম: S4-এ যে নাম ঠিক সেটাই (যেমন \"Cash in Hand\", \"Bank\", \"Sales\", কাস্টমার ও সাপ্লায়ারের নাম)। যে সফটওয়্যারে নেবেন সেখানে আগে থেকে ঠিক এই নামে লেজার থাকতে হবে - ডান দিকের তালিকা আর প্রস্তাবিত গ্রুপ দেখে তৈরি করুন (সেখানের \"Cash\" লেজারের নাম \"Cash in Hand\" করে নিতে পারেন)। টাকা দোকানের মুদ্রায় (" + cur + "), সেই কোম্পানির মূল মুদ্রাও এটাই হতে হবে।\nফাইল: XML হলো প্রচলিত হিসাব সফটওয়্যারে import-যোগ্য ভাউচার ফরম্যাট (সফটওয়্যারের Import > Vouchers / Transactions দিয়ে নিন); CSV সাধারণ শিট - Excel বা হাতে import-এর জন্য। আগে একটা কপি কোম্পানিতে চেষ্টা করুন, আর একই ফাইল দুবার নিলে ভাউচার দুবার হবে।",

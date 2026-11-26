@@ -13,7 +13,7 @@ import { csvText } from "../reports/vatExport.js";
 import { combinePrintHtml } from "../reports/monthEndPack.js";
 import {
   buildPayroll, buildSif, expenseMethodOf, nextExpenseNos, payrollExpense, payrollLineBlockers, payrollPostedFor,
-  payrollSheetCols, payrollSheetRows, payslipRows, wpsEmployerProblems, wpsLineProblems,
+  payrollSheetCols, payrollSheetRows, payslipRows, wpsEmployerProblems, wpsLineProblems, WPS_HANDOFF_STEPS,
 } from "./payroll.js";
 
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
@@ -101,7 +101,7 @@ export default function PayrollPanel({ lang = "en", shopId, shop, user, profile,
     const sif = buildSif({ wps, ym: month, lines: wpsReady, amounts: wpsAmounts });
     try {
       await saveTextFile(sif.fileName, sif.text, "text/plain;charset=utf-8");
-      toast?.(L(`${sif.fileName} সেভ হয়েছে - ${sif.count} জন, ${cur} ${money(sif.total)}`, `${sif.fileName} saved - ${sif.count} employee(s), ${cur} ${money(sif.total)}`));
+      toast?.(L(`${sif.fileName} এই ডিভাইসে সেভ হয়েছে - ${sif.count} জন, ${cur} ${money(sif.total)}। এখন ব্যাংকের পোর্টালে আপলোড করুন।`, `${sif.fileName} saved on this device - ${sif.count} employee(s), ${cur} ${money(sif.total)}. Now upload it on your bank's portal.`));
     } catch (e) { toast?.(e?.message || String(e), "err"); }
   };
   const saveWps = async () => {
@@ -151,6 +151,12 @@ export default function PayrollPanel({ lang = "en", shopId, shop, user, profile,
               <button type="button" className="pm-btn-secondary" onClick={() => setWpsForm(null)}>{L("বাতিল", "Cancel")}</button>
             </span>
           ) : <button type="button" className="pm-btn-secondary" onClick={() => setWpsForm({ ...wps })}>{L("WPS নিয়োগকর্তা তথ্য", "WPS employer details")}</button>}
+          <details style={{ marginTop: 4 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>{L("SIF ফাইল ব্যাংকে দেওয়ার ধাপ (S4 আপলোড করে না)", "Handing the SIF to the bank (S4 does not upload it)")}</summary>
+            <ol style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+              {WPS_HANDOFF_STEPS.map((x, i) => <li key={i}>{bn ? x.bn : x.en}</li>)}
+            </ol>
+          </details>
         </div>
       )}
       <div className="si-main is-all">

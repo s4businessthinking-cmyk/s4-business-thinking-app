@@ -6,6 +6,8 @@
 // - a bill linked to a delivery note / goods receipt moves only what differs from the note;
 // - branch-transfer purchase bills move nothing (the goods stay inside the shop);
 // - drafts, cancelled and deleted documents move nothing.
+// Each line also carries the godown the document names (locationId; a return takes its bill's when it has none, a bill
+// linked to a note takes the note's) - inventory/stockLocations.js documentMoves places the stock there.
 import { itemBaseQty } from "../inventory/unitConversion.js";
 
 const INVOICE_STATUSES = ["confirmed", "paid", "partial"];
@@ -31,17 +33,20 @@ function qtyByProduct(items, productById, into = new Map(), sign = 1) {
 
 /**
  * rows: loadInvoiceRows() result. -> movements sorted by date:
- * [{ date, col, docId, no, party, kind, productId, qtyIn, qtyOut }] in base units.
+ * [{ date, col, docId, no, party, kind, productId, qtyIn, qtyOut, locationId }] in base units ("" = main location).
  */
 export function stockMovements(products, rows, shopId) {
   const productById = new Map((products || []).filter((p) => p?.id).map((p) => [p.id, p]));
   const x = rows?.extras || rows || {};
   const out = [];
-  const push = (doc, col, kind, date, byProduct, sign) => {
+  const salesById = new Map((rows?.salesInvoices || []).filter((d) => d?.id).map((d) => [d.id, d]));
+  const purchById = new Map((rows?.purchaseInvoices || []).filter((d) => d?.id).map((d) => [d.id, d]));
+  const locOf = (doc, col) => String(doc.locationId || (col === "salesReturns" ? salesById.get(doc.invoiceId)?.locationId : col === "purchaseReturns" ? purchById.get(doc.invoiceId)?.locationId : "") || "").trim();
+  const push = (doc, col, kind, date, byProduct, sign, locationId = locOf(doc, col)) => {
     byProduct.forEach((q, productId) => {
       if (!productById.has(productId) || Math.abs(q) < 1e-9) return;
       const signed = sign * q;
-      out.push({ date: day(date), col, docId: doc.id, no: docNo(doc), party: partyOf(doc), kind, productId, qtyIn: q4(Math.max(0, signed)), qtyOut: q4(Math.max(0, -signed)) });
+      out.push({ date: day(date), col, docId: doc.id, no: docNo(doc), party: partyOf(doc), kind, productId, qtyIn: q4(Math.max(0, signed)), qtyOut: q4(Math.max(0, -signed)), locationId });
     });
   };
   const grnById = new Map((x.goodsReceipts || []).filter((g) => g?.id).map((g) => [g.id, g]));
@@ -55,7 +60,7 @@ export function stockMovements(products, rows, shopId) {
       if (!note) return;
       const diff = qtyByProduct(doc.items, productById);
       if (!note.isDeleted && !note.deleted && NOTE_STATUSES.includes(note.status)) qtyByProduct(note.items, productById, diff, -1);
-      push(doc, col, kind, dateOf(doc), diff, sign);
+      push(doc, col, kind, dateOf(doc), diff, sign, locOf(doc, col) || String(note.locationId || "").trim());
       return;
     }
     push(doc, col, kind, dateOf(doc), qtyByProduct(doc.items, productById), sign);

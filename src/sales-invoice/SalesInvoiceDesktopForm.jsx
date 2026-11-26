@@ -1,5 +1,8 @@
+import { fetchRate } from "../reports/fxRates.js";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ProductNameLookup, ProductCodeLookup, codeLine } from "./ProductLookupInputs.jsx";
+import BillLocationPicker from "../inventory/BillLocationPicker.jsx";
+import { billLocationId, hasGodowns } from "../inventory/billLocation.js";
 import { nsq } from "../utils/productSearch";
 import { parseScaleBarcode } from "./scaleBarcode";
 import { salesSpecs } from "../product-master/productSpecs";
@@ -154,14 +157,14 @@ function CustomerTypeahead({ customers, value, onChange, onSelect, placeholder, 
 
 export default function SalesInvoiceDesktopForm({
   lang = "en", t = {}, shopId, products = [], customers = [], team = [], invoices = [], onSelectCustomer,
-  form, setField, lines, setLines, current, setCurrent, totals, formPaid, balance,
-  invoiceNo, editInvId, saving, nameRef, qtyRef,
+  form, setField, lines, setLines, current, setCurrent, totals, formPaid, balance, billLocations = [], locStock = null,
+  invoiceNo, editInvId, saving, nameRef, qtyRef, codeRef: codeRefProp,
   helpers,
   onSelectProduct, onChangeCurrentUnit, onAddCurrent, onDelLine,
   onOpenCustomerPicker, onConfirm, onSaveDraft, onClose, onNew, onOpenInvoice, onPrintInvoice, onOpenProductMaster, onCancelInvoice, onDeleteInvoice, canDeleteInvoice, toast, canEditInvoice = () => true,
   onOpenReminder, reminderForm, onChangeReminder, onSaveReminder, onCloseReminder,
   kind = "sales", sourceQuoteNo = "", sourceIsDN = false, sourceKind = "", onConvertQuote, onConvertToDN, canDiscount = true, canSeeCost = false,
-  loyalty = null, whatsAppDoc, adjustmentReasons = [],
+  loyalty = null, whatsAppDoc, adjustmentReasons = [], baseCurrency = "AED", rateApi = null,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
@@ -176,8 +179,10 @@ export default function SalesInvoiceDesktopForm({
   const isTax = form.invoiceType === "tax" && !isDelivery;
   const isCash = siIsSettledPay(form.paymentMethod, form.cashPartial);
   const cur = form.currency || "AED";
+  const [fetchingRate, setFetchingRate] = useState(false);
 
-  const codeRef = useRef(null);
+  const localCodeRef = useRef(null);
+  const codeRef = codeRefProp || localCodeRef;
   const adjRef = useRef(null);
   const [editingLineId, setEditingLineId] = useState(null);
   const [codeChoices, setCodeChoices] = useState(null);
@@ -260,6 +265,11 @@ export default function SalesInvoiceDesktopForm({
     const otherQty = lines.filter((it) => it.productId === pid && it.id !== editingLineId).reduce((s, it) => s + baseOf(it), 0);
     const available = (stockMap.get(pid) || 0) + savedQty - otherQty;
     const want = itemBaseQty(current, currentProduct);
+    // W01: what the picked godown holds (this bill's saved lines are already left out of locStock)
+    if (hasGodowns(billLocations) && locStock?.ready && want <= available + 1e-9) {
+      const here = (locStock.qtyAt(billLocationId(form, billLocations), pid) || 0) - otherQty;
+      if (want > here + 1e-9) toast(bn ? `এই গুদামে কম: আছে ${parseFloat(here.toFixed(2))} ${currentProduct.unit || "Pcs"}, দিচ্ছেন ${parseFloat(want.toFixed(2))}` : `Not enough in this godown: ${parseFloat(here.toFixed(2))} ${currentProduct.unit || "Pcs"} here, adding ${parseFloat(want.toFixed(2))}`, "err");
+    }
     if (want > available + 1e-9) {
       toast(bn ? `স্টক কম: আছে ${parseFloat(available.toFixed(2))} ${currentProduct.unit || "Pcs"}, দিচ্ছেন ${parseFloat(want.toFixed(2))}` : `Low stock: ${parseFloat(available.toFixed(2))} ${currentProduct.unit || "Pcs"} available, entering ${parseFloat(want.toFixed(2))}`, "err");
     }
@@ -497,12 +507,34 @@ export default function SalesInvoiceDesktopForm({
             <div style={lbl}>{isSO ? "Delivery By" : "Valid Until"}</div>
             <input type="date"lang="en-GB" style={inp()} value={form.validUntil || ""} onChange={(e) => setField("validUntil", e.target.value)} />
           </div>
+        ) : hasGodowns(billLocations) ? (
+          <BillLocationPicker side="sale" bn={bn} locations={billLocations} value={billLocationId(form, billLocations)} onChange={(v) => setField("locationId", v)}
+            labelStyle={lbl} inputStyle={inp({ maxWidth: 240 })}
+            qtyHere={currentProduct && locStock?.ready ? locStock.qtyAt(billLocationId(form, billLocations), currentProduct.id) : null} unit={currentProduct?.unit || ""} />
         ) : <div />}
         <div>
           <div style={lbl}>Currency</div>
           <select style={inp()} value={cur} onChange={(e) => setField("currency", e.target.value)}>
             {[...new Set([cur, ...CURRENCIES])].map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
+          {kind === "sales" && !isDelivery && String(cur).toUpperCase() !== String(baseCurrency).toUpperCase() && (
+            <div style={{ marginTop: 4 }}>
+              <div style={lbl}>{bn ? `রেট: 1 ${cur} = ? ${baseCurrency}` : `Rate: 1 ${cur} = ? ${baseCurrency}`} *</div>
+              <input style={inp()} inputMode="decimal" value={form.exchangeRate || ""} onChange={(e) => setField("exchangeRate", e.target.value)} placeholder="3.6725"
+                title={bn ? `বিল ${cur}-এ লেখা ও প্রিন্ট হয়, হিসাবে ${baseCurrency}-এ এই রেটে যায়` : `The bill is typed and printed in ${cur} and booked in ${baseCurrency} at this rate`} />
+              {rateApi?.url && (
+                <button type="button" disabled={fetchingRate || locked} style={{ marginTop: 3, fontSize: 11, padding: "2px 6px", cursor: "pointer" }}
+                  onClick={async () => {
+                    setFetchingRate(true);
+                    // only a real reply from the owner's rate service fills the rate; on any failure the typed rate stays
+                    const r = await fetchRate(rateApi, cur, baseCurrency);
+                    setFetchingRate(false);
+                    if (r.rate) { setField("exchangeRate", String(r.rate)); toast?.(bn ? `রেট সার্ভিস থেকে: 1 ${cur} = ${r.rate} ${baseCurrency}` : `From the rate service: 1 ${cur} = ${r.rate} ${baseCurrency}`); }
+                    else toast?.(bn ? `রেট আনা যায়নি (${r.error}${r.status ? ` ${r.status}` : ""}) - রেট হাতে দিন` : `Could not get the rate (${r.error}${r.status ? ` ${r.status}` : ""}) - type it by hand`, "err");
+                  }}>{fetchingRate ? "..." : (bn ? "রেট আনুন" : "Fetch rate")}</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -657,7 +689,7 @@ export default function SalesInvoiceDesktopForm({
                 <tr key={it.id} onClick={() => { if (!locked) editLine(it); }} title={locked ? undefined : (bn ? "এডিট করতে ক্লিক করুন" : "Click to edit")}
                   style={{ cursor: locked ? "default" : "pointer", background: selected ? C.sel : i % 2 ? C.rowAlt : "#fff" }}>
                   <td style={{ ...td, textAlign: "center" }}>{i + 1}</td>
-                  <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>{it.name}{it.batchNo && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#7c3aed" }}>[{it.batchNo}]</span>}</td>
+                  <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>{it.name}{it.batchNo && <span style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#7c3aed" }}>[{it.batchNo}]</span>}{(prod?.trackSerial || it.serialNo) && (<div onClick={(e) => e.stopPropagation()} style={{ marginTop: 2 }}><input disabled={locked} value={it.serialNo || ""} onChange={(e) => { const v = e.target.value; setLines((prev) => prev.map((x) => (x.id === it.id ? { ...x, serialNo: v } : x))); }} placeholder={bn ? `সিরিয়াল / IMEI (${it.qty || 1}টি, কমা দিয়ে)` : `Serial / IMEI (${it.qty || 1}, comma separated)`} style={{ width: "100%", fontSize: 11, height: 20, padding: "0 4px", border: "1px solid #93c5fd", borderRadius: 3, fontWeight: 400 }} /></div>)}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.code}</td>
                   <td style={td}>{it.qty}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.unit}</td>

@@ -1,3 +1,5 @@
+import { rateApiOf } from "../reports/fxRates.js";
+import { batchExpirySettingsOf } from "../inventory/batchExpiry.js";
 import { AutoTA, PI_VOUCHER_METHODS } from "../shared/appShared.jsx";
 import { DocDateRange, DocListSummary, DocStatusPills } from "../components/DocListFilters.jsx";
 import PendingBillsPanel from "../components/PendingBillsPanel.jsx";
@@ -19,8 +21,10 @@ import { printMoneyReceipt, qtIsExpired } from "./siHelpers.js";
 import WhatsAppButton from "../share/WhatsAppButton.jsx";
 import { normalizeAdjustments, reasonsFor, rowName } from "../masters/simpleMasters.js";
 import { salesSpecs } from "../product-master/productSpecs";
+import { billLocationId, hasGodowns } from "../inventory/billLocation.js";
+import { locationPath } from "../inventory/stockLocations.js";
 
-export function renderSiScreens({ listFilter = null, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, canViewAllInvoices = false, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty = null, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
+export function renderSiScreens({ listFilter = null, siLocations = [], siLocStock = null, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv = false, canSeeCost, canViewAllInvoices = false, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, onStartReturn, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siCodeRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty = null, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop }) {
   // Confirming a document opens a fresh form (or the detail view after an edit), so the print prompt
   // is rendered on every screen, not only on the list.
   const siPrintPrompt = canPrintInv&&siPrintModal&&(
@@ -496,7 +500,7 @@ export function renderSiScreens({ listFilter = null, STATUSES, balance, billRetu
         <span>{isSO?"SALES ORDER":isQuote?"QUOTATION":isDN?"DELIVERY NOTE":"SALES INVOICE"}{siInvoiceNo?` — ${siInvoiceNo}`:""}</span>
         <WindowButtons win={siWin} lang={lang} onClose={()=>{ siLeaveFormToList(); }} />
       </div>
-      {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
+      {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} day={siForm?.invoiceDate||""} soonDays={batchExpirySettingsOf(shop).soonDays} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
       {showCustPicker&&(
         <PartyPickerWindow title="Select Customer"columns={CUSTOMER_PICKER_COLS} items={siPickCustomers} lang={lang}
           partyWord="customer"modalId="customer-picker"
@@ -505,10 +509,11 @@ export function renderSiScreens({ listFilter = null, STATUSES, balance, billRetu
           onQuickAdd={canManageCustomers ? siQuickAddCustomer : null} />
       )}
       <SalesInvoiceDesktopForm
+        baseCurrency={String(shop?.currency || "AED").trim().toUpperCase() || "AED"} rateApi={rateApiOf(shop)}
         lang={lang} t={t} shopId={shopId} products={products} customers={siPickCustomers} onSelectCustomer={siSelectCustomer} team={team} invoices={invoices} loyalty={siLoyalty}
-        form={siForm} setField={siUpd} lines={siLines} setLines={setSiLines} current={siCurrent} setCurrent={setSiCurrent}
+        form={siForm} setField={siUpd} lines={siLines} setLines={setSiLines} current={siCurrent} setCurrent={setSiCurrent} billLocations={siLocations} locStock={siLocStock}
         totals={totals} formPaid={formPaid} balance={balance}
-        invoiceNo={siInvoiceNo} editInvId={editInvId} saving={siSaving} nameRef={siNameRef} qtyRef={siQtyRef}
+        invoiceNo={siInvoiceNo} editInvId={editInvId} saving={siSaving} nameRef={siNameRef} codeRef={siCodeRef} qtyRef={siQtyRef}
         helpers={{ siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES:STATUSES, emptyCurrent:siEmptyCurrent }}
         kind={kind}
         sourceQuoteNo={sourceQuote?.invoiceNo||""}
@@ -580,7 +585,7 @@ export function renderSiScreens({ listFilter = null, STATUSES, balance, billRetu
     <div ref={siRootRef} className="si-root"style={siRootStyle}>
       {siPrintPrompt}{siPrintPayPrompt}
       <style>{PM_CSS}</style>
-      {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
+      {siBatchAsk&&<BatchPickModal lang={lang} product={siBatchAsk.product} choices={siBatchAsk.choices} day={siForm?.invoiceDate||""} soonDays={batchExpirySettingsOf(shop).soonDays} onPick={c=>siBatchAsk.resolve(c)} onClose={()=>siBatchAsk.resolve(null)} />}
       <style>{SI_CSS}</style>
       {showCustPicker&&<SiCustomerPicker {...customerPickerProps} />}
 
@@ -602,6 +607,13 @@ export function renderSiScreens({ listFilter = null, STATUSES, balance, billRetu
             {fField(t.si_invoiceNo, <div className="si-val is-strong"style={{ color:siAccent, fontFamily:"Consolas, monospace" }}>{siInvoiceNo}</div>)}
             {fField(t.si_date, <input type="date"lang="en-GB" className="pm-input"value={siForm.invoiceDate} onChange={e=>siUpd("invoiceDate",e.target.value)} />)}
           </div>
+          {/* which godown the goods leave from (W01) - only when the shop has one besides the main location */}
+          {!isQuote&&hasGodowns(siLocations)&&(()=>{ const locId=billLocationId(siForm, siLocations); const here=siCurrent.productId?siLocStock?.qtyAt(locId, siCurrent.productId):null; return fRow(bnL?"কোন গুদাম থেকে যাবে":"From warehouse / godown", <>
+            <select className="pm-input"value={locId} onChange={e=>siUpd("locationId",e.target.value)}>
+              {siLocations.map(l=><option key={l.id} value={l.id}>{locationPath(siLocations, l.id, bnL)}</option>)}
+            </select>
+            {here!=null&&<div style={{ fontSize:12, fontWeight:700, color:here>0?"#15803d":"#b45309" }}>{bnL?"এখানে আছে":"Qty here"}: {parseFloat(Number(here).toFixed(2))}</div>}
+          </>); })()}
           {isQuote&&(
             <div className="si-grid2">
               {fField(isSO?(bnL?"ডেলিভারির তারিখ":"Delivery by"):(bnL?"মেয়াদ":"Valid Until"), <input type="date"lang="en-GB" className="pm-input"value={siForm.validUntil||""} onChange={e=>siUpd("validUntil",e.target.value)} />)}
@@ -648,6 +660,7 @@ export function renderSiScreens({ listFilter = null, STATUSES, balance, billRetu
                   placeholder="Code / Model"
                   th={PM_TH}
                   lang={lang}
+                  inputRef={siCodeRef}
                   onKeyDown={(e)=>e.key==="Enter"&&siAddCurrentItem()}
                   style={pmInputStyle}
                 />

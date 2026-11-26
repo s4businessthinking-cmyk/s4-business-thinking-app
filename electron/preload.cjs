@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld("S4Desktop", {
   printing: {
     listPrinters: () => ipcRenderer.invoke("s4-print:list"),
     printHtml: (html, options) => ipcRenderer.invoke("s4-print:html", html, options),
+    // Raw ESC/POS bytes (cash-drawer kick). Base64 only — never invent success in the page.
+    printRaw: (payload) => ipcRenderer.invoke("s4-print:raw", payload),
     loadSettings: () => ipcRenderer.invoke("s4-print-settings:load"),
     saveSettings: (settings) => ipcRenderer.invoke("s4-print-settings:save", settings),
   },

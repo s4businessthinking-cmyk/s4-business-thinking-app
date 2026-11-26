@@ -4,6 +4,8 @@ import { C, inp, lbl, btn, th, td, splitRack, productBarcodeUnit, Modal, GridTab
 import { nsq } from "../utils/productSearch";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 import { StockBadgeLabel } from "../inventory/StockBadge.jsx";
+import BillLocationPicker from "../inventory/BillLocationPicker.jsx";
+import { billLocationId, billLocationsOf } from "../inventory/billLocation.js";
 import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "../inventory/stockRowsCache.js";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
@@ -104,6 +106,9 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
   );
 }
 
+// a typed TRN that is not 15 digits (UAE) gets a soft warning only - it is never blocked or "verified"
+const trnLooksOff = (v) => { const d = String(v || "").replace(/\s/g, ""); return !!d && !/^\d{15}$/.test(d); };
+
 export default function PurchaseInvoiceDesktopForm({
   lang = "en", t = {}, shopId, shop, products = [], vendors = [], invoices = [],
   form, setField, lines, setLines, current, setCurrent, totals, paid, balance,
@@ -131,6 +136,7 @@ export default function PurchaseInvoiceDesktopForm({
   const billCur = foreign ? String(form.currency).toUpperCase() : baseCurrency;
   const fxRate = rateOf(form, baseCurrency);
   const showRef = purchaseOptions.refNo || !!String(form.refNo || "").trim();
+  const billLocations = useMemo(() => billLocationsOf(shop), [shop]); // W01 godown picker (hidden for a main-only shop)
   const showCurrency = purchaseOptions.multiCurrency || foreign;
 
   const codeRef = useRef(null);
@@ -361,11 +367,21 @@ export default function PurchaseInvoiceDesktopForm({
           <div style={lbl}>Invoice Date</div>
           <input type="date"lang="en-GB" style={inp()} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} onBlur={() => onCheckDuplicate?.()} />
         </div>
-        <div>
-          <div style={lbl}>Mobile</div>
-          <input style={inp()} inputMode="tel"value={form.vendorMobile} onChange={(e) => setField("vendorMobile", e.target.value)} />
+        <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={lbl}>Mobile</div>
+            <input style={inp()} inputMode="tel"value={form.vendorMobile} onChange={(e) => setField("vendorMobile", e.target.value)} />
+          </div>
+          {/* the TRN printed on the supplier's bill: input VAT is recoverable with it when the supplier master has none (taxDomain supplierTrnOf) */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={lbl}>{bn ? "সাপ্লায়ারের TRN" : "Supplier TRN"}</div>
+            <input style={inp(trnLooksOff(form.vendorTrn) ? { borderColor: "#b45309" } : undefined)} inputMode="numeric" value={form.vendorTrn || ""} onChange={(e) => setField("vendorTrn", e.target.value)}
+              placeholder={bn ? "বিলে যেমন আছে" : "As on the bill"} title={trnLooksOff(form.vendorTrn) ? (bn ? "UAE TRN সাধারণত ১৫ সংখ্যার" : "A UAE TRN is usually 15 digits") : (bn ? "সাপ্লায়ারের বিলে লেখা TRN" : "The TRN printed on the supplier's bill")} />
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "end" }}>
+          <BillLocationPicker side="purchase" bn={bn} locations={billLocations} value={billLocationId(form, billLocations)} onChange={(v) => setField("locationId", v)}
+            labelStyle={lbl} inputStyle={inp({ width: 170 })} />
           {showRef && (
             <div style={{ width: 130 }}>
               <div style={lbl}>Ref. No</div>
@@ -545,6 +561,20 @@ export default function PurchaseInvoiceDesktopForm({
                   <td style={{ ...td, textAlign: "left", whiteSpace: "normal", fontWeight: 600 }}>
                     {it.name}
                     {it.batchNo && <span title={bn ? "আলাদা stock (ব্যাচ)" : "Separate stock (batch)"} style={{ marginLeft: 6, fontSize: 10.5, fontWeight: 800, color: "#fff", background: "#7c3aed", borderRadius: 8, padding: "0 6px" }}> {it.batchNo}</span>}
+                    {it.batchNo && (
+                      <label onClick={(e) => e.stopPropagation()} style={{ marginLeft: 6, fontSize: 10.5, color: "#5b21b6", whiteSpace: "nowrap" }} title={bn ? "এই ব্যাচ শেষ যেদিন বিক্রি করা যাবে (ঐচ্ছিক)" : "Last day this batch may be sold (optional)"}>
+                        {bn ? "মেয়াদ" : "Expiry"}{" "}
+                        <input type="date" lang="en-GB" disabled={locked} value={it.expiryDate || ""} onChange={(e) => { const v = e.target.value; setLines((prev) => prev.map((x) => (x.id === it.id ? { ...x, expiryDate: v } : x))); }}
+                          style={{ fontSize: 10.5, height: 18, padding: "0 2px", border: "1px solid #c4b5fd", borderRadius: 3 }} />
+                      </label>
+                    )}
+                    {(productById.get(it.productId)?.trackSerial || it.serialNo) && (
+                      <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 2 }}>
+                        <input disabled={locked} value={it.serialNo || ""} onChange={(e) => { const v = e.target.value; setLines((prev) => prev.map((x) => (x.id === it.id ? { ...x, serialNo: v } : x))); }}
+                          placeholder={bn ? `সিরিয়াল / IMEI (${it.qty || 1}টি, কমা দিয়ে)` : `Serial / IMEI (${it.qty || 1}, comma separated)`}
+                          style={{ width: "100%", fontSize: 11, height: 20, padding: "0 4px", border: "1px solid #93c5fd", borderRadius: 3 }} />
+                      </div>
+                    )}
                   </td>
                   <td style={{ ...td, textAlign: "left" }}>{it.code}</td>
                   <td style={{ ...td, textAlign: "left" }}>{it.brand}</td>

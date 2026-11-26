@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineCreate, offlineList, offlineRemove } from "../offline/offlineRepository";
@@ -10,10 +11,14 @@ import { saveTextFile } from "../utils/saveTextFile.js";
 import { normUrl, openLink } from "../utils/openLink.js";
 import { openDocFile, readDocFile } from "../utils/docFiles.js";
 import { computeAccounts } from "./accountsCalc.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { r2 } from "./reportFilters.js";
-import { TAX_PRESETS, UAE_CT_DEFAULTS, UAE_EMIRATES, addDays, computeVat, corporateTax, ctDueDate, fyRange, periodRange, presetSettings, taxSettingsOf } from "./taxDomain.js";
+import { CT_ESTIMATE_NOTE, TAX_PRESETS, UAE_CT_DEFAULTS, UAE_EMIRATES, addDays, computeVat, corporateTax, ctDueDate, ctEstimateLines, ctEstimateRows, fyRange, periodRange, presetSettings, taxSettingsOf } from "./taxDomain.js";
 import { csvText, excludedCounts, purchaseDetail, salesDetail, vatChecks, vatFileName, vatPackRows } from "./vatExport.js";
-import { buildVat201, vat201FileName, vat201RegionRows, vat201Rows, vat201SummaryLines } from "./vat201.js";
+import { vat201ForPeriod, vat201EntriesWithout, vat201EntryProblem, vat201FileName, vat201NewEntries, vat201RegionRows, vat201Rows, vat201SummaryLines } from "./vat201.js";
+import { periodLockOf } from "../accounts/periodLock.js";
+import { logAudit } from "../utils/auditLog.js";
 import Vat201Panel from "./Vat201Panel.jsx";
 import EInvoicePanel from "../tax/EInvoicePanel.jsx";
 
@@ -81,12 +86,51 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
 
   const { from, to } = range;
   const badRange = !!(from && to && from > to);
-  const vat = useMemo(() => (badRange ? null : computeVat(data, { shopId, from, to, customers, vendors, defaultRegion: shop?.emirate })), [data, shopId, from, to, customers, vendors, badRange, shop?.emirate]);
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const vat = useMemo(() => (badRange ? null : computeVat(data, { shopId, from, to, customers, vendors, defaultRegion: shop?.emirate, natureOf })), [data, shopId, from, to, customers, vendors, badRange, shop?.emirate, natureOf]);
   const checks = useMemo(() => vatChecks(vat), [vat]);
   // UAE: the same figures laid out by the FTA VAT201 boxes (VAT return tab, print and Excel)
   const noVatBox = settings.vat201NoVatBox === "5" ? "5" : "4";
-  const ret201 = useMemo(() => (isUae && vat ? buildVat201(vat, { customers, shopEmirate: shop?.emirate || "", noVatBox }) : null), [isUae, vat, customers, shop?.emirate, noVatBox]);
+  // boxes 2, 3, 6, 7, 10: the owner's hand entries (customs declarations, reverse charge), kept on the shop under taxSettings
+  const allEntries201 = shop?.taxSettings?.vat201Entries;
+  // the same builder as the month-end pack (vat201ForPeriod), so both show the same boxes for the same period
+  const ret201 = useMemo(() => (isUae && vat && !badRange ? vat201ForPeriod(vat, { shop, customers, from, to, noVatBox }) : null), [isUae, vat, customers, shop, from, to, noVatBox, badRange]);
   const [saving201, setSaving201] = useState(false);
+  const lockDate201 = periodLockOf(shop).lockDate;
+  const saveEntries201 = async (next, docNo, note) => {
+    const updated = await saveShopRecord(shopId, { taxSettings: { ...(shop?.taxSettings || {}), vat201Entries: next } }, { ownerUid: user?.uid || shop?.ownerUid });
+    onShopUpdated?.(updated);
+    logAudit({ shopId, user, profile, action: "edit", collection: "shops", docId: shopId, docNo, note });
+  };
+  // -> "" when saved, else an error key (vat201EntryProblem, "locked", "busy", "owner") or the save error text
+  const addEntry201 = async (form, recover) => {
+    if (!isOwner) return "owner";
+    if (saving201) return "busy";
+    const problem = vat201EntryProblem(form);
+    if (problem) return problem;
+    if (lockDate201 && form.date <= lockDate201) return "locked";
+    setSaving201(true);
+    try {
+      const made = vat201NewEntries(form, { id: uuidv4(), by: user?.uid || "", byName: profile?.personName || user?.displayName || "", recover });
+      const list = Array.isArray(allEntries201) ? allEntries201 : [];
+      await saveEntries201([...list, ...made], `VAT201 box ${made.map((e) => e.box).join(" + ")}`, `Hand entry ${form.date} ${made[0].ref} · amount ${made[0].amount} · VAT ${made[0].vat}`);
+      return "";
+    } catch (e) { return e.message || String(e); } finally { setSaving201(false); }
+  };
+  const removeEntry201 = async (entry) => {
+    if (!isOwner) return "owner";
+    if (saving201) return "busy";
+    if (lockDate201 && entry.date <= lockDate201) return "locked";
+    setSaving201(true);
+    try {
+      const list = Array.isArray(allEntries201) ? allEntries201 : [];
+      const next = vat201EntriesWithout(list, entry);
+      const gone = list.filter((e) => !next.includes(e));
+      await saveEntries201(next, `VAT201 box ${gone.map((e) => e.box).join(" + ")}`, `Hand entry removed ${entry.date} ${entry.ref || entry.no || ""} · VAT ${entry.vat}`);
+      return "";
+    } catch (e) { return e.message || String(e); } finally { setSaving201(false); }
+  };
   const setNoVatBox = async (v) => {
     if (!isOwner || saving201 || v === noVatBox) return;
     setSaving201(true);
@@ -97,7 +141,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
   };
   const leftOut = useMemo(() => (data && !badRange ? excludedCounts(data, { shopId, from, to }) : null), [data, shopId, from, to, badRange]);
   const fy = useMemo(() => fyRange(settings, fyOffset), [settings, fyOffset]);
-  const fyAcc = useMemo(() => computeAccounts(data, { products, shopId, from: fy.from, to: fy.to, bn }), [data, products, shopId, fy, bn]);
+  const fyAcc = useMemo(() => computeAccounts(data, { products, shopId, from: fy.from, to: fy.to, bn, natureOf, method: valuationMethodOf(shop) }), [data, products, shopId, fy, bn, natureOf, shop?.stockValuationMethod]);
   const ct = fyAcc ? corporateTax({ profit: fyAcc.netProfit, revenue: fyAcc.netSales, settings: { ...settings, sbrElected: sbr } }) : null;
 
   const monthly = settings.period === "monthly";
@@ -194,20 +238,12 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
   };
   const { tables, returnSections } = vatViews(L);
 
-  const ctSections = !fyAcc || !ct ? [] : [
-    [L(`বছরের লাভ (${fy.label})`, `Profit for the year (${fy.label})`), [
-      [L("নিট বিক্রি (VAT ও রিটার্ন বাদে)", "Net sales (excl. VAT & returns)"), fyAcc.netSales],
-      [L("বিক্রি হওয়া মালের ক্রয়মূল্য", "Cost of goods sold"), -fyAcc.cogs],
-      ...(fyAcc.vendorDiscount > 0 ? [[L("সাপ্লায়ারের ছাড়", "Supplier discounts"), fyAcc.vendorDiscount]] : []),
-      [L("দোকানের খরচ", "Shop expenses"), -fyAcc.expenseTotal],
-      [fyAcc.netProfit >= 0 ? L("নিট লাভ", "Net profit") : L("নিট ক্ষতি", "Net loss"), fyAcc.netProfit, true, fyAcc.netProfit >= 0 ? "#15803d" : "#b91c1c"],
-    ]],
-    [L("Corporate Tax হিসাব", "Corporate Tax"), [
-      [L(`প্রথম ${cur} ${money(ct.threshold)} পর্যন্ত — 0%`, `First ${cur} ${money(ct.threshold)} — 0%`), ct.atZero],
-      [L(`তার বেশি লাভ — ${ct.rate}%`, `Profit above that — ${ct.rate}%`), ct.atRate],
-      ...(ct.sbrApplied ? [[L("Small Business Relief নেওয়া হয়েছে", "Small Business Relief applied"), 0]] : []),
-      [L("Corporate Tax দিতে হবে", "Corporate Tax payable"), ct.tax, true, ct.tax > 0 ? "#b91c1c" : "#15803d"],
-    ]],
+  // the estimate lines (taxDomain ctEstimateLines): every line that makes up net profit, so they add up, then the tax
+  const ctLines = ctEstimateLines(fyAcc, ct, { cur });
+  const ctRow = (x) => [bn ? x.bn : x.en, x.amount, !!x.total, x.key === "netProfit" ? (x.amount >= 0 ? "#15803d" : "#b91c1c") : x.key === "tax" ? (x.amount > 0 ? "#b91c1c" : "#15803d") : undefined];
+  const ctSections = !ctLines.length ? [] : [
+    [L(`বছরের লাভ (${fy.label})`, `Profit for the year (${fy.label})`), ctLines.filter((x) => x.section === "profit").map(ctRow)],
+    [L("Corporate Tax (আনুমানিক)", "Corporate Tax (estimate)"), ctLines.filter((x) => x.section === "tax").map(ctRow)],
   ];
 
   const sectionRows = (sections) => {
@@ -222,7 +258,9 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
     let doc;
     if (view === "ct") {
       if (!ctSections.length) return;
-      doc = { title: L("কর্পোরেট ট্যাক্স হিসাব", "CORPORATE TAX ESTIMATE"), subtitle: `${L("বছর", "Year")} ${fy.label} · ${fmtDay(fy.from)} — ${fmtDay(fy.to)}`, cols: amtCol, rows: [...sectionRows(ctSections), [L("জমার শেষ তারিখ", "Filing due by"), fmtDay(ctDueDate(fy.to))]] };
+      doc = { title: L("কর্পোরেট ট্যাক্স - আনুমানিক হিসাব", "CORPORATE TAX - ESTIMATE"), subtitle: `${L("বছর", "Year")} ${fy.label} · ${fmtDay(fy.from)} — ${fmtDay(fy.to)}`,
+        partyLine: L(CT_ESTIMATE_NOTE.bn, CT_ESTIMATE_NOTE.en), cols: amtCol,
+        rows: [...sectionRows(ctSections), [L("রিটার্ন ও পেমেন্টের শেষ তারিখ (FTA)", "Return and payment due by (FTA)"), fmtDay(ctDueDate(fy.to))]] };
     } else if (tab === "summary" && ret201) {
       const r201 = vat201Rows(ret201);
       doc = { title: "VAT RETURN (VAT201) - FIGURES", subtitle: periodLabel, cols: r201[0].map((label, i) => ({ label, align: i >= 2 && i <= 4 ? "right" : undefined })), rows: r201.slice(1) };
@@ -262,8 +300,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
   };
   const exportCsv = async () => {
     if (view === "ct") {
-      const text = "\uFEFF" + [["Particulars", `Amount (${cur})`], ...sectionRows(ctSections)].map((r) => r.map(csvCell).join(",")).join("\r\n");
-      try { await saveTextFile(`corporate-tax-${fy.label}.csv`.replace(/[^\w.-]+/g, "-"), text); } catch (e) { toast?.(e.message || String(e), "err"); }
+      if (!ctLines.length) return;
+      await saveCsv(`corporate-tax-estimate-${fy.label}.csv`.replace(/[^\w.-]+/g, "-"), ctEstimateRows(fyAcc, ct, { fyLabel: fy.label, from: fy.from, to: fy.to, cur, bn }));
       return;
     }
     if (!vat) return;
@@ -406,7 +444,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
       <legend className="pm-panel-legend"> {L("কীভাবে জমা দেবেন", "How to file")}</legend>
       <div className="si-panel-body"style={{ gap: 4, fontSize: mobile ? 14 : 12, lineHeight: 1.5 }}>
         {lines.map((t, i) => <div key={i}><b>{i + 1}.</b> {t}</div>)}
-        <button type="button"className="pm-btn pm-btn--primary"style={{ marginTop: 4, alignSelf: "flex-start" }} onClick={fileNow}> {view === "ct" ? L("Corporate Tax জমা দিন", "File Corporate Tax") : L(`${tn} জমা দিন`, `File ${tn}`)}</button>
+        <button type="button"className="pm-btn pm-btn--primary"style={{ marginTop: 4, alignSelf: "flex-start" }} onClick={fileNow}> {view === "ct" ? L("EmaraTax খুলুন (সেখানে জমা দিন)", "Open EmaraTax (file there)") : L(`${tn} জমা দিন`, `File ${tn}`)}</button>
         {filingUrl && <div className="si-hint"style={{ marginLeft: 0, wordBreak: "break-all" }}>{filingUrl}</div>}
       </div>
     </fieldset>
@@ -618,7 +656,7 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
           <button type="button"className={`pm-btn-secondary${view === "vat" ? " is-active" : ""}`} onClick={() => setView("vat")}> {tn}</button>
           {settings.ctEnabled && <button type="button"className={`pm-btn-secondary${view === "ct" ? " is-active" : ""}`} onClick={() => setView("ct")}> {L("কর্পোরেট ট্যাক্স", "Corporate Tax")}</button>}
         </div>
-        <button type="button"className="pm-btn pm-btn--primary"onClick={fileNow}> {mobile ? L("জমা দিন", "File") : view === "ct" ? L("Corporate Tax জমা দিন", "File Corporate Tax") : L(`${tn} জমা দিন`, `File ${tn}`)}</button>
+        <button type="button"className="pm-btn pm-btn--primary"onClick={fileNow}> {mobile ? L("জমা দিন", "File") : view === "ct" ? L("EmaraTax খুলুন (সেখানে জমা দিন)", "Open EmaraTax (file there)") : L(`${tn} জমা দিন`, `File ${tn}`)}</button>
         {canPrint && tab !== "einvoice" && <button type="button"className="pm-btn-secondary"onClick={print} disabled={loading || badRange}> {L("প্রিন্ট", "Print")}</button>}
         {canPrint && tab !== "einvoice" && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={loading || badRange} title={L("এই ভিউয়ের CSV", "CSV of this view")}> Excel</button>}
         {canPrint && view === "vat" && <button type="button" className="pm-btn-secondary" onClick={exportPack} disabled={loading || badRange || !vat} title={L("সারাংশ + বিক্রির বিল + ক্রয়ের বিল + যাচাই, এক ফাইলে", "Summary + sales bills + purchase bills + checks in one file")}> {L("পিরিয়ড প্যাক (CSV)", "Period pack (CSV)")}</button>}
@@ -651,11 +689,16 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
           <div className="si-kpi"><span>{L("জমার শেষ তারিখ", "Due by")}</span><b>{dueDate ? fmtDay(dueDate) : "—"}</b></div>
         </div>
       )}
+      {view === "ct" && (
+        <div className="si-paid-box" style={{ display: "block", margin: "2px 6px" }}>
+          <b>{L("আনুমানিক হিসাব - জমা দেওয়া রিটার্ন নয়।", "Estimate only - not a filed return.")}</b> {L(CT_ESTIMATE_NOTE.bn, CT_ESTIMATE_NOTE.en)}
+        </div>
+      )}
       {view === "ct" && ct && fyAcc && (
         <div className="si-kpis">
           <div className="si-kpi"><span>{L("বছরের বিক্রি", "Revenue")}</span><b>{cur} {money(fyAcc.netSales)}</b></div>
           <div className="si-kpi"><span>{fyAcc.netProfit >= 0 ? L("নিট লাভ", "Net profit") : L("নিট ক্ষতি", "Net loss")}</span><b style={{ color: fyAcc.netProfit >= 0 ? "#15803d" : "#b91c1c" }}>{cur} {money(fyAcc.netProfit)}</b></div>
-          <div className="si-kpi"><span>{L("Corporate Tax", "Corporate Tax")}</span><b style={{ color: ct.tax > 0 ? "#b91c1c" : "#15803d" }}>{cur} {money(ct.tax)}</b></div>
+          <div className="si-kpi"><span>{L("আনুমানিক Corporate Tax", "Estimated Corporate Tax")}</span><b style={{ color: ct.tax > 0 ? "#b91c1c" : "#15803d" }}>{cur} {money(ct.tax)}</b></div>
           <div className="si-kpi"><span>{L("জমার শেষ তারিখ", "Due by")}</span><b>{fmtDay(ctDueDate(fy.to))}</b></div>
         </div>
       )}
@@ -752,7 +795,8 @@ export default function TaxReport({ lang = "en", shopId, shop, user, profile = n
               if (ret201) {
                 return (
                   <>
-                    <Vat201Panel lang={lang} ret={ret201} vat={vat} cur={cur} isOwner={isOwner} noVatBox={noVatBox} onChangeNoVatBox={setNoVatBox} saving={saving201} onOpenDoc={onOpenDoc} mobile={mobile} />
+                    <Vat201Panel lang={lang} ret={ret201} vat={vat} cur={cur} isOwner={isOwner} noVatBox={noVatBox} onChangeNoVatBox={setNoVatBox} saving={saving201} onOpenDoc={onOpenDoc} mobile={mobile}
+                      from={from} to={to} lockDate={lockDate201} onAddEntry={addEntry201} onRemoveEntry={removeEntry201} />
                     {twoCols([howToFileBox], [paymentsBoxEl, noteBox], [howToFileBox, paymentsBoxEl, noteBox])}
                   </>
                 );

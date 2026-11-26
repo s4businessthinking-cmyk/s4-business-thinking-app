@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { marksByDate, monthDates } from "./attendance.js";
-import { buildPayroll, buildSif, expenseMethodOf, nextExpenseNos, payrollExpense, payrollLineBlockers, payrollPostedFor, payrollSheetRows, payslipRows, wpsEmployerProblems, wpsLineProblems } from "./payroll.js";
+import { buildPayroll, buildSif, expenseMethodOf, nextExpenseNos, payrollExpense, payrollLineBlockers, payrollPostedFor, payrollSheetRows, payslipRows, wpsEmployerProblems, wpsLineProblems, WPS_HANDOFF_STEPS } from "./payroll.js";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
 import { buildTrialBalance } from "../reports/trialBalance.js";
 import { buildBalanceSheet } from "../reports/balanceSheet.js";
@@ -106,4 +106,13 @@ test("UAE WPS SIF: EDR per employee, SCR control line, checks on IDs", () => {
   assert.equal(scr, "SCR,1234567890123,803320101,2026-12-01,0905,112026,1,2960.00,AED,NOV");
   assert.equal(sif.fileName, "1234567890123261201090507.SIF");
   assert.deepEqual([sif.count, sif.total], [1, 2960]);
+});
+
+test("WPS handoff checklist: real steps in both languages, never claims the bank or MOHRE accepted the file", () => {
+  assert.ok(WPS_HANDOFF_STEPS.length >= 4);
+  for (const x of WPS_HANDOFF_STEPS) { assert.ok(x.en.trim() && x.bn.trim()); }
+  const all = WPS_HANDOFF_STEPS.map((x) => x.en).join(" ");
+  assert.match(all, /Upload it on your bank/);
+  assert.match(all, /S4 does not receive them/);
+  assert.doesNotMatch(all, /\b(uploaded|submitted|accepted by|approved|processed by MOHRE)\b/i);
 });

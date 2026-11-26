@@ -11,6 +11,7 @@ import { BRANCH_TRANSFER_COLLECTIONS } from "../branch-transfer/branchTransferSe
 import { branchSalesMap } from "../branch-transfer/BranchTransferNative.jsx";
 import { computeAccounts } from "./accountsCalc.js";
 import { averageCosts } from "./averageCost.js";
+import { fifoRun, unitCostsAt } from "./stockValuation.js";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { branchStock } from "./stockHub.js";
 import { csvText } from "./vatExport.js";
@@ -19,7 +20,7 @@ import { GROUP_COLS, branchColumns, branchData, groupCsvRows, groupPl, internalT
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 
-export default function GroupViewPanel({ lang = "en", shopId, data, products = [], from, to, report, shopName = "", cur = "AED", canPrint = false, onClose }) {
+export default function GroupViewPanel({ lang = "en", shopId, data, products = [], from, to, report, method = "average", shopName = "", cur = "AED", canPrint = false, onClose }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [bt, setBt] = useState(null);
@@ -41,17 +42,19 @@ export default function GroupViewPanel({ lang = "en", shopId, data, products = [
   const cols = useMemo(() => (data ? branchColumns(bt?.branches, data.salesInvoices, data.deliveryNotes) : []), [data, bt]);
   const view = useMemo(() => {
     if (!data || !report) return null;
-    const columns = cols.map((c) => ({ ...c, pl: computeAccounts(branchData(data, c.id), { products, shopId, from, to, bn }) }))
+    // FIFO: one run of the whole shop's stock, each branch taking the cost of its own sales from it
+    const fifoShared = method === "fifo" ? fifoRun(products, data, { shopId, upTo: to }) : null;
+    const columns = cols.map((c) => ({ ...c, pl: computeAccounts(branchData(data, c.id), { products, shopId, from, to, bn, method, fifoShared }) }))
       .filter((c) => c.id === "main" || c.pl.count || c.pl.salesReturnCount);
     return groupPl(columns, report);
-  }, [data, report, cols, products, shopId, from, to, bn]);
+  }, [data, report, cols, products, shopId, from, to, bn, method]);
 
   // stock now: received at each branch less sold there; the main shop holds the rest (average cost as of today)
   const stock = useMemo(() => {
     if (!data || !bt) return null;
     const shopQty = computeStockMap(products, data.purchaseInvoices, data.salesInvoices, shopId, data.deliveryNotes, data.extras);
     const purchases = livePurchasesOf(data.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance");
-    const cost = averageCosts(products, purchases, "", liveReturnsOf(data.extras?.purchaseReturns, shopId));
+    const cost = method === "fifo" ? unitCostsAt("fifo", products, data, { shopId }) : averageCosts(products, purchases, "", liveReturnsOf(data.extras?.purchaseReturns, shopId));
     const rows = branchStock(bt.balances, branchSalesMap(products, data.salesInvoices, data.deliveryNotes, shopId), shopQty, bt.branches).rows;
     return stockByBranch(cols, rows, shopQty, cost);
   }, [data, bt, products, shopId, cols]);
@@ -111,6 +114,8 @@ export default function GroupViewPanel({ lang = "en", shopId, data, products = [
                   <tr><td>{L("মার্জিন", "Margin")}</td>{view.columns.map((c) => <td key={c.id} className="si-num">{c.margin.toFixed(1)}%</td>)}<td /><td className="si-num">{view.group.margin.toFixed(1)}%</td></tr>
                   {view.shopLevel.vendorDiscount > 0 && <tr><td>{L("সাপ্লায়ারের ছাড়", "Discount received from suppliers")}</td>{view.columns.map((c) => <td key={c.id} />)}{cell(view.shopLevel.vendorDiscount)}{cell(view.shopLevel.vendorDiscount)}</tr>}
                   <tr><td>{L("খরচ (কোনো ব্রাঞ্চে ট্যাগ নেই)", "Expenses (not tagged to a branch)")}</td>{view.columns.map((c) => <td key={c.id} />)}{cell(-view.shopLevel.expenseTotal)}{cell(-view.shopLevel.expenseTotal)}</tr>
+                  {view.shopLevel.stockAdjustLoss !== 0 && <tr><td>{L("স্টক অ্যাডজাস্টমেন্ট / রাইট-অফ", "Stock adjustments / write-offs")}</td>{view.columns.map((c) => <td key={c.id} />)}{cell(-view.shopLevel.stockAdjustLoss)}{cell(-view.shopLevel.stockAdjustLoss)}</tr>}
+                  {view.shopLevel.warrantyStockGain !== 0 && <tr><td>{L("ওয়ারেন্টিতে বদলে পাওয়া স্টক", "Warranty replacement stock received")}</td>{view.columns.map((c) => <td key={c.id} />)}{cell(view.shopLevel.warrantyStockGain)}{cell(view.shopLevel.warrantyStockGain)}</tr>}
                   <tr><td className="si-strong">{L("নিট লাভ", "Net profit")}</td>{view.columns.map((c) => <React.Fragment key={c.id}>{cell(c.grossProfit, true, plColor(c.grossProfit))}</React.Fragment>)}{cell(view.shopLevel.net, true, plColor(view.shopLevel.net))}{cell(view.group.netProfit, true, plColor(view.group.netProfit))}</tr>
                 </tbody>
               </table>

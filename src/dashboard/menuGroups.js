@@ -6,8 +6,8 @@ export const MENU_GROUPS = [
   { key: "masters", icon: "", bn: "মাস্টার (Masters)", en: "Masters", tabs: ["products", "priceList", "vendors", "customers", "employees", "mergeMasters"] },
   { key: "transaction", icon: "", bn: "লেনদেন (Transaction)", en: "Transaction", tabs: ["purchaseOrder", "salesOrder", "delivery", "goodsReceipt", "branchTransfer", "stockAdjust", "productExchange", "warrantyClaim", "loosen", "bundle", "purchase", "sales", "counter", "purchaseReturn", "salesReturn", "employeeExpense", "attendance", "quotation", "jobCard"] },
   { key: "accounts", icon: "", bn: "হিসাব (Accounts)", en: "Accounts", tabs: ["globalLedger", "chartOfAccounts", "openingBalances", "vouchers", "expenses", "cheque", "pdc", "securityCheque", "bankRec", "partners"] },
-  { key: "reports", icon: "", bn: "রিপোর্ট (Reports)", en: "Reports", tabs: ["accounts", "balanceSheet", "trialBalance", "booksHub", "cashFlow", "fundsSummary", "tallyExport", "partyAging", "stockHub", "salesAnalytics", "purchaseAnalytics", "serialRegistry", "tax", "auditLog"] },
-  { key: "utilities", icon: "", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["labels", "reminders", "bulkMessage", "calculator", "settings"] },
+  { key: "reports", icon: "", bn: "রিপোর্ট (Reports)", en: "Reports", tabs: ["accounts", "balanceSheet", "trialBalance", "booksHub", "cashFlow", "fundsSummary", "ratioAnalysis", "costCentres", "budget", "tallyExport", "partyAging", "overdueInterest", "stockHub", "reorderAlerts", "salesAnalytics", "purchaseAnalytics", "serialRegistry", "tax", "auditLog"] },
+  { key: "utilities", icon: "", bn: "ইউটিলিটি (Utilities)", en: "Utilities", tabs: ["labels", "reminders", "bulkMessage", "overdueReminders", "calculator", "settings"] },
 ];
 
 // items: [[tabKey, label], …] already filtered by permission; empty groups are dropped, unknown tabs go to Utilities.

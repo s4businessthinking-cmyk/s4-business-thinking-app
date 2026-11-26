@@ -27,7 +27,7 @@ export function collectBankTransactions(data, shopId) {
 
   (data?.salesInvoices || []).forEach((inv) => {
     if (!live(inv, shopId) || inv.source === "openingBalance" || inv.invoiceType === "delivery") return;
-    const direct = num(inv.amountPaid) - sumAlloc(receipts, inv.id) - sumApplied(salesRet, inv.id);
+    const direct = num(inv.amountPaid) - sumAlloc(receipts, inv.id) - sumApplied(salesRet, inv.id) - num(inv.fxSettledAed);
     push({ col: "salesInvoices", id: inv.id, dir: "in", method: inv.paymentMethod, amount: direct, no: inv.invoiceNo, party: inv.customerName || "",
       date: day(inv.paymentMethod === "cheque" ? inv.chequeDate || inv.invoiceDate : inv.invoiceDate), ref: inv.chequeNo || inv.paymentRef || "", chequeStatus: inv.chequeStatus, clearedAt: inv.clearedAt });
   });
@@ -61,7 +61,8 @@ export function collectBankTransactions(data, shopId) {
   });
   // Journal / contra lines on a "Bank…" account: debit puts money into the bank, credit takes it out (cash deposits, withdrawals, transfers).
   (data?.vouchers || []).forEach((v) => {
-    if (!live(v, shopId)) return;
+    // a memorandum voucher moves no money
+    if (!live(v, shopId) || v.voucherType === "memo") return;
     (v.lines || []).forEach((l, i) => {
       if (!/^bank\b/i.test(String(l.account || "").trim())) return;
       const dr = num(l.debit), cr = num(l.credit);

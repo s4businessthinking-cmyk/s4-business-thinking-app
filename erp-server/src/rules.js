@@ -328,7 +328,7 @@ export const RULES = {
     update: async (c, { id, res, req }) => isAuthenticated(c) && (
       res.ownerUid === c.uid
       || res.ownerId === c.uid
-      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastSOSerial", "lastGRSerial", "lastJOSerial", "lastPLSerial", "lastPBSerial", "lastPXSerial", "lastWCSerial", "lastVendorCode", "lastCustomerCode"]))
+      || (isShopMember(c, id) && onlyChanged(res, req, ["lastOrderSerial", "lastPISerial", "lastSISerial", "lastQTSerial", "lastDNSerial", "lastPOSerial", "lastPaymentSerial", "lastReceiptSerial", "lastSRSerial", "lastPRSerial", "lastSASerial", "lastJVSerial", "lastCVSerial", "lastMVSerial", "lastSOSerial", "lastGRSerial", "lastJOSerial", "lastPLSerial", "lastPBSerial", "lastPXSerial", "lastWCSerial", "lastVendorCode", "lastCustomerCode"]))
     ),
     delete: async (c, { res }) => isAuthenticated(c) && (res.ownerUid === c.uid || res.ownerId === c.uid),
   },

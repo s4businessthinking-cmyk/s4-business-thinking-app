@@ -5,7 +5,7 @@ import { normCustomerType, siEmptyLine, siResolveRate } from "./siHelpers.js";
 import { offlineCreate } from "../offline/offlineRepository";
 import { siN2, siProductRateRows } from "./salesInvoiceShared.js";
 
-export function createSiLineActions({ canManageCustomers, customers, isDN, isQuote, kind, lang, onCustomerCreated, products, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiLines, shopId, siCurrent, siEditLineId, siEmptyCurrent, siForm, siLines, siNameRef, siQtyRef, t, toast, user }) {
+export function createSiLineActions({ canManageCustomers, customers, isDN, isQuote, kind, lang, onCustomerCreated, products, setShowCustPicker, setSiBatchAsk, setSiCurrent, setSiEditLineId, setSiForm, setSiLines, shopId, siCurrent, siEditLineId, siEmptyCurrent, siForm, siLines, siNameRef, siCodeRef, siQtyRef, t, toast, user }) {
   const siUpd=(k,v)=>setSiForm(p=>({...p,[k]:v}));
   const siAddLine=()=>setSiLines(p=>[...p,siEmptyLine()]);
   const siFindProduct = (productId) => productId ? products.find(p=>p.id===productId) : null;
@@ -114,7 +114,8 @@ export function createSiLineActions({ canManageCustomers, customers, isDN, isQuo
       : [...prev, { ...entry, id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}` }]);
     setSiEditLineId(null);
     setSiCurrent(siEmptyCurrent());
-    setTimeout(()=>siNameRef.current?.focus(), 80);
+    // Prefer Code/Barcode for the next wedge scan; fall back to name on screens without a code box.
+    setTimeout(() => (siCodeRef?.current || siNameRef.current)?.focus(), 80);
   };
 
   const siSelectCustomer=(c)=>{

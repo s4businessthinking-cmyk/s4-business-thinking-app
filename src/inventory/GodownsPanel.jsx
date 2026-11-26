@@ -12,6 +12,7 @@ import { logAudit } from "../utils/auditLog.js";
 import { csvText } from "../reports/vatExport.js";
 import { onHandAt } from "../reports/stockHub.js";
 import {
+  documentMoves,
   LOCATION_KINDS, MAIN_LOCATION_ID, MAX_LOCATION_DEPTH, cancelBlockers, depthOf, liveMoves, locationItems, locationName, locationPath, locationStock, locationSummary,
   locationTree, moveBlockers, moveDoc, negativeAtLocations, nextMoveNo, normalizeLocations, qtyIn, toSavedLocations, usedLocationIds, validateLocation,
 } from "./stockLocations.js";
@@ -47,14 +48,17 @@ export default function GodownsPanel({ lang = "en", shopId, shop, user, profile,
   }, [shopId, tick]);
 
   const productById = useMemo(() => new Map(products.filter((p) => p?.id).map((p) => [p.id, p])), [products]);
-  const stockOn = (d, skipId = "") => locationStock(onHandAt(products, movements, d), moves, locations, { asOf: d, shopId, skipId });
-  const stock = useMemo(() => (movements ? stockOn(day) : null), [movements, products, moves, locations, day, shopId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // bills that name a godown (W01) place their stock there as document moves; saved transfers come on top
+  const docMoves = useMemo(() => (movements ? documentMoves(movements) : []), [movements]);
+  const allMoves = useMemo(() => [...moves, ...docMoves], [moves, docMoves]);
+  const stockOn = (d, skipId = "") => locationStock(onHandAt(products, movements, d), allMoves, locations, { asOf: d, shopId, skipId });
+  const stock = useMemo(() => (movements ? stockOn(day) : null), [movements, products, allMoves, locations, day, shopId]); // eslint-disable-line react-hooks/exhaustive-deps
   const cost = canSeeCost ? avgCost : null;
   const summary = useMemo(() => (stock ? locationSummary(stock, locations, cost, { bn }) : []), [stock, locations, cost, bn]);
   const items = useMemo(() => (stock ? locationItems(stock, locations, selected, cost, { withChildren }) : []), [stock, locations, selected, cost, withChildren])
     .map((r) => ({ ...r, p: productById.get(r.productId) })).filter((r) => r.p && (!filterIds || filterIds.has(r.productId))).sort((a, b) => String(a.p.name).localeCompare(String(b.p.name)));
   const negatives = useMemo(() => (stock ? negativeAtLocations(stock) : []), [stock]);
-  const used = useMemo(() => (stock ? usedLocationIds(stock, moves) : new Set()), [stock, moves]);
+  const used = useMemo(() => (stock ? usedLocationIds(stock, allMoves) : new Set()), [stock, allMoves]);
   const live = useMemo(() => liveMoves(moves, shopId).sort((a, b) => String(b.moveDate).localeCompare(String(a.moveDate)) || String(b.moveNo).localeCompare(String(a.moveNo))), [moves, shopId]);
   const locById = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
   const locLabel = (id) => locationPath(locations, id, bn) || id;

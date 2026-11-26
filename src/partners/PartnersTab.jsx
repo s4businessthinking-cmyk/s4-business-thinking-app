@@ -5,6 +5,8 @@ import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
+import { shopAccountNature } from "../ledger/accountNature.js";
+import { valuationMethodOf } from "../reports/stockValuation.js";
 import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
@@ -257,7 +259,7 @@ export default function PartnersTab({ lang = "en", shopId, user, profile, cur = 
   };
 
   // ── Profit sharing ──
-  const autoProfit = useMemo(() => (acctData && range ? computeAccounts(acctData, { products, shopId, from: range.from, to: range.to, bn }) : null), [acctData, range, products, shopId, bn]);
+  const autoProfit = useMemo(() => (acctData && range ? computeAccounts(acctData, { products, shopId, from: range.from, to: range.to, bn, natureOf: shopAccountNature(shop), method: valuationMethodOf(shop) }) : null), [acctData, range, products, shopId, bn, shop]);
   const netProfit = profitOverride !== "" ? n(profitOverride) : autoProfit ? r2(autoProfit.netProfit) : null;
   const preview = useMemo(() => (netProfit == null || !range ? null : computeDistribution({ netProfit, partners: all, entries: myEntries, from: range.from, to: range.to, reservePct: n(reservePct) })), [netProfit, range, all, myEntries, reservePct]);
   const overlap = range && dists.find((d) => !(String(d.periodTo) < range.from || String(d.periodFrom) > range.to));

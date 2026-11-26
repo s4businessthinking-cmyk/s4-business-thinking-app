@@ -1,3 +1,5 @@
+import { saleAsTyped, saleFxNote } from "./siForex.js";
+import { ARABIC_PRINT_CSS, arabicLabels, invoiceArabicMode } from "../print/arabicPrint.js";
 import { loadPrintDesign, layoutAppliesTo, layoutForPrint, amountInWords, renderLayoutDocument, shopHeaderExtras, applyDesign } from "../print/printDesign.js";
 import { loadPrintSettings, docSettingsFor, paperCss, paperHeightMm, printWithSettings } from "../print/printSettings.js";
 import { PI_VOUCHER_METHODS, piFmt2, piN2 } from "../shared/appShared.jsx";
@@ -229,11 +231,17 @@ export function generateSalesInvoiceHTML(invoice, shop, appLang, showCode, color
   return buildSalesInvoiceHTML(raw ? invoice : siEscDeep(invoice), raw ? shop : siEscDeep(shop), appLang, showCode, colorPrint, { ...opts, design });
 }
 
-export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPrint, opts={}) {
+export function buildSalesInvoiceHTML(savedInvoice, shop, appLang, showCode, colorPrint, opts={}) {
+  // a bill typed in another currency prints in that currency, with the rate and its shop-currency total and VAT
+  const fxNote = saleFxNote(savedInvoice);
+  const invoice = saleAsTyped(savedInvoice);
   const ps         = opts.settings || loadPrintSettings();
   const ds         = docSettingsFor(ps, invoice);
   const lang       = ds.language==="en"||ds.language==="bn" ? ds.language : appLang;
   const isBn       = lang==="bn";
+  // Arabic headings / names on the print (print/arabicPrint.js): the shop's choice, never on a Bangla print
+  const arP        = arabicLabels(invoiceArabicMode(shop), isBn);
+  const A          = arP.label;
   const invType    = invoice.invoiceType||"regular";
   const isTax      = invType==="tax";
   const isDelivery = invType==="delivery";
@@ -294,7 +302,7 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     });
     if (!byRate.size) return "";
     const rowsV = [...byRate.entries()].sort((a,b)=>a[0]-b[0]).map(([r,g])=>`<tr><td style="text-align:center">${r}%</td><td style="text-align:right">${siFmt2(g.base)}</td><td style="text-align:right">${siFmt2(g.vat)}</td><td style="text-align:right">${siFmt2(g.base+g.vat)}</td></tr>`).join("");
-    return `<div style="max-width:420px;margin:0 0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#374151;margin-bottom:4px">${isBn?"VAT সারাংশ":"VAT Summary"}</div><table style="margin:0"><thead><tr><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"করযোগ্য":"Taxable"}</th><th style="text-align:right">VAT</th><th style="text-align:right">${isBn?"মোট":"Total"}</th></tr></thead><tbody>${rowsV}</tbody></table></div>`;
+    return `<div style="max-width:420px;margin:0 0 14px"><div style="font-size:11px;font-weight:800;text-transform:uppercase;color:#374151;margin-bottom:4px">${isBn?"VAT সারাংশ":A("VAT Summary","vatSummary")}</div><table style="margin:0"><thead><tr><th style="text-align:center">${A("VAT%","vatPerc")}</th><th style="text-align:right">${isBn?"করযোগ্য":"Taxable"}</th><th style="text-align:right">VAT</th><th style="text-align:right">${isBn?"মোট":"Total"}</th></tr></thead><tbody>${rowsV}</tbody></table></div>`;
   })();
   const custBalance = siN2(opts.customerBalance);
   const custBalanceHTML = ps.printCustomerBalance && !isQuote && !isDelivery && invoice.customerName && custBalance>0.01
@@ -310,6 +318,9 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     : isDelivery
       ? (isBn?"ডেলিভারি চালান":"DELIVERY CHALLAN")
       : (isBn?"বিক্রয় ইনভয়েস":"SALES INVOICE");
+  // the printed heading carries the Arabic too; `title` stays plain for the page title and custom layouts
+  const titleKey = isSO ? "salesOrder" : isQuote ? "quotation" : isTax ? "taxInvoice" : isDelivery ? "deliveryNote" : "salesInvoice";
+  const titleHtml = A(title, titleKey);
 
   const design = opts.design || loadPrintDesign();
   const layout = design.layout.invoice;
@@ -367,47 +378,47 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
     const codeHtml = showCode&&!invoice.hideCodeInPrint&&(it.code||it.brand)
       ? ` <span style="font-size:9px;font-weight:400;color:#444">(${[it.code,it.brand].filter(Boolean).join(" · ")})</span>` : "";
     if (isDelivery) {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${arP.name(it.name, it.nameAr)}</strong>${codeHtml}</td><td style="text-align:center;font-size:15px;font-weight:800">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     }
     if (hideVatCols) {
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${arP.name(it.name, it.nameAr)}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     }
     if (isTax) {
       const base = siN2(it.unitPrice)*siN2(it.qty) - d;
-      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right">${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${siFmt2(v)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
+      return `<tr><td style="text-align:center">${i+1}</td><td><strong>${arP.name(it.name, it.nameAr)}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right">${siFmt2(base)}</td><td style="text-align:center">${it.vatPerc||0}%</td><td style="text-align:right">${siFmt2(v)}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
     }
-    return `<tr><td style="text-align:center">${i+1}</td><td><strong>${it.name}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
+    return `<tr><td style="text-align:center">${i+1}</td><td><strong>${arP.name(it.name, it.nameAr)}</strong>${codeHtml}</td><td style="text-align:center">${it.qty} ${it.unit}</td><td style="text-align:right">${siFmt2(it.unitPrice)}</td><td style="text-align:center">${siN2(it.discountPerc)>0?it.discountPerc+"%":d>0?siFmt2(d):"—"}</td><td style="text-align:right"><strong>${siFmt2(tot)}</strong></td></tr>`;
   };
 
   const tableHeaders = isDelivery || hideVatCols
-    ? `<th style="width:36px">#</th><th>${isBn?"পণ্যের বিবরণ":"Item Description"}</th><th style="text-align:center;width:95px">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right;width:110px">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:right;width:120px">${isBn?"মোট":"Amount"}</th>`
+    ? `<th style="width:36px">#</th><th>${isBn?"পণ্যের বিবরণ":A("Item Description","itemDescription")}</th><th style="text-align:center;width:95px">${isBn?"পরিমাণ":A("Qty","qty")}</th><th style="text-align:right;width:110px">${isBn?"একক মূল্য":A("Unit Price","unitPrice")}</th><th style="text-align:right;width:120px">${isBn?"মোট":"Amount"}</th>`
     : isTax
-      ? `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"VAT বাদে":"Excl.VAT"}</th><th style="text-align:center">VAT%</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
-      : `<th>#</th><th>${isBn?"পণ্য":"Description"}</th><th style="text-align:center">${isBn?"পরিমাণ":"Qty"}</th><th style="text-align:right">${isBn?"একক মূল্য":"Unit Price"}</th><th style="text-align:center">${isBn?"ছাড়":"Disc"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
+      ? `<th>#</th><th>${isBn?"পণ্য":A("Description","description")}</th><th style="text-align:center">${isBn?"পরিমাণ":A("Qty","qty")}</th><th style="text-align:right">${isBn?"একক মূল্য":A("Unit Price","unitPrice")}</th><th style="text-align:center">${isBn?"ছাড়":A("Disc","disc")}</th><th style="text-align:right">${isBn?"VAT বাদে":A("Excl.VAT","exclVat")}</th><th style="text-align:center">${A("VAT%","vatPerc")}</th><th style="text-align:right">${isBn?"VAT":"VAT Amt"}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`
+      : `<th>#</th><th>${isBn?"পণ্য":A("Description","description")}</th><th style="text-align:center">${isBn?"পরিমাণ":A("Qty","qty")}</th><th style="text-align:right">${isBn?"একক মূল্য":A("Unit Price","unitPrice")}</th><th style="text-align:center">${isBn?"ছাড়":A("Disc","disc")}</th><th style="text-align:right">${isBn?"মোট":"Total"}</th>`;
 
   const paidBalHTML = (!isDelivery && !isQuote)
-    ? `${totalsLine(isBn?"পরিশোধিত":"Paid", moneyTxt(paidAmt))}${totalsLine(isBn?"বাকি":"Balance Due", moneyTxt(Math.max(0, balance)))}`
+    ? `${totalsLine(isBn?"পরিশোধিত":A("Paid","paid"), moneyTxt(paidAmt))}${totalsLine(isBn?"বাকি":A("Balance Due","balanceDue"), moneyTxt(Math.max(0, balance)))}`
     : "";
-  const discTotalHTML = printDiscount ? totalsLine(isBn?"ছাড়":"Discount", moneyTxt(lineDisc, "-")) : "";
+  const discTotalHTML = printDiscount ? totalsLine(isBn?"ছাড়":A("Discount","discount"), moneyTxt(lineDisc, "-")) : "";
   // Amount options without Grand Total / paid / balance — used on continued pages.
   const amountOptionsHTML = isDelivery
     ? extraRowsHTML
     : isTax
-      ? `${totalsLine(isBn?"সাব-টোটাল (VAT বাদে)":"Subtotal (Excl. VAT)", moneyTxt(sub))}${discTotalHTML}${totalsLine(`VAT (${isBn?"মোট":"Total"})`, moneyTxt(vat, "+"))}${extraRowsHTML}`
-      : `${totalsLine(isBn?"সাব-টোটাল":"Subtotal", moneyTxt(sub))}${discTotalHTML}${extraRowsHTML}`;
+      ? `${totalsLine(isBn?"সাব-টোটাল (VAT বাদে)":A("Subtotal (Excl. VAT)","subtotalExcl"), moneyTxt(sub))}${discTotalHTML}${totalsLine(isBn?"VAT (মোট)":A("VAT (Total)","vatTotal"), moneyTxt(vat, "+"))}${extraRowsHTML}`
+      : `${totalsLine(isBn?"সাব-টোটাল":A("Subtotal","subtotal"), moneyTxt(sub))}${discTotalHTML}${extraRowsHTML}`;
   const totalsHTML = isDelivery
-    ? `${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"মোট Amount":"Total Amount"}</span><span class="gv">${siFmt2(grand)}</span></div>`
+    ? `${extraRowsHTML}<div class="grand-row"><span class="gl">${isBn?"মোট Amount":A("Total Amount","totalAmount")}</span><span class="gv">${siFmt2(grand)}</span></div>`
     : isTax
-      ? `${amountOptionsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":"Grand Total (Incl. VAT)"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`
-      : `${amountOptionsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":"Grand Total"}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`;
+      ? `${amountOptionsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট (VAT সহ)":A("Grand Total (Incl. VAT)","grandTotalIncl")}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`
+      : `${amountOptionsHTML}<div class="grand-row"><span class="gl">${isBn?"সর্বমোট":A("Grand Total","grandTotal")}</span><span class="gv">${siFmt2(grand)}</span></div>${paidBalHTML}`;
 
-  const custHTML = `<div class="info-box"><div class="info-label">${isBn?"বিল টু":"Bill To"}</div><div class="info-value">${invoice.customerName||"—"}</div>${infoLine(isBn?"কোড":"Code", invoice.customerCode)}${infoLine(isBn?"মোবাইল":"Mobile", invoice.customerMobile)}${infoLine(isBn?"ঠিকানা":"Address", invoice.customerAddress)}${isTax?infoLine("TRN", invoice.customerTrn):""}</div>`;
+  const custHTML = `<div class="info-box"><div class="info-label">${isBn?"বিল টু":A("Bill To","billTo")}</div><div class="info-value">${arP.name(invoice.customerName||"—", invoice.customerNameAr)}</div>${infoLine(isBn?"কোড":A("Code","code"), invoice.customerCode)}${infoLine(isBn?"মোবাইল":A("Mobile","mobile"), invoice.customerMobile)}${infoLine(isBn?"ঠিকানা":A("Address","address"), arP.name(invoice.customerAddress||"", invoice.customerAddressAr)||"")}${isTax?infoLine(A("TRN","trn"), invoice.customerTrn):""}</div>`;
 
   const payInfoHTML = isQuote
-    ? `<div class="info-box"><div class="info-label">${isSO?(isBn?"ডেলিভারির তারিখ":"Delivery By"):(isBn?"মেয়াদ":"Valid Until")}</div><div class="info-value">${invoice.validUntil||"—"}</div>${infoLine(isBn?"ইউজার":"User", invoice.createdByName)}${metaHTML}</div>`
+    ? `<div class="info-box"><div class="info-label">${isSO?(isBn?"ডেলিভারির তারিখ":A("Delivery By","deliveryBy")):(isBn?"মেয়াদ":A("Valid Until","validUntil"))}</div><div class="info-value">${invoice.validUntil||"—"}</div>${infoLine(isBn?"ইউজার":"User", invoice.createdByName)}${metaHTML}</div>`
     : isDelivery
-    ? `<div class="info-box"><div class="info-label">${isBn?"ডেলিভারি তথ্য":"Delivery Info"}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${infoLine(isBn?"গাড়ি":"Vehicle", invoice.vehicleNo)}${infoLine(isBn?"ইউজার":"User", invoice.createdByName)}${metaHTML}</div>`
-    : `<div class="info-box"><div class="info-label">${isBn?"পেমেন্ট":"Payment"}</div><div class="info-value">${payLabel||"—"}</div>${metaHTML}</div>`;
+    ? `<div class="info-box"><div class="info-label">${isBn?"ডেলিভারি তথ্য":A("Delivery Info","deliveryInfo")}</div><div class="info-value">${invoice.deliveryNoteNo||(invoice.docKind==="delivery"?invoice.invoiceNo:"—")}</div>${infoLine(isBn?"গাড়ি":"Vehicle", invoice.vehicleNo)}${infoLine(isBn?"ইউজার":"User", invoice.createdByName)}${metaHTML}</div>`
+    : `<div class="info-box"><div class="info-label">${isBn?"পেমেন্ট":A("Payment","payment")}</div><div class="info-value">${payLabel||"—"}</div>${metaHTML}</div>`;
 
   const thermal = ds.paper==="80mm" || ds.paper==="58mm";
   // A4: more rows on continued pages (compact footer); fewer on last page (full totals+terms+sigs).
@@ -422,7 +433,7 @@ export function buildSalesInvoiceHTML(invoice, shop, appLang, showCode, colorPri
 
   const thankFooter = isSO?(isBn?"অর্ডারের জন্য ধন্যবাদ।":"Thank you for your order."):isQuote?(isBn?`এই কোটেশন ${invoice.validUntil||""} পর্যন্ত বৈধ। ধন্যবাদ।`:`This quotation is valid until ${invoice.validUntil||"—"}. Thank you.`):isDelivery?(isBn?"ডেলিভারি সম্পন্ন হলে এই চালানে স্বাক্ষর করুন।":"Please sign this challan upon delivery."):(isBn?"ব্যবসার জন্য ধন্যবাদ।":"Thank you for your business.");
 
-  const hdrHTML = (pageNo, pageCount) => `<div class="sheet-top"><div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${shop?.mobile?`<div class="shop-sub">${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${title}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate}${timeText?`  ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no">${userNameHTML}</div>`:""}${pageCount>1?`<div class="inv-no">${isBn?"পৃষ্ঠা":"Page"} ${pageNo}/${pageCount}</div>`:""}</div></div>
+  const hdrHTML = (pageNo, pageCount) => `<div class="sheet-top"><div class="hdr"><div class="shop-block"><div class="shop-name">${shop?.companyName||"Shop"}</div>${shopHeaderExtras(shop).arabic}<div class="shop-sub">${[shop?.area,shop?.countryName].filter(Boolean).join(", ")||""}</div>${arP.on&&shop?.addressAr?`<div class="shop-sub shop-ar" dir="rtl" lang="ar">${shop.addressAr}</div>`:""}${shop?.mobile?`<div class="shop-sub">${shop.mobile}</div>`:""}${shopHeaderExtras(shop).details} ${isTax&&shop?.trnNumber?`<div class="shop-sub" style="font-weight:800;margin-top:3px">TRN: ${shop.trnNumber}${arP.on?` <span class="ar" dir="rtl" lang="ar">${"الرقم الضريبي"}</span>`:""}</div>`:""} ${isTax&&shop?.vatNumber?`<div class="shop-sub" style="font-weight:700">VAT: ${shop.vatNumber}</div>`:""}</div><div><div class="inv-title">${titleHtml}</div><div class="inv-no" style="font-size:14px;font-weight:800">${invoice.invoiceNo}</div><div class="inv-no">${invoice.invoiceDate}${timeText?`  ${timeText}`:""}</div>${userNameHTML?`<div class="inv-no">${userNameHTML}</div>`:""}${pageCount>1?`<div class="inv-no">${isBn?"পৃষ্ঠা":A("Page","page")} ${pageNo}/${pageCount}</div>`:""}</div></div>
 <div class="body"><div class="info-grid">${custHTML}${payInfoHTML}</div></div></div>`;
 
   const continuedBot = (pageNo, pageCount) => `<div class="sheet-bot"><div class="body">
@@ -431,13 +442,14 @@ ${amountOptionsHTML?`<div class="totals-wrap"><div class="totals-left"><div clas
 </div></div>`;
 
   const finalBot = () => `<div class="sheet-bot"><div class="body">
-${totalsHTML?`<div class="totals-wrap">${!isDelivery&&!isQuote?`<div class="totals-left"><div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div></div>`:""}<div class="totals"><div class="totals-box">${totalsHTML}</div></div></div>`:(!isDelivery&&!isQuote?`<div class="words-box"><b>${isBn?"কথায়":"Amount in words"}:</b> ${amountInWords(grand, cur)}</div>`:"")}
+${totalsHTML?`<div class="totals-wrap">${!isDelivery&&!isQuote?`<div class="totals-left"><div class="words-box"><b>${isBn?"কথায়":A("Amount in words","amountInWords")}:</b> ${amountInWords(grand, cur)}</div></div>`:""}<div class="totals"><div class="totals-box">${totalsHTML}</div></div></div>`:(!isDelivery&&!isQuote?`<div class="words-box"><b>${isBn?"কথায়":A("Amount in words","amountInWords")}:</b> ${amountInWords(grand, cur)}</div>`:"")}
 ${vatSummaryHTML}
 ${isDelivery?`<div class="recv-box"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px">${isBn?"মোট পণ্য":"Total Items"}: ${itemList.reduce((s,it)=>s+siN2(it.qty),0)} ${isBn?"পিস":"Pcs"} | ${isBn?"মোট লাইন":"Lines"}: ${itemList.length}</div><div class="recv-grid"><div class="recv-item">${isBn?"প্রেরকের স্বাক্ষর":"Sender Signature"}</div><div class="recv-item">${isBn?"ড্রাইভারের স্বাক্ষর":"Driver Signature"}</div><div class="recv-item">${isBn?"গ্রাহকের স্বাক্ষর":"Receiver Signature"}</div></div></div>`:""}
 ${custBalanceHTML}
+${fxNote?`<div class="note-box">${isBn?"বিনিময় হার":"Exchange rate"}: ${fxNote.rate} &middot; ${isBn?"মোট":"Total"} ${fxNote.total}${isTax?` &middot; VAT ${fxNote.vat}`:""}</div>`:""}
 ${ps.printNarration&&invoice.note?`<div class="note-box">${invoice.note}</div>`:""}
 <div class="footer">${thankFooter}</div>
-${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":"Authorized Signature"}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":"Customer Signature"}</div></div></div>`:""}
+${!isDelivery?`<div class="sigs"><div><div class="sig-line">${isBn?"অনুমোদনকারী স্বাক্ষর":A("Authorized Signature","authorizedSignature")}</div></div><div><div class="sig-line">${isBn?"গ্রাহক স্বাক্ষর":A("Customer Signature","customerSignature")}</div></div></div>`:""}
 </div></div>`;
 
   let rowOffset = 0;
@@ -460,6 +472,7 @@ ${isLast ? finalBot() : continuedBot(idx + 1, pages.length)}
 @page{size:${paperCss(ds.paper)};margin:${thermal?"3mm":"8mm"}}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Times New Roman','Nirmala UI',serif;font-size:12px;color:#111;background:#fff;padding:16px}
+${arP.on?ARABIC_PRINT_CSS:""}
 .invoice{max-width:210mm;margin:0 auto;border:1.5px solid ${accentBorder};background:#fff;display:flex;flex-direction:column${fillPage?`;min-height:${sheetH}`:""}}
 .invoice.paged{min-height:0}
 .sheet-top{flex:0 0 auto}

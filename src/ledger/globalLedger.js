@@ -7,8 +7,9 @@
 // Like the party ledger: every bill counts except cancelled / draft, and a bill or voucher without a party id goes to
 // the customer / supplier of that name.
 
-import { CASH_ACCOUNT } from "../vouchers/accountVoucherDomain.js";
+import { CASH_ACCOUNT, isMemoVoucher } from "../vouchers/accountVoucherDomain.js";
 import { n, r2, dayOf, isLive, liveReturnsOf } from "../reports/reportFilters.js";
+import { STOCK_ADJUSTMENT_ACCOUNT, WARRANTY_STOCK_ACCOUNT, stockLedgerEntries } from "./stockLedger.js";
 
 export const GROUPS = [
   { id: "customer", bn: "কাস্টমার", en: "Customers" },
@@ -18,6 +19,9 @@ export const GROUPS = [
   { id: "expense", bn: "খরচ ও ক্রয়", en: "Purchases & Expenses" },
   { id: "tax", bn: "ভ্যাট", en: "VAT" },
   { id: "equity", bn: "মূলধন ও পার্টনার", en: "Capital & Partners" },
+  // asset / liability: only through a chart-of-accounts group (accountNature.js); they keep their side whatever the balance
+  { id: "asset", bn: "সম্পদ", en: "Assets" },
+  { id: "liability", bn: "দেনা ও ঋণ", en: "Liabilities & Loans" },
   { id: "other", bn: "অন্যান্য", en: "Other" },
 ];
 
@@ -31,6 +35,10 @@ export const FIXED = {
   Depreciation: "expense", "Gain on Asset Disposal": "income", "Loss on Asset Disposal": "expense",
   // foreign currency bills (src/reports/forex.js)
   "Exchange Gain": "income", "Exchange Loss": "expense",
+  // stock written off / found and warranty replacements, moved out of / into Purchase (src/ledger/stockLedger.js)
+  [STOCK_ADJUSTMENT_ACCOUNT]: "expense", [WARRANTY_STOCK_ACCOUNT]: "income",
+  // interest on overdue customer / supplier bills (src/accounts/overdueInterest.js)
+  "Interest Received": "income", "Interest Paid": "expense",
 };
 const lc = (v) => String(v || "").trim().toLowerCase();
 const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);
@@ -44,17 +52,21 @@ const sumApplied = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((
 
 /**
  * data: { salesInvoices, purchaseInvoices, salesReturns, purchaseReturns, receipts, payments, expenses, accountVouchers,
- * partnerEntries, bankEntries }. -> { accounts: Map(key -> { key, name, group, partyId? }), postings: [...] }
+ * partnerEntries, bankEntries, stockAdjustments, warrantyClaims }. products: the product master, needed to value stock adjustments
+ * and warranty replacements (left out, they are not posted). natureOf(name): the chart-of-accounts nature of a custom
+ * account (accountNature.js), used before the name rule; FIXED accounts never change. valuation: the stock valuation
+ * method for those stock entries ("average" | "fifo", reports/stockValuation.js).
+ * -> { accounts: Map(key -> { key, name, group, partyId? }), postings: [...] }
  * posting: { key, date, dr, cr, type, no, col, docId, narration, against } - one per account line of an entry.
  */
-export function buildGlobalLedger(data, { shopId = "", customers = [], vendors = [], expenseLabel = (e) => e.categoryName || e.category || "Expense" } = {}) {
+export function buildGlobalLedger(data, { shopId = "", customers = [], vendors = [], products = [], natureOf = null, valuation = "average", expenseLabel = (e) => e.categoryName || e.category || "Expense" } = {}) {
   const accounts = new Map();
   const postings = [];
   const acc = (key, name, group, extra) => {
     if (!accounts.has(key)) accounts.set(key, { key, name, group, ...extra });
     return key;
   };
-  const named = (name) => acc(`a:${lc(name)}`, name, ledgerGroupOf(name));
+  const named = (name) => acc(`a:${lc(name)}`, name, FIXED[name] || (natureOf && natureOf(name)) || ledgerGroupOf(name));
 
   const custById = new Map(customers.filter((c) => c?.id).map((c) => [c.id, c]));
   const vendById = new Map(vendors.filter((v) => v?.id).map((v) => [v.id, v]));
@@ -106,7 +118,8 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     const doc = { date: inv.invoiceDate, no: inv.invoiceNo, col: "salesInvoices", id: inv.id, narration: inv.note || "" };
     if (inv.source === "openingBalance") entry({ ...doc, type: "opening" }, [[c, gt, 0], [named("Opening Balance"), 0, gt]]);
     else entry({ ...doc, type: "sale" }, [[c, gt, 0], [named("Sales"), 0, gt - vat], [named("VAT Output"), 0, vat]]);
-    const direct = n(inv.amountPaid) - sumAlloc(receipts, inv.id) - sumApplied(salesRet, inv.id);
+    // fxSettledAed: the part of the bill closed by an exchange loss journal (reports/salesForex.js) - not money
+    const direct = n(inv.amountPaid) - sumAlloc(receipts, inv.id) - sumApplied(salesRet, inv.id) - n(inv.fxSettledAed);
     if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "saleReceipt" }, [[money(inv.paymentMethod) || named(CASH_ACCOUNT), direct, 0], [c, 0, direct]]);
   });
   livePurchases(data.purchaseInvoices, shopId).forEach((inv) => {
@@ -162,6 +175,12 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
       entry({ ...doc, type: "refundReceived" }, [[money(r.refundMethod) || named(CASH_ACCOUNT), refund, 0], [v, 0, refund]]);
     }
   });
+  stockLedgerEntries(data, { shopId, products, method: valuation }).forEach((s) => {
+    const doc = { date: s.date, no: s.no, col: s.col, id: s.id, type: s.kind, narration: s.narration };
+    if (s.kind === "warrantyStock") entry(doc, [[named("Purchase"), s.value, 0], [named(WARRANTY_STOCK_ACCOUNT), 0, s.value]]);
+    else if (s.value > 0) entry(doc, [[named(STOCK_ADJUSTMENT_ACCOUNT), s.value, 0], [named("Purchase"), 0, s.value]]);
+    else entry(doc, [[named("Purchase"), -s.value, 0], [named(STOCK_ADJUSTMENT_ACCOUNT), 0, -s.value]]);
+  });
   (data.expenses || []).filter((e) => live(e, shopId)).forEach((e) => {
     const amt = n(e.amount), vat = Math.max(0, n(e.vatAmount));
     const paidFrom = e.paidByPartner || e.method === "partner" ? partner(e.partnerId, e.partnerName)
@@ -171,7 +190,8 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     entry({ date: e.expenseDate, no: e.expenseNo, col: "expenses", id: e.id, type: "expense", narration: [e.employeeName || e.paidTo, e.note].filter(Boolean).join(" · ") },
       [[acc(`a:${lc(label)}`, label, FIXED[label] || "expense"), amt - vat, 0], [named("VAT Input"), vat, 0], [paidFrom, 0, amt]]);
   });
-  (data.accountVouchers || []).filter((v) => live(v, shopId)).forEach((v) => {
+  // memorandum vouchers are kept for the record only and never posted
+  (data.accountVouchers || []).filter((v) => live(v, shopId) && !isMemoVoucher(v)).forEach((v) => {
     const lines = v.lines?.length ? v.lines
       : v.voucherType === "contra" ? [{ account: v.toAccount, debit: v.totalAmount }, { account: v.fromAccount, credit: v.totalAmount }] : [];
     entry({ date: v.voucherDate, no: v.voucherNo, col: "accountVouchers", id: v.id, type: v.voucherType === "contra" ? "contra" : "journal", narration: v.narration || "" },

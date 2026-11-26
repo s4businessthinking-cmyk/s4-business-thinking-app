@@ -86,6 +86,9 @@ import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAut
 import { createStockLedgerEntry, buildStockLedgerEntry, STOCK_COLLECTIONS } from "./inventory/stockManagementService";
 
 import ReorderAlertCard from "./inventory/ReorderAlertCard";
+import { useLowStock } from "./inventory/useLowStock.js";
+import { useOverdueReminders } from "./share/useOverdueReminders.js";
+import { useAutoReminders } from "./share/useAutoReminders.js";
 import { salesSpecs, specValues } from "./product-master/productSpecs";
 import { pricingPatchFromLanding } from "./product-master/pricingFromLanding.js";
 import { scheduleStaleClear, cancelStaleClear, STALE_DRAFT_MS } from "./utils/staleDraftClear.js";
@@ -529,6 +532,13 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef, warrantyAlertList } = useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors });
 
+  // low-stock count for the notification bell (refreshes on focus and every few minutes)
+  const lowStock = useLowStock(products, shopId, { enabled: !!shopId && (isOwner || can("viewProducts") || can("stockAdjust")) });
+  // customers due a payment reminder today, only while the owner has switched reminders on
+  const overdueReminders = useOverdueReminders({ shop: localShop, shopId, customers, enabled: isOwner || can("manageCustomers") || can("manageSales") });
+  // automatic payment reminders through the owner's HTTPS SMS / email provider, once a day while S4 is open on the chosen device
+  useAutoReminders({ shop: localShop, shopId, reminders: overdueReminders, user, profile, cur: t.cur || "AED", shopName: localShop?.companyName || "", lang, toast,
+    enabled: isOwner || can("manageCustomers") || can("manageSales") });
   const taxAlertList = useTaxAlerts({
     shopId: isOwner ? shopId : null, shop: localShop, products, customers, vendors, lang, toast,
     onOpen: () => { setSettingsPage(null); setTab("tax"); },
@@ -549,7 +559,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const { addCo, addItToInvoice, applyGroupToMember, cancelEdit, cancelEditOrder, cancelOrder, closeOrderSupplierPicker, closePriceEditor, closeTeamMember, createStaffMember, delCo, delIt, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, handleEnterAdd, handleLogout, markRead, openOrderSupplierPicker, openPriceEditor, patchOrderOffline, resetStaffPassword, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderReceive, savePermissions, savePriceEditor, saveSupplierPhone, saveUserGroups, searchOrderSuppliers, selectOrderSupplierFromPicker, selectProductToOrder, sendOrder, setCo, setItemStatus, startEdit, startEditOrder, supplierPhone, updCurrentItem, waLinkGroup } = useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle });
 
-  const { canStaffSupplierArea, canStaffVouchers, closeMenu, currentTabLabel, filterOrders, filterOrdersByStatusPage, goBack, groupByDay, makeShopNo, notificationItems, renderOrderPageTabs, selectFromMenu, setOrderStatus, stPage, staffQuickNavKeys, tabLabelOf, unread, visibleTabs } = useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList, team, th, toast, user, warrantyAlertList });
+  const { canStaffSupplierArea, canStaffVouchers, closeMenu, currentTabLabel, filterOrders, filterOrdersByStatusPage, goBack, groupByDay, makeShopNo, notificationItems, renderOrderPageTabs, selectFromMenu, setOrderStatus, stPage, staffQuickNavKeys, tabLabelOf, unread, visibleTabs } = useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList, lowStockCount: lowStock.rows.length, reminderDueCount: overdueReminders.readyCount, team, th, toast, user, warrantyAlertList });
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
 

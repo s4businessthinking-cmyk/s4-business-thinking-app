@@ -10,7 +10,9 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { averageCosts } from "./averageCost.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { buildBalanceSheet, openingStockValue, stockDocsUpTo } from "./balanceSheet.js";
 import { csvText } from "./vatExport.js";
@@ -35,7 +37,7 @@ const FS_CSS = `
 .fs-table tr.is-total td { font-weight: 700; border-top: 1px solid #7d94b7; background: #f8fafc; }
 `;
 
-export default function FundsSummaryReport({ lang = "en", shopId, products = [], customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
+export default function FundsSummaryReport({ lang = "en", shopId, shop = null, products = [], customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [asOf, setAsOf] = useState(() => localDay());
@@ -73,22 +75,23 @@ export default function FundsSummaryReport({ lang = "en", shopId, products = [],
 
   const day = asOf || localDay();
   const cmpDay = compareAsOf && compareAsOf !== day ? compareAsOf : "";
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, natureOf]);
   const openingStock = useMemo(() => openingStockValue(products), [products]);
 
-  // Stock value on a day exactly as the Balance Sheet works it out (quantity on hand x average cost, negatives left out).
+  // Stock value on a day exactly as the Balance Sheet works it out (quantity on hand x cost at the shop's method, negatives left out).
   const stockValueAt = (cutDay) => {
     const cut = stockDocsUpTo(data.rows, cutDay);
-    const purchases = livePurchasesOf(cut.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance");
-    const avg = averageCosts(products, purchases, cutDay, liveReturnsOf(cut.extras.purchaseReturns, shopId));
+    const avg = unitCostsAt(valuationMethodOf(shop), products, cut, { shopId, upTo: cutDay });
     const qty = computeStockMap(products, cut.purchaseInvoices, cut.salesInvoices, shopId, cut.deliveryNotes, cut.extras);
     let value = 0;
     qty.forEach((q, id) => { if (q > 0) value += q * (avg.get(id) || 0); });
     return r2(value);
   };
   const fundsAt = (d) => (ledger && d ? fundsFromSheet(buildBalanceSheet({ accounts: ledger.accounts, bal: balances(ledger.postings, d), closingStock: stockValueAt(d), openingStock })) : null);
-  const f = useMemo(() => fundsAt(day), [ledger, data, products, shopId, day, openingStock]); // eslint-disable-line react-hooks/exhaustive-deps
-  const fc = useMemo(() => (cmpDay ? fundsAt(cmpDay) : null), [ledger, data, products, shopId, cmpDay, openingStock]); // eslint-disable-line react-hooks/exhaustive-deps
+  const f = useMemo(() => fundsAt(day), [ledger, data, products, shopId, day, openingStock, shop?.stockValuationMethod]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fc = useMemo(() => (cmpDay ? fundsAt(cmpDay) : null), [ledger, data, products, shopId, cmpDay, openingStock, shop?.stockValuationMethod]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lines = f ? fundsLines(f) : [];
   const thenOf = fc ? new Map(fundsLines(fc).map((l) => [l.key, l.amount])) : null;

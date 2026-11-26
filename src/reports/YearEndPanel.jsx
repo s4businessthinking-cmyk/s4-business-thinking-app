@@ -12,6 +12,7 @@ import { periodLockOf } from "../accounts/periodLock.js";
 import { logAudit } from "../utils/auditLog.js";
 import { balances } from "../ledger/globalLedger.js";
 import { computeAccounts } from "./accountsCalc.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { buildBalanceSheet, openingStockValue } from "./balanceSheet.js";
 import { r2 } from "./reportFilters.js";
 import { fyRange, taxSettingsOf } from "./taxDomain.js";
@@ -19,6 +20,7 @@ import { buildTrialBalance } from "./trialBalance.js";
 import { csvText } from "./vatExport.js";
 import { combinePrintHtml, packChecks, packCsvRows, packSections, packStatus } from "./monthEndPack.js";
 import { stockValueAt } from "./MonthEndPackPanel.jsx";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
 import { YEAR_END_TARGET, closedYearAt, closingBalances, yearEndChecks, yearEndDocIds, yearEndJournal, yearEndRecord } from "./yearEnd.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,7 +50,7 @@ export default function YearEndPanel({ lang = "en", shopId, shop, user, profile,
     const openingStock = openingStockValue(products);
     const prior = closedYearAt(yearEnds, prevDay(fy.from), vouchers);
     const stockBase = prior ? prior.stockValue : openingStock;
-    const stockEnd = stockValueAt(rows, products, shopId, fy.to);
+    const stockEnd = stockValueAt(rows, products, shopId, fy.to, valuationMethodOf(shop));
     // figures before this year's own closing journal
     const skip = existing ? new Set([existing.journalId]) : null;
     const postings = skip ? ledger.postings.filter((p) => !skip.has(p.docId)) : ledger.postings;
@@ -58,7 +60,7 @@ export default function YearEndPanel({ lang = "en", shopId, shop, user, profile,
     const yearProfit = r2(-closing.net + stockEnd - stockBase);
     const tb = buildTrialBalance(before, { from: fy.from, to: fy.to, chart: shop?.chartOfAccounts || [], coaGroups: shop?.coaGroups || [] });
     const sheet = buildBalanceSheet({ accounts: ledger.accounts, bal: balances(postings, fy.to), closingStock: stockEnd, openingStock, closedStock: prior ? prior.stockValue : null });
-    const pl = computeAccounts({ ...rows, receipts: data.receipts, payments: data.payments, expenses: data.expenses, accountVouchers: vouchers }, { products, shopId, from: fy.from, to: fy.to, bn });
+    const pl = computeAccounts({ ...rows, receipts: data.receipts, payments: data.payments, expenses: data.expenses, accountVouchers: vouchers }, { products, shopId, from: fy.from, to: fy.to, bn, natureOf: shopAccountNature(shop), method: valuationMethodOf(shop) });
     const pack = packChecks({ tb, sheet, to: fy.to });
     // an earlier year with P&L that was never closed
     const prevEnd = prevDay(fy.from);

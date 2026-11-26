@@ -17,7 +17,7 @@ const G = normalizeGroups([
 ]);
 
 test("groups: natures are the ledger's own (no parties), bad parents cleared, tree and path", () => {
-  assert.deepEqual(GROUP_NATURES, ["money", "income", "expense", "tax", "equity", "other"]);
+  assert.deepEqual(GROUP_NATURES, ["money", "income", "expense", "tax", "equity", "asset", "liability", "other"]);
   assert.equal(G.some((g) => g.id === "bad"), false, "customer nature is not a CoA group");
   assert.equal(G.find((g) => g.id === "x").parentId, "", "a parent of another nature is cleared");
   assert.deepEqual(groupTree(G, "other").map((r) => [r.group.id, r.depth]), [["fa", 0], ["fur", 1]]);
@@ -27,15 +27,17 @@ test("groups: natures are the ledger's own (no parties), bad parents cleared, tr
   assert.ok(loop.some((g) => g.parentId === ""), "a loop is broken");
 });
 
-test("an account only goes into a group of the nature the ledger gives it", () => {
+test("a custom account may go into any group; engine and bank accounts only into a group of their own nature", () => {
   const chart = normalizeChart([{ id: "f", name: "Furniture" }, { id: "b2", name: "Bank - ADCB" }], { expenseNames: EXP });
   const get = (n) => chart.find((a) => a.name === n);
   assert.equal(assignIssue(get("Furniture"), "fur", G), "");
-  assert.equal(assignIssue(get("Furniture"), "ind", G), "nature");
+  assert.equal(assignIssue(get("Furniture"), "ind", G), "", "a custom account takes the group's nature");
   assert.equal(assignIssue(get("Cash in Hand"), "banks", G), "");
   assert.equal(assignIssue(get("Sales"), "fa", G), "nature", "Sales can't leave income");
   assert.equal(assignIssue(get("VAT Input"), "ind", G), "nature");
   assert.equal(assignIssue(get("Rent"), "ind", G), "");
+  assert.equal(assignIssue(get("Rent"), "fa", G), "nature", "an expense category stays an expense");
+  assert.equal(assignIssue(get("Bank - ADCB"), "fa", G), "nature", "a bank account stays cash & bank");
   assert.equal(assignIssue(get("Rent"), "missing", G), "group");
   assert.deepEqual(groupsForAccount(G, get("Bank - ADCB")).map((g) => g.id), ["banks"]);
   const placed = applyGroups(chart.map((a) => (a.name === "Furniture" ? { ...a, groupId: "fur" } : a.name === "Sales" ? { ...a, groupId: "fa" } : a)), G);
@@ -60,7 +62,12 @@ test("group rules: name, nature, parent, loop, depth, duplicate, code, nature lo
   assert.equal(validateGroup({ nameEn: "furniture & fittings", nature: "other", parentId: "fa" }, G).error, "duplicate");
   assert.equal(validateGroup({ nameEn: "Furniture & Fittings", nature: "other" }, G).ok, true, "same name under another parent is fine");
   assert.equal(validateGroup({ nameEn: "Vehicles", nature: "other", parentId: "fa", code: "1510" }, G).error, "duplicateCode");
-  assert.equal(validateGroup({ id: "fur", nameEn: "Furniture & Fittings", nature: "expense" }, G, chart).error, "natureLocked");
+  const moveFur = validateGroup({ id: "fur", nameEn: "Furniture & Fittings", nature: "expense" }, G, chart);
+  assert.deepEqual([moveFur.ok, moveFur.group.nature, moveFur.moved.map((a) => a.name), moveFur.cascade], [true, "expense", ["Furniture"], []], "custom accounts move with the group");
+  const moveFa = validateGroup({ id: "fa", nameEn: "Fixed Assets", nature: "asset" }, G, chart);
+  assert.deepEqual([moveFa.ok, moveFa.cascade, moveFa.moved.map((a) => a.name)], [true, ["fur"], ["Furniture"]], "sub-groups follow the parent's new nature");
+  const withRent = applyGroups(normalizeChart([{ id: "r", name: "Rent", groupId: "ind" }], { expenseNames: EXP }), G);
+  assert.equal(validateGroup({ id: "ind", nameEn: "Indirect Expenses", nature: "other" }, G, withRent).error, "natureLocked", "an expense category inside keeps the group's nature");
   assert.equal(validateGroup({ id: "fur", nameEn: "Furniture & Fittings", nature: "other", parentId: "fa", active: false }, G, chart).error, "busy");
   assert.equal(validateGroup({ id: "fa", nameEn: "Fixed Assets", nature: "other", active: false }, G, chart).error, "busy", "active sub-group inside");
   const ok = validateGroup({ nameEn: "Vehicles", nameBn: "গাড়ি", nature: "other", parentId: "fa", code: "1520" }, G);

@@ -11,7 +11,7 @@ import { saveSecurityChequeDocs } from "./securityChequeDocs.js";
 import {
   PARTY_TYPES, DIRECTIONS, STATUSES, ID_TYPES, SECURITY_CHEQUE_DOC_FLAGS,
   emptySecurityCheque, validateSecurityCheque, liveSecurityCheques, isStale, r2,
-  openInvoicesFor, outstandingBalanceFor,
+  openInvoicesFor, outstandingBalanceFor, securityChequeStatusPatch,
 } from "./securityCheque.js";
 
 const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -279,31 +279,43 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
     }
   };
 
+  // Each register action goes through securityChequeStatusPatch (only a held cheque moves) and hands back the record as
+  // saved, so the reopened form shows the new status and a later Save cannot write the old one back.
+  const applyStatus = async (r, action) => {
+    const { patch, error } = securityChequeStatusPatch(r, action, { by: user?.uid || "" });
+    if (error) { toast?.(bn ? "এই চেকের স্ট্যাটাস আর বদলানো যায় না — তালিকা রিফ্রেশ করুন" : "This cheque's status can no longer change - refresh the list", "err"); return null; }
+    await offlinePatch("securityCheques", r.id, patch, r);
+    return { ...r, ...patch };
+  };
   const requestClosure = async (r) => {
-    await offlinePatch("securityCheques", r.id, { closureRequested: true, updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }, r);
-    await logAudit({ shopId, user, profile, action: "closureRequested", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, note: r.party });
+    const next = await applyStatus(r, "requestClosure");
+    if (next) await logAudit({ shopId, user, profile, action: "closureRequested", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, note: r.party });
+    return next;
   };
-  const cancelClosureRequest = async (r) => {
-    await offlinePatch("securityCheques", r.id, { closureRequested: false, updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }, r);
-  };
+  const cancelClosureRequest = async (r) => applyStatus(r, "cancelClosure");
   const approveClosure = async (r) => {
-    if (!isOwner) return;
-    if (!window.confirm(bn ? `${r.party}-এর বন্ধের অনুরোধ অনুমোদন করবেন?` : `Approve closure for ${r.party}?`)) return;
-    await offlinePatch("securityCheques", r.id, { closureApproved: true, closureApprovedAt: new Date().toISOString(), closureApprovedBy: user?.uid || "", updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }, r);
-    await logAudit({ shopId, user, profile, action: "closureApproved", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, note: r.party });
+    if (!isOwner) return null;
+    if (!window.confirm(bn ? `${r.party}-এর বন্ধের অনুরোধ অনুমোদন করবেন?` : `Approve closure for ${r.party}?`)) return null;
+    const next = await applyStatus(r, "approveClosure");
+    if (next) await logAudit({ shopId, user, profile, action: "closureApproved", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, note: r.party });
+    return next;
   };
   const markReturned = async (r) => {
-    if (!isOwner) return;
-    if (!window.confirm(bn ? `চেক ${r.chequeNo} শারীরিকভাবে ফেরত দেওয়া হয়েছে কনফার্ম করছেন?` : `Confirm cheque ${r.chequeNo} has physically been returned?`)) return;
-    await offlinePatch("securityCheques", r.id, { status: "returned", closureRequested: false, returnedAt: new Date().toISOString(), returnedBy: user?.uid || "", updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }, r);
+    if (!isOwner) return null;
+    if (!window.confirm(bn ? `চেক ${r.chequeNo} শারীরিকভাবে ফেরত দেওয়া হয়েছে কনফার্ম করছেন?` : `Confirm cheque ${r.chequeNo} has physically been returned?`)) return null;
+    const next = await applyStatus(r, "returned");
+    if (!next) return null;
     await logAudit({ shopId, user, profile, action: "returned", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, note: r.party });
     toast?.(bn ? "ফেরত রেকর্ড হয়েছে" : "Return recorded");
+    return next;
   };
   const markPresented = async (r) => {
-    if (!isOwner) return;
+    if (!isOwner) return null;
     if (!window.confirm(bn ? "চুক্তি ও প্রযোজ্য আইন যাচাই করার পরই অনুমোদিত উপস্থাপন নিশ্চিত করছেন?" : "Confirm authorised presentation only after reviewing the agreement and applicable law?")) return;
-    await offlinePatch("securityCheques", r.id, { status: "presented", presentedAt: new Date().toISOString(), presentedBy: user?.uid || "", updatedAt: new Date().toISOString(), updatedBy: user?.uid || "" }, r);
+    const next = await applyStatus(r, "presented");
+    if (!next) return null;
     await logAudit({ shopId, user, profile, action: "presented", collection: "securityCheques", docId: r.id, docNo: r.chequeNo, amount: r.amount, note: r.party });
+    return next;
   };
   const deleteRecord = async (r) => {
     if (!canDelete) return;
@@ -618,19 +630,19 @@ export default function SecurityChequeTab({ lang = "en", shopId, user, profile, 
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {canPrint && <button type="button"onClick={() => printSecurityChequeReceipt(form, shop, lang, cur, docs)} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}> {bn ? "A4 রসিদ প্রিন্ট" : "Print A4 receipt"}</button>}
                     {form.status === "held" && !form.closureRequested && (
-                      <button type="button"onClick={() => requestClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "বন্ধের অনুরোধ" : "Request closure"}</button>
+                      <button type="button"onClick={() => requestClosure(form).then((next) => openEdit(next || form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "বন্ধের অনুরোধ" : "Request closure"}</button>
                     )}
                     {form.status === "held" && form.closureRequested && !form.closureApproved && (
-                      <button type="button"onClick={() => cancelClosureRequest(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "অনুরোধ বাতিল" : "Cancel closure request"}</button>
+                      <button type="button"onClick={() => cancelClosureRequest(form).then((next) => openEdit(next || form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "অনুরোধ বাতিল" : "Cancel closure request"}</button>
                     )}
                     {isOwner && form.status === "held" && form.closureRequested && !form.closureApproved && (
-                      <button type="button"onClick={() => approveClosure(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #15803d", background: "#f0fdf4", color: "#15803d", cursor: "pointer", fontSize: 12, fontWeight: 700 }}> {bn ? "বন্ধের অনুমোদন (মালিক)" : "Approve closure (owner)"}</button>
+                      <button type="button"onClick={() => approveClosure(form).then((next) => openEdit(next || form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #15803d", background: "#f0fdf4", color: "#15803d", cursor: "pointer", fontSize: 12, fontWeight: 700 }}> {bn ? "বন্ধের অনুমোদন (মালিক)" : "Approve closure (owner)"}</button>
                     )}
                     {isOwner && form.status === "held" && (
-                      <button type="button"onClick={() => markReturned(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "চেক ফেরত মার্ক (মালিক)" : "Mark returned (owner)"}</button>
+                      <button type="button"onClick={() => markReturned(form).then((next) => openEdit(next || form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "চেক ফেরত মার্ক (মালিক)" : "Mark returned (owner)"}</button>
                     )}
                     {isOwner && form.status === "held" && (
-                      <button type="button"onClick={() => markPresented(form).then(() => openEdit(form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "ব্যাংকে জমা মার্ক (মালিক)" : "Mark presented (owner)"}</button>
+                      <button type="button"onClick={() => markPresented(form).then((next) => openEdit(next || form))} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer", fontSize: 12 }}>{bn ? "ব্যাংকে জমা মার্ক (মালিক)" : "Mark presented (owner)"}</button>
                     )}
                     {canDelete && (
                       <button type="button"onClick={() => deleteRecord(form)} style={{ padding: "7px 10px", borderRadius: 8, border: "none", background: "#b91c1c", color: "#fff", cursor: "pointer", fontSize: 12, fontWeight: 700 }}> {bn ? "ডিলিট" : "Delete"}</button>

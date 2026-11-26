@@ -1,5 +1,6 @@
 import { STOCK_AFFECTING_INVOICE_STATUSES, applyInvoiceStockEffect, deviceSerialTag, piFmt2, piN2, reserveShopSerial, unlinkedStockOk } from "../shared/appShared.jsx";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
+import { billLocationFields, billLocationsOf } from "../inventory/billLocation.js";
 import { isForeign, lineToBase, rateOf } from "./purchaseOptions.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { localIsoDate } from "../utils/localIsoDate.js";
@@ -12,6 +13,7 @@ import { pricingPatchFromLanding } from "../product-master/pricingFromLanding.js
 import { unitFactorFor } from "../inventory/unitConversion";
 import { averageCosts } from "../reports/averageCost.js";
 import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
+import { serialLineProblems, serialProblemText, serialSettingsOf, splitSerials } from "../sales-invoice/serialRules.js";
 
 function unmatchedPurchaseNames(items) {
   return (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
@@ -46,12 +48,17 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       if (piN2(it.discountPerc)<0||piN2(it.discountPerc)>100){ toast(lang==="bn"?` "${it.name}": ছাড় ০–১০০% হতে হবে`:` "${it.name}": discount must be 0–100%`,"err"); return null; }
       if (piN2(it.discountFlat)<0){ toast(lang==="bn"?` "${it.name}": ছাড়ের টাকা ঋণাত্মক হতে পারে না`:` "${it.name}": discount amount cannot be negative`,"err"); return null; }
     }
+    // Serial / IMEI on marked products when the owner requires it on purchases (sales-invoice/serialRules.js); drafts may wait
+    if (status !== "draft") {
+      const serialIssues = serialLineProblems(valid, products, { required: serialSettingsOf(shop).purchase });
+      if (serialIssues.length) { toast(serialProblemText(serialIssues, lang==="bn"), "err"); return null; }
+    }
     const foreign = isForeign(piForm, piBaseCur);
     const rate = rateOf(piForm, piBaseCur);
     if (foreign && !(rate > 0)) { toast(lang==="bn"?` ${piForm.currency} থেকে ${piBaseCur}-এর রেট (Exchange Rate) দিন`:`Enter the exchange rate from ${piForm.currency} to ${piBaseCur}`,"err"); return null; }
     const baseLines = valid.map(it=>lineToBase(it, rate));
     const builtItems=baseLines.map((it,idx)=>{ const { disc, tax, total }=piCalcLine(it); return { productId:it.productId||null, name:it.name.trim(), code:it.code.trim(), brand:it.brand.trim(), qty:piN2(it.qty), unit:it.unit, unitFactor:unitFactorFor(it.productId ? products.find(p=>p.id===it.productId) : null, it.unit), unitCost:piN2(it.unitCost), discountPerc:piN2(it.discountPerc), ...(piN2(it.discountFlat)>0?{ discountFlat:piN2(it.discountFlat) }:{}), discountAmt:parseFloat(piFmt2(disc)), taxPerc:piN2(it.taxPerc), taxAmt:parseFloat(piFmt2(tax)), lineTotal:parseFloat(piFmt2(total)), salePrice:piN2(it.salePrice)||null,
-      ...(foreign?{ fcUnitCost:piN2(valid[idx].unitCost), ...(piN2(valid[idx].discountFlat)>0?{ fcDiscountFlat:piN2(valid[idx].discountFlat) }:{}) }:{}), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[] }:{}) }; });
+      ...(foreign?{ fcUnitCost:piN2(valid[idx].unitCost), ...(piN2(valid[idx].discountFlat)>0?{ fcDiscountFlat:piN2(valid[idx].discountFlat) }:{}) }:{}), ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[], ...(it.expiryDate?{ expiryDate:String(it.expiryDate).slice(0,10) }:{}) }:{}), ...(splitSerials(it.serialNo).length?{ serialNo:splitSerials(it.serialNo).join(", ") }:{}) }; });
     // Adjustment (+/-) is typed in the bill's currency, like the lines
     const adjFc = piN2(piForm.adjustment);
     const { sub, disc, tax, grand } = piCalcTotals(baseLines, { adjustment: adjFc * rate });
@@ -69,7 +76,8 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
       ...(piSource?.kind==="grn" ? { goodsReceiptId:piSource.id, goodsReceiptNo:piSource.no, ...((piSource.ids||[]).length>1 ? { goodsReceiptIds:piSource.ids, goodsReceiptNos:piSource.nos } : {}) }
         : priorInv?.goodsReceiptId ? { goodsReceiptId:priorInv.goodsReceiptId, goodsReceiptNo:priorInv.goodsReceiptNo||"", ...((priorInv.goodsReceiptIds||[]).length>1 ? { goodsReceiptIds:priorInv.goodsReceiptIds, goodsReceiptNos:priorInv.goodsReceiptNos } : {}) } : {}),
     };
-    return { ...sourceFields, shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate, entryDate:piForm.entryDate||piForm.invoiceDate,
+    // the godown the goods go into (W01; nothing stored for a main-only shop)
+    return { ...sourceFields, ...billLocationFields(piForm.locationId||"", billLocationsOf(shop), { prior: priorInv }), shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate, entryDate:piForm.entryDate||piForm.invoiceDate,
       currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName,
       // Adjustment (+/-) after VAT and why (Merge / Masters - adjustment reasons); base currency like the other totals
       adjustment:parseFloat(piFmt2(adjFc * rate)), ...(foreign && adjFc ? { fcAdjustment:adjFc } : {}),

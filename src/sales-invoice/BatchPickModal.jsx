@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { fefoChoices } from "../inventory/batchExpiry.js";
 
 const fmt = (v) => (Number(v) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 
 // Asks which batch a sold line comes from. Enter / number keys pick, Esc closes (the line is not added).
-export default function BatchPickModal({ lang = "en", product, choices, onPick, onClose }) {
+// Batches with an expiry date come first, earliest first (FEFO); expired / expiring ones are marked.
+export default function BatchPickModal({ lang = "en", product, choices: given, onPick, onClose, day = "", soonDays = 30 }) {
   const bn = lang === "bn";
+  const today = day || new Date().toISOString().slice(0, 10);
+  const choices = useMemo(() => fefoChoices(given, today, soonDays), [given, today, soonDays]);
   const [active, setActive] = useState(0);
   const unit = product?.unit || "Pcs";
 
@@ -42,6 +46,12 @@ export default function BatchPickModal({ lang = "en", product, choices, onPick, 
                 {!c.isMain && (
                   <span style={{ display: "block", fontSize: 12, color: "#4b5f86" }}>
                     {[fmtDay(c.date), c.vendorName, c.mrp > 0 ? `M.R.P ${fmt(c.mrp)}` : "", c.cost > 0 ? `${bn ? "খরচ" : "Cost"} ${fmt(c.cost)}` : ""].filter(Boolean).join(" · ")}
+                  </span>
+                )}
+                {!c.isMain && c.state && (
+                  <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: c.state === "expired" ? "#b91c1c" : c.state === "soon" ? "#b45309" : "#4b5f86" }}>
+                    {bn ? "মেয়াদ" : "Expiry"} {fmtDay(c.expiry)}
+                    {c.state === "expired" ? ` - ${bn ? "মেয়াদ শেষ" : "expired"}` : c.state === "soon" ? ` - ${bn ? `${c.daysLeft} দিন বাকি` : `${c.daysLeft} day(s) left`}` : ""}
                   </span>
                 )}
               </span>

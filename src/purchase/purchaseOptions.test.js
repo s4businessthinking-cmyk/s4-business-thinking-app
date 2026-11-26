@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { batchReasons, isForeign, lineToBase, nextBatchNo, purchaseOptionsOf, rateOf } from "./purchaseOptions.js";
 
-const all = { refNo: true, multiCurrency: true, batchVendor: true, batchMrp: true, batchCost: true };
+const all = { refNo: true, multiCurrency: true, batchVendor: true, batchMrp: true, batchCost: true, enablePrint: true };
 const product = { id: "p", name: "Filter", unit: "Pcs", mrp: "25", landingCost: "10", unitPrices: [{ unit: "Box", factor: 12 }] };
 
 test("options default to off and only true switches them on", () => {
-  assert.deepEqual(purchaseOptionsOf({}), { refNo: false, multiCurrency: false, batchVendor: false, batchMrp: false, batchCost: false });
+  assert.deepEqual(purchaseOptionsOf({}), { refNo: false, multiCurrency: false, batchVendor: false, batchMrp: false, batchCost: false, enablePrint: false });
   assert.equal(purchaseOptionsOf({ purchaseOptions: { refNo: true, batchMrp: "yes" } }).refNo, true);
   assert.equal(purchaseOptionsOf({ purchaseOptions: { refNo: true, batchMrp: "yes" } }).batchMrp, false);
+  assert.equal(purchaseOptionsOf({ purchaseOptions: { enablePrint: true } }).enablePrint, true);
 });
 
 test("foreign currency bills convert line costs to the shop currency", () => {

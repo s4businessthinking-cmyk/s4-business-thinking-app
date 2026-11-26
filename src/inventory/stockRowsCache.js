@@ -55,3 +55,18 @@ export function invalidateInvoiceRowsCache() {
   gen += 1;
   listeners.forEach((fn) => { try { fn(gen); } catch { /* ignore listener errors */ } });
 }
+
+/**
+ * Rows for a check that must not hang: peek() (the cache), else load() given waitMs to finish.
+ * -> the rows, or null when they did not arrive in time (the caller then says the check did not run).
+ */
+export async function rowsWithin(peek, load, waitMs = 4000) {
+  try { const hit = peek(); if (hit) return hit; } catch { /* cache unreadable: load below */ }
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(load).catch(() => null),
+      new Promise((resolve) => { timer = setTimeout(() => resolve(null), waitMs); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}

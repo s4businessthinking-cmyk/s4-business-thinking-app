@@ -15,31 +15,42 @@ import { saveShopRecord } from "../offline/shopService";
 import UserGroupsPanel from "../team/UserGroupsPanel.jsx";
 import BackupPanel from "../backup/BackupPanel.jsx";
 import { getCloudSyncBlockReason } from "../offline/cloudPullService";
+import { TILE_CSS, monogram, tileVars } from "../dashboard/dashTiles.js";
+
+// Same accent language as dashboard cards (dashTiles.js) — one colour per settings row after emoji icons were removed.
+const SETTING_ACCENTS = {
+  profile: "#2563eb", period: "#b45309", pin: "#7c3aed", shop: "#0284c7", invite: "#ea580c",
+  team: "#0d9488", groups: "#4f46e5", orderModule: "#0891b2", branchTransfer: "#059669", wastyle: "#16a34a",
+  theme: "#475569", language: "#db2777", print: "#1d4ed8", sync: "#0ea5e9", backup: "#c2410c",
+  license: "#9333ea", update: "#2563eb", help: "#64748b",
+};
 
 export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSettings, closeTeamMember, cloudPullBusy, cloudUploadBusy, createStaffMember, deleteInviteCode, generateNewCode, handleLogout, inviteCodes, isDesktop, isOwner, lang, lastCloudPullAt, localShop, mergeShopRecord, orderModuleEnabled, orderSettingsSaving, periodLock, products, profile, refreshSyncDashboard, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, setBranchTransferSettings, setLang, setLocalShop, setPinModal, setPrintSettingsOpen, setSettingsPage, setStaffForm, setStaffPwReset, setTheme, setWaStyle, settingsPage, shopId, stPage, staffForm, staffPwReset, staffSaving, syncDashboard, syncState, t, team, teamEmployees, th, theme, toast, user, userGroups, waStyle }) {
         const bnS = lang==="bn";
         const plain = (v)=>String(v||"").replace(/^[^\p{L}\p{N}]+/u,"");
         const btCopy = isOwner ? branchTransferSettingsCopy(lang, branchTransferSettings.enabled) : null;
         const may = (key) => isOwner || (profile?.permissions || {})[key] === true;
+        const isLightSet = theme !== "dark";
+        const itemOf = (id, rest) => ({ id, color: SETTING_ACCENTS[id] || "#2563eb", ...rest });
         const items = [
-          { id:"profile", icon:"", label:plain(t.profileTitle), sub:profile.personName },
-          isOwner && { id:"period", icon:"", label:bnS?"হিসাব বছর বন্ধ / লক":"Accounting period lock", sub:periodLock.lockDate?(bnS?`${periodLock.lockDate} পর্যন্ত বন্ধ`:`Closed up to ${periodLock.lockDate}`):(bnS?"লক নেই — পুরোনো এন্ট্রি বন্ধ করুন":"Not locked — close old entries") },
-          isOwner && { id:"pin", icon:"", label:bnS?"মালিকের পিন":"Owner PIN", sub:bnS?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN", action:()=>setPinModal("reset") },
-          localShop && { id:"shop", icon:"", label:plain(t.shopInfoTitle), sub:`${localShop.companyName||""}${!isOwner?(bnS?" · শুধু দেখা":" · View only"):""}` },
-          isOwner && { id:"invite", icon:"", label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` },
-          (isOwner || team.length>0) && { id:"team", icon:"", label:plain(t.teamTitle), sub:`${team.length} ${bnS?"জন সদস্য":"members"}` },
-          isOwner && { id:"groups", icon:"", label:bnS?"ইউজার গ্রুপ ও অনুমতি":"User groups & privileges", sub:`${userGroups.length} ${bnS?"টি গ্রুপ · দেখা / যোগ / এডিট / বাতিল / প্রিন্ট":"groups · view / add / edit / delete / print"}` },
-          isOwner && { id:"orderModule", icon:"", label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") },
-          isOwner && { id:"branchTransfer", icon:"", label:btCopy.title, sub:btCopy.subtitle },
-          isOwner && { id:"wastyle", icon:"", label:"WhatsApp Message Style", sub:WA_STYLES.find(w=>w.id===waStyle)?.[bnS?"labelBn":"labelEn"]||"" },
-          { id:"theme", icon:theme==="dark"?"":"", label:bnS?"থিম / রঙ":"Theme", sub:theme==="dark"?(bnS?"ডার্ক মোড":"Dark Mode"):(bnS?"লাইট মোড":"Light Mode") },
-          { id:"language", icon:"", label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" },
-          { id:"print", icon:"", label:bnS?"প্রিন্ট সেটিংস":"Print Settings", sub:bnS?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview", action:()=>setPrintSettingsOpen(true) },
-          { id:"sync", icon:syncState==="connected"?"":syncState==="offline"?"":syncState==="reconnecting"?"":"", label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." },
-          (isOwner || may("manageBackup")) && { id:"backup", icon:"", label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" },
-          { id:"license", icon:"", label:bnS?"লাইসেন্স স্ট্যাটাস":"License status", sub:bnS?"ঐচ্ছিক লাইসেন্স অ্যাক্টিভেশন":"Optional license activation" },
-          { id:"update", icon:"", label:plain(t.updateTitle), sub:`v${APP_VERSION} · ${t.updateSub}` },
-          { id:"help", icon:"", label:plain(t.helpTitle), sub:t.helpMenuSub },
+          itemOf("profile", { label:plain(t.profileTitle), sub:profile.personName }),
+          isOwner && itemOf("period", { label:bnS?"হিসাব বছর বন্ধ / লক":"Accounting period lock", sub:periodLock.lockDate?(bnS?`${periodLock.lockDate} পর্যন্ত বন্ধ`:`Closed up to ${periodLock.lockDate}`):(bnS?"লক নেই — পুরোনো এন্ট্রি বন্ধ করুন":"Not locked — close old entries") }),
+          isOwner && itemOf("pin", { label:bnS?"মালিকের পিন":"Owner PIN", sub:bnS?"ড্যাশবোর্ডের টাকা, Accounts ও চেক ফোল্ডার — পিন সেট / পরিবর্তন":"Dashboard money, Accounts & cheque folders — set / change PIN", action:()=>setPinModal("reset") }),
+          localShop && itemOf("shop", { label:plain(t.shopInfoTitle), sub:`${localShop.companyName||""}${!isOwner?(bnS?" · শুধু দেখা":" · View only"):""}` }),
+          isOwner && itemOf("invite", { label:plain(t.inviteCodeTitle), sub:`${inviteCodes.filter(c=>!c.used).length} ${bnS?"টি active":"active"}` }),
+          (isOwner || team.length>0) && itemOf("team", { label:plain(t.teamTitle), sub:`${team.length} ${bnS?"জন সদস্য":"members"}` }),
+          isOwner && itemOf("groups", { label:bnS?"ইউজার গ্রুপ ও অনুমতি":"User groups & privileges", sub:`${userGroups.length} ${bnS?"টি গ্রুপ · দেখা / যোগ / এডিট / বাতিল / প্রিন্ট":"groups · view / add / edit / delete / print"}` }),
+          isOwner && itemOf("orderModule", { label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") }),
+          isOwner && itemOf("branchTransfer", { label:btCopy.title, sub:btCopy.subtitle }),
+          isOwner && itemOf("wastyle", { label:"WhatsApp Message Style", sub:WA_STYLES.find(w=>w.id===waStyle)?.[bnS?"labelBn":"labelEn"]||"" }),
+          itemOf("theme", { label:bnS?"থিম / রঙ":"Theme", sub:theme==="dark"?(bnS?"ডার্ক মোড":"Dark Mode"):(bnS?"লাইট মোড":"Light Mode") }),
+          itemOf("language", { label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" }),
+          itemOf("print", { label:bnS?"প্রিন্ট সেটিংস":"Print Settings", sub:bnS?"বিলের ধরন, কাগজের মাপ, কপি, প্রিভিউ":"Bill type, paper size, copies, preview", action:()=>setPrintSettingsOpen(true) }),
+          itemOf("sync", { label:plain(t.syncStatus), sub:syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..." }),
+          (isOwner || may("manageBackup")) && itemOf("backup", { label:bnS?"ব্যাকআপ ও রিস্টোর":"Backup & restore", sub:bnS?"Google Drive / কম্পিউটারে দোকানের ডেটার কপি":"Copy of shop data to Google Drive / computer" }),
+          itemOf("license", { label:bnS?"লাইসেন্স স্ট্যাটাস":"License status", sub:bnS?"ঐচ্ছিক লাইসেন্স অ্যাক্টিভেশন":"Optional license activation" }),
+          itemOf("update", { label:plain(t.updateTitle), sub:`v${APP_VERSION} · ${t.updateSub}` }),
+          itemOf("help", { label:plain(t.helpTitle), sub:t.helpMenuSub }),
         ].filter(Boolean);
         const openItem = (it)=>{ if (it.action) it.action(); else setSettingsPage(it.id); };
         const current = items.find(it=>it.id===stPage);
@@ -57,23 +68,22 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
           <div style={{ fontSize:11, fontWeight:900, letterSpacing:0.4, textTransform:"uppercase", color:th.txtMuted, padding:isDesktop?"10px 10px 4px":"4px 4px 6px", marginTop:first?0:(isDesktop?4:14), borderTop:!first&&isDesktop?`1px solid ${th.border}`:"none" }}>{label}</div>
         );
         return (
-        <div style={isDesktop?{ ...s.desktopPanel, maxWidth:1240 }:s.panel}>
+        <div className={isLightSet ? "s4-dash-light" : "s4-dash-dark"} style={isDesktop?{ ...s.desktopPanel, maxWidth:1240 }:s.panel}>
+          <style>{TILE_CSS}</style>
           {isDesktop&&<style dangerouslySetInnerHTML={{ __html:`
 .st-pc{display:grid;grid-template-columns:290px minmax(0,1fr);gap:18px;align-items:start;}
 .st-side{position:sticky;top:12px;background:${th.bgCard};border:1px solid ${th.border};border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(15,23,42,.06);}
 .st-side-head{padding:12px 16px;font-weight:800;font-size:15px;color:#fff;background:linear-gradient(180deg,#3d6fcb,#24519f);}
-.st-list{max-height:calc(100vh - 210px);overflow:auto;padding:6px;}
-.st-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:none;border-left:3px solid transparent;border-radius:8px;background:transparent;cursor:pointer;text-align:left;font-family:inherit;color:${th.txtPrimary};}
-.st-item:hover{background:${theme==="dark"?"rgba(96,165,250,.12)":"#f1f5fb"};}
-.st-item.is-active{background:${theme==="dark"?"rgba(96,165,250,.2)":"#e3edfc"};border-left-color:${th.accent};}
-.st-item .st-ic{width:32px;height:32px;flex-shrink:0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;background:${theme==="dark"?"rgba(255,255,255,.06)":"#eef3fb"};}
+.st-list{max-height:calc(100vh - 210px);overflow:auto;padding:6px;display:flex;flex-direction:column;gap:6px;}
+.st-item.s4-tile{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px 9px 14px;border-radius:12px;cursor:pointer;text-align:left;font-family:inherit;color:${th.txtPrimary};}
+.st-item.s4-tile.is-active{box-shadow:inset 4px 0 0 var(--acc),0 0 0 1px var(--acc);}
 .st-item b{display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .st-item small{display:block;font-size:11px;color:${th.txtMuted};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .st-item .st-tx{min-width:0;flex:1;}
 .st-out{display:block;width:calc(100% - 12px);margin:6px;padding:9px;border-radius:8px;border:1px solid #fecaca;background:${theme==="dark"?"#450a0a":"#fef2f2"};color:#dc2626;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;}
 .st-main{background:${th.bgCard};border:1px solid ${th.border};border-radius:12px;overflow:hidden;box-shadow:0 2px 10px rgba(15,23,42,.06);min-height:420px;}
-.st-main-head{display:flex;align-items:center;gap:12px;padding:12px 18px;color:#fff;background:linear-gradient(180deg,#3d6fcb,#24519f);}
-.st-main-head .st-ic{font-size:22px;}
+.st-main-head{display:flex;align-items:center;gap:12px;padding:12px 18px;color:#fff;background:linear-gradient(180deg,var(--acc,#3d6fcb),#24519f);}
+.st-main-head .s4-mono{width:40px;height:40px;border-radius:12px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);color:#fff;}
 .st-main-head .st-title{font-size:16px;font-weight:800;}
 .st-main-head .st-sub{font-size:12px;opacity:.85;}
 .st-main-body{padding:18px 22px 24px;max-width:860px;}
@@ -88,8 +98,8 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                     <Fragment key={g.key}>
                       {groupHead(g.label, gi===0)}
                       {g.items.map(it=>(
-                        <button key={it.id} type="button"className={`st-item${stPage===it.id?"is-active":""}`} onClick={()=>openItem(it)} title={it.sub}>
-                          <span className="st-ic">{it.icon}</span>
+                        <button key={it.id} type="button" className={`st-item s4-tile is-click${stPage===it.id?" is-active":""}`} style={tileVars(it.color)} onClick={()=>openItem(it)} title={it.sub}>
+                          <span className="s4-mono">{monogram(it.label)}</span>
                           <span className="st-tx"><b>{it.label}</b><small>{it.sub}</small></span>
                         </button>
                       ))}
@@ -105,9 +115,20 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                   <Fragment key={g.key}>
                     {groupHead(g.label, gi===0)}
                     {g.items.map(it=>(
-                      <button key={it.id} style={s.settingsRow} onClick={()=>openItem(it)}>
-                        <span style={s.settingsRowIcon}>{it.icon}</span>
-                        <div style={{ flex:1 }}>
+                      <button
+                        key={it.id}
+                        type="button"
+                        className="s4-tile is-click"
+                        onClick={()=>openItem(it)}
+                        style={{
+                          ...tileVars(it.color),
+                          width:"100%", display:"flex", alignItems:"center", gap:12,
+                          padding:"12px 14px 12px 16px", marginBottom:8, fontFamily:"inherit",
+                          textAlign:"left", color:th.txtPrimary, cursor:"pointer",
+                        }}
+                      >
+                        <span className="s4-mono">{monogram(it.label)}</span>
+                        <div style={{ flex:1, minWidth:0 }}>
                           <div style={s.settingsRowLabel}>{it.label}</div>
                           <div style={s.settingsRowSub}>{it.sub}</div>
                         </div>
@@ -121,8 +142,8 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
             )}
             <section className={isDesktop?"st-main":undefined}>
               {isDesktop ? (
-                <div className="st-main-head">
-                  <span className="st-ic">{current?.icon}</span>
+                <div className="st-main-head" style={tileVars(current?.color || "#3d6fcb")}>
+                  <span className="s4-mono">{monogram(current?.label || "S")}</span>
                   <div><div className="st-title">{current?.label}</div><div className="st-sub">{current?.sub}</div></div>
                 </div>
               ) : settingsPage&&(

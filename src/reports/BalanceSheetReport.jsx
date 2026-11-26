@@ -10,14 +10,17 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { TYPE_LABEL } from "../ledger/GlobalLedgerWindow.jsx";
 import { averageCosts } from "./averageCost.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
 import { closedYearAt } from "./yearEnd.js";
 import FixedAssetsPanel from "../accounts/FixedAssetsPanel.jsx";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import {
-  alignSides, buildBalanceSheet, excludedDocs, fyStartDate, moneyBreakdown, negativeStock, openingBsAsOf, openingStockValue, stockDocsUpTo,
+  alignSides, buildBalanceSheet, excludedDocs, fyStartDate, moneyBreakdown, negativeStock, openingBsAsOf, openingStockValue, profitReconcile, stockDocsUpTo,
 } from "./balanceSheet.js";
+import { computeAccounts } from "./accountsCalc.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qtyFmt = (v) => (Math.round((Number(v) || 0) * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
@@ -111,15 +114,17 @@ export default function BalanceSheetReport({
   const day = asOf || localDay();
   const cmpDay = compareAsOf && compareAsOf !== day ? compareAsOf : "";
   const fyMonth = Math.max(1, Math.min(12, Number(fyStartMonth) || 1));
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors]);
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod]);
   const openingStock = useMemo(() => openingStockValue(products), [products]);
 
-  // Stock on a day at average purchase cost up to that day (same valuation as P&L). Negative quantities are listed, not valued.
+  // Stock on a day at the shop's valuation method up to that day (same valuation as P&L). Negative quantities are listed, not valued.
+  const method = valuationMethodOf(shop);
   const stockAt = (cutDay) => {
     if (!data || !cutDay) return null;
     const cut = stockDocsUpTo(data.rows, cutDay);
-    const purchases = livePurchasesOf(cut.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance");
-    const avg = averageCosts(products, purchases, cutDay, liveReturnsOf(cut.extras.purchaseReturns, shopId));
+    const avg = unitCostsAt(method, products, cut, { shopId, upTo: cutDay });
     const qty = computeStockMap(products, cut.purchaseInvoices, cut.salesInvoices, shopId, cut.deliveryNotes, cut.extras);
     let value = 0, unpriced = 0;
     qty.forEach((q, id) => {
@@ -130,14 +135,23 @@ export default function BalanceSheetReport({
     });
     return { value: r2(value), negatives: negativeStock(qty, products), unpriced };
   };
-  const stock = useMemo(() => stockAt(day), [data, products, shopId, day]); // eslint-disable-line react-hooks/exhaustive-deps
-  const stockCmp = useMemo(() => (cmpDay ? stockAt(cmpDay) : null), [data, products, shopId, cmpDay]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stock = useMemo(() => stockAt(day), [data, products, shopId, day, method]); // eslint-disable-line react-hooks/exhaustive-deps
+  const stockCmp = useMemo(() => (cmpDay ? stockAt(cmpDay) : null), [data, products, shopId, cmpDay, method]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // after a year-end close, profit counts from the stock value on that year-end day (yearEnd.js)
   const sheetAt = (d, st) => (ledger && st ? buildBalanceSheet({ accounts: ledger.accounts, bal: balances(ledger.postings, d), closingStock: st.value, openingStock,
     closedStock: closedYearAt(yearEnds, d, data?.accountVouchers)?.stockValue ?? null }) : null);
   const sheet = useMemo(() => sheetAt(day, stock), [ledger, stock, day, openingStock, yearEnds]); // eslint-disable-line react-hooks/exhaustive-deps
   const sheetCmp = useMemo(() => (cmpDay ? sheetAt(cmpDay, stockCmp) : null), [ledger, stockCmp, cmpDay, openingStock, yearEnds]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The sheet balances by construction (profit takes the stock change), so check its profit against the P&L over the
+  // same window: from the day after the last closed year-end, or from the start, up to the as-at day.
+  const plCheck = useMemo(() => {
+    if (!data || !sheet) return null;
+    const closed = closedYearAt(yearEnds, day, data.accountVouchers);
+    const from = closed?.fyEnd ? (() => { const d = new Date(`${closed.fyEnd}T12:00:00`); d.setDate(d.getDate() + 1); return localDay(d); })() : "";
+    const pl = computeAccounts({ ...data.rows, receipts: data.receipts, payments: data.payments, expenses: data.expenses, accountVouchers: data.accountVouchers }, { products, shopId, from, to: day, bn, natureOf, method });
+    return pl ? profitReconcile(pl.netProfit, sheet.profit) : null;
+  }, [data, sheet, yearEnds, day, products, shopId, bn, natureOf, method]);
   const moneyRows = useMemo(() => (ledger ? moneyBreakdown(ledger.postings, ledger.accounts, day) : []), [ledger, day]);
 
   const excluded = useMemo(() => (data ? excludedDocs([
@@ -321,10 +335,17 @@ export default function BalanceSheetReport({
           {kpi(L("ইকুইটি / নেট ওয়ার্থ (সম্পদ − দেনা)", "Equity / net worth (assets − liabilities)"), sheet.totalEquity, sheet.totalEquity >= 0 ? "#15803d" : "#b91c1c")}
           {kpi(L("ওয়ার্কিং ক্যাপিটাল", "Working capital"), sheet.workingCapital, sheet.workingCapital >= 0 ? "#15803d" : "#b91c1c")}
           <div className="si-kpi"><span>{L("মিল", "Check")}</span><b style={{ color: balanced ? "#15803d" : "#b91c1c" }}>{balanced ? L("মিলেছে", "Balanced") : `${L("পার্থক্য", "Difference")} ${money(sheet.difference)}`}</b></div>
+          {plCheck && (
+            <div className="si-kpi" title={plCheck.agrees ? undefined : L(`লাভ-ক্ষতি রিপোর্টে লাভ ${money(plCheck.plProfit)}, ব্যালান্স শিটে ${money(plCheck.bsProfit)}। সাধারণ কারণ: মাইনাস স্টক বা বিল না হওয়া ডেলিভারি নোট।`, `Profit & loss shows ${money(plCheck.plProfit)}, the balance sheet ${money(plCheck.bsProfit)}. Usual causes: stock below zero or delivery notes not yet billed.`)}>
+              <span>{L("লাভ-ক্ষতির সাথে মিল", "Agrees with P&L")}</span>
+              <b style={{ color: plCheck.agrees ? "#15803d" : "#b45309" }}>{plCheck.agrees ? L("মিলেছে", "Agrees") : `${L("পার্থক্য", "Difference")} ${money(plCheck.difference)}`}</b>
+            </div>
+          )}
         </div>
       )}
       <div className="si-body">
         {error && <div className="si-paid-box is-due">{L("ডেটা পড়া যায়নি: ", "Could not load: ")}{error}</div>}
+        {method === "fifo" && <div className="si-hint" style={{ margin: "2px 6px" }}>{L("স্টকের মূল্য FIFO পদ্ধতিতে (স্টক হাবের সেটিং) - হাতে থাকা মাল শেষের দিকে কেনা লেয়ারের খরচে।", "Stock is valued FIFO (Stock Hub setting) - stock on hand at the cost of the latest layers.")}</div>}
         {showAssets && data && (
           <FixedAssetsPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} data={data}
             moneyAccounts={ledger ? [...ledger.accounts.values()].filter((a) => a.group === "money").map((a) => a.name) : []} vendors={vendors} asOf={day}

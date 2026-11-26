@@ -1,6 +1,7 @@
-// Chart of Accounts: the shop's account list with code, group (as the ledger posts it), system / custom and active
-// flags, and the shop's own groups / sub-groups (coaGroups.js) as a tree inside each ledger group. Owner edits; everyone
-// with access can view, print and export. Saved on the shop record; see chartOfAccounts.js.
+// Chart of Accounts: the shop's account list with code, group (the nature it posts with), system / custom and active
+// flags, and the shop's own groups / sub-groups (coaGroups.js) as a tree inside each nature. A custom account in a group
+// takes the group's nature in the ledger, Trial Balance, Balance Sheet and P&L (accountNature.js); system and bank
+// accounts keep their own. Owner edits; everyone with access can view, print and export. Saved on the shop record.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
@@ -14,7 +15,7 @@ import { csvText } from "../reports/vatExport.js";
 import { EXPENSE_CATEGORIES } from "../expenses/ExpensesTab.jsx";
 import { GROUPS } from "./globalLedger.js";
 import { ESSENTIAL, canDelete, chartCsvRows, groupLabel, groupOfName, missingFromVouchers, normalizeChart, toSaved, usedNames, validateAccount } from "./chartOfAccounts.js";
-import { GROUP_NATURES, applyGroups, assignIssue, canDeleteGroup, groupName, groupPath, groupTree, groupsForAccount, normalizeGroups, toSavedGroups, validateGroup } from "./coaGroups.js";
+import { GROUP_NATURES, applyGroups, assignIssue, canDeleteGroup, groupName, groupPath, groupTree, groupsForAccount, natureEditable, normalizeGroups, toSavedGroups, validateGroup } from "./coaGroups.js";
 
 export const CHART_EXPENSE_NAMES = EXPENSE_CATEGORIES.filter((c) => c.key !== "other").map((c) => c.en);
 const lc = (v) => String(v || "").trim().toLowerCase();
@@ -96,7 +97,7 @@ export default function ChartOfAccountsScreen({ lang = "en", shopId, shop, isOwn
     systemRename: L("সিস্টেম খাতের নাম বদলানো যায় না — বিল ও ভাউচার এই নামেই পোস্ট হয়", "System account names can't change — bills and vouchers post to this name"),
     usedRename: L("এই খাতে ভাউচার লেখা আছে, তাই নাম বদলানো যাবে না। বন্ধ করে নতুন নামে খাত যোগ করুন।", "Vouchers already use this account, so it can't be renamed. Switch it off and add a new one."),
     essential: L("এই খাত প্রতিটি বিল / VAT-এ লাগে, বন্ধ করা যাবে না", "Every bill / VAT entry uses this account, it can't be switched off"),
-    nature: L("এই গ্রুপ লেজারের অন্য ভাগের - খাতটা শুধু নিজের ভাগের (যেমন খরচ খাত খরচের) গ্রুপে যায়", "That group is on another side of the ledger - an account only goes into a group of its own kind (an expense account into an expense group)"),
+    nature: L("সিস্টেম বা ব্যাংক খাত নিজের ভাগ বদলায় না - শুধু একই ভাগের গ্রুপে যায়", "A system or bank account keeps its own kind - it only goes into a group of that kind"),
     group: L("গ্রুপটা নেই বা বন্ধ", "That group is missing or switched off"),
   }[e] || e);
   const groupErrText = (e) => ({
@@ -104,15 +105,26 @@ export default function ChartOfAccountsScreen({ lang = "en", shopId, shop, isOwn
     parent: L("উপরের গ্রুপ একই ভাগের হতে হবে", "The parent group must be of the same kind"), cycle: L("গ্রুপ নিজের ভেতরে রাখা যায় না", "A group can't sit inside itself"),
     depth: L("সর্বোচ্চ ৩ স্তর", "At most 3 levels"), duplicate: L("একই জায়গায় এই নামে গ্রুপ আছে", "A group with this name is already there"),
     duplicateCode: L("এই কোড আরেকটা গ্রুপে আছে", "Another group already has this code"),
-    natureLocked: L("গ্রুপে খাত বা সাব-গ্রুপ আছে, তাই ভাগ বদলানো যাবে না", "The group has accounts or sub-groups, so its kind can't change"),
+    natureLocked: L("গ্রুপে (বা সাব-গ্রুপে) সিস্টেম খাত আছে, যার ভাগ বদলায় না - আগে সেটা সরিয়ে নিন", "A system account in the group (or a sub-group) can't change kind - move it out first"),
     busy: L("গ্রুপে খাত বা চালু সাব-গ্রুপ আছে - আগে সরিয়ে নিন", "The group still has accounts or active sub-groups - move them first"),
   }[e] || e);
   const saveGroup = async () => {
     const res = validateGroup(groupDraft, coaGroups, chart);
     if (res.error) { toast?.(groupErrText(res.error), "err"); return; }
+    const before = coaGroups.find((g) => g.id === res.group.id);
+    if (before && before.nature !== res.group.nature && (res.moved.length || res.cascade.length)) {
+      const names = res.moved.map((a) => `${a.name}${used.has(lc(a.name)) ? " *" : ""}`);
+      const from = groupLabel(before.nature, bn), to = groupLabel(res.group.nature, bn);
+      const ok = window.confirm(L(
+        `ভাগ "${from}" থেকে "${to}" হবে।\n${res.cascade.length ? `${res.cascade.length}টি সাব-গ্রুপও সাথে যাবে।\n` : ""}${names.length ? `এই খাতগুলো লেজার, ট্রায়াল ব্যালেন্স, ব্যালেন্স শিট আর লাভ-ক্ষতিতে নতুন ভাগে যাবে - আগের তারিখের রিপোর্টেও:\n${names.slice(0, 12).join(", ")}${names.length > 12 ? ` +${names.length - 12}` : ""}\n(* = ভাউচারে ব্যবহার হয়েছে, ব্যালেন্স সরবে)\n` : ""}কোনো বছর বন্ধ করা থাকলে আবার বন্ধ করে দেখুন। চালিয়ে যাবেন?`,
+        `The kind changes from "${from}" to "${to}".\n${res.cascade.length ? `${res.cascade.length} sub-group(s) move with it.\n` : ""}${names.length ? `These accounts move to the new side in the ledger, Trial Balance, Balance Sheet and P&L - past dates included:\n${names.slice(0, 12).join(", ")}${names.length > 12 ? ` +${names.length - 12}` : ""}\n(* = used in vouchers, its balance moves)\n` : ""}If a year is already closed, check its close again. Continue?`));
+      if (!ok) return;
+    }
     const nowIso = new Date().toISOString();
     const row = { ...res.group, createdAt: res.group.createdAt || nowIso, updatedAt: nowIso };
-    const next = coaGroups.some((g) => g.id === row.id) ? coaGroups.map((g) => (g.id === row.id ? row : g)) : [...coaGroups, row];
+    const cascade = new Set(res.cascade || []);
+    const moved = coaGroups.map((g) => (cascade.has(g.id) ? { ...g, nature: row.nature, updatedAt: nowIso } : g));
+    const next = moved.some((g) => g.id === row.id) ? moved.map((g) => (g.id === row.id ? row : g)) : [...moved, row];
     if (await persistGroups(next, groupDraft.id ? L("গ্রুপ আপডেট হয়েছে", "Group updated") : L("গ্রুপ যোগ হয়েছে", "Group added"))) setGroupDraft(null);
   };
   const removeGroup = async () => {
@@ -167,7 +179,11 @@ export default function ChartOfAccountsScreen({ lang = "en", shopId, shop, isOwn
   const current = draft?.id ? chart.find((a) => a.id === draft.id) : null;
   const lockedName = !!current && (current.system || used.has(lc(current.name)));
   const draftGroup = draft ? groupOfName(draft.name || "", CHART_EXPENSE_NAMES) : "";
-  const draftGroupChoices = draft ? groupsForAccount(coaGroups, { group: draftGroup }) : [];
+  const draftAccount = draft ? { name: draft.name || "", group: draftGroup, baseGroup: draftGroup, system: !!current?.system } : null;
+  const draftGroupChoices = draft ? groupsForAccount(coaGroups, draftAccount) : [];
+  const draftFixed = !!draftAccount && (draftAccount.system || !natureEditable(draftAccount.name));
+  // the kind the account will post with: its group's nature for a custom account in a group, else the ledger's own
+  const draftNature = !draftFixed && draft?.groupId ? coaGroups.find((g) => g.id === draft.groupId)?.nature || draftGroup : draftGroup;
   const currentGroup = groupDraft?.id ? coaGroups.find((g) => g.id === groupDraft.id) : null;
   // parents the group may sit under: same kind, active, and not itself / its own sub-group / too deep (same rule as save)
   const parentChoices = groupDraft ? groupTree(coaGroups, groupDraft.nature).filter(({ group }) => group.active
@@ -226,16 +242,18 @@ export default function ChartOfAccountsScreen({ lang = "en", shopId, shop, isOwn
                 </div>
               </div>
               <div className="si-hint" style={{ marginLeft: 0 }}>
-                {L("গ্রুপ", "Group")}: <b>{groupLabel(draftGroup, bn)}</b>{" — "}
-                {L("লেজার নাম দেখে গ্রুপ ঠিক করে: \"Bank\" দিয়ে শুরু হলে ক্যাশ ও ব্যাংক, সিস্টেম খাত নিজের গ্রুপে, বাকি সব অন্যান্য (ব্যালেন্স শিটে অন্যান্য সম্পদ / দেনা)।", "The ledger sets the group from the name: names starting with \"Bank\" are cash & bank, system accounts keep their own group, everything else is other (other assets / liabilities on the Balance Sheet).")}
+                {L("ভাগ", "Kind")}: <b>{groupLabel(draftNature, bn)}</b>{" — "}
+                {draftFixed
+                  ? L("সিস্টেম বা \"Bank\" খাত - ভাগ নাম থেকে ঠিক হয়, গ্রুপে বদলায় না।", "A system or \"Bank\" account - its kind comes from the name and no group changes it.")
+                  : L("নিজের খাত: গ্রুপ বাছলে গ্রুপের ভাগ নেয় (লেজার, ট্রায়াল ব্যালেন্স, ব্যালেন্স শিট, লাভ-ক্ষতি সব জায়গায়); গ্রুপ না থাকলে নাম থেকে - \"Bank\" দিয়ে শুরু হলে ক্যাশ ও ব্যাংক, বাকি অন্যান্য।", "A custom account: in a group it takes the group's kind (ledger, Trial Balance, Balance Sheet and P&L); with no group the name decides - names starting with \"Bank\" are cash & bank, the rest other.")}
                 {lockedName && <div>{current?.system ? errText("systemRename") : errText("usedRename")}</div>}
               </div>
               <div className="si-field"><span className="pm-label">{L("সাব-গ্রুপ (ঐচ্ছিক)", "Sub-group (optional)")}</span>
                 <select className="pm-input" value={draft.groupId || ""} onChange={(e) => setDraft((d) => ({ ...d, groupId: e.target.value }))}>
                   <option value="">{L("নেই", "None")} ({groupLabel(draftGroup, bn)})</option>
-                  {draftGroupChoices.map((g) => <option key={g.id} value={g.id}>{[g.code, groupPath(coaGroups, g.id, bn)].filter(Boolean).join(" · ")}</option>)}
+                  {draftGroupChoices.map((g) => <option key={g.id} value={g.id}>{[g.code, groupPath(coaGroups, g.id, bn)].filter(Boolean).join(" · ")}{draftFixed ? "" : ` (${groupLabel(g.nature, bn)})`}</option>)}
                 </select>
-                {!draftGroupChoices.length && <span className="si-hint" style={{ marginLeft: 0 }}>{L(`"${groupLabel(draftGroup, bn)}" ভাগে এখনো কোনো গ্রুপ নেই`, `No group of kind "${groupLabel(draftGroup, bn)}" yet`)}</span>}
+                {!draftGroupChoices.length && <span className="si-hint" style={{ marginLeft: 0 }}>{draftFixed ? L(`"${groupLabel(draftGroup, bn)}" ভাগে এখনো কোনো গ্রুপ নেই`, `No group of kind "${groupLabel(draftGroup, bn)}" yet`) : L("এখনো কোনো গ্রুপ নেই", "No groups yet")}</span>}
               </div>
               <label className="pm-check">
                 <input type="checkbox" checked={draft.active !== false} disabled={!!current?.system && current.active && ESSENTIAL.has(current.name)}
@@ -279,7 +297,7 @@ export default function ChartOfAccountsScreen({ lang = "en", shopId, shop, isOwn
                 </div>
               </div>
               <div className="si-hint" style={{ marginLeft: 0 }}>
-                {L("লেজারের ভাগ ঠিক করে কোন খাত এই গ্রুপে যেতে পারবে - ব্যালেন্স শিট, ফান্ড আর এজিং সেই ভাগ ধরেই চলে, গ্রুপ শুধু সাজানো আর লেবেল।", "The ledger side decides which accounts can go into this group - the Balance Sheet, Funds and ageing follow that side; the group only arranges and labels.")}
+                {L("লেজারের ভাগই ঠিক করে গ্রুপের নিজের খাত কোথায় বসবে: সম্পদ / দেনা ব্যালেন্স শিটের সেই দিকে, আয় / খরচ লাভ-ক্ষতিতে, ক্যাশ ও ব্যাংক বুকস আর ক্যাশ ফ্লোতে। সিস্টেম খাত নিজের ভাগেই থাকে। ভাগ বদলালে সাব-গ্রুপও বদলায়, আর জিজ্ঞেস করা হয়।", "The ledger side decides where the group's custom accounts sit: assets / liabilities on that side of the Balance Sheet, income / expenses in the P&L, cash & bank in Books and Cash Flow. System accounts keep their own side. Changing the side takes the sub-groups with it, and asks first.")}
               </div>
               <label className="pm-check">
                 <input type="checkbox" checked={groupDraft.active !== false} onChange={(e) => setGroupDraft((d) => ({ ...d, active: e.target.checked }))} /> {L("চালু (খাতে বাছা যাবে)", "Active (can be picked for accounts)")}
@@ -326,8 +344,8 @@ export default function ChartOfAccountsScreen({ lang = "en", shopId, shop, isOwn
         </div>
         <div className="si-note">
           {L(
-            "গ্রুপ ও সাব-গ্রুপ দোকানের নিজের (সর্বোচ্চ ৩ স্তর), লেজারের প্রতিটি ভাগের ভেতরে; খাত শুধু নিজের ভাগের গ্রুপে যায়, তাই রিপোর্টের শ্রেণিবিভাগ একই থাকে। এটা খাতের তালিকা আর লেবেল — লেজার এখনো বিল ও ভাউচার থেকে নাম ধরে পোস্ট করে, তাই ব্যালেন্স শিট / ফান্ড / এজিংয়ের হিসাব বদলায় না। সিস্টেম খাত (ক্যাশ, ব্যাংক, বিক্রি, ক্রয়, VAT, মূলধন, খরচের ক্যাটাগরি…) মোছা বা নাম বদলানো যায় না। নিজের খাতের নাম বদলানো যায় যতক্ষণ কোনো ভাউচারে ব্যবহার হয়নি; বন্ধ খাত নতুন জার্নালে বাছা যায় না, পুরনো হিসাব লেজারে আগের মতোই থাকে। খরচের ক্যাটাগরি খরচ পেজে ব্যবহার হলে লেজারে খরচ খাত। তালিকা শুধু মালিক বদলাতে পারেন।",
-            "Groups and sub-groups are the shop's own (up to 3 levels) inside each ledger side; an account only goes into a group of its own side, so the reports keep the same classification. This is the account list and its labels — the ledger still posts from bills and vouchers by name, so the Balance Sheet, Funds and ageing figures do not change. System accounts (cash, bank, sales, purchase, VAT, capital, expense categories…) can't be deleted or renamed. A custom account can be renamed until a voucher uses it; a switched-off account can't be picked on new journals, and its old entries stay in the ledger as they were. Expense categories are expense accounts in the ledger once used on the Expenses page. Only the owner can change the list."
+            "গ্রুপ ও সাব-গ্রুপ দোকানের নিজের (সর্বোচ্চ ৩ স্তর), লেজারের প্রতিটি ভাগের ভেতরে। নিজের খাত গ্রুপে রাখলে গ্রুপের ভাগ নেয় - লেজার, ট্রায়াল ব্যালেন্স, ব্যালেন্স শিট, ফান্ড আর লাভ-ক্ষতি সেই ভাগ ধরে, আগের তারিখেও; গ্রুপ ছাড়া খাত আগের মতোই নাম দেখে চলে। সিস্টেম খাত (ক্যাশ, ব্যাংক, বিক্রি, ক্রয়, VAT, মূলধন, স্টক অ্যাডজাস্টমেন্ট, খরচের ক্যাটাগরি…) আর \"Bank\" খাত নিজের ভাগেই থাকে। সিস্টেম খাত (ক্যাশ, ব্যাংক, বিক্রি, ক্রয়, VAT, মূলধন, খরচের ক্যাটাগরি…) মোছা বা নাম বদলানো যায় না। নিজের খাতের নাম বদলানো যায় যতক্ষণ কোনো ভাউচারে ব্যবহার হয়নি; বন্ধ খাত নতুন জার্নালে বাছা যায় না, পুরনো হিসাব লেজারে আগের মতোই থাকে। খরচের ক্যাটাগরি খরচ পেজে ব্যবহার হলে লেজারে খরচ খাত। তালিকা শুধু মালিক বদলাতে পারেন।",
+            "Groups and sub-groups are the shop's own (up to 3 levels) inside each ledger side. A custom account in a group takes the group's side - the ledger, Trial Balance, Balance Sheet, Funds and P&L follow it, past dates included; an account with no group follows its name as before. System accounts (cash, bank, sales, purchase, VAT, capital, stock adjustment, expense categories…) and \"Bank\" accounts keep their own side. System accounts (cash, bank, sales, purchase, VAT, capital, expense categories…) can't be deleted or renamed. A custom account can be renamed until a voucher uses it; a switched-off account can't be picked on new journals, and its old entries stay in the ledger as they were. Expense categories are expense accounts in the ledger once used on the Expenses page. Only the owner can change the list."
           )}
         </div>
       </div>

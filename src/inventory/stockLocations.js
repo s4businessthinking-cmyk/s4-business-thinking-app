@@ -2,8 +2,10 @@
 // documents (stockFromInvoices / stockHub) - nothing in the stock engine changes. Locations only say WHERE that stock
 // sits: the location tree is kept on the shop record (shop.stockLocations), goods are moved between locations with
 // location transfers (locationMoves collection), and the main location holds whatever has not been moved out of it.
-// Purchases, sales, returns and adjustments all land on the main location, so the sum over locations is always the
-// shop total. Moves change no money: total stock value stays the Balance Sheet's closing stock.
+// Purchases, sales, returns and adjustments land on the main location unless the document names a godown
+// (locationId on the bill, W01): then documentMoves() treats it as a move between the main location and that godown on
+// the document's date, so the sum over locations is always the shop total. Moves change no money: total stock value
+// stays the Balance Sheet's closing stock.
 
 const num = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const q4 = (v) => Math.round((Number(v) || 0) * 10000) / 10000;
@@ -125,6 +127,29 @@ export function locationStock(total, moves, locations, { asOf = "", shopId = "",
 }
 
 export const qtyIn = (stock, locId, pid) => q4(stock.get(locId)?.get(pid) || 0);
+
+/**
+ * The godown side of documents (Stock Hub stockMovements lines with a locationId other than main): stock that came in
+ * goes main -> godown, stock that went out goes godown -> main, on the document's date. With the shop total from the
+ * same movements, locationStock() then puts each document's stock where the document says.
+ * -> moves in the locationMoves shape, marked fromDocument (never saved). skipDocId: leave one document out (editing it).
+ */
+export function documentMoves(movements, { skipDocId = "" } = {}) {
+  const byDoc = new Map();
+  (movements || []).forEach((m) => {
+    const loc = clean(m?.locationId);
+    if (!loc || loc === MAIN_LOCATION_ID || !m.productId || (skipDocId && m.docId === skipDocId)) return;
+    ["in", "out"].forEach((dir) => {
+      const q = num(dir === "in" ? m.qtyIn : m.qtyOut);
+      if (!(q > 0)) return;
+      const key = `${m.col}|${m.docId}|${dir}`;
+      if (!byDoc.has(key)) byDoc.set(key, { id: `doc-${m.col}-${m.docId}-${dir}`, fromDocument: true, docNo: m.no || "", moveDate: m.date, status: "active",
+        fromId: dir === "in" ? MAIN_LOCATION_ID : loc, toId: dir === "in" ? loc : MAIN_LOCATION_ID, lines: [] });
+      byDoc.get(key).lines.push({ productId: m.productId, qty: q });
+    });
+  });
+  return [...byDoc.values()];
+}
 
 /** Products below zero at a location: [{ locationId, productId, qty }] (main goes negative when it sold goods moved away). */
 export function negativeAtLocations(stock) {

@@ -33,9 +33,22 @@ const toRow = (type, v) => {
 };
 const fmtMonth = (ym) => (/^\d{4}-\d{2}$/.test(ym || "") ? new Date(`${ym}-01T00:00:00`).toLocaleString("en-GB", { month: "short", year: "numeric" }) : "");
 
+/** Can a cheque in this state still be cleared or bounced? Only a pending cheque on a live voucher. */
+export const chequeStillPending = (v) => !!v && v.status !== "cancelled" && !v.isDeleted && (v.chequeStatus || "pending") === "pending";
+
+// The list (or a due alert) can hold an old copy: another device or window may have cleared or bounced it already.
+// Bouncing twice would take the amount off the bills twice, so the saved voucher is read again first.
+async function freshPendingVoucher(col, voucher) {
+  const rec = await offlineGetById(col, voucher.id).catch(() => null);
+  const current = rec?.data ? { ...voucher, ...rec.data, id: voucher.id } : voucher;
+  if (!chequeStillPending(current)) throw new Error(`Cheque ${voucher.chequeNo || voucher.id} is already ${current.chequeStatus === "pending" || !current.chequeStatus ? "cancelled" : current.chequeStatus} - refresh the list`);
+  return current;
+}
+
 // A bounced cheque cancels its voucher and gives the allocated amounts back to the bills'balances.
-export async function bounceVoucher(type, voucher, uid) {
+export async function bounceVoucher(type, given, uid) {
   const m = TYPES[type];
+  const voucher = await freshPendingVoucher(m.col, given);
   const nowIso = new Date().toISOString();
   const bills = [];
   for (const a of voucher.allocations || []) {
@@ -56,7 +69,8 @@ export async function bounceVoucher(type, voucher, uid) {
   }, voucher);
 }
 
-export async function clearVoucher(type, voucher, clearedAt, uid) {
+export async function clearVoucher(type, given, clearedAt, uid) {
+  const voucher = await freshPendingVoucher(TYPES[type].col, given);
   const nowIso = new Date().toISOString();
   await offlinePatch(TYPES[type].col, voucher.id, { chequeStatus: "cleared", clearedAt, clearedBy: uid, updatedAt: nowIso, updatedBy: uid }, voucher);
 }

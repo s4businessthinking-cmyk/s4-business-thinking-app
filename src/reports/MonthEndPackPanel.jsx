@@ -12,14 +12,16 @@ import { periodLockOf } from "../accounts/periodLock.js";
 import { collectBankTransactions, reconcile } from "../accounts/bankRec.js";
 import { balances } from "../ledger/globalLedger.js";
 import { computeAccounts } from "./accountsCalc.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
 import { averageCosts } from "./averageCost.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
 import { buildBalanceSheet, openingStockValue, stockDocsUpTo } from "./balanceSheet.js";
 import { buildCashFlow } from "./cashFlow.js";
 import { buildAging } from "./partyAging.js";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { computeVat, taxSettingsOf } from "./taxDomain.js";
 import { buildTrialBalance } from "./trialBalance.js";
-import { buildVat201 } from "./vat201.js";
+import { vat201ForPeriod } from "./vat201.js";
 import { closedYearAt } from "./yearEnd.js";
 import { csvText } from "./vatExport.js";
 import { combinePrintHtml, packChecks, packCsvRows, packFileName, packSections, packStatus } from "./monthEndPack.js";
@@ -29,11 +31,10 @@ const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate(
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
 const BANK_COL = { salesInvoices: "Sales bill", purchaseInvoices: "Purchase bill", salesReceipts: "Receipt", purchasePayments: "Payment", expenses: "Expense", bankReconciliations: "Bank entry", salesReturns: "Sales return refund", purchaseReturns: "Purchase return refund", accountVouchers: "Journal / Contra", partnerEntries: "Partner money" };
 
-/** Closing stock exactly as the Balance Sheet works it out (quantity on hand x average cost, negatives left out). */
-export function stockValueAt(rows, products, shopId, day) {
+/** Closing stock exactly as the Balance Sheet works it out (quantity on hand x cost at the method, negatives left out). */
+export function stockValueAt(rows, products, shopId, day, method = "average") {
   const cut = stockDocsUpTo(rows, day);
-  const purchases = livePurchasesOf(cut.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance");
-  const avg = averageCosts(products, purchases, day, liveReturnsOf(cut.extras.purchaseReturns, shopId));
+  const avg = unitCostsAt(method, products, cut, { shopId, upTo: day });
   const qty = computeStockMap(products, cut.purchaseInvoices, cut.salesInvoices, shopId, cut.deliveryNotes, cut.extras);
   let value = 0;
   qty.forEach((q, id) => { if (q > 0) value += q * (avg.get(id) || 0); });
@@ -61,15 +62,16 @@ export default function MonthEndPackPanel({ lang = "en", shopId, shop, user, pro
     const rows = data.rows || { salesInvoices: data.salesInvoices, purchaseInvoices: data.purchaseInvoices, extras: { salesReturns: data.salesReturns, purchaseReturns: data.purchaseReturns } };
     const docData = { ...rows, receipts: data.receipts, payments: data.payments, expenses: data.expenses, accountVouchers: data.accountVouchers };
     const tb = buildTrialBalance(ledger, { from, to, chart: shop?.chartOfAccounts || [], coaGroups: shop?.coaGroups || [] });
-    const pl = computeAccounts(docData, { products, shopId, from, to, bn });
-    const stockValue = stockValueAt(rows, products, shopId, to);
+    const pl = computeAccounts(docData, { products, shopId, from, to, bn, natureOf: shopAccountNature(shop), method: valuationMethodOf(shop) });
+    const stockValue = stockValueAt(rows, products, shopId, to, valuationMethodOf(shop));
     const sheet = buildBalanceSheet({ accounts: ledger.accounts, bal: balances(ledger.postings, to), closingStock: stockValue, openingStock: openingStockValue(products),
       closedStock: closedYearAt(shop?.yearEnds, to, data.accountVouchers)?.stockValue ?? null });
     const cash = buildCashFlow(ledger.postings, ledger.accounts, { from, to });
     const debtors = buildAging(ledger.postings, ledger.accounts, { side: "customer", asOf: to });
     const creditors = buildAging(ledger.postings, ledger.accounts, { side: "vendor", asOf: to });
-    const vat = computeVat(docData, { shopId, from, to, customers, vendors, defaultRegion: shop?.emirate });
-    const ret201 = isUae && vat ? buildVat201(vat, { customers, shopEmirate: shop?.emirate || "", noVatBox: settings.vat201NoVatBox === "5" ? "5" : "4" }) : null;
+    const vat = computeVat(docData, { shopId, from, to, customers, vendors, defaultRegion: shop?.emirate, natureOf: shopAccountNature(shop) });
+    // the same VAT201 as the Tax page for this period, hand entries (boxes 2, 3, 6, 7, 10) included
+    const ret201 = isUae && vat ? vat201ForPeriod(vat, { shop, customers, from, to, noVatBox: settings.vat201NoVatBox === "5" ? "5" : "4" }) : null;
     // bank reconciliation at the month end, with the statement saved for that day (Bank Reconciliation screen)
     const docs = (data.bankDocs || []).filter((d) => d && !d.isDeleted && d.shopId === shopId);
     const bankSettings = docs.filter((d) => d.kind === "settings").sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0] || null;
@@ -152,6 +154,7 @@ export default function MonthEndPackPanel({ lang = "en", shopId, shop, user, pro
               ))}
             </div>
             <div className="si-muted">{L("প্যাকে থাকে: ", "The pack holds: ")}{pack.sections.filter((s) => s.id !== "cover").map((s) => s.title).join(" · ")}</div>
+            {isUae && <div className="si-muted" style={{ fontSize: 12 }}>{L("VAT201 ট্যাক্স পাতার একই হিসাব - এই সময়ের হাতে দেওয়া এন্ট্রি (Box 2, 3, 6, 7, 10) সহ। S4 FTA-তে কিছু জমা দেয় না।", "VAT201 is the same as on the Tax page - this period's hand entries (boxes 2, 3, 6, 7, 10) included. S4 does not file anything with FTA.")}</div>}
             {isOwner ? (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <button type="button" className="pm-btn pm-btn--danger" onClick={closeBooks} disabled={busy || alreadyLocked || pack.status === "blocked" || to > today}>

@@ -13,8 +13,8 @@ const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const monthStart = () => { const d = new Date(); return localDay(new Date(d.getFullYear(), d.getMonth(), 1)); };
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
-const TYPE_LABEL = { journal: ["জার্নাল", "Journal"], contra: ["কন্ট্রা", "Contra"], receipt: ["রসিদ", "Receipt"], payment: ["পেমেন্ট", "Payment"] };
-const TYPE_COLOR = { journal: "#7c3aed", contra: "#0e7490", receipt: "#15803d", payment: "#b45309" };
+const TYPE_LABEL = { journal: ["জার্নাল", "Journal"], contra: ["কন্ট্রা", "Contra"], memo: ["মেমো (হিসাবে নেই)", "Memo (not posted)"], receipt: ["রসিদ", "Receipt"], payment: ["পেমেন্ট", "Payment"] };
+const TYPE_COLOR = { journal: "#7c3aed", contra: "#0e7490", memo: "#64748b", receipt: "#15803d", payment: "#b45309" };
 const METHOD_LABEL = { cash: ["নগদ", "Cash"], cheque: ["চেক", "Cheque"], bank_transfer: ["ব্যাংক", "Bank"], bank: ["ব্যাংক", "Bank"], card: ["কার্ড", "Card"], credit: ["বাকি", "Credit"] };
 
 export default function VoucherRegister({

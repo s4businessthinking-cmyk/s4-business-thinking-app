@@ -47,7 +47,8 @@ export function saveTemplate(list, draft) {
 }
 
 /** Body with variables filled; values: { name, shop, due, loyaltyNo }. A missing value becomes "". */
-export const fillTemplate = (body, values = {}) => String(body || "").replace(/\{(\w+)\}/g, (m, k) => (TEMPLATE_VARS.includes(k) ? String(values[k] ?? "") : m));
+// placeholders in any case: templates saved before the fix were stored in capitals ({NAME})
+export const fillTemplate = (body, values = {}) => String(body || "").replace(/\{(\w+)\}/g, (m, k) => { const v = TEMPLATE_VARS.find((x) => x.toLowerCase() === k.toLowerCase()); return v ? String(values[v] ?? "") : m; });
 
 /**
  * Customers who can get a message.

@@ -13,11 +13,29 @@ const daysBetween = (fromIso, toIso) => {
   return Number.isFinite(a) && Number.isFinite(b) ? Math.max(0, Math.round((b - a) / 86400000)) : 0;
 };
 export const bucketOf = (days) => AGE_BUCKETS.findIndex(([lo, hi]) => days >= lo && days <= hi);
+export { daysBetween };
+
+/**
+ * When a bill falls due: its own due date, else the bill date plus its credit days, else plus the party's payment
+ * terms (Credit Days on the customer / supplier master); with none of these it is due on the bill date.
+ */
+export function billDueDate(bill, party = null) {
+  const own = String(bill?.dueDate || "").slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(own)) return own;
+  const day = String(bill?.invoiceDate || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return "";
+  const terms = Math.max(0, Math.round(Number(bill?.creditDays) || Number(party?.paymentTerms) || 0));
+  if (!terms) return day;
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + terms);
+  return d.toISOString().slice(0, 10);
+}
 
 /**
  * side: "customer" (debtors, bills are debits) or "vendor" (creditors, bills are credits).
- * -> { rows: [{ key, name, partyId, due, buckets: [4], oldestDays, bills }], advances: [{ key, name, partyId, amount }],
+ * -> { rows: [{ key, name, partyId, due, buckets: [4], oldestDays, bills, open }], advances: [{ key, name, partyId, amount }],
  *      totals: { due, buckets: [4], advance, net } }
+ * open: what is still due on each charge (newest first): [{ date, amount, col, docId, no, type }] - the same split as the buckets.
  */
 export function buildAging(postings, accounts, { side = "customer", asOf = "" } = {}) {
   const sign = side === "vendor" ? -1 : 1;
@@ -29,7 +47,7 @@ export function buildAging(postings, accounts, { side = "customer", asOf = "" } 
     const owed = sign * (p.dr - p.cr);
     e.balance = r2(e.balance + owed);
     const charge = side === "vendor" ? p.cr : p.dr;
-    if (charge > 0) e.charges.push({ date: p.date, amount: charge });
+    if (charge > 0) e.charges.push({ date: p.date, amount: charge, col: p.col || "", docId: p.docId || "", no: p.no || "", type: p.type || "" });
   });
 
   const rows = [], advances = [];
@@ -40,17 +58,19 @@ export function buildAging(postings, accounts, { side = "customer", asOf = "" } 
     if (e.balance < 0.005) return;
     const buckets = AGE_BUCKETS.map(() => 0);
     let left = e.balance, oldestDays = 0, bills = 0;
+    const open = [];
     // newest charges carry what is still due
     [...e.charges].sort((x, y) => y.date.localeCompare(x.date)).some((c) => {
       const take = Math.min(left, c.amount);
       const days = daysBetween(c.date, asOf || c.date);
       buckets[bucketOf(days)] = r2(buckets[bucketOf(days)] + take);
       oldestDays = Math.max(oldestDays, days);
+      open.push({ date: c.date, amount: r2(take), col: c.col, docId: c.docId, no: c.no, type: c.type });
       bills += 1;
       left = r2(left - take);
       return left < 0.005;
     });
-    rows.push({ ...base, due: e.balance, buckets, oldestDays, bills });
+    rows.push({ ...base, due: e.balance, buckets, oldestDays, bills, open });
   });
   rows.sort((x, y) => y.due - x.due || x.name.localeCompare(y.name));
   advances.sort((x, y) => y.amount - x.amount || x.name.localeCompare(y.name));

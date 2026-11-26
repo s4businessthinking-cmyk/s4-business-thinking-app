@@ -15,6 +15,8 @@ export const EMPTY_CUSTOMER = {
   contactPerson:"",
   mobileNumber:"", phoneNumber:"", whatsappNumber:"", fax:"", email:"",
   address:"", emirate:"", area:"", city:"", country:"", mapLink:"",
+  // optional Arabic name / address, printed on bills when the shop prints Arabic
+  customerNameAr:"", addressAr:"",
   trnNumber:"", tradeLicenseNumber:"", tinNumber:"", binNumber:"", vatNumber:"",
   bankName:"", bankBranch:"", accountName:"", accountNumber:"", ibanNumber:"", swiftCode:"",
   creditLimit:"", openingBalance:"", paymentTerms:"",
@@ -283,6 +285,7 @@ export default function CustomerMasterScreen({
     payload.autoWhatsAppInvoice = !!form.autoWhatsAppInvoice;
 
     const openingChanged = num(form.openingBalance) !== num(JSON.parse(baseline).openingBalance);
+    const creating = !selectedId;
 
     setSaving(true);
     try {
@@ -310,18 +313,24 @@ export default function CustomerMasterScreen({
       if (link.other) onVendorSaved?.(link.other);
       if (link.removedId) onVendorRemoved?.(link.removedId);
       if (link.keptBecauseUsed) toast(L("ভেন্ডর বিল আছে, তাই ভেন্ডর মাস্টারে আলাদা রেকর্ড থেকে গেছে", "Vendor has bills, so it stays on Vendor Master as its own record"));
-      holdId.current = savedId;
-      const saved = toForm(savedDoc);
-      setForm(saved);
-      setBaseline(JSON.stringify(saved));
-      setSelectedId(savedId);
       onPartySaved?.({ id: savedId, ...savedDoc });
-      if (openingChanged || (selectedId === null && num(savedDoc.openingBalance) > 0)) {
+      if (openingChanged || (creating && num(savedDoc.openingBalance) > 0)) {
         try { await syncOpening(savedId, savedDoc); }
         catch (err) { toast(err.message || String(err), "err"); }
       }
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch((err) => console.warn("[S4 Sync] customer sync failed", err));
+      }
+      // New entry: clear for the next one. Edit: keep the saved record open.
+      if (creating) {
+        loadCustomer(null);
+        if (isMobile) setMobileTab("list");
+      } else {
+        holdId.current = savedId;
+        const saved = toForm(savedDoc);
+        setForm(saved);
+        setBaseline(JSON.stringify(saved));
+        setSelectedId(savedId);
       }
     } catch (e) {
       toast(e.message || String(e), "err");
@@ -379,8 +388,8 @@ export default function CustomerMasterScreen({
     <div className="pm-form-row">
       <label className="pm-label">{label}{opts.required && <span className="vm-req"> *</span>}</label>
       {opts.multiline
-        ? <textarea className="pm-input"value={form[key]} onChange={(e) => upd(key, e.target.value)} />
-        : <input className="pm-input"value={form[key]} inputMode={opts.inputMode} placeholder={opts.placeholder || ""}
+        ? <textarea className="pm-input"value={form[key]} dir={opts.dir} placeholder={opts.placeholder || ""} onChange={(e) => upd(key, e.target.value)} />
+        : <input className="pm-input"value={form[key]} dir={opts.dir} inputMode={opts.inputMode} placeholder={opts.placeholder || ""}
             readOnly={opts.readOnly} tabIndex={opts.readOnly ? -1 : undefined}
             style={{ ...(opts.mono ? { fontFamily: "Consolas, monospace" } : {}), ...(opts.readOnly ? { background: "#eef1f6", cursor: "not-allowed" } : {}) }}
             onChange={opts.readOnly ? undefined : (e) => upd(key, e.target.value)} />}
@@ -531,6 +540,8 @@ export default function CustomerMasterScreen({
           <div className="vm-col vm-col-more">
             {panel(L("ঠিকানা", "Address"), <>
               {row(L("ঠিকানা", "Address"), "address", { multiline: true })}
+              {row(L("আরবি নাম (ঐচ্ছিক)", "Arabic name (optional)"), "customerNameAr", { dir: "rtl", placeholder: "الاسم" })}
+              {row(L("আরবি ঠিকানা (ঐচ্ছিক)", "Arabic address (optional)"), "addressAr", { multiline: true, dir: "rtl", placeholder: "العنوان" })}
               {row(L("এমিরেট", "Emirate"), "emirate")}
               {row(L("এলাকা", "Area"), "area")}
               {row(L("শহর", "City"), "city")}

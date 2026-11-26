@@ -1,45 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { computeStockMap, loadInvoiceRows } from "./stockFromInvoices";
+import React from "react";
+import { useLowStock } from "./useLowStock.js";
 
 const MAX_ROWS = 50;
 
-export default function ReorderAlertCard({ products = [], shopId, lang = "en", s = {}, wrapStyle, onOpenProducts }) {
-  const [stockMap, setStockMap] = useState(null);
+// Dashboard card: products at or below their reorder level (rules in reorder.js, stock from useLowStock).
+export default function ReorderAlertCard({ products = [], shopId, lang = "en", s = {}, wrapStyle, onOpenProducts, onOpenList }) {
   const bn = lang === "bn";
-
-  const watched = useMemo(
-    () => products.filter((p) => p && !p.isDeleted && !p.deleted && Number(p.reorderMin) > 0),
-    [products]
-  );
-
-  useEffect(() => {
-    if (!watched.length) return undefined;
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const { purchaseInvoices, salesInvoices, deliveryNotes, extras } = await loadInvoiceRows();
-        if (!cancelled) setStockMap(computeStockMap(watched, purchaseInvoices, salesInvoices, shopId, deliveryNotes, extras));
-      } catch (err) {
-        console.warn("[S4 Reorder] stock load failed", err);
-      }
-    };
-    load();
-    window.addEventListener("focus", load);
-    const timer = window.setInterval(load, 30000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      window.removeEventListener("focus", load);
-    };
-  }, [watched, shopId]);
-
-  const lowStock = useMemo(() => {
-    if (!stockMap) return [];
-    return watched
-      .map((p) => ({ p, stock: stockMap.get(p.id) || 0, min: Number(p.reorderMin) || 0 }))
-      .filter((r) => r.stock <= r.min)
-      .sort((a, b) => (a.stock - a.min) - (b.stock - b.min));
-  }, [watched, stockMap]);
+  const { rows: lowStock } = useLowStock(products, shopId);
 
   if (!lowStock.length) return null;
 
@@ -50,6 +17,12 @@ export default function ReorderAlertCard({ products = [], shopId, lang = "en", s
         <div style={{ fontWeight: 700, color: "#f59e0b" }}>
           {bn ? `স্টক কম — রি-অর্ডার করুন (${lowStock.length})` : `Low stock — reorder needed (${lowStock.length})`}
         </div>
+        {onOpenList && (
+          <button type="button" onClick={onOpenList}
+            style={{ background: "transparent", border: "1px solid #f59e0b", color: "#f59e0b", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 12 }}>
+            {bn ? "রি-অর্ডার তালিকা" : "Reorder list"}
+          </button>
+        )}
         {onOpenProducts && (
           <button type="button" onClick={onOpenProducts}
             style={{ background: "transparent", border: "1px solid #f59e0b", color: "#f59e0b", borderRadius: 6, padding: "3px 10px", cursor: "pointer", fontSize: 12 }}>
@@ -68,18 +41,16 @@ export default function ReorderAlertCard({ products = [], shopId, lang = "en", s
             </tr>
           </thead>
           <tbody>
-            {lowStock.slice(0, MAX_ROWS).map(({ p, stock, min }) => (
-              <tr key={p.id} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            {lowStock.slice(0, MAX_ROWS).map((r) => (
+              <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <td style={{ padding: "4px 6px" }}>
-                  {p.name}{p.code ? <span style={{ opacity: 0.6 }}> · {p.code}</span> : null}
+                  {r.name}{r.code ? <span style={{ opacity: 0.6 }}> · {r.code}</span> : null}
                 </td>
-                <td style={{ padding: "4px 6px", textAlign: "right", color: stock <= 0 ? "#ef4444" : "#f59e0b", fontWeight: 600 }}>
-                  {stock} {p.unit || ""}
+                <td style={{ padding: "4px 6px", textAlign: "right", color: r.out ? "#ef4444" : "#f59e0b", fontWeight: 600 }}>
+                  {r.stock} {r.unit}
                 </td>
-                <td style={{ padding: "4px 6px", textAlign: "right" }}>{min}</td>
-                <td style={{ padding: "4px 6px", textAlign: "right" }}>
-                  {Number(p.reorderQty) > 0 ? p.reorderQty : Math.max((Number(p.reorderMax) || min) - stock, 0) || "-"}
-                </td>
+                <td style={{ padding: "4px 6px", textAlign: "right" }}>{r.min}</td>
+                <td style={{ padding: "4px 6px", textAlign: "right" }}>{r.suggest || "-"}</td>
               </tr>
             ))}
           </tbody>

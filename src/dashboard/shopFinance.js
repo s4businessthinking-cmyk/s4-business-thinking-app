@@ -119,7 +119,7 @@ export function computeShopFinance({ salesInvoices = [], salesReceipts = [], pur
     if (d === today) {
       out.salesToday += n2(inv.grandTotal);
       out.salesTodayCount += 1;
-      out.collectedToday += Math.max(0, n2(inv.amountPaid) - (allocatedByInvoice.get(inv.id) || 0));
+      out.collectedToday += Math.max(0, n2(inv.amountPaid) - (allocatedByInvoice.get(inv.id) || 0) - n2(inv.fxSettledAed));
     }
     if (d.startsWith(month)) {
       out.salesMonth += n2(inv.grandTotal);

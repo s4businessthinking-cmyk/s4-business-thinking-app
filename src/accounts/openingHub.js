@@ -11,7 +11,7 @@
 import { GROUPS } from "../ledger/globalLedger.js";
 
 export const OPENING_ACCOUNT = "Opening Balance";
-export const OPENING_NATURES = ["money", "tax", "equity", "other"];
+export const OPENING_NATURES = ["money", "tax", "equity", "asset", "liability", "other"];
 const lc = (v) => String(v || "").trim().toLowerCase();
 const r2 = (v) => Math.round(((Number(v) || 0) + Number.EPSILON) * 100) / 100;
 const slug = (v) => lc(v).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "x";

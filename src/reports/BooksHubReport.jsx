@@ -9,6 +9,8 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
+import { shopAccountNature } from "../ledger/accountNature.js";
+import { valuationMethodOf } from "./stockValuation.js";
 import { CASH_ACCOUNT } from "../vouchers/accountVoucherDomain.js";
 import { r2 } from "./reportFilters.js";
 import {
@@ -27,7 +29,7 @@ const TABS = [
   { id: "bank", bn: "ব্যাংক বুক", en: "Bank Book" },
 ];
 
-export default function BooksHubReport({ lang = "en", shopId, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
+export default function BooksHubReport({ lang = "en", shopId, shop = null, customers = [], vendors = [], products = [], shopName = "", cur = "AED", toast, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [mode, setMode] = useState("day");
@@ -51,7 +53,7 @@ export default function BooksHubReport({ lang = "en", shopId, customers = [], ve
       if (cancelled) return;
       setData({
         salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices,
-        salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [],
+        salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [], stockAdjustments: rows.extras?.stockAdjustments || [], warrantyClaims: rows.extras?.warrantyClaims || [],
         receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av),
         partnerEntries: rowsOf(pe), bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
@@ -66,9 +68,11 @@ export default function BooksHubReport({ lang = "en", shopId, customers = [], ve
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, []);
 
+  // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
   const ledger = useMemo(
-    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors],
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
+    [data, shopId, customers, vendors, products, natureOf],
   );
   const range = useMemo(() => ({ from: from || "", to: to || "" }), [from, to]);
   const moneyList = useMemo(() => (ledger ? moneyAccounts(ledger.accounts) : []), [ledger]);

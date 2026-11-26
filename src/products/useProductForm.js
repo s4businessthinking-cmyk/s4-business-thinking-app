@@ -34,7 +34,7 @@ export function useProductForm({ isOwner, lang, setSelOrder, setSettingsPage, sh
     name:"", code:"",
     barcode:"", ean:"", moreBarcodes:[],
     brand:"", company:"", productGroup:"", category:"", subcategory:"",
-    commodityCode:"", productType:"Goods", arabicName:"", weightBarcode:false, rateBarcode:false,
+    commodityCode:"", productType:"Goods", arabicName:"", weightBarcode:false, rateBarcode:false, trackSerial:false,
     salesVat:"0", purchaseVat:"0",
     landingCost:"", marginPerc:"", marginAmount:"",
     vatExclusive:"", vatInclusive:"", vatOnMrp:false, mrp:"", averageCost:"",

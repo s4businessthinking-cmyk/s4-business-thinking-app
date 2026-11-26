@@ -100,6 +100,27 @@ export function validateSecurityCheque(form, bn) {
 const live = (r, shopId) => r && !r.isDeleted && (!shopId || r.shopId === shopId);
 export const liveSecurityCheques = (records, shopId) => (records || []).filter((r) => live(r, shopId));
 
+/**
+ * The fields one register action writes, or why it cannot run. Only a held cheque moves; returned and presented are
+ * final. action: "requestClosure" | "cancelClosure" | "approveClosure" | "returned" | "presented".
+ * -> { patch } or { error: "not-held" | "no-request" | "already-approved" | "unknown" }
+ */
+export function securityChequeStatusPatch(record, action, { at = new Date().toISOString(), by = "" } = {}) {
+  if (!record || record.status !== "held") return { error: "not-held" };
+  const stamp = { updatedAt: at, updatedBy: by };
+  switch (action) {
+    case "requestClosure": return { patch: { closureRequested: true, ...stamp } };
+    case "cancelClosure": return record.closureRequested ? { patch: { closureRequested: false, ...stamp } } : { error: "no-request" };
+    case "approveClosure":
+      if (!record.closureRequested) return { error: "no-request" };
+      if (record.closureApproved) return { error: "already-approved" };
+      return { patch: { closureApproved: true, closureApprovedAt: at, closureApprovedBy: by, ...stamp } };
+    case "returned": return { patch: { status: "returned", closureRequested: false, returnedAt: at, returnedBy: by, ...stamp } };
+    case "presented": return { patch: { status: "presented", presentedAt: at, presentedBy: by, ...stamp } };
+    default: return { error: "unknown" };
+  }
+}
+
 /** True once `reminderMonths`have passed since the last recorded transaction, for a still-held cheque. */
 export function isStale(record, today) {
   if (!record?.lastTxn || record.status !== "held") return false;

@@ -3,9 +3,11 @@
 // matches accounts by name, so:
 // - system accounts (the ledger's fixed accounts and the expense categories) can't be renamed, deleted or switched off;
 // - a custom account can be renamed only while nothing has been posted to it (old postings keep the old name);
-// - the group is never typed in: it is what the ledger itself gives that name (ledgerGroupOf), so the Balance Sheet,
-//   Funds and the other reports classify it exactly as before. A bank account needs a name starting with "Bank".
+// - group: what the ledger gives the name (ledgerGroupOf, kept as baseGroup); a custom account put into one of the shop's
+//   groups takes that group's nature instead (coaGroups.js / accountNature.js), which the ledger, Balance Sheet, Trial
+//   Balance and P&L follow. System accounts never change nature. A bank account needs a name starting with "Bank".
 import { FIXED, GROUPS, ledgerGroupOf } from "./globalLedger.js";
+import { applyGroups, normalizeGroups } from "./coaGroups.js";
 import { CASH_ACCOUNT } from "../vouchers/accountVoucherDomain.js";
 
 const lc = (v) => String(v || "").trim().toLowerCase();
@@ -27,8 +29,14 @@ export const groupLabel = (id, bn = false) => { const g = GROUPS.find((x) => x.i
 /**
  * Saved list + every system account that is missing from it (system accounts always exist), groups re-derived.
  * expenseNames: the Expenses page categories, which the ledger books as expense accounts.
+ * coaGroups: the saved groups - given, each custom account in a group takes the group's nature (applyGroups).
  */
-export function normalizeChart(saved, { expenseNames = [] } = {}) {
+export function normalizeChart(saved, { expenseNames = [], coaGroups = null } = {}) {
+  const list = normalizeChartRows(saved, expenseNames);
+  return coaGroups ? applyGroups(list, normalizeGroups(coaGroups)) : list;
+}
+
+function normalizeChartRows(saved, expenseNames) {
   const list = (Array.isArray(saved) ? saved : []).filter((a) => a && clean(a.name));
   const byName = new Map(list.map((a) => [lc(a.name), a]));
   const systemNames = [...SYSTEM_NAMES, ...expenseNames.filter((e) => !FIXED[e])];
@@ -88,7 +96,8 @@ export function missingFromVouchers(chart, accountVouchers, partyNames = []) {
   const parties = new Set(partyNames.map(lc));
   const seen = new Map();
   (accountVouchers || []).forEach((v) => {
-    if (!v || v.isDeleted) return;
+    // a memorandum voucher's names are not accounts of the books
+    if (!v || v.isDeleted || v.voucherType === "memo") return;
     [...(v.lines || []).map((l) => l?.account), v.fromAccount, v.toAccount].forEach((x) => {
       const n = clean(x);
       if (n && !known.has(lc(n)) && !parties.has(lc(n)) && !seen.has(lc(n))) seen.set(lc(n), n);

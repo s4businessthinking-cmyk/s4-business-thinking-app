@@ -36,8 +36,8 @@ export function taxDueAlerts({ vat, ct, tn, cur, dueDate, ctDue, today, bn }) {
     if (tone) {
       const tax = ct.tax || 0;
       const title = tax > 0
-        ? (bn ? `Corporate Tax দিতে হবে — ${cur} ${fmtMoney(tax)}` : `Corporate Tax due — ${cur} ${fmtMoney(tax)}`)
-        : (bn ? "এই বছর Corporate Tax দিতে হবে না (0)" : "No Corporate Tax due this year (0)");
+        ? (bn ? `আনুমানিক Corporate Tax — ${cur} ${fmtMoney(tax)} (S4-এর হিসাব, জমা নয়)` : `Estimated Corporate Tax — ${cur} ${fmtMoney(tax)} (S4 estimate, not filed)`)
+        : (bn ? "এই বছরের আনুমানিক Corporate Tax: 0 (S4-এর হিসাব)" : "Estimated Corporate Tax this year: 0 (S4 estimate)");
       const sub = tone === "overdue"
         ? (bn ? `সময় পার হয়েছে — ${fmtDay(ctDue)}` : `Overdue — ${fmtDay(ctDue)}`)
         : tone === "today"

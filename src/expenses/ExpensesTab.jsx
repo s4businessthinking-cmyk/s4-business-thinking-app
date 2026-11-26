@@ -9,6 +9,7 @@ import { logAudit } from "../utils/auditLog.js";
 import { normalizeAllowances, rowName } from "../masters/simpleMasters.js";
 import { taxSettingsOf } from "../reports/taxDomain.js";
 import { partnerDirectoryOf, matchPartnerName, PARTNER_BLOCKED_EXPENSE_CATEGORIES } from "../partners/partners.js";
+import { activeCostCentres, costCentreLabel, costCentreRequired, costCentresOf, expenseCentreProblem } from "../accounts/costCentres.js";
 
 export const EXPENSE_CATEGORIES = [
   { key: "rent", bn: "দোকান ভাড়া", en: "Rent", icon: "" },
@@ -63,7 +64,7 @@ export function expenseCategoryLabel(row, bn) {
 }
 
 // vatAuto: the VAT box follows the amount until the user types their own VAT figure.
-const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", allowanceTypeId: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "", partnerId: "", partnerUse: "", partnerPaid: "shop", enteredBy: "" });
+const emptyForm = (forEmployee = false) => ({ expenseDate: localDay(), category: forEmployee ? "salary" : "rent", categoryName: "", allowanceTypeId: "", employeeId: "", forMonth: forEmployee ? localDay().slice(0, 7) : "", amount: "", method: "cash", paidTo: "", refNo: "", note: "", chequeNo: "", chequeBank: "", chequeDate: localDay(), hasVat: false, vatAmount: "", vatAuto: true, supplierTrn: "", costCentreId: "", partnerId: "", partnerUse: "", partnerPaid: "shop", enteredBy: "" });
 const ENTERED_BY_KEY = "s4_expense_entered_by";
 
 export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile, isOwner, cur = "AED", isDesktop, toast, shopName = "", leaveGuard = null, shop = null, employeeMode = false, canDelete = false, canPrint = false }) {
@@ -107,6 +108,9 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const activeEmployees = useMemo(() => employees.filter((e) => e.status !== "inactive").sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))), [employees]);
   const empName = (id, fallback = "") => employees.find((e) => e.id === id)?.name || fallback;
   const partnerDirectory = useMemo(() => partnerDirectoryOf(shop), [shop]);
+  // cost centres (accounts/costCentres.js): the owner's list on the shop record; required only when the owner switches it on
+  const centres = useMemo(() => costCentresOf(shop), [shop]);
+  const centreRequired = costCentreRequired(shop);
   const partnerName = (id, fallback = "") => partnerDirectory.find((p) => p.id === id)?.name || fallback;
   // Partners share the owner login, so the login alone can't tell which of them wrote the entry.
   const showEnteredBy = isOwner && partnerDirectory.length > 0;
@@ -160,7 +164,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
   const lastEnteredBy = () => { try { const id = localStorage.getItem(`${ENTERED_BY_KEY}:${shopId}`) || ""; return partnerDirectory.some((p) => p.id === id) ? id : ""; } catch { return ""; } };
   const openNew = () => { const f = { ...emptyForm(employeeMode), employeeId: employeeMode ? empFilter : "", enteredBy: showEnteredBy ? lastEnteredBy() : "" }; if (f.employeeId) f.paidTo = empName(f.employeeId); setEditId(null); setForm(f); setBaseline(JSON.stringify(f)); };
   const openEdit = (r) => {
-    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", allowanceTypeId: r.allowanceTypeId || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: !r.method || r.method === "partner" ? "cash" : r.method, paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "", partnerId: r.partnerId || "", partnerUse: r.partnerId ? "shop" : "", partnerPaid: r.paidByPartner ? "own" : "shop", enteredBy: r.enteredBy || "" };
+    const f = { expenseDate: r.expenseDate || localDay(), category: r.category || "other", categoryName: r.categoryName || "", allowanceTypeId: r.allowanceTypeId || "", employeeId: r.employeeId || "", forMonth: r.forMonth || "", amount: String(r.amount ?? ""), method: !r.method || r.method === "partner" ? "cash" : r.method, paidTo: r.paidTo || "", refNo: r.refNo || "", note: r.note || "", chequeNo: r.chequeNo || "", chequeBank: r.chequeBank || "", chequeDate: r.chequeDate || r.expenseDate || localDay(), hasVat: n(r.vatAmount) > 0, vatAmount: n(r.vatAmount) > 0 ? String(r.vatAmount) : "", vatAuto: false, supplierTrn: r.supplierTrn || "", costCentreId: r.costCentreId || "", partnerId: r.partnerId || "", partnerUse: r.partnerId ? "shop" : "", partnerPaid: r.paidByPartner ? "own" : "shop", enteredBy: r.enteredBy || "" };
     setEditId(r.id);
     setForm(f);
     setBaseline(JSON.stringify(f));
@@ -238,6 +242,10 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
     if (linkEmployee && !form.employeeId && (employeeMode || (activeEmployees.length > 0 && !oldUnlinked))) { toast?.(L("কর্মচারী বাছুন", "Pick the employee"), "err"); return; }
     const isCheque = method === "cheque";
     if (isCheque && !form.chequeDate) { toast?.(L("চেকের তারিখ দিন", "Pick the cheque date"), "err"); return; }
+    const centreProblem = expenseCentreProblem({ costCentreId: form.costCentreId, centres, required: centreRequired, keepId: editId ? rows.find((r) => r.id === editId)?.costCentreId || "" : "" });
+    if (centreProblem === "required") { toast?.(L("কস্ট সেন্টার বাছুন - মালিক খরচে সেন্টার বাধ্যতামূলক করেছেন", "Pick a cost centre - the owner has made it required on expenses"), "err"); return; }
+    if (centreProblem === "inactive") { toast?.(L("এই কস্ট সেন্টার বন্ধ - অন্যটি বাছুন", "This cost centre is stopped - pick another"), "err"); return; }
+    if (centreProblem === "unknown") { toast?.(L("এই কস্ট সেন্টার আর তালিকায় নেই - আবার বাছুন", "This cost centre is no longer on the list - pick again"), "err"); return; }
     const vatAmount = form.hasVat ? r2(form.vatAmount) : 0;
     if (form.hasVat && !(vatAmount > 0 && vatAmount < amount)) { toast?.(L(` ${tn}-এর পরিমাণ ঠিক করুন — মোট টাকার চেয়ে কম হতে হবে`, `Fix the ${tn} amount — it must be less than the total`), "err"); return; }
     setSaving(true);
@@ -253,6 +261,7 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
       chequeNo: isCheque ? form.chequeNo.trim() : "", chequeBank: isCheque ? form.chequeBank.trim() : "", chequeDate: isCheque ? form.chequeDate : "",
       chequeStatus: isCheque ? (prev.method === "cheque" && prev.chequeStatus && prev.chequeDate === form.chequeDate ? prev.chequeStatus : "pending") : "",
       vatAmount, supplierTrn: form.hasVat ? form.supplierTrn.trim() : "",
+      costCentreId: form.costCentreId || "",
       employeeId: linkEmployee ? form.employeeId || "" : "", employeeName: linkEmployee && form.employeeId ? empName(form.employeeId, prev.employeeName || "") : "",
       forMonth: linkEmployee && form.employeeId ? form.forMonth || String(form.expenseDate).slice(0, 7) : "",
       updatedAt: nowIso, updatedBy: user?.uid || "",
@@ -650,7 +659,8 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
           {allowanceTypes.filter((a) => a.active || a.id === form.allowanceTypeId).map((a) => <option key={a.id} value={a.id}>{[a.code, rowName(a, bn)].filter(Boolean).join(" · ")}</option>)}
         </select>
       ))}
-      {form.category === "other" && fField(`${L("খরচের ধরন", "Expense type")} *`, <input className="pm-input"disabled={readOnly} value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} />)}
+      {form.category === "other" && fField(`${L("খরচের ধরন", "Expense type")} *`, <input className="pm-input"disabled={readOnly} list="s4-expense-type-suggestions" value={form.categoryName} onChange={(e) => setF("categoryName", e.target.value)} placeholder={L("যেমন: পরিষ্কার", "e.g. Cleaning")} />)}
+      {form.category === "other" && Array.isArray(shop?.expenseNameSuggestions) && shop.expenseNameSuggestions.length > 0 && <datalist id="s4-expense-type-suggestions">{shop.expenseNameSuggestions.map((n) => <option key={n} value={n} />)}</datalist>}
       {partnerBox}
       {!formOwnPocket && fField(L("কীভাবে দিলেন", "Paid by"), (
         <div className="si-types"style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}>
@@ -674,6 +684,19 @@ export default function ExpensesTab({ lang = "en", th, s, shopId, user, profile,
         {fField(L("কাকে দিলেন", "Paid to"), <input className="pm-input"disabled={readOnly} value={form.paidTo} onChange={(e) => setF("paidTo", e.target.value)} />)}
         {fField(L("রেফারেন্স / বিল নং", "Ref / Bill No"), <input className="pm-input"disabled={readOnly} value={form.refNo} onChange={(e) => setF("refNo", e.target.value)} />)}
       </div>
+      {centres.length > 0 && (
+        <div className="si-grid2">
+          {fField(centreRequired ? L("কস্ট সেন্টার *", "Cost centre *") : L("কস্ট সেন্টার", "Cost centre"), (
+            <select className="pm-input" disabled={readOnly} value={form.costCentreId} onChange={(e) => setF("costCentreId", e.target.value)}>
+              <option value="">{centreRequired ? L("বাছুন…", "Pick…") : L("বরাদ্দ নেই", "Not allocated")}</option>
+              {activeCostCentres(centres).map((c) => <option key={c.id} value={c.id}>{costCentreLabel(c, bn)}</option>)}
+              {form.costCentreId && !activeCostCentres(centres).some((c) => c.id === form.costCentreId) && (
+                <option value={form.costCentreId}>{costCentreLabel(centres.find((c) => c.id === form.costCentreId), bn) || form.costCentreId} ({L("বন্ধ", "stopped")})</option>
+              )}
+            </select>
+          ))}
+        </div>
+      )}
       {paidToPartner && !readOnly && (
         <div className="si-hint"style={{ marginLeft: 0, color: "#b45309" }}>
            {L(`"${paidToPartner.name}"একজন পার্টনার। তিনি টাকা নিয়ে থাকলে পার্টনার বাছুন — নিজের কাজে নিলে এটা খরচ নয়।`, `"${paidToPartner.name}"is a partner. If they took the money, pick the partner — personal use is not an expense.`)}{" "}

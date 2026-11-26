@@ -1,3 +1,4 @@
+const { requestText } = require("./requestText.cjs");
 const { autoUpdater } = require("electron-updater");
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
 const fs = require("fs");
@@ -281,6 +282,95 @@ function setupPrintIpc() {
     return printers.map((p) => ({ name: p.name, displayName: p.displayName || p.name, isDefault: !!p.isDefault }));
   });
 
+  // Sends raw bytes (ESC/POS drawer kick) to a Windows printer via the spooler.
+  // HTML silent print cannot pulse a cash drawer; this path must report real spooler errors.
+  ipcMain.handle("s4-print:raw", async (_event, payload = {}) => {
+    if (process.platform !== "win32") {
+      return { ok: false, error: "Cash drawer raw print is only supported on Windows" };
+    }
+    const deviceName = typeof payload.deviceName === "string" ? payload.deviceName.trim() : "";
+    const b64 = typeof payload.base64 === "string" ? payload.base64.trim() : "";
+    if (!deviceName) return { ok: false, error: "printer name required" };
+    if (!b64 || b64.length > 4096) return { ok: false, error: "invalid raw payload" };
+    let bytes;
+    try { bytes = Buffer.from(b64, "base64"); } catch { return { ok: false, error: "invalid base64" }; }
+    if (!bytes.length || bytes.length > 256) return { ok: false, error: "invalid raw length" };
+    const rawFile = path.join(app.getPath("temp"), `s4-drawer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.bin`);
+    const psFile = path.join(app.getPath("temp"), `s4-drawer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.ps1`);
+    try {
+      await fs.promises.writeFile(rawFile, bytes);
+      const ps = `
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class S4RawPrinter {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Ansi)]
+  public class DOCINFOA {
+    [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", EntryPoint="OpenPrinterA", SetLastError=true, CharSet=CharSet.Ansi)]
+  public static extern bool OpenPrinter([MarshalAs(UnmanagedType.LPStr)] string szPrinter, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.Drv", EntryPoint="ClosePrinter", SetLastError=true)]
+  public static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="StartDocPrinterA", SetLastError=true, CharSet=CharSet.Ansi)]
+  public static extern bool StartDocPrinter(IntPtr hPrinter, Int32 level, [In] DOCINFOA di);
+  [DllImport("winspool.Drv", EntryPoint="EndDocPrinter", SetLastError=true)]
+  public static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="StartPagePrinter", SetLastError=true)]
+  public static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="EndPagePrinter", SetLastError=true)]
+  public static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true)]
+  public static extern bool WritePrinter(IntPtr hPrinter, IntPtr pBytes, Int32 dwCount, out Int32 dwWritten);
+  public static void Send(string printer, string file) {
+    IntPtr h = IntPtr.Zero;
+    if (!OpenPrinter(printer, out h, IntPtr.Zero)) throw new Exception("OpenPrinter failed " + Marshal.GetLastWin32Error());
+    try {
+      DOCINFOA di = new DOCINFOA();
+      di.pDocName = "S4 Cash Drawer";
+      di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("StartDocPrinter failed " + Marshal.GetLastWin32Error());
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("StartPagePrinter failed " + Marshal.GetLastWin32Error());
+        try {
+          byte[] data = File.ReadAllBytes(file);
+          IntPtr p = Marshal.AllocHGlobal(data.Length);
+          try {
+            Marshal.Copy(data, 0, p, data.Length);
+            int written;
+            if (!WritePrinter(h, p, data.Length, out written) || written != data.Length)
+              throw new Exception("WritePrinter failed " + Marshal.GetLastWin32Error());
+          } finally { Marshal.FreeHGlobal(p); }
+        } finally { EndPagePrinter(h); }
+      } finally { EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+"@
+[S4RawPrinter]::Send(${JSON.stringify(deviceName)}, ${JSON.stringify(rawFile)})
+Write-Output 'OK'
+`;
+      await fs.promises.writeFile(psFile, ps, "utf8");
+      const { stdout, stderr } = await execFileAsync("powershell.exe", [
+        "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", psFile,
+      ], { windowsHide: true, timeout: 20000, maxBuffer: 1024 * 1024 });
+      const out = String(stdout || "");
+      if (!/\bOK\b/.test(out)) {
+        return { ok: false, error: String(stderr || out || "raw print failed").trim().slice(0, 300) };
+      }
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: String(err?.stderr || err?.message || err).trim().slice(0, 300) };
+    } finally {
+      fs.promises.unlink(rawFile).catch(() => {});
+      fs.promises.unlink(psFile).catch(() => {});
+    }
+  });
+
   // Prints an HTML document straight to the chosen printer, without a dialog.
   ipcMain.handle("s4-print:html", async (_event, html, options = {}) => {
     if (typeof html !== "string" || !html || Buffer.byteLength(html, "utf8") > PRINT_HTML_MAX_BYTES) {
@@ -448,17 +538,19 @@ const ASP_MAX_REPLY = 256 * 1024;
 const ASP_TIMEOUT_MS = 30000;
 function setupAspIpc() {
   ipcMain.handle("s4-asp:request", async (_event, req = {}) => {
+    // the same bridge serves the SMS / email reminder providers (req.purpose), so errors name the right service
+    const say = requestText(req.purpose);
     let url;
-    try { url = new URL(String(req.url || "")); } catch { throw new Error("The ASP address is not a valid link"); }
+    try { url = new URL(String(req.url || "")); } catch { throw new Error(say.badUrl); }
     const local = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
-    if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) throw new Error("The ASP address must start with https://");
+    if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) throw new Error(say.notHttps);
     const method = req.method === "GET" ? "GET" : "POST";
     const headers = {};
     Object.entries(req.headers && typeof req.headers === "object" ? req.headers : {}).forEach(([k, v]) => {
       if (/^[A-Za-z0-9-]+$/.test(k) && typeof v === "string" && !/[\r\n]/.test(v)) headers[k] = v;
     });
     const body = method === "POST" && typeof req.body === "string" ? req.body : undefined;
-    if (body && Buffer.byteLength(body, "utf8") > ASP_MAX_BODY) throw new Error("The document is too large to send");
+    if (body && Buffer.byteLength(body, "utf8") > ASP_MAX_BODY) throw new Error(say.tooLarge);
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ASP_TIMEOUT_MS);
     try {
@@ -466,7 +558,7 @@ function setupAspIpc() {
       const text = await res.text();
       return { status: res.status, text: text.slice(0, ASP_MAX_REPLY) };
     } catch (err) {
-      throw new Error(ctrl.signal.aborted ? `The ASP did not answer within ${ASP_TIMEOUT_MS / 1000} seconds` : String(err?.cause?.message || err?.message || err));
+      throw new Error(ctrl.signal.aborted ? say.timeout(ASP_TIMEOUT_MS / 1000) : say.failed(err?.cause?.message || err?.message || err));
     } finally {
       clearTimeout(timer);
     }

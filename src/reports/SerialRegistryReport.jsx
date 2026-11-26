@@ -1,5 +1,8 @@
 // Serial / IMEI Registry: search every product serial already saved on bills, returns, warranty claims and job cards,
 // with its status and history from those documents. Read-only; see serialRegistry.js for the sources.
+import { saveShopRecord } from "../offline/shopService";
+import { logAudit } from "../utils/auditLog.js";
+import { serialSettingsOf } from "../sales-invoice/serialRules.js";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PM_CSS } from "../product-master/pmStyles";
 import { SI_CSS, usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
@@ -40,7 +43,7 @@ const SR_CSS = `
 .sr-serial { font-family: Consolas, "Courier New", monospace; font-weight: 700; }
 `;
 
-export default function SerialRegistryReport({ lang = "en", shopId, shop, products = [], shopName = "", toast, canPrint = false, includeJobs = false, onOpenDoc }) {
+export default function SerialRegistryReport({ lang = "en", shopId, shop, products = [], shopName = "", toast, canPrint = false, includeJobs = false, onOpenDoc, isOwner = false, user = null, profile = null, onShopUpdated }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [query, setQuery] = useState("");
@@ -143,6 +146,7 @@ export default function SerialRegistryReport({ lang = "en", shopId, shop, produc
         <strong> {L("সিরিয়াল / IMEI রেজিস্টার", "Serial / IMEI Registry")}</strong>
         <span>{filterLine || L("সব সিরিয়াল", "All serials")}</span>
       </div>
+      <SerialRequireBar lang={lang} shop={shop} shopId={shopId} isOwner={isOwner} user={user} profile={profile} toast={toast} onShopUpdated={onShopUpdated} marked={products.filter((p) => p?.trackSerial && !p.isDeleted).length} />
       <div className="si-toolbar">
         <input ref={searchRef} className="pm-input" style={{ width: mobile ? "100%" : 260 }} value={query} onChange={(e) => { setQuery(e.target.value); setSelKey(""); }}
           placeholder={L("সিরিয়াল / IMEI (পুরো বা অংশ), প্রোডাক্ট বা পার্টি", "Serial / IMEI (full or part), product or party")} />
@@ -243,6 +247,37 @@ export default function SerialRegistryReport({ lang = "en", shopId, shop, produc
         {registry && [...sources.entries()].map(([col, n]) => <span key={col}>{docName(col)} <b>{n}</b></span>)}
         <span>{L("উইন্ডোতে ফিরলে নিজে থেকে রিফ্রেশ হয়", "Refreshes automatically when you come back to the window")}</span>
       </div>
+    </div>
+  );
+}
+
+// Owner: make the serial / IMEI a must on sales and / or purchase bills for products marked "Serial / IMEI".
+function SerialRequireBar({ lang, shop, shopId, isOwner, user, profile, toast, onShopUpdated, marked }) {
+  const bn = lang === "bn";
+  const L = (b, e) => (bn ? b : e);
+  const s = serialSettingsOf(shop);
+  const [busy, setBusy] = React.useState(false);
+  const set = async (key, on) => {
+    if (!isOwner || busy) return;
+    setBusy(true);
+    try {
+      const updated = await saveShopRecord(shopId, { [key]: on }, { ownerUid: user?.uid || shop?.ownerUid });
+      onShopUpdated?.(updated);
+      logAudit({ shopId, user, profile, action: "edit", collection: "shops", docId: shopId, docNo: "Serial / IMEI", note: `${key === "requireSerialOnSales" ? "Sales" : "Purchase"} bills: serial ${on ? "required" : "optional"} on marked products` });
+      toast?.(L("সেটিং সেভ হয়েছে", "Setting saved"));
+    } catch (e) { toast?.(e?.message || String(e), "err"); } finally { setBusy(false); }
+  };
+  return (
+    <div className="si-toolbar" style={{ flexWrap: "wrap" }}>
+      <label className="pm-check" title={isOwner ? undefined : L("শুধু মালিক বদলাতে পারেন", "Only the owner can change this")}>
+        <input type="checkbox" checked={s.sales} disabled={!isOwner || busy} onChange={(e) => set("requireSerialOnSales", e.target.checked)} /> {L("বিক্রির বিলে সিরিয়াল বাধ্যতামূলক", "Serial required on sales bills")}
+      </label>
+      <label className="pm-check" title={isOwner ? undefined : L("শুধু মালিক বদলাতে পারেন", "Only the owner can change this")}>
+        <input type="checkbox" checked={s.purchase} disabled={!isOwner || busy} onChange={(e) => set("requireSerialOnPurchase", e.target.checked)} /> {L("ক্রয়ের বিলে সিরিয়াল বাধ্যতামূলক", "Serial required on purchase bills")}
+      </label>
+      <span className="si-muted" style={{ fontSize: 12 }}>
+        {L(`শুধু প্রোডাক্ট মাস্টারে "Serial / IMEI" দেওয়া পণ্যে (এখন ${marked}টি) - প্রতি ইউনিটে একটি, কমা দিয়ে আলাদা`, `Only products marked "Serial / IMEI" on the product master (${marked} now) - one per unit, comma separated`)}
+      </span>
     </div>
   );
 }

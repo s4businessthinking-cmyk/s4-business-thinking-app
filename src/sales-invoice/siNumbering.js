@@ -1,4 +1,5 @@
 import { QT_VALID_DAYS, siAddDays, siEmptyForm, siToday } from "./siHelpers.js";
+import { saleAsTyped } from "./siForex.js";
 import { SI_PAY, siIsSettledPay, siN2 } from "./salesInvoiceShared.js";
 import { db } from "../firebase-config";
 import { deviceSerialTag, reserveShopSerial } from "../shared/appShared.jsx";
@@ -70,7 +71,9 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
     setSiView("form");
   };
 
-  const siLoadDoc=(inv)=>{
+  const siLoadDoc=(savedInv)=>{
+    // a bill typed in another currency is saved in the shop currency: show it as typed (siForex.js)
+    const inv = saleAsTyped(savedInv);
     // A plain cash bill is always auto-paid — don't pre-fill amountPaid so switching to credit gives 0.
     // A "partial cash" bill (cashPartial) tracks a real balance just like credit, so its paid amount loads back.
     const isPlainCash = siIsSettledPay(inv.paymentMethod, inv.cashPartial);
@@ -84,8 +87,8 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
       customerType:(customers||[]).find(c=>c.id===inv.customerId)?.customerType||"",
       amountPaid: isPlainCash ? "" : (inv.amountPaid>0?String(inv.amountPaid):""),
       deliveryNoteNo:inv.deliveryNoteNo||"", vehicleNo:inv.vehicleNo||"", note:inv.note||"",
-      refNo:inv.refNo||"", salesmanId:inv.salesmanId||"", salesmanName:inv.salesmanName||"",
-      currency:inv.currency||"AED", stockLocation:inv.stockLocation||"main", stockLocationName:inv.stockLocationName||"Main",
+      refNo:inv.refNo||"", locationId:inv.locationId||"", salesmanId:inv.salesmanId||"", salesmanName:inv.salesmanName||"",
+      currency:inv.currency||"AED", exchangeRate:inv.fx && inv.exchangeRate ? String(inv.exchangeRate) : "", stockLocation:inv.stockLocation||"main", stockLocationName:inv.stockLocationName||"Main",
       billDiscPerc:siN2(inv.billDiscPerc)>0?String(inv.billDiscPerc):"",
       billDiscAmt:siN2(inv.billDiscPerc)>0?"":(siN2(inv.billDiscAmt)>0?String(inv.billDiscAmt):""),
       adjustment:siN2(inv.adjustment)?String(inv.adjustment):"", adjustmentReasonId:inv.adjustmentReasonId||"", adjustmentReason:inv.adjustmentReason||"", roundOff:siN2(inv.roundOff)?String(inv.roundOff):"",
@@ -93,7 +96,7 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
       hideCodeInPrint:!!inv.hideCodeInPrint,
       validUntil:inv.validUntil||"",
     });
-    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), discountPerc:String(it.discountPerc||"0"), discountFlat:siN2(it.discountFlat)>0?String(it.discountFlat):"", vatPerc:it.vatPerc!=null&&it.vatPerc!==""?String(it.vatPerc):"5", batchNo:it.batchNo||"", ...(it.isService?{ isService:true }:{}) })));
+    setSiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitPrice:String(it.unitPrice||""), serialNo:it.serialNo||"", discountPerc:String(it.discountPerc||"0"), discountFlat:siN2(it.discountFlat)>0?String(it.discountFlat):"", vatPerc:it.vatPerc!=null&&it.vatPerc!==""?String(it.vatPerc):"5", batchNo:it.batchNo||"", ...(it.isService?{ isService:true }:{}) })));
     setSiCurrent(siEmptyCurrent());
   };
   // viewOnly: load any saved document into the desktop form read-only (it shows Edit only where siCanEditDoc allows).

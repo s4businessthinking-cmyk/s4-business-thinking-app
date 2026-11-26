@@ -94,6 +94,10 @@ export default function ProductDetailsForm({
               <input type="checkbox" checked={!!form.rateBarcode} onChange={(e) => upd("rateBarcode", e.target.checked)} />
               Rate Barcode
             </label>
+            <label className="pm-check" title="Bills ask for one serial / IMEI per unit when the owner requires it (Serial / IMEI page)">
+              <input type="checkbox" checked={!!form.trackSerial} onChange={(e) => upd("trackSerial", e.target.checked)} />
+              Serial / IMEI
+            </label>
           </div>
         </div>
 

@@ -7,14 +7,14 @@ import { r2, voucherParticulars } from "./accountVoucherDomain.js";
 const n = (v) => parseFloat(String(v ?? "").replace(/,/g, "")) || 0;
 const day = (v) => String(v || "").slice(0, 10);
 const lc = (v) => String(v || "").trim().toLowerCase();
-export const REGISTER_TYPES = ["journal", "contra", "receipt", "payment"];
-const TYPE_EN = { journal: "Journal", contra: "Contra", receipt: "Receipt", payment: "Payment" };
+export const REGISTER_TYPES = ["journal", "contra", "memo", "receipt", "payment"];
+const TYPE_EN = { journal: "Journal", contra: "Contra", memo: "Memo (not posted)", receipt: "Receipt", payment: "Payment" };
 const METHOD_EN = { cash: "Cash", cheque: "Cheque", bank_transfer: "Bank transfer", bank: "Bank transfer", card: "Card", credit: "Credit" };
 
 const allocNos = (v) => (v.allocations || []).map((a) => a.invoiceNo || a.supplierInvoiceNo).filter(Boolean);
 
 function rowOf(kind, v) {
-  if (kind === "journal" || kind === "contra") {
+  if (kind === "journal" || kind === "contra" || kind === "memo") {
     return {
       kind, refund: false, id: v.id, no: v.voucherNo || "", date: day(v.voucherDate || v.createdAt), particulars: voucherParticulars(v), party: "",
       narration: v.narration || "", ref: v.refNo || "", method: "", amount: r2(v.totalAmount), user: v.createdByName || "", cancelled: v.status === "cancelled", src: v,
@@ -57,9 +57,11 @@ export function buildVoucherRegister(data, opts = {}) {
     const list = counted.filter((r) => r.kind === t);
     return [t, { count: list.length, amount: r2(list.reduce((s, r) => s + r.amount, 0)) }];
   }));
+  // a memo voucher is listed but never part of the total: it is not posted
+  const posted = counted.filter((r) => r.kind !== "memo");
   return {
     rows, kpi,
-    total: { count: counted.length, amount: r2(counted.reduce((s, r) => s + r.amount, 0)) },
+    total: { count: posted.length, amount: r2(posted.reduce((s, r) => s + r.amount, 0)) },
     cancelled: inPeriod.length - counted.length,
   };
 }
@@ -73,7 +75,7 @@ export function registerRows(reg) {
     REGISTER_COLS,
     ...reg.rows.map((r) => [r.date, typeName(r), r.no, r.particulars, r.party, METHOD_EN[r.method] || r.method, r.ref, r.narration, r.amount.toFixed(2),
       r.cancelled ? "Cancelled" : r.chequeStatus ? `Active (cheque ${r.chequeStatus})` : "Active", r.user]),
-    ["Total (cancelled left out)", `${reg.total.count} voucher(s)`, "", "", "", "", "", "", reg.total.amount.toFixed(2), "", ""],
+    ["Total (cancelled and memo left out)", `${reg.total.count} voucher(s)`, "", "", "", "", "", "", reg.total.amount.toFixed(2), "", ""],
   ];
 }
 

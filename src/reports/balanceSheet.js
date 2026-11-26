@@ -2,7 +2,8 @@
 // Purchases are booked as an expense in the ledger, so stock is brought in from the stock count at average cost:
 // opening stock (product master) sits in equity, and the year's stock change goes into profit to date.
 // A ledger account goes to assets when it has a debit balance and to liabilities when it has a credit balance,
-// except income / expense (rolled into profit) and capital / partner accounts (equity).
+// except income / expense (rolled into profit), capital / partner accounts (equity) and accounts the chart of accounts
+// puts in an asset or liability group (that side, whatever the balance).
 import { recordDay, dayOf } from "../accounts/periodLock.js";
 import { n, r2, isLive } from "./reportFilters.js";
 import { isFixedAssetAccount } from "../accounts/fixedAssets.js";
@@ -130,6 +131,9 @@ export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStoc
     if (a.group === "vendor") { if (v < 0) add(payable, a.name, -v, a.key); else add(supplierAdvance, a.name, v, a.key); return; }
     // fixed asset cost and its accumulated depreciation stay together as one non-current section (cost less depreciation)
     if (isFixedAssetAccount(a.name)) { add(fixedAsset, a.name, v, a.key); return; }
+    // a chart-of-accounts asset / liability group keeps the account on its side (a credit asset shows as a negative asset)
+    if (a.group === "asset") { add(otherAsset, a.name, v, a.key); return; }
+    if (a.group === "liability") { add(otherLiability, a.name, -v, a.key); return; }
     if (v > 0) add(otherAsset, a.name, v, a.key); else add(otherLiability, a.name, -v, a.key);
   });
 
@@ -166,6 +170,18 @@ export function buildBalanceSheet({ accounts, bal, closingStock = 0, openingStoc
     assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity, profit,
     workingCapital, difference: r2(totalAssets - totalLiabilities - totalEquity),
   };
+}
+
+/**
+ * P&L net profit for the same window as the balance sheet's "Profit to date" (from the last closed year-end, or from
+ * the start, up to the as-at day) against that line. The sheet always balances because profit absorbs the stock change,
+ * so this is the check that the profit report and the stock count tell the same story.
+ * -> { plProfit, bsProfit, difference, agrees }; agrees within 1 fils-level rounding (0.05).
+ */
+export function profitReconcile(plNetProfit, bsProfit) {
+  const plProfit = r2(plNetProfit), sheetProfit = r2(bsProfit);
+  const difference = r2(plProfit - sheetProfit);
+  return { plProfit, bsProfit: sheetProfit, difference, agrees: Math.abs(difference) < 0.05 };
 }
 
 /** Financial-year start date (YYYY-MM-DD) for the year that contains `asOf`. fyStartMonth = 1..12 (shop setting). */

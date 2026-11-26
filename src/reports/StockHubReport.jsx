@@ -12,8 +12,13 @@ import { splitRack } from "../sales-invoice/rackLocation.js";
 import { BRANCH_TRANSFER_COLLECTIONS } from "../branch-transfer/branchTransferService.js";
 import { BRANCH_TRANSFER_STATUSES, remainingQuantityForLine, statusLabel } from "../branch-transfer/branchTransferDomain.js";
 import { branchSalesMap } from "../branch-transfer/BranchTransferNative.jsx";
-import { averageCosts } from "./averageCost.js";
+import { unitCostsAt, valuationMethodOf } from "./stockValuation.js";
+import { saveShopRecord } from "../offline/shopService";
+import { logAudit } from "../utils/auditLog.js";
 import GodownsPanel from "../inventory/GodownsPanel.jsx";
+import BatchExpiryPanel from "../inventory/BatchExpiryPanel.jsx";
+import { stockDocsUpTo } from "./balanceSheet.js";
+import { batchStockByProduct } from "../inventory/batchStock.js";
 import { livePurchasesOf, liveReturnsOf, r2 } from "./reportFilters.js";
 import { branchStock, itemLedger, movementByProduct, onHandAt, productMatches, stockMovements, valuation } from "./stockHub.js";
 
@@ -26,11 +31,13 @@ const csvCell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"
 
 const TABS = [
   { id: "onhand", bn: "হাতে স্টক", en: "On hand" },
-  { id: "movement", bn: "স্টক মুভমেন্ট", en: "Movement" },
-  { id: "ledger", bn: "আইটেম লেজার", en: "Item ledger" },
-  { id: "valuation", bn: "স্টকের মূল্য", en: "Valuation" },
+  { id: "movement", bn: "মুভিং আইটেম (স্টক ইন-আউট)", en: "Moving Item (stock in-out)" },
+  { id: "ledger", bn: "পণ্যের স্টক খাতা", en: "Item stock ledger" },
+  { id: "valuation", bn: "স্টকের দাম", en: "Stock value" },
   { id: "locations", bn: "র‍্যাক / ব্রাঞ্চ", en: "Rack / branch" },
-  { id: "godowns", bn: "গোডাউন / লোকেশন", en: "Godowns / locations" },
+  { id: "godowns", bn: "ওয়্যারহাউস / গোডাউন", en: "Warehouse / godown" },
+  // only when a batch has an expiry date (inventory/batchExpiry.js)
+  { id: "expiry", bn: "ব্যাচের মেয়াদ", en: "Batch expiry" },
 ];
 const KIND_LABEL = {
   purchase: ["ক্রয়", "Purchase"], goodsReceipt: ["মাল রিসিভ (GRN)", "Goods received"], sale: ["বিক্রয়", "Sale"],
@@ -113,13 +120,30 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
     return bad;
   }, [data, qtyNow, products, shopId]);
 
+  // cost of a unit on `day` at the shop's valuation method (stockValuation.js), the same the Balance Sheet uses
+  const method = valuationMethodOf(shop);
   const avgCost = useMemo(() => {
     if (!data || !canSeeCost) return new Map();
-    const r = data.rows;
-    // averageCosts stops at `day` itself
-    const purchases = livePurchasesOf(r.purchaseInvoices, shopId).filter((inv) => inv.source !== "openingBalance");
-    return averageCosts(products, purchases, day, liveReturnsOf(r.extras?.purchaseReturns, shopId));
-  }, [data, products, shopId, day, canSeeCost]);
+    return unitCostsAt(method, products, data.rows, { shopId, upTo: day });
+  }, [data, products, shopId, day, canSeeCost, method]);
+  const [savingMethod, setSavingMethod] = useState(false);
+  const setMethod = async (next) => {
+    if (!isOwner || savingMethod || next === method) return;
+    if (!window.confirm(L(
+      next === "fifo"
+        ? "স্টকের মূল্য FIFO (আগে কেনা মাল আগে বিক্রি) পদ্ধতিতে হবে। লাভ-ক্ষতির ক্রয়মূল্য, ব্যালেন্স শিটের স্টক, স্টক হাব আর লেজারের স্টক এন্ট্রি সব এই পদ্ধতিতে আবার হিসাব হবে - আগের তারিখের রিপোর্টেও। সেভ করা ভাউচার বদলায় না। কোনো বছর বন্ধ করা থাকলে আবার দেখে নিন। চালাবেন?"
+        : "স্টকের মূল্য আবার গড় খরচে হবে। সব রিপোর্ট গড় খরচে আবার হিসাব হবে - আগের তারিখেও। সেভ করা ভাউচার বদলায় না। চালাবেন?",
+      next === "fifo"
+        ? "Stock will be valued first in, first out (FIFO). Cost of goods sold, the Balance Sheet stock, the Stock Hub and the ledger's stock entries are all worked out again this way - past dates included. Saved vouchers do not change. If a year is already closed, check it again. Continue?"
+        : "Stock will be valued at average cost again. Every report is worked out again at average cost - past dates included. Saved vouchers do not change. Continue?"))) return;
+    setSavingMethod(true);
+    try {
+      const updated = await saveShopRecord(shopId, { stockValuationMethod: next }, { ownerUid: user?.uid || shop?.ownerUid });
+      onShopUpdated?.(updated);
+      logAudit({ shopId, user, profile, action: "edit", collection: "shops", docId: shopId, docNo: "Stock valuation", note: `Stock valuation method: ${next === "fifo" ? "FIFO" : "Average cost"}` });
+      toast?.(L("স্টক মূল্যায়ন পদ্ধতি সেভ হয়েছে", "Stock valuation method saved"));
+    } catch (e) { toast?.(e?.message || String(e), "err"); } finally { setSavingMethod(false); }
+  };
 
   const categories = useMemo(() => [...new Set(products.map((p) => String(p.category || "").trim()).filter(Boolean))].sort(), [products]);
   const listed = useMemo(() => products.filter((p) => p?.id && productMatches(p, search) && (!category || String(p.category || "").trim() === category)), [products, search, category]);
@@ -217,9 +241,12 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
   const kpi = (label, value, color) => (
     <div className="si-kpi" title={`${label}: ${value}`}><span>{label}</span><b style={{ color }}>{value}</b></div>
   );
-  const usesAsOf = tab === "onhand" || tab === "valuation" || tab === "godowns";
+  const usesAsOf = tab === "onhand" || tab === "valuation" || tab === "godowns" || tab === "expiry";
   const usesRange = tab === "movement" || tab === "ledger";
   const ready = !!movements;
+  // batches with their expiry (batchStock.js), only for the products that have batches
+  const batchMap = useMemo(() => (data?.rows ? batchStockByProduct(products, stockDocsUpTo(data.rows, day), shopId, new Map()) : new Map()), [data, products, shopId, day]);
+  const hasExpiry = useMemo(() => [...batchMap.values()].some((info) => info.batches.some((b) => b.expiry)), [batchMap]);
   const warn = { color: "#b45309", fontWeight: 700, marginTop: 3 };
   const tableBox = { overflow: "auto", maxHeight: mobile ? undefined : 460 };
 
@@ -229,20 +256,33 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
       <style>{SI_CSS}</style>
       <style>{SH_CSS}</style>
       <div className="pm-reference-title">
-        <strong> {L("স্টক হাব", "Stock Hub")}</strong>
+        <strong> {L("স্টক হাব (মুভিং আইটেম / ওয়্যারহাউস)", "Stock Hub (Moving Item / Warehouse)")}</strong>
         <span>{usesAsOf ? `${L("পর্যন্ত", "As at")} ${fmtDay(day)}` : usesRange ? `${fmtDay(from) || L("শুরু", "Start")} — ${fmtDay(to) || L("আজ", "Today")}` : L("এখন", "Now")}</span>
       </div>
       <div className="si-toolbar">
         <div className="si-pills">
-          {TABS.map((t) => (
+          {TABS.filter((t) => t.id !== "expiry" || hasExpiry || tab === "expiry").map((t) => (
             <button key={t.id} type="button" className={`pm-btn-secondary${tab === t.id ? " is-active" : ""}`} onClick={() => setTab(t.id)}>{bn ? t.bn : t.en}</button>
           ))}
         </div>
         <span className="si-toolbar-gap" />
-        {canPrint && tab !== "godowns" && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!ready || (tab === "ledger" && !ledger)}> {L("প্রিন্ট", "Print")}</button>}
-        {canPrint && tab !== "godowns" && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!ready || (tab === "ledger" && !ledger)}> Excel</button>}
+        {canPrint && tab !== "godowns" && tab !== "expiry" && (tab !== "valuation" || canSeeCost) && <button type="button" className="pm-btn pm-btn--primary" onClick={print} disabled={!ready || (tab === "ledger" && !ledger)}> {L("প্রিন্ট", "Print")}</button>}
+        {canPrint && tab !== "godowns" && tab !== "expiry" && (tab !== "valuation" || canSeeCost) && <button type="button" className="pm-btn-secondary" onClick={exportCsv} disabled={!ready || (tab === "ledger" && !ledger)}> Excel</button>}
         <button type="button" className="pm-btn-secondary" onClick={() => setTick((v) => v + 1)}> {L("রিফ্রেশ", "Refresh")}</button>
+        {canSeeCost && (
+          <select className="pm-input" style={{ width: 170 }} value={method} disabled={!isOwner || savingMethod} onChange={(e) => setMethod(e.target.value)}
+            title={isOwner ? L("স্টক মূল্যায়ন পদ্ধতি (মালিক)", "Stock valuation method (owner)") : L("স্টক মূল্যায়ন পদ্ধতি - শুধু মালিক বদলাতে পারেন", "Stock valuation method - only the owner can change it")}>
+            <option value="average">{L("মূল্য: গড় খরচ", "Value: average cost")}</option>
+            <option value="fifo">{L("মূল্য: FIFO", "Value: FIFO")}</option>
+          </select>
+        )}
       </div>
+      {canSeeCost && method === "fifo" && (
+        <div className="si-hint" style={{ margin: "2px 6px" }}>
+          {L("স্টকের মূল্য FIFO: আগে কেনা মাল আগে বের হয় ধরে হিসাব। হাতে থাকা মালের মূল্য = শেষের দিকে কেনা লেয়ারের খরচ। লাভ-ক্ষতি, ব্যালেন্স শিট আর লেজার একই পদ্ধতিতে।",
+            "Stock is valued FIFO: what was bought first leaves first, so stock on hand carries the cost of the latest layers. The P&L, Balance Sheet and ledger use the same method.")}
+        </div>
+      )}
       <div className="si-toolbar">
         <input className="pm-input" style={{ width: mobile ? "100%" : 220 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder={L("কোড, নাম, ব্র্যান্ড বা র‍্যাক", "Code, name, brand or rack")} />
         {categories.length > 0 && (
@@ -334,6 +374,10 @@ export default function StockHubReport({ lang = "en", shopId, products = [], sho
 
       <div className="si-body">
         {error && <div className="si-paid-box is-due">{L("ডেটা পড়া যায়নি: ", "Could not load: ")}{error}</div>}
+        {ready && tab === "expiry" && (
+          <BatchExpiryPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canPrint={canPrint} canSeeCost={canSeeCost}
+            products={products} batchMap={batchMap} day={day} cur={cur} toast={toast} shopName={shopName} onShopUpdated={onShopUpdated} filterIds={search || category ? listedIds : null} />
+        )}
         {ready && tab === "godowns" && (
           <GodownsPanel lang={lang} shopId={shopId} shop={shop} user={user} profile={profile} isOwner={isOwner} canMove={canMove} canPrint={canPrint} canSeeCost={canSeeCost}
             products={products} movements={movements} avgCost={avgCost} day={day} cur={cur} toast={toast} shopName={shopName} onShopUpdated={onShopUpdated} filterIds={search || category ? listedIds : null} />
