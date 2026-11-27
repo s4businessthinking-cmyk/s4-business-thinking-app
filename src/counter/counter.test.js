@@ -8,7 +8,7 @@ import { billSnapshot, displayHtml } from "./customerDisplay.js";
 const S = "s1";
 const data = () => ({
   salesInvoices: [
-    { id: "i1", shopId: S, invoiceNo: "SI-1", invoiceDate: "2026-11-20", status: "paid", customerId: "c1", grandTotal: 210, totalVat: 10, amountPaid: 210, paymentMethod: "cash", createdAt: "2026-11-20T09:10:00.000Z" },
+    { id: "i1", shopId: S, invoiceNo: "SI-1", invoiceDate: "2026-11-20", status: "paid", customerId: "c1", grandTotal: 210, totalVat: 10, amountPaid: 210, paymentMethod: "cash", stockLocation: "b1", createdAt: "2026-11-20T09:10:00.000Z" },
     { id: "i2", shopId: S, invoiceNo: "SI-2", invoiceDate: "2026-11-20", status: "paid", customerId: "c2", grandTotal: 105, totalVat: 5, amountPaid: 105, paymentMethod: "card", createdAt: "2026-11-20T09:20:00.000Z" },
     { id: "i3", shopId: S, invoiceNo: "SI-3", invoiceDate: "2026-11-20", status: "cancelled", customerId: "c1", grandTotal: 999, totalVat: 0, amountPaid: 999, paymentMethod: "cash", createdAt: "2026-11-20T09:30:00.000Z" },
     { id: "i4", shopId: S, invoiceNo: "SI-4", invoiceDate: "2026-11-20", status: "paid", customerId: "c1", grandTotal: 50, totalVat: 0, amountPaid: 50, paymentMethod: "cash", createdAt: "2026-11-20T15:00:00.000Z" },
@@ -29,6 +29,9 @@ test("shift cash: only Cash in Hand postings saved inside the shift; card and ca
   const ledger = buildGlobalLedger(d, { shopId: S, customers });
   const cash = shiftCash(ledger, d, "2026-11-20T09:00:00.000Z", "2026-11-20T12:00:00.000Z");
   assert.deepEqual([cash.cashIn, cash.cashOut, cash.net], [240, 20, 220]);
+  const ledgerSplit = buildGlobalLedger(d, { shopId: S, customers, branches: [{ id: "b1", name: "Branch 1" }], branchCashSplit: true });
+  const branchOnly = shiftCash(ledgerSplit, d, "2026-11-20T09:00:00.000Z", "2026-11-20T12:00:00.000Z", "b1", "Branch 1");
+  assert.deepEqual([branchOnly.cashIn, branchOnly.cashOut], [210, 0]);
   assert.deepEqual(cash.lines.map((l) => l.no), ["SI-1", "RV-1", "EX-1"]);
   assert.equal(shiftCash(ledger, d, "2026-11-20T12:00:00.000Z", "").cashIn, 50);
   const before = JSON.stringify(ledger.postings);
@@ -46,6 +49,11 @@ test("open / close: one open shift, amounts checked, expected and difference fro
   const shift = { id: "sh1", ...opened.doc };
   assert.equal(openShiftDoc({ openingCash: "0" }, [shift], who).error, "open");
   assert.equal(openShifts([shift, { ...shift, id: "x", shopId: "other" }], S).length, 1);
+  const br2 = { ...shift, id: "sh2", branchId: "b2", branchName: "Branch 2" };
+  assert.equal(openShifts([shift, br2], S).length, 2);
+  assert.equal(openShifts([shift, br2], S, "b2").length, 1);
+  assert.ok(openShiftDoc({ openingCash: "0", branchId: "b2" }, [shift], who).ok);
+  assert.equal(openShiftDoc({ openingCash: "0", branchId: "b2" }, [shift, br2], who).error, "open");
   const live = shiftSummary(shift, { cashIn: 240, cashOut: 20 });
   assert.deepEqual([live.expected, live.difference], [320, null]);
   assert.equal(closeShiftPatch(shift, { cashIn: 240, cashOut: 20 }, { closingCash: "" }, who).error, "amount");

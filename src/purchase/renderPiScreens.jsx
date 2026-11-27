@@ -5,9 +5,12 @@ import { CURRENCIES } from "../reports/taxDomain.js";
 import ChequeHandoverModal from "../vouchers/ChequeHandoverModal.jsx";
 import { MinimizedChip, WindowButtons } from "../components/WindowChrome.jsx";
 import { PI_CHEQUE_STATUSES, PI_PAY_METHODS, PI_STATUSES, PI_UNITS, piCalcLine, piCalcTotals, piEmptyCurrent, piToday } from "./purchaseShared.js";
+import InvoiceBankSelect from "../ledger/InvoiceBankSelect.jsx";
+import { isInvoiceBankPayMethod } from "../ledger/invoiceBankPay.js";
 import { PI_VOUCHER_METHODS, piFmt2, piN2, toVoucherView, voucherParties } from "../shared/appShared.jsx";
 import { PM_CSS } from "../product-master/pmStyles";
 import { PM_TH, SI_CSS } from "../sales-invoice/siSkin.js";
+import { docWinFrameStyle, docWinTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 import PartyLedgerWindow from "../vouchers/PartyLedgerWindow.jsx";
 import { partyLedgerKey, partyLedgerKeyFromInvoice } from "../vouchers/partyLedgerMeta.js";
 import { PiItemsTable } from "./PiItemsTable.jsx";
@@ -18,6 +21,7 @@ import PurchaseInvoiceDesktopForm from "./PurchaseInvoiceDesktopForm.jsx";
 import { fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import StockBadge from "../inventory/StockBadge.jsx";
 import { UAE_BANKS, amountToWordsAED } from "../cheque/chequeConfig.js";
+import { bankChoicesForShop, shopBankAccountName } from "../ledger/ledgerShopOpts.js";
 import VendorChequeWizard from "../vouchers/VendorChequeWizard.jsx";
 import { groupInvoicesByParty } from "../invoices/PartyFolderList.jsx";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
@@ -28,7 +32,7 @@ import { isOpeningBill } from "../utils/openingBill.js";
 import { generatePaymentVoucherHTML, printPaymentVoucher, siUnitOptionsFor } from "../sales-invoice/salesInvoiceShared.js";
 import { generatePurchaseInvoiceHTML, printPurchaseInvoice } from "./purchasePrint.js";
 import WhatsAppButton from "../share/WhatsAppButton.jsx";
-import { docMessage, partyPhone, pdfFileName, voucherShareDoc } from "../share/whatsappDocShare.js";
+import { countryCodeOf, docMessage, partyPhone, pdfFileName, voucherShareDoc } from "../share/whatsappDocShare.js";
 import { settleLeftoverVendorReturnCredits } from "../returns/returnsCreditSettle.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import DateField from "../components/DateField.jsx";
@@ -172,7 +176,8 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
                 lang={lang} mode="payment"cur={t.cur||"AED"}
                 voucherNo={piFormatPaymentNo(piMaxLocalPaymentSerial() + 1)}
                 parties={voucherParties(vendors, openAll, "vendorId", "vendorName", v=>v.vendorName, v=>v.mobileNumber||v.whatsappNumber)}
-                banks={UAE_BANKS.map(b=>b.name)}
+                banks={bankChoicesForShop(UAE_BANKS.map((b) => b.name), shop)}
+                defaultBankAccount={shopBankAccountName(shop)}
                 getOpenInvoices={(p)=>getVendorOpenInvoices(p.id, p.name)}
                 vouchers={payments.map(p=>toVoucherView(withSupRefs(p),"payment"))}
                 prefill={pmtEditSnapshot || (prefParty ? { ...prefParty, invoiceId:pmtPrefillInvoiceId } : null)}
@@ -188,6 +193,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
                 onSetChequeStatus={isOwner ? async (v,st)=>{ const u = await piSetVoucherChequeStatus(v.raw, st); return u ? toVoucherView(u,"payment") : null; } : undefined}
                 onPrint={(isOwner||can("printPayments")) ? (v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts) : undefined}
                 onWhatsApp={(isOwner||can("printPayments")) ? (v)=>voucherShareDoc({ kind:"payment", raw:v.raw, html:generatePaymentVoucherHTML(v.raw, shop, lang), partyRecord:vendors.find(x=>x.id===v.raw.vendorId), bn:lang==="bn", shop:shop?.companyName||"", cur:t.cur||"AED" }) : null}
+                countryCode={countryCodeOf(shop)}
                 toast={toast}
                 onPrintCheque={onOpenChequePrinter ? (v)=>openVoucherInChequePrinter(v.raw) : undefined}
                 onPrintChequeVoucher={(v)=>printChequePaymentVoucher(v.raw)}
@@ -537,11 +543,13 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
 
   // ══════ FORM VIEW ══════
   if (wideDesktop) return (
-    <div style={{ position:"fixed", inset:piWin.max?0:"28px 40px", zIndex:1500, background:"#c7d8ee", padding:piWin.max?6:"0 6px 6px", boxSizing:"border-box", overflowX:"auto", overflowY:"hidden", display:"flex", flexDirection:"column", border:piWin.max?"none":"1px solid #2854ad", boxShadow:piWin.max?"none":"0 18px 50px rgba(2,6,23,0.45)" }}>
-      <div onDoubleClick={piWin.toggleMax} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, margin:piWin.max?"-6px -6px 6px":"0 -6px 6px", padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", flexShrink:0, fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
-        <span>PURCHASE INVOICE{piInvoiceNo?` — ${piInvoiceNo}`:""}</span>
-        <WindowButtons win={piWin} lang={lang} onClose={()=>{ piLeaveFormToList(); }} />
+    <div style={docWinFrameStyle(piWin.max)}>
+      <style>{SI_CSS}</style>
+      <div onDoubleClick={piWin.toggleMax} style={docWinTitleChrome(piWin.max)}>
+        <strong style={{ color: "#c2410c" }}>PURCHASE INVOICE{piInvoiceNo?` — ${piInvoiceNo}`:""}</strong>
+        <WindowButtons win={piWin} lang={lang} light onClose={()=>{ piLeaveFormToList(); }} />
       </div>
+      <div className="s4-doc-desktop-shell">
       <PurchaseInvoiceDesktopForm
         lang={lang} t={t} shopId={shopId} shop={shop} products={products} vendors={pickVendors} invoices={invoices}
         form={piForm} setField={piUpd} lines={piLines} setLines={setPiLines} current={piCurrent} setCurrent={setPiCurrent}
@@ -564,6 +572,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
         onProductPatched={onProductPatched}
         toast={toast}
       />
+      </div>
     </div>
   );
 
@@ -764,10 +773,21 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
           {fRow(bnL?"পেমেন্টের ধরন":"Payment method", (
             <select className="pm-input"value={piForm.paymentMethod} onChange={e=>{
               const key = e.target.value;
-              setPiForm(p=>({ ...p, paymentMethod:key, ...(p.paymentMethod==="cash"&&key!=="cash" ? { amountPaid:"" } : {}) }));
+              setPiForm(p=>({ ...p, paymentMethod:key, ...(p.paymentMethod==="cash"&&key!=="cash" ? { amountPaid:"" } : {}), ...(isInvoiceBankPayMethod(key) ? {} : { paymentBank:"" }) }));
             }}>
               {Object.entries(PI_PAY_METHODS).map(([key,pm])=><option key={key} value={key}>{pm.icon} {pm[lang]}</option>)}
             </select>
+          ))}
+          {isInvoiceBankPayMethod(piForm.paymentMethod) && fRow(bnL ? "ব্যাংক অ্যাকাউন্ট" : "Bank account", (
+            <InvoiceBankSelect
+              lang={lang}
+              method={piForm.paymentMethod}
+              value={piForm.paymentBank}
+              shop={shop}
+              showLabel={false}
+              className="pm-input"
+              onChange={(v) => piUpd("paymentBank", v)}
+            />
           ))}
           {piForm.paymentMethod==="cash" ? (
             <div className="si-paid-box"><span> {bnL?"নগদে সম্পূর্ণ পরিশোধিত":"Fully paid (cash)"}</span><span>{t.cur} {piFmt2(totals.grand)}</span></div>

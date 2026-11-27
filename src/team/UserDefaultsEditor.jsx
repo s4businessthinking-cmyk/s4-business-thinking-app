@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BRANCH_TRANSFER_COLLECTIONS, listShopRecords } from "../branch-transfer/branchTransferService.js";
 
 export const START_TABS = [
   ["dashboard", "ড্যাশবোর্ড", "Dashboard"],
@@ -15,12 +16,21 @@ export const START_TABS = [
 ];
 
 // Per-login defaults: who the bill is credited to, how it is paid, the bill type and the first screen.
-export default function UserDefaultsEditor({ lang = "bn", th, s, member, team = [], employees = [], payOptions = {}, onSave }) {
+export default function UserDefaultsEditor({ lang = "bn", th, s, member, team = [], employees = [], payOptions = {}, shopId = "", branchTransferEnabled = false, onSave }) {
   const L = (bn, en) => (lang === "bn" ? bn : en);
   const [d, setD] = useState(member?.defaults || {});
   const [busy, setBusy] = useState(false);
+  const [branches, setBranches] = useState([]);
   const memberId = member?.uid || member?.id;
   useEffect(() => { setD(member?.defaults || {}); }, [memberId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!branchTransferEnabled || !shopId) { setBranches([]); return; }
+    let off = false;
+    listShopRecords(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, shopId)
+      .then((rows) => { if (!off) setBranches((rows || []).filter((b) => b && b.active !== false)); })
+      .catch(() => { if (!off) setBranches([]); });
+    return () => { off = true; };
+  }, [branchTransferEnabled, shopId]);
 
   const dirty = JSON.stringify(d) !== JSON.stringify(member?.defaults || {});
   const salesmen = team.filter((m) => m.status !== "disabled");
@@ -71,6 +81,22 @@ export default function UserDefaultsEditor({ lang = "bn", th, s, member, team = 
           <option value="">{L("— প্রিন্ট সেটিং অনুযায়ী —", "— From print settings —")}</option>
           <option value="tax">{L("ট্যাক্স ইনভয়েস", "Tax invoice")}</option>
           <option value="regular">{L("সাধারণ বিল", "Regular bill")}</option>
+        </select>
+      ))}
+      {branchTransferEnabled && branches.length > 0 && row(L("আমার ব্রাঞ্চ (বিক্রি)", "My branch (sales)"), (
+        <select style={sel} value={d.stockLocation || ""} onChange={(e) => {
+          const id = e.target.value;
+          if (!id) { setD((p) => ({ ...p, stockLocation: "", stockLocationName: "" })); return; }
+          const b = branches.find((x) => x.id === id);
+          setD((p) => ({
+            ...p,
+            stockLocation: id,
+            stockLocationName: id === "main" ? (L("মূল", "Main")) : (b?.name || id),
+          }));
+        }}>
+          <option value="">{L("— মূল দোকান (Main) —", "— Main store —")}</option>
+          <option value="main">{L("মূল দোকান", "Main store")}</option>
+          {branches.map((b) => <option key={b.id} value={b.id}>{b.name}{b.code ? ` · ${b.code}` : ""}</option>)}
         </select>
       ))}
       {row(L("লগইনের পর প্রথম পাতা", "First screen after login"), (

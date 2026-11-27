@@ -3,6 +3,7 @@ import { useId, useState, useEffect, useMemo } from "react";
 import { filterProducts, findExactProductMatch } from "../utils/productSearch.js";
 import { unitFactorFor, rescaleForUnit } from "../inventory/unitConversion.js";
 import { numberValue, BRANCH_TRANSFER_STATUSES } from "./branchTransferDomain.js";
+import { crossBranchQtyRows, loadCrossBranchStock } from "./crossBranchStock.js";
 import DateField from "../components/DateField.jsx";
 
 export const localDay = () => {
@@ -22,13 +23,19 @@ export function productCost(product) {
   return numberValue(product?.landingCost || product?.vatExclusive || product?.purchasePrice);
 }
 
-export function NewTransferForm({ lang, mobile, branches, team, products, vendors, mainStock, busy, dirtyRef, onSave, onBack, toast }) {
+export function NewTransferForm({
+  lang, mobile, branches, team, products, vendors, mainStock, busy, dirtyRef, onSave, onBack, toast,
+  homeShopId = "", allowPeer = false, canHqDispatch = true, peerOnly = false,
+}) {
   const t = bt(lang);
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const vendorListId = useId().replaceAll(":", "-");
+  const peerMode = peerOnly || !canHqDispatch;
+  const [fromBranchId, setFromBranchId] = useState(peerMode ? "" : "main");
   const [branchId, setBranchId] = useState("");
   const [salesmanKey, setSalesmanKey] = useState("");
+  const [sourceStock, setSourceStock] = useState(peerMode ? null : mainStock);
   const [vendor, setVendor] = useState({ vendorId: null, vendorName: "", vendorMobile: "", supplierInvoiceNo: "" });
   const [expectedDate, setExpectedDate] = useState("");
   const [note, setNote] = useState("");
@@ -43,6 +50,22 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
   const activeSalesmen = team.filter((member) => member?.role !== "owner" && member?.status !== "disabled" && member?.isDeleted !== true);
   const activeProducts = useMemo(() => products.filter((p) => p && p.isDeleted !== true && p.deleted !== true && p.name), [products]);
   const productById = useMemo(() => new Map(activeProducts.map((p) => [p.id, p])), [activeProducts]);
+
+  useEffect(() => {
+    if (!allowPeer || !homeShopId || !fromBranchId || fromBranchId === "main") {
+      setSourceStock(mainStock);
+      return undefined;
+    }
+    let cancelled = false;
+    loadCrossBranchStock({ homeShopId, branches: activeBranches, products: activeProducts })
+      .then((rows) => {
+        if (cancelled) return;
+        const match = rows.find((row) => row.branchId === fromBranchId);
+        setSourceStock(match?.qtyByProductId || new Map());
+      })
+      .catch(() => { if (!cancelled) setSourceStock(new Map()); });
+    return () => { cancelled = true; };
+  }, [allowPeer, homeShopId, fromBranchId, activeBranches, activeProducts, mainStock]);
   const activeVendors = vendors.filter((row) => row?.isDeleted !== true && row?.status !== "disabled");
   const memberKey = (member) => String(member?.uid || member?.firebaseUid || member?.id || member?.localUserId || member?.username || "");
 
@@ -68,7 +91,11 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
   };
 
   const prodMatches = useMemo(() => (prodQ.trim() ? filterProducts(activeProducts, prodQ, { limit: 20 }) : []), [prodQ, activeProducts]);
-  const availOf = (id) => (mainStock?.has(id) ? mainStock.get(id) : null);
+  const stockMap = sourceStock || mainStock;
+  const availOf = (id) => (stockMap?.has?.(id) ? stockMap.get(id) : null);
+  const stockLocLabel = peerMode || (fromBranchId && fromBranchId !== "main")
+    ? L("পাঠানোর শাখায়", "At sending branch")
+    : L("মেইন দোকানে", "In main shop");
   const factorOf = (line) => unitFactorFor(productById.get(line.productId), line.unit) || 1;
   const baseQtyOf = (line) => numberValue(line.qty) * factorOf(line);
   const isShort = (line) => {
@@ -113,6 +140,11 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
     if (busy) return;
     const branch = activeBranches.find((row) => row.id === branchId);
     if (!branch) return toast(t.branchRequired, "err");
+    const sourceBranch = allowPeer && fromBranchId && fromBranchId !== "main"
+      ? activeBranches.find((row) => row.id === fromBranchId)
+      : null;
+    if (peerMode && !sourceBranch) return toast(L("কোন শাখা থেকে পাঠাবে বেছে নিন", "Choose which branch sends stock"), "err");
+    if (sourceBranch && sourceBranch.id === branch.id) return toast(L("উৎস ও গন্তব্য শাখা আলাদা হতে হবে", "Source and destination must differ"), "err");
     const salesman = activeSalesmen.find((member) => memberKey(member) === salesmanKey);
     if (!salesman) return toast(t.salesmanRequired, "err");
     if (!lines.length) return toast(t.itemsRequired, "err");
@@ -122,12 +154,13 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
     if (badCost) return toast(L(` "${badCost.name}": দাম মাইনাস হতে পারে না`, ` "${badCost.name}": cost can't be negative`), "err");
     const short = lines.filter(isShort);
     if (initialStatus === BRANCH_TRANSFER_STATUSES.DISPATCHED && short.length && !window.confirm(L(
-      `মেইন দোকানে স্টক কম: ${short.map((line) => line.name).join(", ")}। তবুও পাঠাবেন?`,
-      `Main shop stock is short for: ${short.map((line) => line.name).join(", ")}. Send anyway?`
+      `${stockLocLabel} স্টক কম: ${short.map((line) => line.name).join(", ")}। তবুও পাঠাবেন?`,
+      `Stock is short at source for: ${short.map((line) => line.name).join(", ")}. Send anyway?`
     ))) return;
 
     onSave({
       branch,
+      sourceBranch: sourceBranch || undefined,
       receiver: {
       receiverUserId: String(salesman.firebaseUid || salesman.uid || salesman.id || ""),
       receiverFirebaseUid: String(salesman.firebaseUid || salesman.uid || ""),
@@ -178,9 +211,16 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
     <>
       <div className="si-body">
         <fieldset className="pm-panel"style={{ margin: 0 }}>
-          <legend className="pm-panel-legend">{L("কোথায় পাঠাবেন", "Send to")}</legend>
+          <legend className="pm-panel-legend">{peerMode ? L("শাখার মধ্যে স্টক অনুরোধ", "Branch stock request") : L("কোথায় পাঠাবেন", "Send to")}</legend>
           <div className={mobile ? "si-panel-body" : "si-grid2"} style={mobile ? undefined : { gridTemplateColumns: "repeat(4,minmax(0,1fr))", paddingTop: 3 }}>
-            {field(`${t.branch} *`, (
+            {allowPeer && field(L("কোথা থেকে", "From"), (
+              <select className="pm-input"value={fromBranchId} onChange={(e) => setFromBranchId(e.target.value)} disabled={peerMode}>
+                {!peerMode && <option value="main">{L("মেইন / HQ", "Main / HQ")}</option>}
+                <option value="">{peerMode ? L("পাঠানোর শাখা বেছে নিন", "Choose sending branch") : ""}</option>
+                {activeBranches.map((branch) => <option key={branch.id} value={branch.id} disabled={branch.id === branchId}>{branch.name}{branch.code ? ` · ${branch.code}` : ""}</option>)}
+              </select>
+            ))}
+            {field(`${peerMode ? L("আমার শাখা (রিসিভ)", "My branch (receive)") : t.branch} *`, (
               <select className="pm-input"value={branchId} onChange={(e) => selectBranch(e.target.value)}>
           <option value="">{t.chooseBranch}</option>
                 {activeBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}{branch.code ? ` · ${branch.code}` : ""}</option>)}
@@ -292,10 +332,16 @@ export function NewTransferForm({ lang, mobile, branches, team, products, vendor
         {lines.length > 0 && <span className="si-hint">{lines.length} {t.itemsCount} · {t.totalValue}: <b>{f2(total)}</b></span>}
         {mainStock == null && <span className="si-hint"> {L("স্টক লোড হচ্ছে…", "Loading stock…")}</span>}
         <span className="si-toolbar-gap" />
-        <button type="button"className="pm-btn-secondary"disabled={busy || !lines.length} onClick={() => save(BRANCH_TRANSFER_STATUSES.DRAFT)}> {t.saveDraft}</button>
-        <button type="button"className="pm-btn pm-btn--primary"disabled={busy || !lines.length} onClick={() => save(BRANCH_TRANSFER_STATUSES.DISPATCHED)}>
-          {busy ? L("সেভ হচ্ছে…", "Saving…") : ` ${t.dispatchNow}`}
-        </button>
+        {!peerMode && canHqDispatch && <button type="button"className="pm-btn-secondary"disabled={busy || !lines.length} onClick={() => save(BRANCH_TRANSFER_STATUSES.DRAFT)}> {t.saveDraft}</button>}
+        {peerMode || (allowPeer && fromBranchId && fromBranchId !== "main") ? (
+          <button type="button"className="pm-btn pm-btn--primary"disabled={busy || !lines.length} onClick={() => save(BRANCH_TRANSFER_STATUSES.REQUESTED)}>
+            {busy ? L("সেভ হচ্ছে…", "Saving…") : L("অনুরোধ পাঠান", "Send request")}
+          </button>
+        ) : (
+          <button type="button"className="pm-btn pm-btn--primary"disabled={busy || !lines.length} onClick={() => save(BRANCH_TRANSFER_STATUSES.DISPATCHED)}>
+            {busy ? L("সেভ হচ্ছে…", "Saving…") : ` ${t.dispatchNow}`}
+          </button>
+        )}
       </div>
     </>
   );

@@ -4,6 +4,7 @@
 // embedded: shown as a page (menu / dashboard) instead of a window over the screen.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, inp, lbl, btn, fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
+import { docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { usePmFitHeight, usePmMobile } from "../sales-invoice/siSkin";
 import { offlineList } from "../offline/offlineRepository";
@@ -13,6 +14,7 @@ import { printWithSettings } from "../print/printSettings.js";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { accountNatureOf } from "./accountNature.js";
 import { buildGlobalLedger, balances, accountStatement, GROUPS } from "./globalLedger.js";
+import { ledgerOptsWithBranches, loadBranchMaster } from "../branch-transfer/branchLedgerOpts.js";
 import { groupPath, normalizeGroups } from "./coaGroups.js";
 import DateField from "../components/DateField.jsx";
 import { useFindShortcut, usePrintShortcut } from "../utils/useDesktopFormShortcuts.js";
@@ -32,7 +34,7 @@ export const TYPE_LABEL = {
   stockAdjust: ["স্টক অ্যাডজাস্টমেন্ট", "Stock adjustment"], warrantyStock: ["ওয়ারেন্টি বদলি স্টক", "Warranty replacement"],
 };
 
-export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName = "", cur = "AED", customers = [], vendors = [], products = [], valuation = "average", onClose, embedded = false, canPrint = false, chartOfAccounts = null, coaGroups = null }) {
+export default function GlobalLedgerWindow({ lang = "en", shopId = "", shop = null, shopName = "", cur = "AED", customers = [], vendors = [], products = [], valuation = "average", onClose, embedded = false, canPrint = false, chartOfAccounts = null, coaGroups = null }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const win = useWindowState({ maximized: true });
@@ -41,6 +43,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
   const mobile = usePmMobile();
   const fitH = usePmFitHeight(pageRef, mobile);
   const [data, setData] = useState(null);
+  const [branchMaster, setBranchMaster] = useState([]);
   const [error, setError] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState(() => localDay());
@@ -63,8 +66,9 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
         bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
     }).catch((err) => { console.warn("[S4 Global Ledger] load failed", err); if (!cancelled) setError(String(err?.message || err)); });
+    loadBranchMaster(shopId, shop).then((rows) => { if (!cancelled) setBranchMaster(rows || []); });
     return () => { cancelled = true; };
-  }, [shopId]);
+  }, [shopId, shop]);
 
   // Account codes from the chart of accounts, shown next to the name (the ledger itself is built from the documents).
   const codeOf = useMemo(() => new Map((Array.isArray(chartOfAccounts) ? chartOfAccounts : []).filter((a) => a?.code && a?.name).map((a) => [String(a.name).trim().toLowerCase(), a.code])), [chartOfAccounts]);
@@ -74,7 +78,8 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
     return new Map((Array.isArray(chartOfAccounts) ? chartOfAccounts : []).filter((a) => a?.groupId && a?.name).map((a) => [String(a.name).trim().toLowerCase(), groupPath(groups, a.groupId, lang === "bn")]).filter(([, p]) => p));
   }, [chartOfAccounts, coaGroups, lang]);
   const natureOf = useMemo(() => accountNatureOf(chartOfAccounts, coaGroups), [chartOfAccounts, coaGroups]);
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, valuation]);
+  const branchLedgerOpts = useMemo(() => ledgerOptsWithBranches(shop, branchMaster), [shop, branchMaster]);
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation, expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null), [data, shopId, customers, vendors, products, natureOf, valuation, branchLedgerOpts]);
   const bal = useMemo(() => (ledger ? balances(ledger.postings, to) : new Map()), [ledger, to]);
 
   // accounts by group, filtered by the search, zero balances hidden unless asked
@@ -262,10 +267,10 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
           )}
     </>
   );
-  const box = { display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label };
+  const box = { display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.border}`, fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif', color: C.label };
   const titleBar = (buttons) => (
-    <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none", minHeight: 22 }}>
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{winTitle}</span>
+    <div onDoubleClick={win.toggleMax} style={{ ...docModalTitleChrome, minHeight: 22 }}>
+      <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#064e22" }}>{winTitle}</strong>
       {buttons}
     </div>
   );
@@ -283,7 +288,7 @@ export default function GlobalLedgerWindow({ lang = "en", shopId = "", shopName 
       {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
       <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1650, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
         <div style={{ ...box, width: "100%", maxWidth: win.max ? "none" : 1180, height: win.max ? "100%" : "92%", borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)" }}>
-          {titleBar(<WindowButtons win={win} onClose={onClose} lang={lang} />)}
+          {titleBar(<WindowButtons win={win} onClose={onClose} lang={lang} light />)}
           {body}
         </div>
       </div>

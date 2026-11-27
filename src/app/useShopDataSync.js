@@ -19,8 +19,10 @@ import { useWarrantyAlerts } from "../returns/useWarrantyAlerts.js";
 import { useShopFinance } from "../dashboard/shopFinance.js";
 import { backupBeforeExit } from "../backup/backupOnExit.js";
 import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
+import { loadCustomersForLedgerShop, loadVendorsForLedgerShop } from "../branch-transfer/companyPartyLoader.js";
+import { mergeSharedParties, resolvePartyParentShopId } from "../branch-transfer/companyPartyScope.js";
 
-export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors }) {
+export function useShopDataSync({ applyShopRecord, authSyncReady, branchTransferSettings, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors }) {
   useEffect(() => {
     if (!shopId) {
       setSyncState("offline");
@@ -427,12 +429,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
 
     const loadLocalVendors = async () => {
       try {
-        const local = await offlineList("vendors");
-        const docs = local.records
-          .map(r => ({ id: r.document_id, ...(r.data || {}) }))
-          .filter(v => v.shopId === shopId)
-          .sort((a,b)=>(a.vendorName||"").localeCompare(b.vendorName||""));
-
+        const docs = await loadVendorsForLedgerShop(shopId, { ...localShop, shopId }, branchTransferSettings);
         setVendors(docs);
         setSyncState("offline");
       } catch (err) {
@@ -440,7 +437,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       }
     };
 
-    const applyDocs = (snap) => {
+    const applyDocs = async (snap) => {
       if (snap.metadata?.fromCache && snap.empty) {
         loadLocalVendors();
         return;
@@ -449,7 +446,16 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       const docs = snap.docs
         .map(d => ({ id:d.id, ...d.data() }));
 
-      setVendors((prev) => mergeCloudPartyList(prev, docs, "vendorName"));
+      const parentId = resolvePartyParentShopId({ ...localShop, shopId }, branchTransferSettings);
+      if (parentId) {
+        const local = await offlineList("vendors");
+        const parentRows = (local.records || [])
+          .map((r) => ({ id: r.document_id, ...(r.data || {}) }))
+          .filter((v) => v.shopId === parentId && !v.isDeleted);
+        setVendors(mergeSharedParties(docs, parentRows, "vendorName"));
+      } else {
+        setVendors((prev) => mergeCloudPartyList(prev, docs, "vendorName"));
+      }
       offlineCacheCloudRecords("vendors", docs).catch(err => console.warn("[S4 Offline] vendor cache failed", err));
       setSyncState("connected");
     };
@@ -477,7 +483,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
     loadLocalVendors();
 
     return () => { unsub1(); unsub2 && unsub2(); };
-  }, [shopId, authSyncReady]);
+  }, [shopId, authSyncReady, localShop?.parentShopId, localShop?.isBranchCompanyFile, branchTransferSettings?.sharePartiesFromHq]);
 
   // ── Customers real-time listener with offline fallback ──
   useEffect(() => {
@@ -485,12 +491,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
 
     const loadLocalCustomers = async () => {
       try {
-        const local = await offlineList("customers");
-        const docs = local.records
-          .map(r => ({ id: r.document_id, ...(r.data || {}) }))
-          .filter(c => c.shopId === shopId)
-          .sort((a,b)=>(a.customerName||"").localeCompare(b.customerName||""));
-
+        const docs = await loadCustomersForLedgerShop(shopId, { ...localShop, shopId }, branchTransferSettings);
         setCustomers(docs);
         setSyncState("offline");
       } catch (err) {
@@ -498,7 +499,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       }
     };
 
-    const applyDocs = (snap) => {
+    const applyDocs = async (snap) => {
       if (snap.metadata?.fromCache && snap.empty) {
         loadLocalCustomers();
         return;
@@ -507,7 +508,16 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       const docs = snap.docs
         .map(d=>({ id:d.id, ...d.data() }));
 
-      setCustomers((prev) => mergeCloudPartyList(prev, docs, "customerName"));
+      const parentId = resolvePartyParentShopId({ ...localShop, shopId }, branchTransferSettings);
+      if (parentId) {
+        const local = await offlineList("customers");
+        const parentRows = (local.records || [])
+          .map((r) => ({ id: r.document_id, ...(r.data || {}) }))
+          .filter((c) => c.shopId === parentId && !c.isDeleted);
+        setCustomers(mergeSharedParties(docs, parentRows, "customerName"));
+      } else {
+        setCustomers((prev) => mergeCloudPartyList(prev, docs, "customerName"));
+      }
       offlineCacheCloudRecords("customers", docs).catch(err => console.warn("[S4 Offline] customer cache failed", err));
       setSyncState("connected");
     };
@@ -535,7 +545,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
     loadLocalCustomers();
 
     return () => { unsub1(); unsub2 && unsub2(); };
-  }, [shopId, authSyncReady]);
+  }, [shopId, authSyncReady, localShop?.parentShopId, localShop?.isBranchCompanyFile, branchTransferSettings?.sharePartiesFromHq]);
 
   // Owner, online: give vendors/customers without a code (old, quick-added, imported, offline) a shop code.
   const partyCodeBusy = useRef({});

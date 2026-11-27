@@ -22,6 +22,7 @@ import {
 } from "./balanceSheet.js";
 import { computeAccounts } from "./accountsCalc.js";
 import DateField from "../components/DateField.jsx";
+import { ledgerOptsWithBranches, loadBranchMaster } from "../branch-transfer/branchLedgerOpts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const qtyFmt = (v) => (Math.round((Number(v) || 0) * 1000) / 1000).toLocaleString("en-US", { maximumFractionDigits: 3 });
@@ -82,6 +83,7 @@ export default function BalanceSheetReport({
   const [panel, setPanel] = useState("");
   const [showAssets, setShowAssets] = useState(false);
   const [data, setData] = useState(null);
+  const [branchMaster, setBranchMaster] = useState([]);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
   const mobile = usePmMobile();
@@ -102,8 +104,9 @@ export default function BalanceSheetReport({
         bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
     }).catch((err) => { console.warn("[S4 Balance Sheet] load failed", err); if (!cancelled) setError(String(err?.message || err)); });
+    loadBranchMaster(shopId, shop).then((rows) => { if (!cancelled) setBranchMaster(rows || []); });
     return () => { cancelled = true; };
-  }, [shopId, tick]);
+  }, [shopId, shop, tick]);
 
   useEffect(() => {
     const refresh = () => { if (document.visibilityState !== "hidden") setTick((v) => v + 1); };
@@ -117,7 +120,8 @@ export default function BalanceSheetReport({
   const fyMonth = Math.max(1, Math.min(12, Number(fyStartMonth) || 1));
   // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod]);
+  const branchLedgerOpts = useMemo(() => ledgerOptsWithBranches(shop, branchMaster), [shop, branchMaster]);
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod, branchLedgerOpts]);
   const openingStock = useMemo(() => openingStockValue(products), [products]);
 
   // Stock on a day at the shop's valuation method up to that day (same valuation as P&L). Negative quantities are listed, not valued.

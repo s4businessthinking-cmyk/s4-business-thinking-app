@@ -29,6 +29,27 @@ const data = {
 };
 const opts = { shopId: S, customers: [{ id: "c1", customerName: "Al Noor" }], vendors: [{ id: "v1", vendorName: "Gulf" }], expenseLabel: (e) => ({ rent: "Rent", fuel: "Fuel" })[e.category] };
 
+test("invoice paymentBank posts to named bank ledger not generic Bank", () => {
+  const inv = {
+    id: "si-bank",
+    shopId: S,
+    status: "paid",
+    invoiceNo: "SI-B",
+    invoiceDate: "2026-10-04",
+    customerId: "c1",
+    grandTotal: 200,
+    totalVat: 0,
+    amountPaid: 200,
+    paymentMethod: "bank_transfer",
+    paymentBank: "Bank - Branch 1",
+  };
+  const { accounts, postings } = buildGlobalLedger({ salesInvoices: [inv] }, { ...opts, defaultBankAccount: "Bank" });
+  const branch = [...accounts.values()].find((a) => a.name === "Bank - Branch 1");
+  assert.ok(branch);
+  const bal = balances(postings);
+  assert.equal(bal.get(branch.key), 200);
+});
+
 test("every entry balances: total debit equals total credit", () => {
   const { postings } = buildGlobalLedger(data, opts);
   const dr = postings.reduce((t, p) => t + p.dr, 0), cr = postings.reduce((t, p) => t + p.cr, 0);

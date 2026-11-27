@@ -2,9 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { C, inp, lbl, btn, th, td, Modal, GridTable, todayIso, fmtDate, fmtDateLong, textMatch } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
 import { useEscapeKey, useWindowState, WindowButtons, MinimizedChip } from "../components/WindowChrome.jsx";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
-import WhatsAppButton from "../share/WhatsAppButton.jsx";
+import WhatsAppButton, { useDocShare } from "../share/WhatsAppButton.jsx";
+import { loadWhatsappShareSettings, saveWhatsappShareSettings } from "../share/whatsappShareSettings.js";
 import DateField from "../components/DateField.jsx";
 import { runVoucherFormShortcuts } from "../utils/desktopFormShortcuts.js";
+import { docModalTitleChrome, docTitleBar } from "../sales-invoice/docDesktopLayout.js";
 
 const METHODS = [["cash", "Cash"], ["cheque", "Cheque"], ["bank_transfer", "Bank Transfer"], ["card", "Card"]];
 const METHOD_LABEL = Object.fromEntries(METHODS);
@@ -127,6 +129,9 @@ export default function AgainstInvoiceVoucherWindow({
   saving = false, onSave, onCancelVoucher, onDeleteVoucher, onSetChequeStatus, onPrint, onClose, initialViewId = null,
   onPrintCheque, onPrintChequeVoucher, onHandover, onPrepareParty = null,
   onWhatsApp = null, toast,
+  countryCode,
+  partyAutoWhatsAppOnSave = null,
+  defaultBankAccount = "",
 }) {
   const bn = lang === "bn";
   const isReceipt = mode === "receipt";
@@ -153,6 +158,8 @@ export default function AgainstInvoiceVoucherWindow({
   const [discount, setDiscount] = useState("");
   const [printDetails, setPrintDetails] = useState(false);
   const [summaryPrint, setSummaryPrint] = useState(false);
+  const [whatsappOnSave, setWhatsappOnSave] = useState(() => loadWhatsappShareSettings().whatsappOnSaveVoucher);
+  const waShare = useDocShare({ lang, toast, countryCode });
   const [viewingId, setViewingId] = useState(initialViewId);
   const [viewSnapshot, setViewSnapshot] = useState(null);
   const [editing, setEditing] = useState(null); // active voucher being edited in-place (not cancelled)
@@ -171,6 +178,18 @@ export default function AgainstInvoiceVoucherWindow({
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  useEffect(() => {
+    if (!party || editing || viewingId || typeof partyAutoWhatsAppOnSave !== "function") return;
+    if (partyAutoWhatsAppOnSave(party)) setWhatsappOnSave(true);
+  }, [party?.id, party?.key, party?.name, editing, viewingId, partyAutoWhatsAppOnSave]);
+
+  const bankDefault = String(defaultBankAccount || "").trim();
+  useEffect(() => {
+    if (!bankDefault || viewingId || editing || prefill) return;
+    if (method === "cheque" && !chequeBank) setChequeBank(bankDefault);
+    if ((method === "bank_transfer" || method === "card") && !refBank) setRefBank(bankDefault);
+  }, [method, bankDefault, viewingId, editing, prefill, chequeBank, refBank]);
 
   const viewing = viewingId ? (vouchers.find((v) => v.id === viewingId) || viewSnapshot) : null;
 
@@ -323,6 +342,14 @@ export default function AgainstInvoiceVoucherWindow({
     });
     if (!created) return;
     if (printDetails) onPrint?.(created, { summaryOnly: summaryPrint });
+    // Same rule as sales invoice auto-WhatsApp: new voucher only, not an in-place edit.
+    if (whatsappOnSave && onWhatsApp && !editing) {
+      try {
+        waShare.startAuto(onWhatsApp(created), isReceipt ? (bn ? "রিসিট" : "Receipt") : (bn ? "পেমেন্ট" : "Payment"));
+      } catch (e) {
+        waShare.say((bn ? "WhatsApp খোলা যায়নি: " : "Could not open WhatsApp: ") + (e?.message || e), "err");
+      }
+    }
     resetNew();
   };
   saveRef.current = save;
@@ -365,20 +392,20 @@ export default function AgainstInvoiceVoucherWindow({
     <>
     {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} slot={1} />}
     <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
-      <div style={{ width: "100%", maxWidth: win.max ? "none" : 720, height: win.max ? "100%" : undefined, maxHeight: "100%", overflow: "hidden", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
-        <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none" }}>
-          <span>{winTitle}</span>
-          <WindowButtons win={win} onClose={onClose} lang={lang} />
+      <div style={{ width: "100%", maxWidth: win.max ? "none" : 720, height: win.max ? "100%" : undefined, maxHeight: "100%", overflow: "hidden", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.border}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif', color: C.label }}>
+        <div onDoubleClick={win.toggleMax} style={docModalTitleChrome}>
+          <strong style={{ color: "#064e22" }}>{winTitle}</strong>
+          <WindowButtons win={win} onClose={onClose} lang={lang} light />
         </div>
 
-        <div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0, overflowY: "auto" }}>
+        <div style={{ padding: "4px 8px", display: "flex", flexDirection: "column", gap: 4, flex: 1, minHeight: 0, overflowY: "auto" }}>
           {/* Header */}
-          <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 140px", gap: 8, alignItems: "stretch" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 124px", gap: 4, alignItems: "stretch" }}>
             <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff", textAlign: "center" }}>
               <div style={{ background: C.head, color: "#fff", fontSize: 12, fontWeight: 800, padding: "1px 0" }}>Voucher No.</div>
               <div style={{ fontSize: 15, fontWeight: 900, padding: "3px 0", color: "#111" }}>{ro ? viewing.no : (editing?.no || voucherNo)}</div>
             </div>
-            <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            <div style={{ ...docTitleBar, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
               <span style={{ fontSize: 20, fontWeight: 900, letterSpacing: 6, color: "#111" }}>{isReceipt ? "RECEIPTS" : "PAYMENTS"}</span>
               {cancelled && <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: C.red, color: "#fff" }}>CANCELLED</span>}
               {!ro && editing && <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: "#b45309", color: "#fff" }}>{bn ? "এডিট" : "EDITING"}</span>}
@@ -619,6 +646,20 @@ export default function AgainstInvoiceVoucherWindow({
                     Summary only (hide {docLabel.toLowerCase()} list — for many {docLabel.toLowerCase()}s)
                   </label>
                 )}
+                {onWhatsApp && (
+                  <label style={{ ...lbl, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }} title={bn
+                    ? "সেভের পর PDF + মেসেজ নিয়ে WhatsApp খুলবে; Send আপনি চাপবেন"
+                    : "After save, open WhatsApp with PDF + message; you press Send"}>
+                    <input type="checkbox" checked={whatsappOnSave} onChange={(e) => {
+                      const v = e.target.checked;
+                      setWhatsappOnSave(v);
+                      saveWhatsappShareSettings({ whatsappOnSaveVoucher: v });
+                    }} />
+                    {bn
+                      ? `সেভের পর WhatsApp (${isReceipt ? "রিসিট" : "পেমেন্ট"} PDF)`
+                      : `WhatsApp After Saving (${isReceipt ? "Receipt" : "Payment"} PDF)`}
+                  </label>
+                )}
               </div>
             ) : (
               <div style={{ display: "flex", gap: 6, marginRight: narrow ? 0 : "auto", flexWrap: "wrap", order: narrow ? 2 : 0 }}>
@@ -662,6 +703,7 @@ export default function AgainstInvoiceVoucherWindow({
       </div>
 
       {showFind && <VoucherFindModal vouchers={vouchers} isReceipt={isReceipt} lang={lang} onClose={() => setShowFind(false)} onPick={openVoucher} />}
+      {waShare.dialogs}
     </div>
     </>
   );

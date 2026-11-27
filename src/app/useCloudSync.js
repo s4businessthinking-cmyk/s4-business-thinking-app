@@ -1,6 +1,6 @@
 import { db } from "../firebase-config";
 import { doc, onSnapshot } from "../backend/firestore";
-import { getCloudSyncBlockReason, getShopCloudPulledAt, getSyncDashboardStatus, pullShopFromCloud, reconcileShopWithCloud, sortPulledRecords, uploadPendingShopChanges } from "../offline/cloudPullService";
+import { getCloudSyncBlockReason, getShopCloudPulledAt, getSyncDashboardStatus, pullBranchCompanyFilesFromCloud, pullShopFromCloud, reconcileShopWithCloud, sortPulledRecords, uploadPendingShopChanges } from "../offline/cloudPullService";
 import { mergeProductCatalog } from "./mainAppHelpers.js";
 import { offlineCacheCloudRecords, offlineGetById } from "../offline/offlineRepository";
 import { saveCachedShop, saveShopRecord } from "../offline/shopService";
@@ -201,12 +201,32 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
       }
 
       applyCloudPullResult(result);
+
+      let branchFilesPulled = 0;
+      const btOn = localShop?.branchTransferSettings?.enabled === true;
+      const multiFile = localShop?.branchTransferSettings?.companyFilePerBranch !== false;
+      if (isOwner && !localShop?.isBranchCompanyFile && btOn && multiFile) {
+        const childPack = await pullBranchCompanyFilesFromCloud(shopId, {
+          filterOrdersForUserId: user?.uid,
+          includeAllOrders: isOwner || isOrderManager,
+        });
+        for (const row of childPack.pulls || []) {
+          if (row.result?.data) {
+            applyCloudPullResult(row.result);
+            branchFilesPulled += 1;
+          }
+        }
+      }
+
       setLastCloudPullAt(result.pulledAt || getShopCloudPulledAt(shopId));
       setSyncRefreshKey((value) => value + 1);
 
       if (!silent) {
         const productCount = result?.data?.products?.length || 0;
-        const msg = `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})`;
+        const branchNote = branchFilesPulled > 0
+          ? (lang === "bn" ? ` · শাখা ফাইল ${branchFilesPulled}` : ` · branch files ${branchFilesPulled}`)
+          : "";
+        const msg = `${t.syncDownloadOk} (${result.totalDocs || 0}, products: ${productCount})${branchNote}`;
         const failedNames = (result.results || []).filter((r) => !r.ok).map((r) => r.collection);
         const failedNote = failedNames.length
           ? (lang==="bn" ? `আসেনি: ${failedNames.join(", ")}` : `Not downloaded: ${failedNames.join(", ")}`)

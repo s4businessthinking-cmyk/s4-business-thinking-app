@@ -1,5 +1,6 @@
 export const BRANCH_TRANSFER_STATUSES = Object.freeze({
   DRAFT: "draft",
+  REQUESTED: "requested",
   PACKED: "packed",
   DISPATCHED: "dispatched",
   IN_TRANSIT: "in_transit",
@@ -13,6 +14,10 @@ export const DEFAULT_BRANCH_TRANSFER_SETTINGS = Object.freeze({
   enabled: false,
   autoCreatePurchaseInvoiceOnReceive: true,
   allowPartialReceive: true,
+  /** Premier-style: each branch gets its own shopId / company file (child ledger). */
+  companyFilePerBranch: true,
+  /** Child company file sales can pick HQ customers/vendors (master stays on HQ). */
+  sharePartiesFromHq: true,
 });
 
 // The bill made when a branch receives a transfer only records the goods moving inside the shop:
@@ -257,9 +262,23 @@ export function buildInternalPurchaseInvoice({
   };
 }
 
+export function isPeerTransfer(transfer) {
+  return String(transfer?.transferKind || "").trim() === "peer"
+    && String(transfer?.sourceBranchId || "").trim().length > 0;
+}
+
+export function dispatchShopIdForTransfer(transfer) {
+  if (isPeerTransfer(transfer)) {
+    const lid = String(transfer?.sourceLedgerShopId || "").trim();
+    if (lid) return lid;
+  }
+  return String(transfer?.shopId || "").trim();
+}
+
 export function statusLabel(status, lang = "bn") {
   const labels = {
     draft: ["খসড়া", "Draft"],
+    requested: ["অনুরোধ", "Requested"],
     packed: ["প্যাক করা হয়েছে", "Packed"],
     dispatched: ["পাঠানো হয়েছে", "Dispatched"],
     in_transit: ["পথে আছে", "In Transit"],

@@ -14,6 +14,7 @@ import { unitFactorFor } from "../inventory/unitConversion";
 import { averageCosts } from "../reports/averageCost.js";
 import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
 import { serialLineProblems, serialProblemText, serialSettingsOf, splitSerials } from "../sales-invoice/serialRules.js";
+import { invoicePaymentBankField } from "../ledger/ledgerShopOpts.js";
 
 function unmatchedPurchaseNames(items) {
   return (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
@@ -78,7 +79,7 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
     };
     // the godown the goods go into (W01; nothing stored for a main-only shop)
     return { ...sourceFields, ...billLocationFields(piForm.locationId||"", billLocationsOf(shop), { prior: priorInv }), shopId, invoiceNo:invoiceNoOverride ?? piInvoiceNo, supplierInvoiceNo:piForm.supplierInvoiceNo.trim(), refNo:String(piForm.refNo||"").trim(), invoiceDate:piForm.invoiceDate, entryDate:piForm.entryDate||piForm.invoiceDate,
-      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, settleKind: "", note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName,
+      currency:foreign?String(piForm.currency).trim().toUpperCase():"", exchangeRate:foreign?rate:null, fcGrandTotal:foreign?fcGrand:null, vendorId:piForm.vendorId||null, vendorName:piForm.vendorName.trim(), vendorMobile:piForm.vendorMobile.trim(), vendorAddress:String(piForm.vendorAddress||"").trim(), vendorTrn:String(piForm.vendorTrn||"").trim(), items:builtItems, subtotal:parseFloat(piFmt2(sub)), totalDiscount:parseFloat(piFmt2(disc)), totalTax:parseFloat(piFmt2(tax)), grandTotal:parseFloat(piFmt2(grand)), paymentMethod:piForm.paymentMethod, amountPaid:parseFloat(piFmt2(paid)), balanceDue:parseFloat(piFmt2(balanceDue)), status:derivedStatus, ...invoicePaymentBankField(piForm.paymentMethod, shop, paid, piForm.paymentBank), settleKind: "", note:piForm.note.trim(), createdBy:priorInv?.createdBy||user.uid, createdByName:priorInv?.createdByName||profile.personName,
       // Adjustment (+/-) after VAT and why (Merge / Masters - adjustment reasons); base currency like the other totals
       adjustment:parseFloat(piFmt2(adjFc * rate)), ...(foreign && adjFc ? { fcAdjustment:adjFc } : {}),
       adjustmentReasonId:adjFc ? (piForm.adjustmentReasonId||"") : "", adjustmentReason:adjFc ? String(piForm.adjustmentReason||"").trim() : "" };

@@ -53,7 +53,7 @@ export const PM_CSS = `
 .pm-reference-grid {
   display: grid;
   grid-template-columns: minmax(280px, 38.3fr) minmax(315px, 40.2fr) minmax(180px, 21.5fr);
-  grid-template-rows: minmax(344px, 1fr) 110px;
+  grid-template-rows: minmax(344px, 1fr) minmax(118px, auto);
   gap: 4px;
   padding: 4px 4px 5px;
   height: calc(100% - 22px);
@@ -61,7 +61,15 @@ export const PM_CSS = `
 }
 .pm-reference-left, .pm-reference-middle, .pm-reference-right { min-width: 0; }
 .pm-readonly-wrap { display: contents; border: 0; margin: 0; padding: 0; min-width: 0; }
-.pm-reference-left { grid-column: 1; grid-row: 1; }
+.pm-reference-left {
+  grid-column: 1;
+  grid-row: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
 .pm-reference-middle {
   grid-column: 2;
   grid-row: 1;
@@ -96,8 +104,16 @@ export const PM_CSS = `
   font-weight: 400;
   line-height: 10px;
 }
-.pm-details-panel { width: 100%; height: 100%; padding-top: 2px; }
-.pm-details-body { height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 5px; }
+.pm-details-panel {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-top: 2px;
+}
+.pm-details-body { height: auto; display: flex; flex-direction: column; gap: 4px; }
+.pm-reference-left .pm-panel:not(.pm-details-panel) { flex: 0 0 auto; min-height: 0; max-height: 38%; overflow-y: auto; }
 .pm-form-row {
   display: grid;
   grid-template-columns: 81px minmax(0, 1fr);
@@ -287,10 +303,13 @@ textarea.pm-input { resize: vertical; }
   grid-template-columns: 48.5% 51.5%;
   gap: 4px;
   min-width: 0;
+  position: relative;
+  z-index: 2;
+  background: ${PM_COLORS.body};
 }
 .pm-actions-left, .pm-actions-middle { min-width: 0; display: flex; flex-direction: column; }
 .pm-actions-left { justify-content: space-between; }
-.pm-multi-rate-check { font-weight: 700; margin-top: 25px; }
+.pm-multi-rate-check { font-weight: 700; margin: 2px 0 4px; line-height: 1.2; }
 .pm-master-tools { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; }
 .pm-master-tools .pm-btn-secondary { padding-left: 2px; padding-right: 2px; }
 .pm-tool-wide { grid-column: 1 / span 2; }
@@ -873,8 +892,9 @@ textarea.pm-input { resize: vertical; }
     height: auto;
     overflow: visible;
   }
-  .pm-reference-left, .pm-reference-middle, .pm-reference-right { width: 100%; }
-  .pm-details-panel { height: auto; }
+  .pm-reference-left, .pm-reference-middle, .pm-reference-right { width: 100%; overflow: visible; display: block; }
+  .pm-details-panel { height: auto; flex: none; overflow: visible; }
+  .pm-reference-left .pm-panel:not(.pm-details-panel) { max-height: none; overflow: visible; }
   .pm-selling-panel { height: auto; }
   .pm-list { height: 60vh; }
   .pm-actions { display: flex; flex-direction: column; min-height: 250px; }

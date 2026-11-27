@@ -1,5 +1,5 @@
 import { bt, TransferRemaining, acceptedQty, fq, BT_ACCENT, fmtDay, transferSentDate, sentQty, f2, transferTotalValue } from "./btShared.jsx";
-import { numberValue, receivedQuantityForLine, remainingQuantityForLine } from "./branchTransferDomain.js";
+import { isPeerTransfer, numberValue, receivedQuantityForLine, remainingQuantityForLine } from "./branchTransferDomain.js";
 
 export function damagedQuantityForLine(transfer, lineId) {
   return (transfer?.receipts || []).reduce((total, receipt) => {
@@ -46,7 +46,8 @@ export function TransferDetail({ lang, mobile, transfer, isOwner, canManage, can
             <div className="si-panel-body"style={{ paddingTop: 0 }}>
               {vRow(L("নম্বর", "No"), transfer.transferNo, { strong: true, color: BT_ACCENT })}
               {vRow(t.transferDate, fmtDay(transferSentDate(transfer)) || "—")}
-              {vRow(t.branch, transfer.branchName || "—", { strong: true })}
+              {vRow(isPeerTransfer(transfer) ? L("বিবেহিত শাখা (রিসিভ)", "Receiving branch") : t.branch, transfer.branchName || "—", { strong: true })}
+              {isPeerTransfer(transfer) && vRow(L("পাঠানোর শাখা", "Sending branch"), transfer.sourceBranchName || transfer.sourceShopName || "—", { strong: true })}
               {vRow(t.assignedTo, transfer.receiverName || "—")}
           </div>
             <div className="si-panel-body"style={{ paddingTop: 0 }}>
@@ -169,6 +170,7 @@ export function TransferDetail({ lang, mobile, transfer, isOwner, canManage, can
         <button type="button"className="pm-btn-secondary"disabled={busy} onClick={onBack}>← {L("তালিকা", "List")}</button>
         {canPrint && <button type="button"className="pm-btn-secondary"onClick={() => onPrint(transfer)}> {L("চালান প্রিন্ট", "Print")}</button>}
         <span className="si-toolbar-gap" />
+        {canManage && status === "requested" && <button type="button"className="pm-btn pm-btn--primary"disabled={busy} onClick={() => onStatus(transfer, "packed")}> {L("অনুরোধ গ্রহণ", "Accept request")}</button>}
         {canManage && status === "draft" && <button type="button"className="pm-btn-secondary"disabled={busy} onClick={() => onStatus(transfer, "packed")}> {t.packed}</button>}
         {canManage && ["draft", "packed"].includes(status) && <button type="button"className="pm-btn pm-btn--primary"disabled={busy} onClick={() => onStatus(transfer, "dispatched")}> {t.dispatch}</button>}
         {canManage && status === "dispatched" && <button type="button"className="pm-btn-secondary"disabled={busy} onClick={() => onStatus(transfer, "in_transit")}> {t.inTransit}</button>}

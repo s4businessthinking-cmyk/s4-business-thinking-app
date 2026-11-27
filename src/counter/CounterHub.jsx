@@ -12,6 +12,7 @@ import { siCalcLine } from "../sales-invoice/salesInvoiceShared.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { csvText } from "../reports/vatExport.js";
 import { buildGlobalLedger } from "../ledger/globalLedger.js";
+import { shopBankAccountName } from "../ledger/ledgerShopOpts.js";
 import { TYPE_LABEL } from "../ledger/GlobalLedgerWindow.jsx";
 import { liveSalesOf, r2 } from "../reports/reportFilters.js";
 import { closeShiftPatch, isoOf, openShiftDoc, openShifts, shiftCash, shiftCsvRows, shiftFileName, shiftSummary } from "./counterShift.js";
@@ -20,6 +21,11 @@ import { billSnapshot, closeCustomerDisplay, isDisplayOpen, openCustomerDisplay 
 import { kickCashDrawer, loadPrintSettings } from "../print/printSettings.js";
 import { normalizeDrawerSettings, drawerPrinterName } from "./cashDrawer.js";
 import DateField from "../components/DateField.jsx";
+import { branchDefaultsOf } from "../branch-transfer/userBranchDefaults.js";
+import { getActiveBranch } from "../branch-transfer/branchSession.js";
+import { MAIN_BRANCH } from "../reports/groupView.js";
+import { BRANCH_TRANSFER_COLLECTIONS, listShopRecords } from "../branch-transfer/branchTransferService.js";
+import { branchCashAccountName } from "../branch-transfer/branchCashAccounts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -39,7 +45,7 @@ const CH_CSS = `
 .ch-form label { display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; font-weight: 700; }
 `;
 
-export default function CounterHub({ lang = "en", shopId, shop, user, profile, isOwner = false, canSell = false, canPrint = false, customers = [], shopName = "", cur = "AED", toast, onShopUpdated, onOpenCustomers }) {
+export default function CounterHub({ lang = "en", shopId, shop, user, profile, team = [], isOwner = false, canSell = false, canPrint = false, customers = [], shopName = "", cur = "AED", toast, onShopUpdated, onOpenCustomers }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [section, setSection] = useState("shift");
@@ -49,14 +55,21 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
   const [tick, setTick] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const [busy, setBusy] = useState(false);
-  const [openForm, setOpenForm] = useState({ counter: "", openingCash: "" });
+  const [openForm, setOpenForm] = useState({ counter: "", openingCash: "", branchId: "", branchName: "" });
   const [closeForm, setCloseForm] = useState({ closingCash: "", note: "" });
   const [rateForm, setRateForm] = useState({ per: "", from: localDay(), enabled: true });
   const [displayOpen, setDisplayOpen] = useState(isDisplayOpen());
+  const [branchMaster, setBranchMaster] = useState([]);
+  const branchCashSplit = shop?.branchTransferSettings?.enabled === true;
   const mobile = usePmMobile();
   const rootRef = useRef(null);
   const fitH = usePmFitHeight(rootRef, mobile);
   const actorName = profile?.personName || profile?.username || user?.email || "";
+  const myDefaults = useMemo(() => team.find((m) => (m.uid || m.id) === user?.uid)?.defaults || profile?.defaults || {}, [team, user?.uid, profile?.defaults]);
+  const defaultBranch = useMemo(() => branchDefaultsOf(myDefaults), [myDefaults]);
+  const sessionBranch = useMemo(() => getActiveBranch(shopId), [shopId, tick]);
+  const branchId = sessionBranch?.branchId || defaultBranch?.stockLocation || MAIN_BRANCH;
+  const branchName = sessionBranch?.branchName || defaultBranch?.stockLocationName || (branchId === MAIN_BRANCH ? "Main" : branchId);
 
   // Same documents and loading as the Global Ledger, plus the shifts.
   useEffect(() => {
@@ -66,7 +79,8 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
       loadInvoiceRows(), offlineList("salesReceipts"), offlineList("purchasePayments"), offlineList("expenses"),
       offlineList("accountVouchers").catch(() => []), offlineList("partnerEntries").catch(() => []), offlineList("bankReconciliations").catch(() => []),
       offlineList("counterShifts").catch(() => []),
-    ]).then(([rows, rc, pm, ex, av, pe, br, cs]) => {
+      branchCashSplit ? listShopRecords(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, shopId).catch(() => []) : Promise.resolve([]),
+    ]).then(([rows, rc, pm, ex, av, pe, br, cs, bm]) => {
       if (cancelled) return;
       setData({
         salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [],
@@ -74,10 +88,11 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
         bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
       setShifts(rowsOf(cs).filter((s) => s && !s.isDeleted && s.shopId === shopId));
+      setBranchMaster((bm || []).filter((b) => b && b.active !== false));
       setNow(new Date());
     }).catch((err) => { console.warn("[S4 Counter] load failed", err); if (!cancelled) setError(String(err?.message || err)); });
     return () => { cancelled = true; };
-  }, [shopId, tick]);
+  }, [shopId, tick, branchCashSplit]);
   useEffect(() => {
     const refresh = () => { if (document.visibilityState !== "hidden") setTick((v) => v + 1); };
     window.addEventListener("focus", refresh);
@@ -86,12 +101,31 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
     return () => { window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); clearInterval(timer); };
   }, []);
 
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers]);
-  const open = openShifts(shifts, shopId);
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, {
+    shopId,
+    customers,
+    branches: branchMaster,
+    branchCashSplit,
+    defaultBankAccount: shopBankAccountName(shop),
+    expenseLabel: (e) => expenseCategoryLabel(e, false),
+  }) : null), [data, shopId, customers, branchMaster, branchCashSplit, shop]);
+  const open = openShifts(shifts, shopId, branchId);
   const current = open[0] || null;
-  const liveCash = useMemo(() => (ledger && current ? shiftCash(ledger, data, current.openedAt, isoOf(now)) : null), [ledger, data, current, now]);
+  useEffect(() => {
+    if (current) return;
+    setOpenForm((f) => {
+      if (f.branchId) return f;
+      return {
+        ...f,
+        counter: f.counter || branchName || "",
+        branchId,
+        branchName,
+      };
+    });
+  }, [branchId, branchName, current]);
+  const liveCash = useMemo(() => (ledger && current ? shiftCash(ledger, data, current.openedAt, isoOf(now), branchId, branchName) : null), [ledger, data, current, now, branchId, branchName]);
   const summary = current ? shiftSummary(current, liveCash) : null;
-  const closed = useMemo(() => shifts.filter((s) => s.status === "closed").sort((a, b) => isoOf(b.openedAt).localeCompare(isoOf(a.openedAt))), [shifts]);
+  const closed = useMemo(() => shifts.filter((s) => s.status === "closed" && String(s.branchId || MAIN_BRANCH) === String(branchId || MAIN_BRANCH)).sort((a, b) => isoOf(b.openedAt).localeCompare(isoOf(a.openedAt))), [shifts, branchId]);
 
   const loyalty = useMemo(() => normalizeLoyalty(shop?.loyaltySettings), [shop?.loyaltySettings]);
   const members = useMemo(() => customers.filter(isMember), [customers]);
@@ -100,7 +134,7 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
 
   const syncSoon = () => { if (navigator.onLine) window.S4Offline?.syncNow?.().catch(() => {}); };
   const errText = (code) => ({
-    open: L("একটা শিফট এখনো খোলা আছে - আগে সেটা বন্ধ করুন", "A shift is still open - close it first"),
+    open: L("এই শাখায় শিফট খোলা আছে - আগে সেটা বন্ধ করুন", "A shift is still open at this branch - close it first"),
     amount: L("টাকার পরিমাণ সঠিকভাবে দিন (০ বা তার বেশি)", "Enter a valid amount (0 or more)"),
     closed: L("এই শিফট আগেই বন্ধ হয়েছে", "This shift is already closed"),
     rate: L("প্রতি পয়েন্টের টাকা ০-এর বেশি দিন", "Amount per point must be above 0"),
@@ -109,13 +143,13 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
 
   const doOpen = async () => {
     if (!canSell || busy) return;
-    const res = openShiftDoc(openForm, shifts, { shopId, uid: user?.uid || "", name: actorName });
+    const res = openShiftDoc({ ...openForm, branchId, branchName }, shifts, { shopId, uid: user?.uid || "", name: actorName });
     if (res.error) { toast?.(errText(res.error), "err"); return; }
     setBusy(true);
     try {
       const saved = await offlineCreate("counterShifts", res.doc);
       setShifts((prev) => [...prev, { ...res.doc, id: saved.documentId }]);
-      setOpenForm({ counter: "", openingCash: "" });
+      setOpenForm({ counter: "", openingCash: "", branchId: "", branchName: "" });
       toast?.(L("শিফট খোলা হয়েছে", "Shift opened"));
       syncSoon();
     } catch (e) { toast?.(e.message || String(e), "err"); } finally { setBusy(false); }
@@ -123,7 +157,7 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
   const doClose = async () => {
     if (!canSell || busy || !current) return;
     const at = new Date();
-    const res = closeShiftPatch(current, shiftCash(ledger, data, current.openedAt, isoOf(at)), closeForm, { uid: user?.uid || "", name: actorName, now: at });
+    const res = closeShiftPatch(current, shiftCash(ledger, data, current.openedAt, isoOf(at), branchId, branchName), closeForm, { uid: user?.uid || "", name: actorName, now: at });
     if (res.error) { toast?.(errText(res.error), "err"); return; }
     setBusy(true);
     try {
@@ -240,7 +274,11 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
 
         {data && section === "shift" && (
           <>
-            {open.length > 1 && <div className="si-paid-box is-due">{L(`${open.length}টি শিফট একসাথে খোলা (অন্য ডিভাইস থেকে সিঙ্ক হয়ে এসেছে)। সবচেয়ে নতুনটা দেখানো হচ্ছে - বাকিগুলো বন্ধ করুন।`, `${open.length} shifts are open at once (synced from another device). The newest is shown - close the others too.`)}</div>}
+            <div className="si-paid-box" style={{ marginBottom: 6 }}>
+              {L("শাখা", "Branch")}: <b>{branchName}</b>
+              {branchCashSplit && <span className="si-muted"> · {branchCashAccountName(branchId, branchName)}</span>}
+              {open.length > 1 && <span> — {L("এই শাখায় একাধিক শিফট সিঙ্ক হয়ে এসেছে; সবচেয়ে নতুনটা দেখানো হচ্ছে।", "Multiple open shifts synced for this branch; showing the newest.")}</span>}
+            </div>
             {!canSell && <div className="si-paid-box">{L("শিফট খুলতে / বন্ধ করতে 'বিক্রয় ম্যানেজ' অনুমতি লাগে", "Opening and closing a shift needs the Manage Sales permission")}</div>}
             <fieldset className="pm-panel" style={{ margin: 0 }}>
               <legend className="pm-panel-legend">{current ? L("শিফট বন্ধ করুন", "Close the shift") : L("শিফট খুলুন", "Open a shift")}</legend>
@@ -248,7 +286,7 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
                 {current ? (
                   <>
                     <div style={{ marginBottom: 6 }}>
-                      {current.counter ? `${current.counter} · ` : ""}{L("খুলেছেন", "Opened by")} <b>{current.openedByName || "-"}</b> · {fmtTime(current.openedAt)}
+                      {current.branchName ? `${current.branchName} · ` : current.counter ? `${current.counter} · ` : ""}{L("খুলেছেন", "Opened by")} <b>{current.openedByName || "-"}</b> · {fmtTime(current.openedAt)}
                     </div>
                     <div className="ch-form">
                       <label>{L("গুনে পাওয়া ক্যাশ", "Counted cash")} ({cur})
@@ -267,7 +305,7 @@ export default function CounterHub({ lang = "en", shopId, shop, user, profile, i
                   </>
                 ) : (
                   <div className="ch-form">
-                    <label>{L("কাউন্টারের নাম (ঐচ্ছিক)", "Counter name (optional)")}
+                    <label>{defaultBranch ? L("কাউন্টার / ব্রাঞ্চ", "Counter / branch") : L("কাউন্টারের নাম (ঐচ্ছিক)", "Counter name (optional)")}
                       <input className="pm-input" style={{ width: 160 }} value={openForm.counter} disabled={!canSell} onChange={(e) => setOpenForm((f) => ({ ...f, counter: e.target.value }))} />
                     </label>
                     <label>{L("শুরুর ক্যাশ", "Opening cash")} ({cur})

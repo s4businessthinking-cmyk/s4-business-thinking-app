@@ -1,12 +1,15 @@
 {
   "name": "s4-business-thinking",
   "private": true,
-  "version": "1.0.99",
+  "version": "1.0.100",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test:branch": "node --test src/branch-transfer/*.test.js src/ledger/globalLedger.test.js src/ledger/interCompanyLedger.test.js src/ledger/ledgerShopOpts.test.js src/ledger/repairInvoicePaymentBank.test.js src/branch-transfer/premierAcceptanceChecks.test.js",
+    "test:e2e:branch": "node --test src/branch-transfer/branchPremierSmoke.test.js src/branch-transfer/interCompanyReceiveFlow.test.js",
+    "test:e2e:core": "node --test src/e2e/coreProductSmoke.test.js",
     "preview": "vite preview",
     "cap:add:android": "npm run build && npx cap add android",
     "cap:sync": "npm run build && npx cap sync android",

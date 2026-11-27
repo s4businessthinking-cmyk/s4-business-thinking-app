@@ -18,6 +18,7 @@ import { buildBalanceSheet, openingStockValue, stockDocsUpTo } from "./balanceSh
 import { csvText } from "./vatExport.js";
 import { fundsCsvRows, fundsFileName, fundsFromSheet, fundsLines } from "./fundsSummary.js";
 import DateField from "../components/DateField.jsx";
+import { useBranchLedgerOpts } from "./useBranchLedgerOpts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -78,7 +79,11 @@ export default function FundsSummaryReport({ lang = "en", shopId, shop = null, p
   const cmpDay = compareAsOf && compareAsOf !== day ? compareAsOf : "";
   // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, natureOf]);
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
+  const ledger = useMemo(
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, natureOf, branchLedgerOpts],
+  );
   const openingStock = useMemo(() => openingStockValue(products), [products]);
 
   // Stock value on a day exactly as the Balance Sheet works it out (quantity on hand x cost at the shop's method, negatives left out).

@@ -54,6 +54,7 @@ const toForm = (c) => Object.fromEntries(Object.keys(EMPTY_CUSTOMER).map((k) => 
   ["alsoVendor", !!c?.linkedVendorId],
   ["loyaltyMember", c?.loyaltyMember === true],
   ["autoWhatsAppInvoice", c?.autoWhatsAppInvoice === true],
+  ["autoWhatsAppReceipt", c?.autoWhatsAppReceipt === true],
 ]));
 
 const num = (v) => {
@@ -287,6 +288,7 @@ export default function CustomerMasterScreen({
     payload.paymentType = form.paymentType || "cash";
     payload.loyaltyMember = !!form.loyaltyMember;
     payload.autoWhatsAppInvoice = !!form.autoWhatsAppInvoice;
+    payload.autoWhatsAppReceipt = !!form.autoWhatsAppReceipt;
 
     const openingChanged = num(form.openingBalance) !== num(JSON.parse(baseline).openingBalance);
     const creating = !selectedId;
@@ -531,6 +533,15 @@ export default function CustomerMasterScreen({
                   <span>{L("বিল confirm হলে WhatsApp খুলবে (PDF + মেসেজ); সার্ভার থেকে নিজে পাঠায় না", "Confirming a bill opens WhatsApp (PDF + message); nothing is sent from a server")}</span>
                 </div>
               )}
+              <label className="pm-form-row" style={{ alignItems: "center" }} title={L(
+                "চেক থাকলে রিসিট ভাউচার সেভের সময় WhatsApp চেকবক্স অন থাকবে (PDF + মেসেজ)",
+                "When ticked, the receipt voucher WhatsApp checkbox stays on when saving (PDF + message)")}>
+                <span className="pm-label">WhatsApp</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700 }}>
+                  <input type="checkbox" checked={!!form.autoWhatsAppReceipt} onChange={(e) => upd("autoWhatsAppReceipt", e.target.checked)} />
+                  {L("রিসিট হলে WhatsApp", "WhatsApp on receipt")}
+                </span>
+              </label>
               {form.loyaltyMember && row(L("সদস্য নং", "Member No."), "loyaltyNo", { mono: true, required: true })}
               {form.loyaltyMember && (
                 <div className="pm-form-row">

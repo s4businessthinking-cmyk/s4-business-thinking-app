@@ -47,18 +47,20 @@ test("shop country code for local numbers", () => {
 test("share outcome: says the PDF is not attached by itself, never claims sent", () => {
   const p = "C:\Docs\SI-1.pdf";
   const texts = [
-    shareOutcome({ mode: "desktop", desktop: true, clipboard: true, path: p }), shareOutcome({ mode: "desktop", desktop: true, clipboard: false, path: p }),
+    shareOutcome({ mode: "desktop", desktop: true, clipboard: true, path: p }), shareOutcome({ mode: "desktop", desktop: true, clipboard: true, autoPaste: true, path: p }),
+    shareOutcome({ mode: "desktop", desktop: true, clipboard: false, path: p }),
     shareOutcome({ mode: "desktop", desktop: false, clipboard: true, path: p }), shareOutcome({ mode: "android", opened: true }),
     shareOutcome({ mode: "browser", downloaded: true, opened: true }), shareOutcome({ mode: "desktop-old", downloaded: true, opened: true }),
     shareOutcome({ mode: "desktop", desktop: true, path: "", pdfError: "boom" }), shareOutcome({ mode: "browser", downloaded: true, opened: false }),
   ].map((o) => o.text);
   assert.ok(texts[0].includes("WhatsApp Desktop") && texts[0].includes("Ctrl+V") && texts[0].includes("not attached by itself"));
-  assert.ok(texts[1].includes("Drag the PDF"));
-  assert.ok(texts[2].includes("browser (wa.me)") && texts[2].includes("Drag the PDF"));
-  assert.ok(texts[4].includes("cannot hand files") && texts[4].includes("wa.me tab"));
-  assert.ok(texts[5].includes("older build"));
-  assert.ok(texts[6].includes("could not be made: boom"));
-  assert.ok(texts[7].includes("pop-ups are blocked"));
+  assert.ok(texts[1].includes("paste the PDF"));
+  assert.ok(texts[2].includes("Drag the PDF"));
+  assert.ok(texts[3].includes("browser (wa.me)") && texts[3].includes("Drag the PDF"));
+  assert.ok(texts[5].includes("cannot hand files") && texts[5].includes("wa.me tab"));
+  assert.ok(texts[6].includes("older build"));
+  assert.ok(texts[7].includes("could not be made: boom"));
+  assert.ok(texts[8].includes("pop-ups are blocked"));
   texts.forEach((t) => assert.equal(/\bsent\b|delivered/i.test(t), false, t));
 });
 

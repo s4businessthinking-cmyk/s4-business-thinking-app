@@ -14,8 +14,9 @@ import { valuationMethodOf } from "./stockValuation.js";
 import { CASH_ACCOUNT } from "../vouchers/accountVoucherDomain.js";
 import { r2 } from "./reportFilters.js";
 import {
-  BANK_ACCOUNT, buildBankBook, buildCashBook, buildDayBook, moneyAccounts,
+  BANK_ACCOUNT, buildBankBook, buildDayBook, buildMoneyBook, moneyAccounts,
 } from "./booksHub.js";
+import { ledgerOptsWithBranches, loadBranchMaster } from "../branch-transfer/branchLedgerOpts.js";
 import DateField from "../components/DateField.jsx";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -37,6 +38,8 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(() => localDay());
   const [bankName, setBankName] = useState(BANK_ACCOUNT);
+  const [cashName, setCashName] = useState(CASH_ACCOUNT);
+  const [branchMaster, setBranchMaster] = useState([]);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
@@ -59,8 +62,9 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
         partnerEntries: rowsOf(pe), bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
       });
     }).catch((err) => { console.warn("[S4 Books] load failed", err); if (!cancelled) setError(String(err?.message || err)); });
+    loadBranchMaster(shopId, shop).then((rows) => { if (!cancelled) setBranchMaster(rows || []); });
     return () => { cancelled = true; };
-  }, [shopId, tick]);
+  }, [shopId, shop, tick]);
 
   useEffect(() => {
     const refresh = () => { if (document.visibilityState !== "hidden") setTick((v) => v + 1); };
@@ -71,9 +75,10 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
 
   // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const branchLedgerOpts = useMemo(() => ledgerOptsWithBranches(shop, branchMaster), [shop, branchMaster]);
   const ledger = useMemo(
-    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors, products, natureOf],
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, products, natureOf, branchLedgerOpts],
   );
   const range = useMemo(() => ({ from: from || "", to: to || "" }), [from, to]);
   const moneyList = useMemo(() => (ledger ? moneyAccounts(ledger.accounts) : []), [ledger]);
@@ -82,13 +87,15 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
     [ledger, range],
   );
   const cashBook = useMemo(
-    () => (ledger ? buildCashBook(ledger.postings, ledger.accounts, range) : null),
-    [ledger, range],
+    () => (ledger ? buildMoneyBook(ledger.postings, ledger.accounts, cashName || CASH_ACCOUNT, range) : null),
+    [ledger, range, cashName],
   );
   const bankBook = useMemo(
     () => (ledger ? buildBankBook(ledger.postings, ledger.accounts, range, bankName || BANK_ACCOUNT) : null),
     [ledger, range, bankName],
   );
+
+  const cashAccountList = useMemo(() => moneyList.filter((a) => /^cash in hand/i.test(String(a.name || ""))), [moneyList]);
 
   useEffect(() => {
     if (!moneyList.length) return;
@@ -97,6 +104,14 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
       if (prefer) setBankName(prefer.name);
     }
   }, [moneyList, bankName]);
+
+  useEffect(() => {
+    if (!cashAccountList.length) return;
+    if (!cashAccountList.some((a) => a.name === cashName)) {
+      const prefer = cashAccountList.find((a) => a.name === CASH_ACCOUNT) || cashAccountList[0];
+      if (prefer) setCashName(prefer.name);
+    }
+  }, [cashAccountList, cashName]);
 
   const today = localDay();
   const yearStart = `${new Date().getFullYear()}-01-01`;
@@ -186,9 +201,16 @@ export default function BooksHubReport({ lang = "en", shopId, shop = null, custo
             </button>
           ))}
         </div>
-        {mode === "bank" && moneyList.filter((a) => a.name !== CASH_ACCOUNT).length > 0 && (
+        {mode === "cash" && cashAccountList.length > 1 && (
+          <select className="pm-input" style={{ width: mobile ? "100%" : 200, height: 26 }} value={cashName} onChange={(e) => setCashName(e.target.value)} title={L("ক্যাশ হিসাব", "Cash account")}>
+            {cashAccountList.map((a) => (
+              <option key={a.key} value={a.name}>{a.name}</option>
+            ))}
+          </select>
+        )}
+        {mode === "bank" && moneyList.filter((a) => !/^cash in hand/i.test(String(a.name || ""))).length > 0 && (
           <select className="pm-input" style={{ width: mobile ? "100%" : 180, height: 26 }} value={bankName} onChange={(e) => setBankName(e.target.value)} title={L("ব্যাংক হিসাব", "Bank account")}>
-            {moneyList.filter((a) => a.name !== CASH_ACCOUNT).map((a) => (
+            {moneyList.filter((a) => !/^cash in hand/i.test(String(a.name || ""))).map((a) => (
               <option key={a.key} value={a.name}>{a.name}</option>
             ))}
           </select>

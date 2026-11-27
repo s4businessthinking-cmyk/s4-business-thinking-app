@@ -326,6 +326,7 @@ export const acceptedQty = (transfer) => (transfer?.items || []).reduce((sum, it
 
 export const STATUS_COLOR = {
   draft: "#64748b",
+  requested: "#0f766e",
   packed: "#7c3aed",
   dispatched: "#2563eb",
   in_transit: "#2563eb",

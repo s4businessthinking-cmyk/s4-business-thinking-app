@@ -20,6 +20,7 @@ import { valuationMethodOf } from "./stockValuation.js";
 import { csvText } from "./vatExport.js";
 import { buildRatios, ratioFileName, ratioRows, ratioText } from "./ratioAnalysis.js";
 import DateField from "../components/DateField.jsx";
+import { useBranchLedgerOpts } from "./useBranchLedgerOpts.js";
 
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -76,8 +77,11 @@ export default function RatioAnalysisReport({ lang = "en", shopId, shop = null, 
   const badRange = !from || !to || from > to;
   const method = valuationMethodOf(shop);
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: method, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors, products, natureOf, method]);
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
+  const ledger = useMemo(
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: method, expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, products, natureOf, method, branchLedgerOpts],
+  );
   const openingStock = useMemo(() => openingStockValue(products), [products]);
   const sheetOn = (day) => buildBalanceSheet({ accounts: ledger.accounts, bal: balances(ledger.postings, day), openingStock,
     closingStock: stockValueAt(data.rows, products, shopId, day, method), closedStock: closedYearAt(shop?.yearEnds, day, data.accountVouchers)?.stockValue ?? null });

@@ -16,6 +16,7 @@ import { r2 } from "./reportFilters.js";
 import { moneyAccounts } from "./booksHub.js";
 import { buildCashFlow } from "./cashFlow.js";
 import DateField from "../components/DateField.jsx";
+import { useBranchLedgerOpts } from "./useBranchLedgerOpts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -80,9 +81,10 @@ export default function CashFlowReport({ lang = "en", shopId, shop = null, custo
 
   // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
   const ledger = useMemo(
-    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors, natureOf],
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, natureOf, branchLedgerOpts],
   );
   const moneyList = useMemo(() => (ledger ? moneyAccounts(ledger.accounts) : []), [ledger]);
   const badRange = !!(from && to && from > to);

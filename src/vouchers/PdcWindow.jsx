@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { C, inp, lbl, btn, th, td, todayIso, fmtDate } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
+import { docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 import { offlineGetById, offlinePatch, offlineRemove } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
 import { printWithSettings } from "../print/printSettings.js";
@@ -204,10 +205,10 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
   const cellIn = { ...inp(), height: 22, fontSize: 12, padding: "0 4px" };
 
   const box = (
-    <div style={{ width: "100%", maxWidth: inline ? 1180 : 1000, maxHeight: "100%", margin: inline ? "0 auto" : 0, display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: 4, boxShadow: inline ? "none" : "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "5px 10px", fontWeight: 800, fontSize: 13 }}>
-        <span>POST DATED CHEQUES [PDC]</span>
-        {onClose && <button type="button"onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>}
+    <div style={{ width: "100%", maxWidth: inline ? 1180 : 1000, maxHeight: "100%", margin: inline ? "0 auto" : 0, display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, boxShadow: inline ? "none" : "0 18px 40px rgba(0,0,0,0.35)", fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif', color: C.label }}>
+      <div style={docModalTitleChrome}>
+        <strong style={{ color: "#064e22" }}>POST DATED CHEQUES [PDC]</strong>
+        {onClose && <button type="button"onClick={onClose} style={{ background: "#c42b1c", border: "1px solid #e8806f", color: "#fff", borderRadius: 3, fontSize: 13, fontWeight: 900, width: 30, height: 22, cursor: "pointer" }}>✕</button>}
       </div>
 
       <div style={{ padding: "10px 12px", display: "grid", gap: 8, minHeight: 0, overflow: "auto" }}>

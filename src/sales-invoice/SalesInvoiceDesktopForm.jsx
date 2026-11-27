@@ -11,6 +11,7 @@ import { invoiceRowsCacheGen, subscribeInvoiceRowsCache } from "../inventory/sto
 import { itemBaseQty } from "../inventory/unitConversion";
 import { StockBadgeLabel } from "../inventory/StockBadge.jsx";
 import { listShopRecords } from "../branch-transfer/branchTransferService";
+import { SiBranchStockRequest } from "../branch-transfer/SiBranchStockRequest.jsx";
 import GlobalSearchModal from "../product-master/modals/GlobalSearchModal";
 import { PM_CSS } from "../product-master/pmStyles";
 import WhatsAppButton from "../share/WhatsAppButton.jsx";
@@ -19,20 +20,43 @@ import { splitRack } from "./rackLocation.js";
 import { dropdownMouseDown, shouldPreserveTextSelection } from "../utils/dropdownSelectionGuard.js";
 import { siIsSettledPay } from "./salesInvoiceShared.js";
 import DateField from "../components/DateField.jsx";
+import InvoiceBankSelect from "../ledger/InvoiceBankSelect.jsx";
+import { isInvoiceBankPayMethod } from "../ledger/invoiceBankPay.js";
 import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
 import { runDesktopBillShortcuts } from "../utils/desktopFormShortcuts.js";
+import {
+  docActionBar,
+  docEntryGrid,
+  docEntryRow,
+  docFieldLbl,
+  docFooterCol,
+  docFooterGrid,
+  docFooterTotals,
+  docHdrGrid,
+  docItemsPane,
+  docNoBox,
+  docNoHead,
+  docNoValue,
+  docPartyRow,
+  docProductStrip,
+  docSummaryLine,
+  docTitleBar,
+  docTitleText,
+  docTotalAmt,
+  docTotalBar,
+} from "./docDesktopLayout.js";
 
 const CURRENCIES = ["AED", "USD", "SAR", "OMR", "QAR", "KWD", "BHD", "INR", "BDT", "EUR"];
 
 export const C = {
-  bg: "#c7d8ee",
-  panel: "#dbe6f5",
-  bar: "#1f3f73",
-  label: "#0d2350",
-  border: "#8aa3c7",
+  bg: "#f3e6c8",
+  panel: "#f3e6c8",
+  bar: "#315eb8",
+  label: "#07101c",
+  border: "#7d94b7",
   input: "#ffffff",
-  head: "#2c5aa0",
-  rowAlt: "#eef3fb",
+  head: "#315eb8",
+  rowAlt: "#fffdf6",
   sel: "#ffe9a8",
   red: "#b91c1c",
   green: "#166534",
@@ -40,16 +64,16 @@ export const C = {
 
 export const inp = (extra = {}) => ({
   // longhands, so a caller can tint borderColor (required field) without React shorthand warnings
-  height: 26, padding: "2px 6px", borderWidth: 1, borderStyle: "solid", borderColor: C.border, borderRadius: 2, background: C.input,
-  color: "#111", fontSize: 13, fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box", ...extra,
+  height: 22, padding: "0 4px", borderWidth: 1, borderStyle: "solid", borderColor: C.border, borderRadius: 2, background: C.input,
+  color: "#111", fontSize: 12, fontFamily: "inherit", outline: "none", width: "100%", boxSizing: "border-box", ...extra,
 });
-export const lbl = { fontSize: 12, fontWeight: 700, color: C.label, whiteSpace: "nowrap" };
+export const lbl = { fontSize: 10.5, fontWeight: 700, color: C.label, whiteSpace: "nowrap", lineHeight: 1.1 };
 export const btn = (bg = "#e7eef9", color = C.label, extra = {}) => ({
-  height: 30, padding: "0 14px", border: `1px solid ${C.border}`, borderRadius: 3, background: bg, color,
-  fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", ...extra,
+  height: 24, padding: "0 10px", border: `1px solid ${C.border}`, borderRadius: 2, background: bg, color,
+  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", ...extra,
 });
-export const th = { padding: "4px 6px", background: C.head, color: "#fff", fontSize: 12, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap", position: "sticky", top: 0 };
-export const td = { padding: "3px 6px", fontSize: 12.5, textAlign: "right", borderBottom: `1px solid #d3deef`, whiteSpace: "nowrap", color: "#0f172a" };
+export const th = { padding: "2px 5px", background: C.head, color: "#fff", fontSize: 11, fontWeight: 700, textAlign: "right", whiteSpace: "nowrap", position: "sticky", top: 0 };
+export const td = { padding: "2px 5px", fontSize: 11.5, textAlign: "right", borderBottom: `1px solid #d3deef`, whiteSpace: "nowrap", color: "#0f172a" };
 
 export { splitRack };
 
@@ -147,7 +171,7 @@ function CustomerTypeahead({ customers, value, onChange, onSelect, placeholder, 
               onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
               onClick={() => { if (!shouldPreserveTextSelection(inputRef)) pick(c); }}
               onMouseEnter={() => { if (!shouldPreserveTextSelection(inputRef)) setActive(i); }}
-              style={{ padding: "5px 10px", cursor: "pointer", background: i === active ? "#dbe6f5" : "#fff", borderBottom: "1px solid #eef3fb" }}>
+              style={{ padding: "5px 10px", cursor: "pointer", background: i === active ? "#fffdf6" : "#fff", borderBottom: "1px solid #fffdf6" }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: C.label }}>{c.customerName}</div>
               <div style={{ fontSize: 11, color: "#4b5f86" }}>{[c.mobileNumber, c.area || c.city, c.customerType].filter(Boolean).join(" · ")}</div>
             </div>
@@ -168,6 +192,10 @@ export default function SalesInvoiceDesktopForm({
   onOpenReminder, reminderForm, onChangeReminder, onSaveReminder, onCloseReminder,
   kind = "sales", sourceQuoteNo = "", sourceIsDN = false, sourceKind = "", onConvertQuote, onConvertToDN, canDiscount = true, canSeeCost = false,
   loyalty = null, whatsAppDoc, adjustmentReasons = [], baseCurrency = "AED", rateApi = null,
+  branchLocked = false,
+  shop = null,
+  user = null,
+  profile = null,
 }) {
   const { siCalcLine, siFmt2, siN2, siUnitOptionsFor, SI_PAY, SI_STATUSES } = helpers;
   const bn = lang === "bn";
@@ -188,6 +216,7 @@ export default function SalesInvoiceDesktopForm({
   const codeRef = codeRefProp || localCodeRef;
   const adjRef = useRef(null);
   const [editingLineId, setEditingLineId] = useState(null);
+  const [branchStockOpen, setBranchStockOpen] = useState(false);
   const [codeChoices, setCodeChoices] = useState(null);
   const custRef = useRef(null);
   const salesmanRef = useRef(null);
@@ -417,26 +446,26 @@ export default function SalesInvoiceDesktopForm({
     : 0;
   const rack = splitRack(currentProduct?.rackLocation);
   const unitOptions = siUnitOptionsFor(currentProduct, current.unit);
-  const field = (label, node, labelWidth = 92) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+  const field = (label, node, labelWidth = 76) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
       <span style={{ ...lbl, width: labelWidth, flexShrink: 0 }}>{label}</span>
       <div style={{ flex: 1, minWidth: 0 }}>{node}</div>
     </div>
   );
 
   return (
-    <div style={{ background: C.bg, border: `1px solid ${C.bar}`, borderRadius: 4, minWidth: 1060, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, minWidth: 1060, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif', color: C.label }}>
       <fieldset disabled={locked} style={{ display: "contents" }}>
       {/* Header */}
-      <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 150px", gap: 8, padding: "8px 10px 4px", background: C.panel }}>
-        <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
-          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, textDecoration: "underline", padding: "2px 0" }}>{isSO ? "Order No" : isQuote ? "Quotation No" : isDN ? "DN No" : "Bill No"}</div>
-          <div style={{ textAlign: "center", fontSize: 16, fontWeight: 900, color: "#111", padding: "4px 0" }}>{invoiceNo || "—"}</div>
+      <div style={docHdrGrid}>
+        <div style={docNoBox}>
+          <div style={docNoHead}>{isSO ? "Order No" : isQuote ? "Quotation No" : isDN ? "DN No" : "Bill No"}</div>
+          <div style={docNoValue}>{invoiceNo || "—"}</div>
         </div>
-        <div style={{ position: "relative", border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
-          <div style={{ position: "absolute", left: 8, top: 0, bottom: 0, display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ ...docTitleBar, position: "relative" }}>
+          <div style={{ position: "absolute", left: 4, top: 0, bottom: 0, display: "flex", alignItems: "center", gap: 4 }}>
             {!isDN && !isQuote && (
-              <select style={inp({ width: 130, height: 24, fontSize: 12 })} value={form.invoiceType} onChange={(e) => setField("invoiceType", e.target.value)}
+              <select style={inp({ width: 108, height: 20, fontSize: 11 })} value={form.invoiceType} onChange={(e) => setField("invoiceType", e.target.value)}
                 title={bn ? "ইনভয়েস টাইপ" : "Invoice type"}>
                 {form.invoiceType === "regular" && <option value="regular">{t.si_regular || "Regular"}</option>}
                 <option value="tax">{t.si_tax || "Tax Invoice"}</option>
@@ -444,7 +473,7 @@ export default function SalesInvoiceDesktopForm({
               </select>
             )}
             {savedInvoice && (
-              <span style={{ fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: SI_STATUSES[savedInvoice.status]?.color || "#64748b", color: "#fff" }}>
+              <span style={{ fontSize: 10, fontWeight: 800, padding: "0 6px", borderRadius: 8, background: SI_STATUSES[savedInvoice.status]?.color || "#64748b", color: "#fff" }}>
                 {invoiceStatusLabel(savedInvoice, lang, SI_STATUSES) || savedInvoice.status}
               </span>
             )}
@@ -454,17 +483,17 @@ export default function SalesInvoiceDesktopForm({
               </span>
             )}
           </div>
-          <div style={{ textAlign: "center", lineHeight: 1.1 }}>
-            <span style={{ fontSize: 24, fontWeight: 900, color: isSO ? "#0e7490" : isQuote ? "#b45309" : isDN ? "#6d28d9" : "#111", letterSpacing: 0.5 }}>{docName}</span>
+          <div style={{ textAlign: "center", lineHeight: 1.05 }}>
+            <span style={{ ...docTitleText, color: isSO ? "#0e7490" : isQuote ? "#b45309" : isDN ? "#6d28d9" : "#111" }}>{docName}</span>
             {sourceQuoteNo && (
               <div style={{ fontSize: 11, fontWeight: 800, color: sourceIsDN ? "#6d28d9" : sourceKind === "salesOrder" ? "#0e7490" : sourceKind === "jobOrder" ? "#c2410c" : "#b45309" }}>
                 {sourceIsDN ? (bn ? "ডেলিভারি নোট থেকে" : "From Delivery Note") : sourceKind === "salesOrder" ? (bn ? "সেলস অর্ডার থেকে" : "From Sales Order") : sourceKind === "jobOrder" ? (bn ? "জব কার্ড থেকে" : "From Job Card") : (bn ? "কোটেশন থেকে" : "From Quotation")}: {sourceQuoteNo}
               </div>
             )}
           </div>
-          <div style={{ position: "absolute", right: 8, top: 4, width: 200 }}>
-            <div style={{ ...lbl, fontSize: 11 }}><u>S</u>tock Location</div>
-            <select style={inp({ height: 22, fontSize: 12 })} value={form.stockLocation || "main"}
+          <div style={{ position: "absolute", right: 4, top: 0, bottom: 0, display: "flex", alignItems: "center", gap: 3, maxWidth: 168 }}>
+            <span style={{ ...lbl, fontSize: 10 }}>{branches.length ? (bn ? "ব্রাঞ্চ" : "Branch") : "Loc."}</span>
+            <select style={inp({ height: 20, fontSize: 11, width: 96 })} value={form.stockLocation || "main"} disabled={branchLocked}
               onChange={(e) => {
                 const id = e.target.value;
                 setField("stockLocation", id);
@@ -478,15 +507,15 @@ export default function SalesInvoiceDesktopForm({
             </select>
           </div>
         </div>
-        <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
-          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>Bill Date</div>
-          <DateField style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
+        <div style={docNoBox}>
+          <div style={docNoHead}>Bill Date</div>
+          <DateField style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={form.invoiceDate} onChange={(e) => setField("invoiceDate", e.target.value)} />
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "150px minmax(280px,360px) minmax(240px,320px) 1fr 130px", gap: 10, padding: "2px 10px 8px", background: C.panel, borderBottom: `1px solid ${C.border}` }}>
+      <div style={docPartyRow("120px minmax(220px,1fr) minmax(200px,280px) minmax(120px,1fr) 112px")}>
         <div>
-          <div style={lbl}>Ref.Number</div>
+          <div style={docFieldLbl}>Ref.Number</div>
           <input style={inp()} value={form.refNo || ""} onChange={(e) => setField("refNo", e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); custRef.current?.focus(); } }} />
         </div>
@@ -511,12 +540,12 @@ export default function SalesInvoiceDesktopForm({
             <button type="button"onClick={onOpenCustomerPicker} title="Home"style={btn("#e7eef9", C.label, { height: 26, padding: "0 6px", fontSize: 11, whiteSpace: "nowrap" })}>▼ Home</button>
           </div>
           {kind === "sales" && !isDelivery && form.customerId && customers.find((c) => c.id === form.customerId)?.autoWhatsAppInvoice === true && (
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#166534", marginTop: 2 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#166534", marginTop: 1, lineHeight: 1.1 }}>
               {bn ? "Confirm করলে WhatsApp খুলবে (PDF + মেসেজ)" : "Confirming opens WhatsApp (PDF + message)"}
             </div>
           )}
           {loyalty && (
-            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#15803d", marginTop: 2 }} title={bn ? "লয়্যালটি: এখন শুধু পয়েন্ট জমা হয়" : "Loyalty: earn only for now"}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#15803d", marginTop: 1, lineHeight: 1.1 }} title={bn ? "লয়্যালটি: এখন শুধু পয়েন্ট জমা হয়" : "Loyalty: earn only for now"}>
               {bn ? "লয়্যালটি" : "Loyalty"} {loyalty.no} · {loyalty.points == null ? "…" : `${loyalty.points} ${bn ? "পয়েন্ট" : "pts"}`}
               {loyalty.earn ? ` · +${loyalty.earn} ${bn ? "এই বিলে" : "on this bill"}` : ""}
             </div>
@@ -572,8 +601,8 @@ export default function SalesInvoiceDesktopForm({
       </div>
 
       {/* Entry row */}
-      <div style={{ padding: "8px 12px", background: "#e9f0fa", borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 84px 64px auto", gap: 6, alignItems: "end" }}>
+      <div style={docEntryRow}>
+        <div style={docEntryGrid("minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 84px 64px auto")}>
           <div>
             <div style={{ ...lbl, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span>Product Nam<u>e</u>{" "}
@@ -590,6 +619,12 @@ export default function SalesInvoiceDesktopForm({
                   as="span"
                   style={{ marginTop: 0, fontSize: 11 }}
                 />
+              )}
+              {!isQuote && currentProduct && !editInvId && (
+                <button type="button" onClick={() => setBranchStockOpen(true)} title={bn ? "অন্য শাখার স্টক ও অনুরোধ" : "Other branches stock / request"}
+                  style={{ background: "none", border: "none", padding: 0, color: "#0f766e", fontWeight: 700, fontSize: 11, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>
+                  {bn ? "অন্য শাখা" : "Other branches"}
+                </button>
               )}
               <button type="button"onClick={() => handlersRef.current.newProduct()} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", marginRight: 40 }}>
                 New Product [F9]
@@ -659,7 +694,7 @@ export default function SalesInvoiceDesktopForm({
           </div>
         </div>
         {/* Product info strip */}
-        <div style={{ display: "flex", gap: 22, marginTop: 6, fontSize: 12.5, fontWeight: 700, minHeight: 18 }}>
+        <div style={docProductStrip}>
           {currentProduct ? (
             <>
               {stockOf == null
@@ -687,7 +722,7 @@ export default function SalesInvoiceDesktopForm({
       </div>
 
       {/* Items table */}
-      <div style={{ flex: 1, minHeight: 90, overflow: "auto", background: "#fff", borderBottom: `1px solid ${C.border}` }}>
+      <div style={docItemsPane}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -709,7 +744,7 @@ export default function SalesInvoiceDesktopForm({
           </thead>
           <tbody>
             {lineRows.length === 0 && (
-              <tr><td colSpan={14} style={{ ...td, textAlign: "center", color: "#64748b", padding: 24 }}>
+              <tr><td colSpan={14} style={{ ...td, textAlign: "center", color: "#64748b", padding: 14 }}>
                 {bn ? "এখনো কোনো item নেই — উপরে পণ্য বাছাই করে Add দিন" : "No items yet — pick a product above and press Add"}
               </td></tr>
             )}
@@ -745,17 +780,17 @@ export default function SalesInvoiceDesktopForm({
           </tbody>
           {lineRows.length > 0 && (
             <tfoot>
-              <tr style={{ background: "#dbe6f5", fontWeight: 800 }}>
-                <td style={{ ...td, textAlign: "left", fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }} colSpan={3}>TOTAL ({lineRows.length})</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{parseFloat(lineSum.qty.toFixed(3))}</td>
-                <td style={{ ...td, position: "sticky", bottom: 0, background: "#dbe6f5" }} colSpan={2} />
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{siFmt2(lineSum.gross)}</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{siFmt2(lineSum.disc)}</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{siFmt2(lineSum.gross - lineSum.disc)}</td>
-                <td style={{ ...td, position: "sticky", bottom: 0, background: "#dbe6f5" }} />
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{siFmt2(lineSum.vat)}</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{siFmt2(lineSum.total)}</td>
-                <td style={{ ...td, position: "sticky", bottom: 0, background: "#dbe6f5" }} colSpan={2} />
+              <tr style={{ background: "#fffdf6", fontWeight: 800 }}>
+                <td style={{ ...td, textAlign: "left", fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }} colSpan={3}>TOTAL ({lineRows.length})</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{parseFloat(lineSum.qty.toFixed(3))}</td>
+                <td style={{ ...td, position: "sticky", bottom: 0, background: "#fffdf6" }} colSpan={2} />
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{siFmt2(lineSum.gross)}</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{siFmt2(lineSum.disc)}</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{siFmt2(lineSum.gross - lineSum.disc)}</td>
+                <td style={{ ...td, position: "sticky", bottom: 0, background: "#fffdf6" }} />
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{siFmt2(lineSum.vat)}</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{siFmt2(lineSum.total)}</td>
+                <td style={{ ...td, position: "sticky", bottom: 0, background: "#fffdf6" }} colSpan={2} />
               </tr>
             </tfoot>
           )}
@@ -763,8 +798,8 @@ export default function SalesInvoiceDesktopForm({
       </div>
 
       {/* Bottom: payment + totals */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14, padding: "6px 12px", background: C.panel, flexShrink: 0 }}>
-        <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+      <div style={docFooterGrid}>
+        <div style={docFooterCol}>
           {field("Disc %", (
             <input style={inp({ textAlign: "right" })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.billDiscPerc}
               onChange={(e) => { setField("billDiscPerc", e.target.value); if (siN2(e.target.value) > 0) setField("billDiscAmt", ""); }} />
@@ -782,9 +817,22 @@ export default function SalesInvoiceDesktopForm({
                 setField("paymentMethod", key);
                 setField("amountPaid", "");
                 if (key !== "cash") setField("cashPartial", false);
+                if (!isInvoiceBankPayMethod(key)) setField("paymentBank", "");
               }}>
               {Object.entries(SI_PAY).map(([k, v]) => <option key={k} value={k}>{v.icon} {v[lang] || v.en}</option>)}
             </select>
+          ))}
+          {!isQuote && !isDN && isInvoiceBankPayMethod(form.paymentMethod) && field(bn ? "ব্যাংক অ্যাকাউন্ট" : "Bank account", (
+            <InvoiceBankSelect
+              lang={lang}
+              method={form.paymentMethod}
+              value={form.paymentBank}
+              shop={shop}
+              disabled={isDelivery || locked}
+              showLabel={false}
+              inpStyle={inp()}
+              onChange={(v) => setField("paymentBank", v)}
+            />
           ))}
           {field("Crdt. Period", (
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -794,37 +842,37 @@ export default function SalesInvoiceDesktopForm({
             </div>
           ))}
         </div>
-        <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+        <div style={docFooterCol}>
           {isDelivery && !isDN && field(bn ? "ডেলিভারি নোট" : "DN No", <input style={inp()} value={form.deliveryNoteNo} onChange={(e) => setField("deliveryNoteNo", e.target.value)} />)}
           {!isSO && field(bn ? "গাড়ি নং" : "Vehicle No", <input style={inp()} value={form.vehicleNo || ""} placeholder="ABC-1234"onChange={(e) => setField("vehicleNo", e.target.value)} />)}
           <div>
-            <div style={lbl}>Narration</div>
-            <textarea style={inp({ height: isDelivery ? 32 : isQuote ? 92 : 62, resize: "none", padding: 6 })} value={form.note} onChange={(e) => setField("note", e.target.value)} />
+            <div style={docFieldLbl}>Narration</div>
+            <textarea style={inp({ height: isDelivery ? 22 : isQuote ? 36 : 30, resize: "none", padding: 2, lineHeight: 1.2 })} value={form.note} onChange={(e) => setField("note", e.target.value)} />
           </div>
         </div>
-        <div style={{ display: "grid", gap: 3, alignContent: "start", background: "#eef3fb", border: `1px solid ${C.border}`, padding: "5px 8px", borderRadius: 3 }}>
+        <div style={docFooterTotals}>
           {[
             ["Gross Amount", siFmt2(totals.sub)],
             ["Discount", siFmt2(totals.disc)],
             ...(isTax ? [["VAT", siFmt2(totals.vat)]] : []),
           ].map(([l, v]) => (
-            <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700 }}><span>{l}</span><span>{v}</span></div>
+            <div key={l} style={docSummaryLine}><span>{l}</span><span>{v}</span></div>
           ))}
-          {field(<span>Adjustments <span style={{ color: "#4b5f86", fontWeight: 600 }}>[Insert]</span></span>, (
-            <input ref={adjRef} style={inp({ textAlign: "right", height: 24 })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
+          {field(<span>Adj. <span style={{ color: "#4b5f86", fontWeight: 600 }}>[Ins]</span></span>, (
+            <input ref={adjRef} style={inp({ textAlign: "right", height: 20 })} inputMode="decimal"disabled={isDelivery || !canDiscount} value={isDelivery ? "" : form.adjustment}
               placeholder="+ / -"onChange={(e) => setField("adjustment", e.target.value)} />
-          ), 128)}
-          {!isDelivery && Number(String(form.adjustment || "").replace(/,/g, "")) !== 0 && adjustmentReasons.length > 0 && field(bn ? "সমন্বয়ের কারণ" : "Reason", (
-            <select style={inp({ height: 24 })} disabled={!canDiscount} value={form.adjustmentReasonId || ""}
+          ), 72)}
+          {!isDelivery && Number(String(form.adjustment || "").replace(/,/g, "")) !== 0 && adjustmentReasons.length > 0 && field(bn ? "কারণ" : "Reason", (
+            <select style={inp({ height: 20 })} disabled={!canDiscount} value={form.adjustmentReasonId || ""}
               onChange={(e) => { const r = adjustmentReasons.find((x) => x.id === e.target.value); setField("adjustmentReasonId", r?.id || ""); setField("adjustmentReason", r?.name || ""); }}>
               <option value="">-</option>
               {form.adjustmentReasonId && !adjustmentReasons.some((x) => x.id === form.adjustmentReasonId) && <option value={form.adjustmentReasonId}>{form.adjustmentReason}</option>}
               {adjustmentReasons.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
-          ), 128)}
-          {field(bn ? "রাউন্ড অফ" : "Round Off", (
-            <div style={{ display: "flex", gap: 4 }}>
-              <input style={inp({ textAlign: "right", height: 24 })} inputMode="decimal"disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
+          ), 72)}
+          {field(bn ? "রাউন্ড" : "Round", (
+            <div style={{ display: "flex", gap: 3 }}>
+              <input style={inp({ textAlign: "right", height: 20 })} inputMode="decimal"disabled={isDelivery} value={isDelivery ? "" : form.roundOff}
                 title={canDiscount ? "" : (bn ? "অনুমতি ছাড়া শুধু ১ পর্যন্ত কমানো যাবে" : "Without discount permission only up to 1 can be rounded down")}
                 placeholder="+ / -"onChange={(e) => setField("roundOff", e.target.value)} />
               <button type="button"disabled={isDelivery} title={bn ? "নিকটতম পূর্ণ সংখ্যায়" : "Round to nearest whole number"}
@@ -833,23 +881,23 @@ export default function SalesInvoiceDesktopForm({
                   const diff = Math.round(before) - before;
                   setField("roundOff", Math.abs(diff) < 0.005 ? "" : diff.toFixed(2));
                 }}
-                style={btn("#e7eef9", C.label, { height: 24, padding: "0 6px", fontSize: 11 })}>Auto</button>
+                style={btn("#e7eef9", C.label, { height: 20, padding: "0 5px", fontSize: 10 })}>Auto</button>
             </div>
-          ), 128)}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "3px 8px", borderRadius: 2 }}>
+          ), 72)}
+          <div style={docTotalBar}>
             <span style={{ fontWeight: 800 }}>TOTAL</span>
-            <span style={{ fontSize: 18, fontWeight: 900 }}>{cur} {siFmt2(totals.grand)}</span>
+            <span style={docTotalAmt}>{cur} {siFmt2(totals.grand)}</span>
           </div>
           {!isDelivery && !isQuote && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <span style={{ ...lbl, whiteSpace: "nowrap" }}>Received</span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                <span style={{ ...lbl, whiteSpace: "nowrap" }}>Rcvd</span>
                 {isCash
-                  ? <input style={inp({ textAlign: "right", height: 24, fontWeight: 700 })} readOnly value={siFmt2(formPaid)} />
-                  : <input style={inp({ textAlign: "right", height: 24, fontWeight: 700 })} inputMode="decimal"value={form.amountPaid}
+                  ? <input style={inp({ textAlign: "right", height: 20, fontWeight: 700 })} readOnly value={siFmt2(formPaid)} />
+                  : <input style={inp({ textAlign: "right", height: 20, fontWeight: 700 })} inputMode="decimal"value={form.amountPaid}
                       onChange={(e) => setField("amountPaid", e.target.value)} />}
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 900, color: balance > 0.01 ? C.red : C.green }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, fontWeight: 900, color: balance > 0.01 ? C.red : C.green }}>
                 <span>Bal.</span><span>{siFmt2(balance)}</span>
               </div>
             </div>
@@ -859,7 +907,7 @@ export default function SalesInvoiceDesktopForm({
       </fieldset>
 
       {/* Action bar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
+      <div style={docActionBar}>
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button"title="Ctrl+N" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন (Ctrl+N)" : "New (Ctrl+N)"}</button>
           <button type="button"title="F7" onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন (F7)" : "Search (F7)"}</button>
@@ -919,8 +967,8 @@ export default function SalesInvoiceDesktopForm({
       </div>
 
       {/* Status line */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 12px", background: "#fff", borderTop: `1px solid ${C.border}`, minHeight: 24 }}>
-        <div style={{ flex: 1, textAlign: "center", color: C.red, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "1px 6px", background: "#fff", borderTop: `1px solid ${C.border}`, minHeight: 20, flexShrink: 0 }}>
+        <div style={{ flex: 1, textAlign: "center", color: C.red, fontWeight: 800, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {currentProduct ? (() => {
             const excl = siN2(current.unitPrice) || siN2(currentProduct.vatExclusive);
             const vatP = siN2(currentProduct.salesVat || current.vatPerc);
@@ -928,7 +976,7 @@ export default function SalesInvoiceDesktopForm({
             return `${codeLine(currentProduct)} (Excl Rate:${siFmt2(excl)} ,Incl Rate:${siFmt2(incl)})`;
           })() : ""}
         </div>
-        <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: C.label, whiteSpace: "nowrap", cursor: "pointer" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: C.label, whiteSpace: "nowrap", cursor: "pointer" }}>
           <input type="checkbox"checked={!!form.hideCodeInPrint} onChange={(e) => setField("hideCodeInPrint", e.target.checked)} />
           Do not Print Code in Bill
         </label>
@@ -941,6 +989,22 @@ export default function SalesInvoiceDesktopForm({
             onClose={() => setShowHistory(false)}
             onOpen={(inv) => { setShowHistory(false); onOpenInvoice(inv); }} />
         </div>
+      )}
+
+      {branchStockOpen && currentProduct && (
+        <Modal title={bn ? "অন্য শাখায় স্টক / অনুরোধ" : "Other branch stock / request"} width={520} onClose={() => setBranchStockOpen(false)}>
+          <SiBranchStockRequest
+            lang={lang}
+            shop={shop}
+            shopId={shopId}
+            user={user}
+            profile={profile}
+            team={team}
+            product={currentProduct}
+            toast={toast}
+            onClose={() => setBranchStockOpen(false)}
+          />
+        </Modal>
       )}
 
       {productSearchName !== null && (
@@ -1023,7 +1087,7 @@ export function GridTable({ columns, rows, rowKey, onRowDoubleClick, minRows = 1
         {rows.map((r, i) => (
           <tr key={rowKey(r, i)} onDoubleClick={onRowDoubleClick ? () => onRowDoubleClick(r) : undefined}
             title={onRowDoubleClick ? "Double click to open" : undefined}
-            style={{ cursor: onRowDoubleClick ? "pointer" : "default", background: i === 0 ? "#dbe6f5" : "#fff" }}>
+            style={{ cursor: onRowDoubleClick ? "pointer" : "default", background: i === 0 ? "#fffdf6" : "#fff" }}>
             {columns.map((c) => (
               <td key={c.key} style={{
                 ...td, textAlign: c.align || "left", borderRight: "1px solid #d3deef", fontWeight: c.bold ? 700 : 400, color: c.color?.(r) || td.color,

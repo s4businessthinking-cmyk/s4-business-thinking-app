@@ -456,6 +456,19 @@ function hasWhatsAppDesktop() {
 }
 
 /** -> "desktop" (WhatsApp Desktop opened) | "web" (wa.me in the browser) */
+function autoPasteWhatsAppAttachment() {
+  if (process.platform !== "win32") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const ps = "Start-Sleep -Milliseconds 1600; Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^v')";
+    execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-STA", "-Command", ps],
+      { windowsHide: true, timeout: 12000 },
+      (err) => {
+        if (err) console.warn("[S4 Share] auto-paste failed", err.message);
+        resolve(!err);
+      });
+  });
+}
+
 async function openWhatsAppChat(phone, text) {
   const msg = encodeURIComponent(String(text || ""));
   if (await hasWhatsAppDesktop()) {
@@ -506,7 +519,9 @@ function setupShareIpc() {
     try { file = await writeSharePdf(html, payload.fileName); } catch (err) { pdfError = String(err?.message || err); console.warn("[S4 Share] PDF failed", pdfError); }
     const clipboard = file ? await copyFileToClipboard(file) : false;
     const via = await openWhatsAppChat(waPhone(payload.phone), payload.text);
-    return { path: file, folder: shareFolder(), clipboard, desktop: via === "desktop", via, pdfError };
+    const autoPaste = payload.autoPaste === true && clipboard && via === "desktop";
+    const pasted = autoPaste ? await autoPasteWhatsAppAttachment() : false;
+    return { path: file, folder: shareFolder(), clipboard, desktop: via === "desktop", via, pdfError, autoPaste: pasted };
   });
   // Bulk messages: text only, one chat at a time.
   ipcMain.handle("s4-share:whatsapp-text", async (_event, payload = {}) => {

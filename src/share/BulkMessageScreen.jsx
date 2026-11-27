@@ -9,6 +9,7 @@ import { loadInvoiceRows, rowsOf } from "../inventory/stockFromInvoices";
 import { saveShopRecord } from "../offline/shopService";
 import { expenseCategoryLabel } from "../expenses/ExpensesTab.jsx";
 import { buildGlobalLedger, balances } from "../ledger/globalLedger.js";
+import { ledgerOptsFromShop } from "../ledger/ledgerShopOpts.js";
 import { r2 } from "../reports/reportFilters.js";
 import { openWhatsAppText } from "./whatsappDocShare.js";
 import { TEMPLATE_VARS, appendLog, clearLog, fillTemplate, logEntry, normalizeTemplates, readLog, recipientsOf, saveTemplate } from "./bulkMessage.js";
@@ -59,7 +60,7 @@ export default function BulkMessageScreen({ lang = "en", shopId, shop, isOwner =
       const ledger = buildGlobalLedger({
         salesInvoices: rows.salesInvoices, purchaseInvoices: rows.purchaseInvoices, salesReturns: rows.extras?.salesReturns || [], purchaseReturns: rows.extras?.purchaseReturns || [],
         receipts: rowsOf(rc), payments: rowsOf(pm), expenses: rowsOf(ex), accountVouchers: rowsOf(av), partnerEntries: rowsOf(pe), bankEntries: rowsOf(br).filter((d) => d?.kind === "entry"),
-      }, { shopId, customers, expenseLabel: (e) => expenseCategoryLabel(e, false) });
+      }, { shopId, customers, expenseLabel: (e) => expenseCategoryLabel(e, false), ...ledgerOptsFromShop(shop) });
       const bal = balances(ledger.postings, "");
       setDues(new Map(customers.filter((c) => c?.id).map((c) => [c.id, r2(bal.get(`c:${c.id}`) || 0)])));
     }).catch((err) => { console.warn("[S4 Bulk message] balances failed", err); });

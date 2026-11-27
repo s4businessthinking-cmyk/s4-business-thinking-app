@@ -3,13 +3,16 @@ import { BranchStockView } from "./BtBranchStockView.jsx";
 import { NewTransferForm } from "./BtNewTransferForm.jsx";
 import { TransferDetail } from "./BtTransferDetail.jsx";
 import { statusLabel } from "./branchTransferDomain.js";
+import { canManageBranchTransfer } from "./branchTransferService.js";
 import DateField from "../components/DateField.jsx";
 
-export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete = false, canPrint = false, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting }) {
-  if (view === "new" && canSendTransfer) {
+export function renderBtWorkspace({ L, actor, allowPeer = false, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete = false, canPrint = false, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, homeShopId = "", incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, peerOnly = false, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting }) {
+  const canOpenNew = canSendTransfer || (canReceiveTransfer && allowPeer);
+  if (view === "new" && canOpenNew) {
   return (
-      <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={L("নতুন ট্রান্সফার", "New Transfer")} titleRight={shellTitle}>
+      <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={peerOnly ? L("অন্য শাখা থেকে অনুরোধ", "Request from branch") : L("নতুন ট্রান্সফার", "New Transfer")} titleRight={shellTitle}>
         <NewTransferForm lang={lang} mobile={mobile} branches={branches} team={team} products={products} vendors={vendors}
+          homeShopId={homeShopId} allowPeer={allowPeer} canHqDispatch={canSendTransfer} peerOnly={peerOnly}
           mainStock={mainStock} busy={busy} dirtyRef={dirtyRef} toast={toast} onSave={createTransfer} onBack={backToList} />
       </SkinShell>
     );
@@ -19,7 +22,7 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
   if (sel) {
     return (
       <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={<>{sel.transferNo} <StatusBadge status={sel.status} lang={lang} /></>} titleRight={shellTitle}>
-        <TransferDetail lang={lang} mobile={mobile} transfer={sel} isOwner={isOwner} canManage={canSendTransfer} canDelete={canDelete} canPrint={canPrint}
+        <TransferDetail lang={lang} mobile={mobile} transfer={sel} isOwner={isOwner} canManage={canManageBranchTransfer(sel, actor)} canDelete={canDelete} canPrint={canPrint}
           canReceive={canReceiveRow(sel)} canCreateInvoice={canInvoiceRow(sel)} busy={busy}
           onStatus={changeStatus} onDelete={deleteTransfer} onReceive={setReceiving} onCreateInvoice={createInvoice}
           onPrint={printTransfer} onBack={backToList} />
@@ -31,13 +34,13 @@ export function renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow
   const statusOptions = [
     ["", L("সব অবস্থা", "All statuses")],
     ["open", L("চলমান (শেষ হয়নি)", "Open (not finished)")],
-    ...["draft", "packed", "dispatched", "in_transit", "partially_received", "discrepancy", "received", "cancelled"].map((key) => [key, statusLabel(key, lang)]),
+    ...["draft", "requested", "packed", "dispatched", "in_transit", "partially_received", "discrepancy", "received", "cancelled"].map((key) => [key, statusLabel(key, lang)]),
   ];
 
   return (
     <SkinShell rootRef={rootRef} fitH={fitH} titleLeft={shellTitle} titleRight={section === "stock" ? t.stock : `${filtered.length} ${L("টি", "transfers")}`}>
       <div className="si-toolbar">
-        {canSendTransfer && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {t.newTransfer}</button>}
+        {canOpenNew && <button type="button"className="pm-btn pm-btn--primary"onClick={openNew}>+ {peerOnly && !canSendTransfer ? L("স্টক অনুরোধ", "Stock request") : t.newTransfer}</button>}
         <div className="si-pills">
           <button type="button"className={`pm-btn-secondary${section === "all" ? "is-active" : ""}`} onClick={() => setSection("all")}>{canSendTransfer ? L("সব ট্রান্সফার", "All transfers") : L("আমার ট্রান্সফার", "My transfers")}</button>
           {canReceiveTransfer && (

@@ -5,9 +5,11 @@ import {
 } from "./printDesign.js";
 import { printHtmlDocument } from "./printSettings.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
+import { PM_COLORS } from "../product-master/pmStyles.js";
+import { docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 
 const font = "Tahoma, 'Segoe UI', Arial, sans-serif";
-const C = { bg: "#c9d9ef", panel: "#dbe6f5", border: "#7d94b7", bar: "#2854ad", text: "#07101c", sel: "#0a64d8" };
+const C = { bg: PM_COLORS.body, panel: "#fffdf6", border: PM_COLORS.border, bar: PM_COLORS.bar, text: PM_COLORS.text, sel: PM_COLORS.bar };
 const snap = (v) => Math.round(v * 2) / 2;
 const num = (v, d = 0) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : d);
 let seq = 0;
@@ -263,8 +265,8 @@ export default function PrintDesigner({ kind, layout: initial, lang, logo = "", 
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5200, background: C.bg, display: "flex", flexDirection: "column", fontFamily: font, color: C.text }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 6px 5px 10px", background: "linear-gradient(180deg,#3f69bd,#2854ad)", color: "#fff", fontWeight: 700, fontSize: 13 }}>
-        <span> {bn ? "প্রিন্ট ডিজাইনার" : "Print Designer"} — {docName}</span>
+      <div style={docModalTitleChrome}>
+        <strong style={{ color: "#064e22" }}>{bn ? "প্রিন্ট ডিজাইনার" : "Print Designer"} — {docName}</strong>
         <button type="button"onClick={close} title={bn ? "বন্ধ করুন (Esc)" : "Close (Esc)"}
           style={{ width: 30, height: 22, border: "1px solid #e8806f", borderRadius: 3, background: "#c42b1c", color: "#fff", fontWeight: 900, cursor: "pointer" }}>✕</button>
       </div>

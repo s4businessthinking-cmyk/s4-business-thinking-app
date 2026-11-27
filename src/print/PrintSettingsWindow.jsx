@@ -1,12 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { loadPrintSettings, savePrintSettings, hydratePrintSettingsFromDisk, PAPER_SIZES, canPickPrinter, listPrinters, printHtmlDocument } from "./printSettings.js";
+import { loadWhatsappShareSettings, saveWhatsappShareSettings } from "../share/whatsappShareSettings.js";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 import { DESIGN_DOCS, TEMPLATES, SAMPLE_DATA, loadPrintDesign, savePrintDesign, savePrintDesignBestEffort, extractShopPrintDesign, hydratePrintDesignFromShop, renderLayoutDocument, imageFileToDataUrl } from "./printDesign.js";
 import { saveShopRecord } from "../offline/shopService";
 import PrintDesigner from "./PrintDesigner.jsx";
+import { PM_COLORS } from "../product-master/pmStyles.js";
+import { docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 
 const C = {
-  bg: "#c9d9ef", panel: "#dbe6f5", border: "#7d94b7", bar: "#2854ad", text: "#07101c", legend: "#1e3a8a",
+  bg: PM_COLORS.body,
+  panel: "#fffdf6",
+  tab: PM_COLORS.body,
+  border: PM_COLORS.border,
+  bar: PM_COLORS.bar,
+  text: PM_COLORS.text,
+  legend: PM_COLORS.bar,
 };
 const font = "Tahoma, 'Segoe UI', Arial, sans-serif";
 
@@ -21,7 +30,7 @@ function Check({ checked, onChange, children, hint, disabled }) {
 
 function Group({ title, children }) {
   return (
-    <fieldset style={{ border: `1px solid ${C.border}`, borderRadius: 2, padding: "8px 10px 10px", margin: "0 0 10px", background: C.panel }}>
+    <fieldset style={{ border: `1px solid ${C.border}`, borderRadius: 2, padding: "6px 8px 8px", margin: "0 0 8px", background: C.panel }}>
       <legend style={{ fontSize: 12, fontWeight: 700, color: C.legend, padding: "0 4px" }}>{title}</legend>
       {children}
     </fieldset>
@@ -31,8 +40,8 @@ function Group({ title, children }) {
 const tabBtn = (active) => ({
   padding: "6px 14px", fontSize: 13, fontFamily: font, cursor: "pointer",
   borderTop: `1px solid ${C.border}`, borderLeft: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
-  borderBottom: active ? `1px solid ${C.panel}` : `1px solid ${C.border}`,
-  background: active ? C.panel : "#eef3fb", color: C.text, fontWeight: active ? 700 : 400,
+  borderBottom: active ? `1px solid ${C.tab}` : `1px solid ${C.border}`,
+  background: active ? C.tab : C.panel, color: C.text, fontWeight: active ? 700 : 400,
   borderRadius: "3px 3px 0 0", marginRight: 2, position: "relative", top: 1,
 });
 
@@ -86,9 +95,9 @@ function PrinterSetup({ bn, billPrinter, barcodePrinter, chequePrinter, drawerPr
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5100, background: "rgba(10,25,55,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
-      <div style={{ width: "min(500px, 100%)", background: "#c7d5c9", border: "1px solid #3e6b54", boxShadow: "0 16px 40px rgba(2,6,23,0.5)", fontFamily: font, color: C.text }}>
-        <div style={{ padding: "6px 10px", background: "linear-gradient(180deg,#5f8f74,#3e6b54)", color: "#fff", fontWeight: 700, fontSize: 13 }}>
-           {bn ? "প্রিন্টার সেটআপ (PRINTER SETUP)" : "PRINTER SETUP"}
+      <div style={{ width: "min(500px, 100%)", background: C.bg, border: `1px solid ${C.border}`, boxShadow: "0 16px 40px rgba(2,6,23,0.5)", fontFamily: font, color: C.text }}>
+        <div style={{ ...docModalTitleChrome, padding: "4px 8px" }}>
+          <strong style={{ color: "#064e22" }}>{bn ? "প্রিন্টার সেটআপ (PRINTER SETUP)" : "PRINTER SETUP"}</strong>
         </div>
         <div style={{ padding: 14, display: "grid", gap: 14 }}>
           {!supported ? (
@@ -382,6 +391,7 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
   const [design, setDesign] = useState(() => hydratePrintDesignFromShop(shop).design);
   const [designerDoc, setDesignerDoc] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [waShare, setWaShare] = useState(loadWhatsappShareSettings);
   useEscapeKey(onClose, { level: 3 });
   useEffect(() => {
     let alive = true;
@@ -397,6 +407,7 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
   const apply = async () => {
     if (saving) return false;
     savePrintSettings(draft);
+    saveWhatsappShareSettings(waShare);
     setShowCode?.(!hideCode);
     setColorPrint?.(color);
     const stored = loadPrintDesign();
@@ -433,21 +444,21 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 5000, background: "rgba(10,25,55,0.45)", display: "flex", alignItems: isDesktop ? "center" : "stretch", justifyContent: "center", padding: isDesktop ? 12 : 0 }}>
-      <div style={{ width: isDesktop ? (tab === "design" ? "min(980px, 100%)" : "min(560px, 100%)") : "100%", maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, boxShadow: "0 18px 44px rgba(2,6,23,0.5)", fontFamily: font, color: C.text }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 6px 5px 10px", background: "linear-gradient(180deg,#3f69bd,#2854ad)", color: "#fff", fontWeight: 700, fontSize: 13 }}>
-          <span> {bn ? "প্রিন্ট সেটিংস (Print Settings)" : "Print Settings"}</span>
+      <div style={{ width: isDesktop ? (tab === "design" ? "min(980px, 100%)" : "min(560px, 100%)") : "100%", maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.border}`, boxShadow: "0 18px 44px rgba(2,6,23,0.5)", fontFamily: font, color: C.text }}>
+        <div style={docModalTitleChrome}>
+          <strong style={{ color: "#064e22" }}> {bn ? "প্রিন্ট সেটিংস (Print Settings)" : "Print Settings"}</strong>
           <button type="button"onClick={onClose} title={bn ? "বন্ধ করুন (Esc)" : "Close (Esc)"}
             style={{ width: 30, height: 22, border: "1px solid #e8806f", borderRadius: 3, background: "#c42b1c", color: "#fff", fontWeight: 900, cursor: "pointer" }}>✕</button>
         </div>
 
-        <div style={{ padding: "10px 10px 0", overflowY: "auto", flex: 1 }}>
+        <div style={{ padding: "6px 8px 0", overflowY: "auto", flex: 1 }}>
           <div style={{ display: "flex", flexWrap: "wrap" }}>
             <button type="button"style={tabBtn(tab === "general")} onClick={() => setTab("general")}>{bn ? "সাধারণ" : "General"}</button>
             <button type="button"style={tabBtn(tab === "retail")} onClick={() => setTab("retail")}>{bn ? "রিটেইল ইনভয়েস" : "Retail Invoice"}</button>
             <button type="button"style={tabBtn(tab === "tax")} onClick={() => setTab("tax")}>{bn ? "ট্যাক্স ইনভয়েস" : "Tax Invoice"}</button>
             <button type="button"style={tabBtn(tab === "design")} onClick={() => setTab("design")}> {bn ? "ডিজাইন" : "Design"}</button>
           </div>
-          <div style={{ border: `1px solid ${C.border}`, background: C.panel, padding: 10 }}>
+          <div style={{ border: `1px solid ${C.border}`, background: C.tab, padding: 8 }}>
             {tab === "general" && (
               <>
                 <Group title={bn ? "প্রিন্টার" : "Printers"}>
@@ -485,6 +496,18 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
                   <Check checked={color} onChange={setColor}>
                     {bn ? "রঙিন হেডার দিয়ে প্রিন্ট করো" : "Print with Color Header"}
                   </Check>
+                </Group>
+                <Group title="WhatsApp">
+                  <Check checked={waShare.whatsappAutoPaste} onChange={(v) => setWaShare((s) => ({ ...s, whatsappAutoPaste: v }))}>
+                    {bn
+                      ? "Windows অ্যাপে WhatsApp খোলার পর PDF নিজে পেস্ট করার চেষ্টা (Ctrl+V ছাড়া)"
+                      : "On Windows app, try to paste the PDF into WhatsApp after it opens (no manual Ctrl+V)"}
+                  </Check>
+                  <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.45, marginTop: 4 }}>
+                    {bn
+                      ? "ইনভয়েস, স্টেটমেন্ট, রিসিট ইত্যাদিতে WhatsApp বাটন বা সেভের পর WhatsApp — এখানে চেক থাকলে PDF ক্লিপবোর্ড থেকে চ্যাটে যুক্ত করার চেষ্টা হবে; Send আপনি চাপবেন। মোবাইল অ্যাপে Android শেয়ার শীটই PDF দেয়।"
+                      : "For invoice, statement, receipt WhatsApp (button or after save): when ticked, tries to attach the PDF from the clipboard; you still press Send. On mobile, the Android share sheet already attaches the PDF."}
+                  </div>
                 </Group>
                 <Group title={bn ? "বিলে কী কী প্রিন্ট হবে" : "Print in Bill"}>
                   <Check checked={draft.printSalesman} onChange={(v) => set("printSalesman", v)}>{bn ? "বিক্রেতা/Salesman-এর নাম" : "Print Name of Salesman/Executive in Bill"}</Check>
@@ -532,7 +555,7 @@ export default function PrintSettingsWindow({ lang, onClose, showCode, setShowCo
               toast?.(bn ? "প্রিন্টার সেট হয়েছে" : "Printers set");
             }} />
         )}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: 10 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "6px 8px", background: "#eef2f7", borderTop: `1px solid ${C.border}` }}>
           <button type="button"style={winBtn(true)} disabled={saving || !ready} onClick={async () => { if (await apply()) onClose(); }}>OK</button>
           <button type="button"style={winBtn(false)} onClick={onClose}>{bn ? "বাতিল" : "Cancel"}</button>
           <button type="button"style={winBtn(false)} disabled={saving || !ready} onClick={apply}>{saving ? (bn ? "সেভ হচ্ছে..." : "Saving...") : (bn ? "প্রয়োগ" : "Apply")}</button>

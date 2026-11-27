@@ -10,8 +10,10 @@ import { ShopSetupWizard } from "../auth/AuthScreens.jsx";
 import SideMenuGroups from "../dashboard/SideMenuGroups.jsx";
 import { shopNeedsSetup } from "../offline/shopService";
 import DateField from "../components/DateField.jsx";
+import CompanyFileSwitcher from "../branch-transfer/CompanyFileSwitcher.jsx";
+import { docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 
-export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout, isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, localShop, menuOpen, minTab, notificationItems, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs }) {
+export function renderMainLayout({ activeBranch = null, canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, companyFiles = [], currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout, homeShopId = "", isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, ledgerShopId = "", localShop, menuOpen, minTab, notificationItems, onSwitchBranch, onSwitchCompanyFile, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs }) {
   if (licenseAccessLoading && !licenseAccess) {
     return (
       <div style={s.root}>
@@ -130,6 +132,25 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
         shopName={localShop?.companyName||""} personName={profile.personName||""}
         rightSlot={(
           <>
+            {isOwner && onSwitchCompanyFile && (
+              <CompanyFileSwitcher
+                lang={lang}
+                files={companyFiles}
+                activeShopId={ledgerShopId}
+                homeShopId={homeShopId}
+                onSelect={onSwitchCompanyFile}
+              />
+            )}
+            {activeBranch?.branchName && (
+              <button
+                type="button"
+                title={lang === "bn" ? "শাখা বদল (কাউন্টার লগইন)" : "Switch branch (counter login)"}
+                onClick={onSwitchBranch}
+                style={{ border: "1px solid #f97316", background: "rgba(249,115,22,0.12)", color: "#f97316", borderRadius: 8, padding: "4px 8px", fontSize: 11, fontWeight: 900, cursor: "pointer", fontFamily: "inherit", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              >
+                {activeBranch.branchName}
+              </button>
+            )}
             {!isDesktop && globalSearchCanAny && (
               <button
                 type="button"
@@ -150,13 +171,15 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
           {!(pageMax && tab!=="dashboard") && <div style={s.sidebar}>
             <SideMenuGroups items={visibleTabs} activeKey={tab} lang={lang}
               colors={{ head:th.txtPrimary, headBg:th.bgInp, line:th.borderMid }}
-              renderItem={(k,label)=>(
-                <button style={{ ...s.sideTab, padding:"8px 12px", ...(tab===k?s.sideTabA:{}) }} onClick={()=>setTab(k)}>
+              renderItem={(k,label)=>{
+                const branchSales = String(k).startsWith("sales@branch:");
+                return (
+                <button style={{ ...s.sideTab, padding: branchSales ? "10px 12px" : "8px 12px", fontSize: branchSales ? 13 : undefined, fontWeight: branchSales ? 850 : undefined, ...(tab===k&&!branchSales?s.sideTabA:{}), ...(branchSales&&tab==="sales"?s.sideTabA:{}) }} onClick={()=> (branchSales ? selectFromMenu(k) : setTab(k))}>
                   <span style={{ flex:1, textAlign:"left" }}>{label}</span>
                   {TAB_SHORTCUT_KEYS[k]&&<span style={{ ...s.sideKey, ...(tab===k?s.sideKeyA:{}) }}>{TAB_SHORTCUT_KEYS[k]}</span>}
                   {((isOwner&&k==="owner")||(!isOwner&&k==="shop"))&&unread>0&&<span style={s.sideBadge}>{unread}</span>}
                 </button>
-              )} />
+              );}} />
             <div style={{ flex:1 }} />
             <div style={{ fontSize:11, color:syncState==="connected"?"#22c55e":syncState==="offline"?"#ef4444":"#f59e0b", textAlign:"center", marginBottom:10 }}>
               {syncState==="connected"?"Online":syncState==="offline"?"Offline":syncState==="reconnecting"?"Reconnecting...":"Connecting..."}
@@ -166,9 +189,9 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
           <div style={s.desktopContent}>
             {tab!=="dashboard"&&(
               <div onDoubleClick={()=>setPageMax(m=>!m)}
-                style={{ position:"sticky", top:0, zIndex:8, display:"flex", alignItems:"center", justifyContent:"space-between", gap:8, padding:"4px 6px 4px 12px", background:"linear-gradient(180deg,#3f69bd,#2854ad)", color:"#fff", fontSize:13, fontWeight:800, userSelect:"none", fontFamily:"Segoe UI, Tahoma, sans-serif" }}>
-                <span style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{currentTabLabel}</span>
-                <WindowButtons lang={lang}
+                style={{ ...docModalTitleChrome, position:"sticky", top:0, zIndex:8 }}>
+                <strong style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", color:"#064e22" }}>{currentTabLabel}</strong>
+                <WindowButtons lang={lang} light
                   win={{ max:pageMax, minimize:()=>{ setMinTab(tab); setTab("dashboard"); }, toggleMax:()=>setPageMax(m=>!m) }}
                   onClose={()=>setTab("dashboard")} />
               </div>

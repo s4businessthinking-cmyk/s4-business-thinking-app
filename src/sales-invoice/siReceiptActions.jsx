@@ -1,4 +1,5 @@
 import AgainstInvoiceVoucherWindow from "../vouchers/AgainstInvoiceVoucherWindow.jsx";
+import { bankChoicesForShop, shopBankAccountName } from "../ledger/ledgerShopOpts.js";
 import PartyLedgerWindow from "../vouchers/PartyLedgerWindow.jsx";
 import { UAE_BANKS } from "../cheque/chequeConfig.js";
 import { applyInvoiceStockEffect, deviceSerialTag, reserveShopSerial, toVoucherView, voucherParties } from "../shared/appShared.jsx";
@@ -7,7 +8,7 @@ import { logAudit } from "../utils/auditLog.js";
 import { offlineCreate, offlineGetById, offlineList, offlinePatch, offlineRemove, offlineUpdate } from "../offline/offlineRepository";
 import { persistOfflineDb } from "../offline/sqliteDb.js";
 import { generatePaymentVoucherHTML, printPaymentVoucher, siFmt2, siN2 } from "./salesInvoiceShared.js";
-import { voucherShareDoc } from "../share/whatsappDocShare.js";
+import { voucherShareDoc, countryCodeOf } from "../share/whatsappDocShare.js";
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import { siToday } from "./siHelpers.js";
 
@@ -220,7 +221,8 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
         voucherNo={rcptFormatNo(rcptMaxLocalSerial() + 1)}
         parties={voucherParties(customers, openAll, "customerId", "customerName", c=>c.customerName, c=>c.mobileNumber)}
         salesmen={salesmen}
-        banks={UAE_BANKS.map(b=>b.name)}
+        banks={bankChoicesForShop(UAE_BANKS.map((b) => b.name), shop)}
+        defaultBankAccount={shopBankAccountName(shop)}
         getOpenInvoices={(p)=>getCustomerOpenInvoices(p.id, p.name)}
         vouchers={receipts.map(r=>toVoucherView(r,"receipt"))}
         prefill={receiptWin.partyId||receiptWin.partyName ? receiptWin : null}
@@ -235,6 +237,8 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
         }}
         onPrint={canPrintInv ? (v,opts)=>printPaymentVoucher(v.raw, shop, lang, opts) : undefined}
         onWhatsApp={canPrintInv ? (v)=>voucherShareDoc({ kind:"receipt", raw:v.raw, html:generatePaymentVoucherHTML(v.raw, shop, lang), partyRecord:customers.find(c=>c.id===v.raw.customerId), bn:lang==="bn", shop:shop?.companyName||"", cur:t.cur||"AED" }) : null}
+        countryCode={countryCodeOf(shop)}
+        partyAutoWhatsAppOnSave={(p) => !!(p?.id && customers.find((c) => c.id === p.id)?.autoWhatsAppReceipt)}
         toast={toast}
         onClose={()=>{
           setReceiptWin(null);
@@ -259,7 +263,8 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
         lang={lang} mode="receipt"cur={t.cur||"AED"} title={lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER"}
         voucherNo={rcptFormatNo(rcptMaxLocalSerial() + 1)}
         parties={voucherParties(customers, openAllCash, "customerId", "customerName", c=>c.customerName, c=>c.mobileNumber)}
-        banks={UAE_BANKS.map(b=>b.name)}
+        banks={bankChoicesForShop(UAE_BANKS.map((b) => b.name), shop)}
+        defaultBankAccount={shopBankAccountName(shop)}
         getOpenInvoices={(p)=>getCustomerCashOpenInvoices(p.id, p.name)}
         vouchers={receipts.map(r=>toVoucherView(r,"receipt"))}
         prefill={cashReceiptWin.partyId||cashReceiptWin.partyName ? cashReceiptWin : null}
@@ -272,6 +277,8 @@ export function createSiReceiptActions({ COL, billReturns, canCancelInv, canPrin
           printPaymentVoucher(v.raw, shop, lang, { ...opts, allocDetail:cashAllocDetail(v), title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" });
         } : undefined}
         onWhatsApp={canPrintInv ? (v)=>voucherShareDoc({ kind:"receipt", raw:v.raw, html:generatePaymentVoucherHTML(v.raw, shop, lang, { allocDetail:cashAllocDetail(v), title:lang==="bn"?"ক্যাশ রিসিট ভাউচার":"CASH RECEIPT VOUCHER" }), partyRecord:customers.find(c=>c.id===v.raw.customerId), bn:lang==="bn", shop:shop?.companyName||"", cur:t.cur||"AED" }) : null}
+        countryCode={countryCodeOf(shop)}
+        partyAutoWhatsAppOnSave={(p) => !!(p?.id && customers.find((c) => c.id === p.id)?.autoWhatsAppReceipt)}
         toast={toast}
         onClose={()=>setCashReceiptWin(null)}
       />

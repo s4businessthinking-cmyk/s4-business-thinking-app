@@ -12,8 +12,12 @@ import { signOut } from "../backend/auth";
 import { unitFactorFor } from "../inventory/unitConversion";
 import { useEffect } from "react";
 import { backupBeforeExit } from "../backup/backupOnExit.js";
+import { BRANCH_COUNTER_PERMISSIONS, branchCounterDefaults, defaultCounterPassword, suggestBranchLoginUsername } from "../branch-transfer/branchCounterLogin.js";
+import { resolveBranchLedgerShopId } from "../branch-transfer/branchCompanyFile.js";
+import { MAIN_BRANCH } from "../reports/groupView.js";
 
-export function useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle }) {
+export function useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, branchAdminShopId = "", staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle }) {
+  const btShopId = branchAdminShopId || shopId;
   const selectProductToOrder = (prod) => {
     setCurrentItem(p=>({...p, name:prod.name, code:prod.code||prod.barcode||"", brand:prod.brand||"", unit:prod.unit||"Pcs"}));
   };
@@ -593,6 +597,58 @@ const startEditOrder = (order) => {
     } catch(e) { hErr(e); }
   };
 
+  const createBranchCounterLogin = async (branch) => {
+    if (!isOwner || !branch) return;
+    const username = suggestBranchLoginUsername(branch);
+    const existing = team.find((m) => String(m.username || "").toLowerCase() === username);
+    if (existing) {
+      toast(lang === "bn" ? `ইউজারনেম "${username}" আগে থেকেই আছে — টিম থেকে দেখুন` : `Username "${username}" already exists — see Team`, "err");
+      return;
+    }
+    const password = defaultCounterPassword(branch);
+    const isMain = branch?.id === MAIN_BRANCH;
+    setStaffSaving(true);
+    try {
+      const counterShopId = isMain
+        ? btShopId
+        : await resolveBranchLedgerShopId(btShopId, branch, {
+          ownerUid: profile?.uid || user?.uid || "",
+          ownerName: profile?.personName || "",
+        });
+      const ownCompanyFile = !isMain && counterShopId !== shopId;
+      const member = await createShopStaffUser({
+        username,
+        password,
+        personName: `${branch.name || branch.code || "Branch"} Counter`,
+        shopId: counterShopId,
+        position: "Branch Counter",
+        permissions: { ...BRANCH_COUNTER_PERMISSIONS },
+      });
+      const defaults = branchCounterDefaults(branch, { ownCompanyFile });
+      const withDefaults = { ...member, defaults, shopId: counterShopId };
+      await updateShopMemberPermissions(member.uid || member.id, {
+        localUserId: member.localUserId,
+        memberRecord: { ...withDefaults, shopId: counterShopId },
+        extra: { defaults },
+      });
+      if (counterShopId === shopId) {
+        setTeam((prev) => mergeTeamMembers(prev, [withDefaults]));
+      }
+      toast(lang === "bn"
+        ? `কাউন্টার লগইন: "${username}" / "${password}" — company file: ${counterShopId}${ownCompanyFile ? " (আলাদা বই)" : ""}`
+        : `Counter login: "${username}" / "${password}" — company file: ${counterShopId}${ownCompanyFile ? " (separate books)" : ""}`);
+    } catch (e) {
+      if (e?.code === "USERNAME_TAKEN") toast(lang === "bn" ? "ইউজারনেম আগে থেকেই আছে" : "Username already taken", "err");
+      else hErr(e);
+    } finally {
+      setStaffSaving(false);
+    }
+  };
+
+  const createMainCounterLogin = async () => {
+    await createBranchCounterLogin({ id: MAIN_BRANCH, name: "Main", code: "main" });
+  };
+
   const createStaffMember = async () => {
     if (!staffForm.username.trim() || !staffForm.password || !staffForm.personName.trim()) {
       return toast(lang==="bn"?"username, password ও নাম দিন":"Enter username, password and name","err");
@@ -802,5 +858,5 @@ const startEditOrder = (order) => {
     try { await navigator.clipboard.writeText(localShop.inviteCode); setCopyState(true); setTimeout(()=>setCopyState(false),2000); }
     catch { toast("Copy failed","err"); }
   };
-  return { addCo, addItToInvoice, applyGroupToMember, cancelEdit, cancelEditOrder, cancelOrder, closeOrderSupplierPicker, closePriceEditor, closeTeamMember, createStaffMember, delCo, delIt, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, handleEnterAdd, handleLogout, markRead, openOrderSupplierPicker, openPriceEditor, patchOrderOffline, resetStaffPassword, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderReceive, savePermissions, savePriceEditor, saveSupplierPhone, saveUserGroups, searchOrderSuppliers, selectOrderSupplierFromPicker, selectProductToOrder, sendOrder, setCo, setItemStatus, startEdit, startEditOrder, supplierPhone, updCurrentItem, waLinkGroup };
+  return { addCo, addItToInvoice, applyGroupToMember, cancelEdit, cancelEditOrder, cancelOrder, closeOrderSupplierPicker, closePriceEditor, closeTeamMember, createBranchCounterLogin, createMainCounterLogin, createStaffMember, delCo, delIt, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, handleEnterAdd, handleLogout, markRead, openOrderSupplierPicker, openPriceEditor, patchOrderOffline, resetStaffPassword, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderReceive, savePermissions, savePriceEditor, saveSupplierPhone, saveUserGroups, searchOrderSuppliers, selectOrderSupplierFromPicker, selectProductToOrder, sendOrder, setCo, setItemStatus, startEdit, startEditOrder, supplierPhone, updCurrentItem, waLinkGroup };
 }

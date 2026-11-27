@@ -489,6 +489,8 @@ export function SyncSettingsPanel({
   onUpload,
   onDownload,
   onRefresh,
+  localShop = null,
+  isOwner = false,
 }) {
   const isOnline = typeof navigator !== "undefined" ? navigator.onLine : false;
   const [showFailingDetails, setShowFailingDetails] = useState(false);
@@ -631,6 +633,33 @@ export function SyncSettingsPanel({
           ? "নতুন PC/mobile-এ প্রথমবার internet দিয়ে Cloud Download চাপুন। পরে local data offline-এ কাজ করবে।"
           : "On a new PC/mobile, tap Cloud Download once while online. After that, local data works offline."}
       </div>
+      {localShop?.isBranchCompanyFile && (
+        <div style={{ fontSize:11, color:th.txtMuted, marginTop:8, lineHeight:1.5, padding:10, borderRadius:8, background:th.bgInp }}>
+          <div style={{ fontWeight:700, color:th.txtPrimary, marginBottom:4 }}>
+            {lang === "bn" ? "শাখা PC — ক্লাউড (Premier)" : "Branch PC — cloud (Premier)"}
+          </div>
+          {lang === "bn" ? (
+            <>
+              <div>১. প্রথমবার অনলাইনে <strong>Cloud Download</strong> — এই শাখার shopId: <span style={{ wordBreak:"break-all" }}>{shopId}</span></div>
+              <div>২. দিনে শেষে বা HQ চাইলে <strong>Local → Cloud Upload</strong> — শাখার বিল/স্টক HQ-তে যাবে।</div>
+              <div>৩. HQ owner Download করলে সব সক্রিয় শাখা ফাইলও টানতে পারে।</div>
+            </>
+          ) : (
+            <>
+              <div>1. First time online: <strong>Cloud Download</strong> for this branch shopId: <span style={{ wordBreak:"break-all" }}>{shopId}</span></div>
+              <div>2. End of day (or when HQ asks): <strong>Local → Cloud Upload</strong> pushes this branch file to cloud.</div>
+              <div>3. HQ owner Download can pull all active branch company files.</div>
+            </>
+          )}
+        </div>
+      )}
+      {isOwner && !localShop?.isBranchCompanyFile && localShop?.branchTransferSettings?.enabled && localShop?.branchTransferSettings?.companyFilePerBranch !== false && (
+        <div style={{ fontSize:11, color:th.txtMuted, marginTop:8, lineHeight:1.5 }}>
+          {lang === "bn"
+            ? "HQ থেকে Download করলে সক্রিয় শাখার company file-গুলোও একসাথে টানা হয় (Premier-style)।"
+            : "Downloading from HQ also pulls active branch company files (Premier-style)."}
+        </div>
+      )}
     </div>
   );
 }

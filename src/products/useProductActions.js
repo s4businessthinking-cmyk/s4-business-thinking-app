@@ -10,6 +10,18 @@ import { printWithSettings } from "../print/printSettings.js";
 import { saveTextFile } from "../utils/saveTextFile.js";
 import { normalizeManufacturingBom, validateManufacturingBom } from "../inventory/manufacturingBom.js";
 import { useMemo } from "react";
+import { loadShopRecord } from "../offline/shopService.js";
+import { syncProductsFromParentToBranches } from "../branch-transfer/parentCatalogSync.js";
+
+function maybeSyncProductCatalogToBranches(shopId) {
+  if (!shopId) return;
+  void loadShopRecord(shopId)
+    .then((shop) => {
+      if (shop?.isBranchCompanyFile) return null;
+      return syncProductsFromParentToBranches(shopId);
+    })
+    .catch(() => {});
+}
 
 export function useProductActions({ canManageProducts, canSeeProductCost, clearingProducts, createEmptyPmForm, hErr, isOwner, lang, pmCatFilter, pmEditId, pmForm, pmOverSales, pmReset, pmSearch, productBulkDeleteRef, productMaintenanceId, productMaintenanceRef, productReplacementActive, products, profile, setClearingProducts, setPmEditId, setPmForm, setPmOverSales, setPmPickForSales, setPmShowAdd, setProductMaintenance, setProductReplacementActive, setProducts, setSavingProduct, setSyncRefreshKey, shopId, t, toast, user }) {
   const collectProductBarcodes = (p) => [
@@ -479,6 +491,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product sync failed", err));
       }
+      maybeSyncProductCatalogToBranches(shopId);
     } catch(e) {
       hErr(e);
     } finally {
@@ -523,6 +536,7 @@ export function useProductActions({ canManageProducts, canSeeProductCost, cleari
       if (navigator.onLine) {
         window.S4Offline?.syncNow?.().catch(err => console.warn("[S4 Sync] product update sync failed", err));
       }
+      maybeSyncProductCatalogToBranches(shopId);
     } catch(e) {
       hErr(e);
     } finally {

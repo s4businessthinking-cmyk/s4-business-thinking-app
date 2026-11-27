@@ -141,6 +141,13 @@ import VendorMasterScreen, { EMPTY_VENDOR } from "./vendor-master/VendorMasterSc
 import CustomerMasterScreen, { EMPTY_CUSTOMER } from "./customer-master/CustomerMasterScreen.jsx";
 import { syncOpeningBill, isOpeningBill } from "./utils/openingBill.js";
 import { isBranchTransferBill } from "./branch-transfer/branchTransferDomain.js";
+import { BRANCH_TRANSFER_COLLECTIONS, listShopRecords } from "./branch-transfer/branchTransferService.js";
+import BranchLoginGate from "./branch-transfer/BranchLoginGate.jsx";
+import { clearActiveBranch, clearAllActiveBranches, getActiveBranch, setActiveBranch } from "./branch-transfer/branchSession.js";
+import { branchDefaultsOf } from "./branch-transfer/userBranchDefaults.js";
+import { getOwnerActiveCompanyFile, setOwnerActiveCompanyFile } from "./branch-transfer/companyFileSession.js";
+import { listOwnerCompanyFiles } from "./branch-transfer/branchCompanyFile.js";
+import { loadCustomersForLedgerShop, loadVendorsForLedgerShop } from "./branch-transfer/companyPartyLoader.js";
 import ReturnsTab, { returnsAsLedgerVouchers } from "./returns/ReturnsTab.jsx";
 import VouchersTab from "./vouchers/VouchersTab.jsx";
 import StockAdjustmentTab from "./returns/StockAdjustmentTab.jsx";
@@ -256,7 +263,14 @@ import { useCloudSync } from "./app/useCloudSync.js";
 function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBase, th:thBase, theme, setTheme, onLogout, onProfileUpdate }) {
   const isOwner = profile.role==="owner";
   const isSalesman = !isOwner;
-  const shopId  = profile.shopId;
+  const homeShopId = isOwner ? (profile.shopId || "") : "";
+  const [ledgerShopId, setLedgerShopId] = useState(() => (isOwner ? getOwnerActiveCompanyFile(profile.shopId || "") : profile.shopId || ""));
+  const [companyFiles, setCompanyFiles] = useState([]);
+  const [companyFileTick, setCompanyFileTick] = useState(0);
+  const shopId = isOwner ? (ledgerShopId || profile.shopId) : profile.shopId;
+  const branchAdminShopId = isOwner ? (homeShopId || shopId) : shopId;
+  const viewingBranchCompanyFile = isOwner && homeShopId && shopId !== homeShopId;
+
   const perms   = { ...DEFAULT_PERMISSIONS, ...(profile.permissions || {}) };
   const can     = (key) => isOwner||perms[key]===true;
   const canManageProducts = can("manageProducts");
@@ -344,6 +358,9 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   // Global desktop shortcut: F4 opens a new sales invoice.
   const [siNewReq,setSiNewReq] = useState(0);
   const [siNewCustomer,setSiNewCustomer] = useState(null);
+  const [siBranchSalesPrefill, setSiBranchSalesPrefill] = useState(null);
+  const [branchSalesLinks, setBranchSalesLinks] = useState([]);
+  const [branchSessionTick, setBranchSessionTick] = useState(0);
   useEffect(() => {
     const onSalesShortcut = (event) => {
       if (event.key !== "F4") return;
@@ -414,32 +431,6 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const [copyState,setCopyState]=useState(false);
   const [vendors, setVendors] = useState([]);
   const [customers, setCustomers] = useState([]);
-  const reloadCustomersFromOffline = useCallback(async () => {
-    if (!shopId) return;
-    try {
-      const local = await offlineList("customers");
-      const docs = (local.records || [])
-        .map((r) => ({ id: r.document_id || r.data?.id, ...(r.data || r) }))
-        .filter((c) => c.shopId === shopId)
-        .sort((a, b) => (a.customerName || "").localeCompare(b.customerName || ""));
-      setCustomers(docs);
-    } catch (err) {
-      console.warn("[S4] customers reload failed", err);
-    }
-  }, [shopId]);
-  const reloadVendorsFromOffline = useCallback(async () => {
-    if (!shopId) return;
-    try {
-      const local = await offlineList("vendors");
-      const docs = (local.records || [])
-        .map((r) => ({ id: r.document_id || r.data?.id, ...(r.data || r) }))
-        .filter((v) => v.shopId === shopId)
-        .sort((a, b) => (a.vendorName || "").localeCompare(b.vendorName || ""));
-      setVendors(docs);
-    } catch (err) {
-      console.warn("[S4] vendors reload failed", err);
-    }
-  }, [shopId]);
 
   const [searchQ,setSearchQ]=useState("");
   const [waStyle,setWaStyleState]=useState(loadWaStyle());
@@ -500,12 +491,78 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const [orderModuleOverride,setOrderModuleOverride]=useState(null);
   const orderModuleEnabled = orderModuleOverride ?? (localShop?.orderModuleEnabled === true);
   const branchTransferAccess = useBranchTransferAccess({
-    shopId, user, profile, isOwner,
+    shopId: branchAdminShopId || shopId, user, profile, isOwner,
   });
   const branchTransferSettings = branchTransferAccess.settings;
   const setBranchTransferSettings = branchTransferAccess.setSettings;
+  const reloadCustomersFromOffline = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const docs = await loadCustomersForLedgerShop(shopId, { ...localShop, shopId }, branchTransferSettings);
+      setCustomers(docs);
+    } catch (err) {
+      console.warn("[S4] customers reload failed", err);
+    }
+  }, [shopId, localShop, branchTransferSettings]);
+  const reloadVendorsFromOffline = useCallback(async () => {
+    if (!shopId) return;
+    try {
+      const docs = await loadVendorsForLedgerShop(shopId, { ...localShop, shopId }, branchTransferSettings);
+      setVendors(docs);
+    } catch (err) {
+      console.warn("[S4] vendors reload failed", err);
+    }
+  }, [shopId, localShop, branchTransferSettings]);
   const canUseBranchTransfer = branchTransferAccess.canUse;
   const btInbox = useBranchTransferInbox({ shopId, user, profile, enabled: canUseBranchTransfer });
+  useEffect(() => {
+    if (!canUseBranchTransfer || !shopId) { setBranchSalesLinks([]); return undefined; }
+    let alive = true;
+    listShopRecords(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, branchAdminShopId || shopId)
+      .then((rows) => {
+        if (!alive) return;
+        setBranchSalesLinks((rows || []).filter((b) => b && b.active !== false).map((b) => ({ id: b.id, name: b.name || b.code || b.id })));
+      })
+      .catch(() => { if (alive) setBranchSalesLinks([]); });
+    return () => { alive = false; };
+  }, [canUseBranchTransfer, shopId, branchAdminShopId, branchTransferSettings?.enabled]);
+
+  useEffect(() => {
+    if (!isOwner || !homeShopId) return;
+    setLedgerShopId(getOwnerActiveCompanyFile(homeShopId));
+  }, [isOwner, homeShopId]);
+
+  useEffect(() => {
+    if (!isOwner || !homeShopId) {
+      setCompanyFiles([]);
+      return;
+    }
+    let cancelled = false;
+    listOwnerCompanyFiles(homeShopId).then((rows) => { if (!cancelled) setCompanyFiles(rows || []); });
+    return () => { cancelled = true; };
+  }, [isOwner, homeShopId, companyFileTick, branchTransferSettings?.enabled]);
+
+  useEffect(() => {
+    if (!isOwner || !ledgerShopId) return;
+    loadShopRecord(ledgerShopId).then((shop) => { if (shop) setLocalShop(shop); });
+  }, [isOwner, ledgerShopId]);
+
+  const switchCompanyFile = useCallback(async (targetShopId) => {
+    if (!isOwner || !homeShopId) return;
+    const next = String(targetShopId || homeShopId).trim() || homeShopId;
+    setOwnerActiveCompanyFile(homeShopId, next);
+    setLedgerShopId(next);
+    const shop = await loadShopRecord(next);
+    if (shop) setLocalShop(shop);
+    else if (next === homeShopId && shopProp) setLocalShop(shopProp);
+    clearActiveBranch(homeShopId);
+    setBranchSessionTick((v) => v + 1);
+    setSyncRefreshKey((v) => v + 1);
+    setSettingsPage(null);
+    setTab("dashboard");
+    setCompanyFileTick((v) => v + 1);
+  }, [isOwner, homeShopId, shopProp]);
+
   const btSeenRef = useRef(null);
   useEffect(() => {
     const ids = new Set(btInbox.map((tr) => tr.id));
@@ -552,7 +609,7 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const { applyShopRecord, mergeShopRecord, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, runCloudUpload } = useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, isOwner, lang, localShop, onLogout, onProfileUpdate, profile, profileSyncRef, setCloudPullBusy, setCloudUploadBusy, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setLicenseAccess, setLicenseAccessLoading, setLocalShop, setOrders, setProducts, setSyncDashboard, setSyncRefreshKey, setSyncState, setTeam, setVendors, shopId, syncDashboard, t, toast, user });
 
-  const { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef, warrantyAlertList } = useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors });
+  const { calcMode, empFocus, employeeAlertList, finance, openEmployeeAlert, partnerAlertList, productMaintenance, productMaintenanceId, productMaintenanceRef, productReplacementActive, productsLoading, rebuildTeam, reminderAlertList, securityChequeAlertList, setCalcMode, setEmpFocus, setProductMaintenance, setProductReplacementActive, setProductsLoading, teamPermissionOverridesRef, warrantyAlertList } = useShopDataSync({ applyShopRecord, authSyncReady, branchTransferSettings, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors });
 
   // low-stock count for the notification bell (refreshes on focus and every few minutes)
   const lowStock = useLowStock(products, shopId, { enabled: !!shopId && (isOwner || can("viewProducts") || can("stockAdjust")) });
@@ -581,9 +638,10 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
 
   const { addProduct, clearAllShopProducts, deleteProduct, editProduct, exportProductsCsv, exportWeighingBarcodeCsv, filteredProducts, finishProductReplacement, getFilteredProducts, importProductRecords, pmUpd, printProductBarcodes, removeBlankProducts } = useProductActions({ canManageProducts, canSeeProductCost, clearingProducts, createEmptyPmForm, hErr, isOwner, lang, pmCatFilter, pmEditId, pmForm, pmOverSales, pmReset, pmSearch, productBulkDeleteRef, productMaintenanceId, productMaintenanceRef, productReplacementActive, products, profile, setClearingProducts, setPmEditId, setPmForm, setPmOverSales, setPmPickForSales, setPmShowAdd, setProductMaintenance, setProductReplacementActive, setProducts, setSavingProduct, setSyncRefreshKey, shopId, t, toast, user });
 
-  const { addCo, addItToInvoice, applyGroupToMember, cancelEdit, cancelEditOrder, cancelOrder, closeOrderSupplierPicker, closePriceEditor, closeTeamMember, createStaffMember, delCo, delIt, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, handleEnterAdd, handleLogout, markRead, openOrderSupplierPicker, openPriceEditor, patchOrderOffline, resetStaffPassword, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderReceive, savePermissions, savePriceEditor, saveSupplierPhone, saveUserGroups, searchOrderSuppliers, selectOrderSupplierFromPicker, selectProductToOrder, sendOrder, setCo, setItemStatus, startEdit, startEditOrder, supplierPhone, updCurrentItem, waLinkGroup } = useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle });
+  const { addCo, addItToInvoice, applyGroupToMember, cancelEdit, cancelEditOrder, cancelOrder, closeOrderSupplierPicker, closePriceEditor, closeTeamMember, createBranchCounterLogin, createMainCounterLogin, createStaffMember, delCo, delIt, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, handleEnterAdd, handleLogout, markRead, openOrderSupplierPicker, openPriceEditor, patchOrderOffline, resetStaffPassword, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderReceive, savePermissions, savePriceEditor, saveSupplierPhone, saveUserGroups, searchOrderSuppliers, selectOrderSupplierFromPicker, selectProductToOrder, sendOrder, setCo, setItemStatus, startEdit, startEditOrder, supplierPhone, updCurrentItem, waLinkGroup } = useOrderTeamActions({ can, cos, currentItem, editNm, editPh, editingOrderId, hErr, isOwner, isSalesman, items, lang, localShop, mergeShopRecord, nameRef, newNm, newPh, note, onLogout, orderEditBaselineRef, orderReceive, orderReceiveSaving, orders, priceEditorInputRef, priceEditorTarget, priceEditorValue, products, profile, rebuildTeam, selOrder, setCopyState, setCos, setCurrentItem, setEditId, setEditNm, setEditPh, setEditingOrderId, setItems, setLocalShop, setNewNm, setNewPh, setNote, setOrderReceive, setOrderReceiveSaving, setOrders, setPriceEditorTarget, setPriceEditorValue, setSelOrder, setShowAdd, setStaffForm, setStaffPwReset, setStaffSaving, setSupplierPickerQuery, setSupplierPickerTarget, setTeam, shopId, branchAdminShopId, staffForm, staffPwReset, supplierPickerInputRef, supplierPickerTarget, t, teamPermissionOverridesRef, toast, user, userGroups, vendors, waStyle });
 
-  const { canStaffSupplierArea, canStaffVouchers, closeMenu, currentTabLabel, filterOrders, filterOrdersByStatusPage, goBack, groupByDay, makeShopNo, notificationItems, renderOrderPageTabs, selectFromMenu, setOrderStatus, stPage, staffQuickNavKeys, tabLabelOf, unread, visibleTabs } = useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList, lowStockCount: lowStock.rows.length, reminderDueCount: overdueReminders.readyCount, team, th, toast, user, warrantyAlertList });
+  const showCompanyConsolidated = isOwner && companyFiles.length > 1 && branchTransferSettings?.companyFilePerBranch !== false;
+  const { canStaffSupplierArea, canStaffVouchers, closeMenu, currentTabLabel, filterOrders, filterOrdersByStatusPage, goBack, groupByDay, makeShopNo, notificationItems, renderOrderPageTabs, selectFromMenu, setOrderStatus, stPage, staffQuickNavKeys, tabLabelOf, unread, visibleTabs } = useNavigationState({ btInbox, branchSalesLinks, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setSiBranchSalesPrefill, setTab, setTabState, settingsPage, shopId, showCompanyConsolidated, t, tab, taxAlertList, lowStockCount: lowStock.rows.length, reminderDueCount: overdueReminders.readyCount, team, th, toast, user, warrantyAlertList });
 
   const canExpand = isOwner || isOrderManager || can("deleteOrder");
 
@@ -601,9 +659,53 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   }, [isOwner, perms.viewGlobalLedger]);
   const { OrderCard, ownerLockedPanel } = createOrderRenderers({ can, canExpand, cancelOrder, delOrder, deliverItem, findOrderSupplier, getOrderDisplayNo, isDesktop, isOrderManager, isOwner, isSalesman, lang, markRead, openOrderSupplierPicker, openPriceEditor, s, saveSupplierPhone, selOrder, setCo, setItemStatus, setOrderStatus, setPinModal, setSelOrder, shopName: localShop?.companyName||"", startEditOrder, supplierPhone, t, th, user, waLinkGroup });
 
-  const { tabContent } = renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenReturnInvoiceId, globalOpenWarrantyClaimId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenReturnInvoiceId, setGlobalOpenWarrantyClaimId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth });
+  const staffBranchDefaults = useMemo(() => {
+    if (isOwner) return null;
+    const myDefaults = team.find((m) => (m.uid || m.id) === user?.uid)?.defaults || profile?.defaults || {};
+    return branchDefaultsOf(myDefaults);
+  }, [isOwner, team, user?.uid, profile?.defaults]);
 
-  return renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout, isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, localShop, menuOpen, minTab, notificationItems, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs });
+  useEffect(() => {
+    if (!canUseBranchTransfer || !branchTransferSettings?.enabled || !staffBranchDefaults || !shopId) return;
+    if (!getActiveBranch(shopId)) {
+      setActiveBranch(shopId, { branchId: staffBranchDefaults.stockLocation, branchName: staffBranchDefaults.stockLocationName });
+      setBranchSessionTick((v) => v + 1);
+    }
+  }, [staffBranchDefaults, canUseBranchTransfer, branchTransferSettings?.enabled, shopId]);
+
+  const activeBranch = useMemo(() => getActiveBranch(shopId), [shopId, branchSessionTick]);
+  const isChildCompanyFile = localShop?.isBranchCompanyFile === true || viewingBranchCompanyFile;
+  const branchLoginRequired = !isChildCompanyFile
+    && branchTransferSettings?.companyFilePerBranch !== true
+    && canUseBranchTransfer && branchTransferSettings?.enabled && !activeBranch && (isOwner || !staffBranchDefaults);
+  const branchLocked = !!activeBranch;
+  const switchBranchSession = () => {
+    if (!isOwner) return;
+    clearActiveBranch(shopId);
+    setBranchSessionTick((v) => v + 1);
+    setSettingsPage(null);
+    setTab("dashboard");
+  };
+  const logoutWithBranch = () => {
+    clearActiveBranch(shopId);
+    handleLogout();
+  };
+
+  const { tabContent } = renderTabContent({ OrderCard, activeBranch, addCo, addItToInvoice, addProduct, applyGroupToMember, branchAdminShopId, branchLocked, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createBranchCounterLogin, createMainCounterLogin, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenReturnInvoiceId, globalOpenWarrantyClaimId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout: logoutWithBranch, homeShopId, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, onSwitchBranch: switchBranchSession, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenReturnInvoiceId, setGlobalOpenWarrantyClaimId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiBranchSalesPrefill, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siBranchSalesPrefill, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth });
+
+  if (branchLoginRequired) {
+    return (
+      <BranchLoginGate
+        lang={lang} shopId={shopId} profile={profile} team={team} isOwner={isOwner}
+        branches={branchSalesLinks} shopName={localShop?.companyName || ""}
+        s={s} theme={theme} setTheme={setTheme} setLang={setLang} t={t}
+        onSelect={(b) => { setActiveBranch(shopId, b); setBranchSessionTick((v) => v + 1); }}
+        onLogout={logoutWithBranch}
+      />
+    );
+  }
+
+  return renderMainLayout({ activeBranch, canSeeProductCost, closeMenu, closeOrderSupplierPicker, closePriceEditor, companyFiles, currentTabLabel, customers, erpDark, erpSkin, findOrderSupplier, getOrderDisplayNo, globalSearchCan, globalSearchCanAny, goBack, handleGlobalSearchNavigate, handleLogout: logoutWithBranch, homeShopId, isDesktop, isOwner, lang, licenseAccess, licenseAccessLoading, ledgerShopId: shopId, localShop, menuOpen, minTab, notificationItems, onSwitchBranch: isOwner && branchTransferSettings?.companyFilePerBranch !== true ? switchBranchSession : undefined, onSwitchCompanyFile: isOwner ? switchCompanyFile : undefined, orderReceive, orderReceiveSaving, orders, pageMax, pmOverSales, priceEditorInputRef, priceEditorTarget, priceEditorValue, printSettingsOpen, products, profile, refreshLicenseAccess, s, saveOrderReceive, savePriceEditor, searchOrderSuppliers, selectFromMenu, selectOrderSupplierFromPicker, setLang, setLocalShop, setMinTab, setOrderReceive, setPageMax, setPriceEditorValue, setPrintSettingsOpen, setSiColorPrint, setSiShowCode, setSupplierPickerQuery, setTab, setTheme, shopId, siColorPrint, siShowCode, supplierPickerInputRef, supplierPickerQuery, supplierPickerTarget, syncState, t, tab, tabContent, tabLabelOf, th, theme, toast, unread, user, vendors, visibleTabs });
 }
 
 // ─── ROOT ────────────────────────────────────────────────────
@@ -719,6 +821,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    clearAllActiveBranches();
     await logoutLocalAuth();
     try { await signOut(auth); } catch {}
     setUser(null);

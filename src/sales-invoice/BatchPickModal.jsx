@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { PM_COLORS } from "../product-master/pmStyles.js";
 import { fefoChoices } from "../inventory/batchExpiry.js";
+import { C } from "./SalesInvoiceDesktopForm.jsx";
+import { DOC_FONT, docModalTitleChrome } from "./docDesktopLayout.js";
 
 const fmt = (v) => (Number(v) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDay = (d) => (d ? String(d).slice(0, 10).split("-").reverse().join("/") : "");
@@ -29,16 +32,16 @@ export default function BatchPickModal({ lang = "en", product, choices: given, o
   return (
     <div data-si-modal-open=""style={{ position: "fixed", inset: 0, background: "rgba(10,25,55,0.45)", zIndex: 10060, display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", background: "#f4f7fc", border: "1px solid #2854ad", borderRadius: 6, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#2854ad", color: "#fff", padding: "7px 10px", fontWeight: 800, fontSize: 13.5 }}>
-          <span> {bn ? "কোন ব্যাচ থেকে দেবেন?" : "Which batch?"} — {product?.name}</span>
-          <button type="button"onClick={onClose} style={{ background: "transparent", border: "none", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
+      <div style={{ width: "100%", maxWidth: 640, maxHeight: "85vh", display: "flex", flexDirection: "column", background: PM_COLORS.body, border: `1px solid ${PM_COLORS.border}`, borderRadius: 6, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: DOC_FONT }}>
+        <div style={docModalTitleChrome}>
+          <strong style={{ color: "#064e22" }}> {bn ? "কোন ব্যাচ থেকে দেবেন?" : "Which batch?"} — {product?.name}</strong>
+          <button type="button"onClick={onClose} style={{ background: "#fffdf6", border: `1px solid ${C.border}`, color: "#07101c", fontSize: 14, cursor: "pointer", fontWeight: 900, lineHeight: 1, padding: "2px 6px" }}>✕</button>
         </div>
         <div style={{ overflow: "auto", padding: 8, display: "grid", gap: 6 }}>
           {choices.map((c, i) => (
             <button key={c.batchNo || "main"} type="button"onClick={() => onPick(c)} onMouseEnter={() => setActive(i)}
-              style={{ textAlign: "left", padding: "8px 10px", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", border: i === active ? "2px solid #2854ad" : "1px solid #b7c6e0", background: i === active ? "#dbe6f5" : "#fff", display: "grid", gridTemplateColumns: "24px 1fr auto", gap: 8, alignItems: "center" }}>
-              <b style={{ color: "#2854ad", fontSize: 15 }}>{i + 1}</b>
+              style={{ textAlign: "left", padding: "8px 10px", borderRadius: 5, cursor: "pointer", fontFamily: "inherit", border: i === active ? `2px solid ${C.bar}` : `1px solid ${C.border}`, background: i === active ? "#fffdf6" : "#fff", display: "grid", gridTemplateColumns: "24px 1fr auto", gap: 8, alignItems: "center" }}>
+              <b style={{ color: C.bar, fontSize: 15 }}>{i + 1}</b>
               <span>
                 <span style={{ fontWeight: 800, fontSize: 13.5, color: c.isMain ? "#1f2937" : "#7c3aed" }}>
                   {c.isMain ? (bn ? "আগের / সাধারণ stock" : "Main stock") : `${bn ? "ব্যাচ" : "Batch"} ${c.batchNo}`}

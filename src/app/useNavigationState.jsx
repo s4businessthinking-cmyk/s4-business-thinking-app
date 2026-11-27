@@ -10,7 +10,7 @@ import { warrantyAlertText } from "../returns/warrantyClaim.js";
 import { useEffect, useMemo, useRef } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
-export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId = null, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setTab, setTabState, settingsPage, shopId, t, tab, taxAlertList = [], lowStockCount = 0, reminderDueCount = 0, team, th, toast, user, warrantyAlertList = [] }) {
+export function useNavigationState({ btInbox, branchSalesLinks = [], can, canUseBranchTransfer, confirmPmDiscard, employeeAlertList, finance, findOrderSupplier, getOrderDisplayNo, hErr, isDesktop, isOrderManager, isOwner, lang, localShop, menuOpen, openEmployeeAlert, orderModuleEnabled, orderReceive, orderReceiveSaving, orderStatusPage, orders, partnerAlertList, patchOrderOffline, pmOverSales, pmReset, profile, reminderAlertList, searchQ, securityChequeAlertList, setGlobalOpenSalesInvoiceId, setGlobalOpenWarrantyClaimId = null, setMenuOpen, setOrderReceive, setOrderStatusPage, setPmEditId, setPmOverSales, setPmShowAdd, setSettingsPage, setSiBranchSalesPrefill = null, setTab, setTabState, settingsPage, shopId, showCompanyConsolidated = false, t, tab, taxAlertList = [], lowStockCount = 0, reminderDueCount = 0, team, th, toast, user, warrantyAlertList = [] }) {
   const unread = isOwner || isOrderManager
     ? orders.filter(o=>o.overall==="pending"&&!o.read).length
     : orders.filter(o=>o.items?.some(it=>it.status==="out_for_branch")).length;
@@ -142,14 +142,23 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     setMenuOpen(false);
   };
   const selectFromMenu = (k) => {
-    if (k !== tab && billLeaveGuard.current && !billLeaveGuard.current.leave()) { closeMenu(); return; }
+    const branchKey = String(k || "").startsWith("sales@branch:") ? k : null;
+    const targetTab = branchKey ? "sales" : k;
+    if (targetTab !== tab && billLeaveGuard.current && !billLeaveGuard.current.leave()) { closeMenu(); return; }
     if (menuHistRef.current) {
       menuHistRef.current = false;
-      if (k !== "dashboard" && !navHistRef.current.pushed) navHistRef.current.pushed = true;
+      if (targetTab !== "dashboard" && !navHistRef.current.pushed) navHistRef.current.pushed = true;
       else { navHistRef.current.ignorePop = true; window.history.back(); }
     }
     setMenuOpen(false);
     setSettingsPage(null);
+    if (branchKey) {
+      const branchId = branchKey.slice("sales@branch:".length);
+      const br = (branchSalesLinks || []).find((b) => b.id === branchId);
+      setSiBranchSalesPrefill?.({ branchId, branchName: br?.name || branchId, at: Date.now() });
+      setTabState("sales");
+      return;
+    }
     setTabState(k);
   };
   const stPage = settingsPage || (isDesktop ? "profile" : null);
@@ -286,8 +295,28 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
     auditLog: lang==="bn"?"অডিট লগ":"Audit Log",
   };
 
-  const visibleTabs = useMemo(() => (isOwner
-    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["priceList",lang==="bn"?"মূল্য তালিকা":"Price List"],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["counter",lang==="bn"?"কাউন্টার":"Counter"],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["mergeMasters",lang==="bn"?"মার্জ / মাস্টার":"Merge / Masters"],["cheque",t.tabCheque],["pdc",lang==="bn"?"PDC চেক":"PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"খরচ":"Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["chartOfAccounts",lang==="bn"?"হিসাবের খাত":"Chart of Accounts"],["openingBalances",lang==="bn"?"শুরুর ব্যালেন্স ও মাইগ্রেশন":"Opening & Migration"],["vouchers",lang==="bn"?"ভাউচার":"Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["warrantyClaim",returnTabLabels.warrantyClaim],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"হিসাব নিকাশ":"Accounts"],["balanceSheet",lang==="bn"?"ব্যালেন্স শিট":"Balance Sheet"],["trialBalance",lang==="bn"?"ট্রায়াল ব্যালেন্স":"Trial Balance"],["booksHub",lang==="bn"?"বুকস":"Books"],["cashFlow",lang==="bn"?"ক্যাশ ফ্লো":"Cash Flow"],["fundsSummary",lang==="bn"?"ফান্ড / ওয়ার্কিং ক্যাপিটাল":"Funds / Working Capital"],["ratioAnalysis",lang==="bn"?"অনুপাত বিশ্লেষণ":"Ratio Analysis"],["costCentres",lang==="bn"?"কস্ট সেন্টার":"Cost Centres"],["budget",lang==="bn"?"বাজেট":"Budget"],["tallyExport",lang==="bn"?"হিসাব এক্সপোর্ট":"Accounting Export"],["partyAging",lang==="bn"?"ডেটরস / ক্রেডিটরস এজিং":"Debtors / Creditors Ageing"],["overdueInterest",lang==="bn"?"বকেয়া বিলে সুদ":"Overdue Interest"],["stockHub",lang==="bn"?"স্টক হাব (মুভিং / ওয়্যারহাউস)":"Stock Hub (Moving / Warehouse)"],["reorderAlerts",lang==="bn"?"স্টক কম / রি-অর্ডার":"Low Stock / Reorder"],["salesAnalytics",lang==="bn"?"সেলস অ্যানালিটিক্স":"Sales Analytics"],["purchaseAnalytics",lang==="bn"?"পারচেজ অ্যানালিটিক্স":"Purchase Analytics"],["serialRegistry",lang==="bn"?"সিরিয়াল / IMEI":"Serial / IMEI"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["bulkMessage",lang==="bn"?"বাল্ক মেসেজ":"Bulk Message"],["overdueReminders",lang==="bn"?"বকেয়ার রিমাইন্ডার":"Payment Reminders"],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
+  const branchSalesMenuRows = useMemo(() => {
+    if (!canUseBranchTransfer || !(branchSalesLinks || []).length) return [];
+    if (!isOwner && !can("manageSales")) return [];
+    return branchSalesLinks.map((b) => {
+      const name = b.name || b.id || "";
+      const label = lang === "bn" ? `${name} বিক্রয়` : `${name} Sales`;
+      return [`sales@branch:${b.id}`, label];
+    });
+  }, [branchSalesLinks, canUseBranchTransfer, isOwner, lang, can]);
+
+  const visibleTabs = useMemo(() => {
+    const withBranchSales = (base) => {
+      if (!branchSalesMenuRows.length) return base;
+      const out = [];
+      base.forEach((row) => {
+        out.push(row);
+        if (row[0] === "sales") out.push(...branchSalesMenuRows);
+      });
+      return out;
+    };
+    return withBranchSales(isOwner
+    ? [["dashboard",t.tabDashboard],...(orderModuleEnabled?[["owner",t.tabOwner]]:[]),["products",t.tabProducts],["priceList",lang==="bn"?"মূল্য তালিকা":"Price List"],["purchaseOrder",newTabLabels.purchaseOrder],["goodsReceipt",newTabLabels.goodsReceipt],["purchase",t.tabPurchase],["sales",t.tabSales],["counter",lang==="bn"?"কাউন্টার":"Counter"],["quotation",t.tabQuotation],["salesOrder",newTabLabels.salesOrder],["delivery",t.tabDelivery],["jobCard",newTabLabels.jobCard],["vendors",t.tabVendor],["customers",t.tabCustomer],["mergeMasters",lang==="bn"?"মার্জ / মাস্টার":"Merge / Masters"],["cheque",t.tabCheque],["pdc",lang==="bn"?"PDC চেক":"PDC Cheques"],["securityCheque",newTabLabels.securityCheque],["expenses",lang==="bn"?"খরচ":"Expenses"],["employees",newTabLabels.employees],["employeeExpense",newTabLabels.employeeExpense],["attendance",newTabLabels.attendance],["globalLedger",newTabLabels.globalLedger],["chartOfAccounts",lang==="bn"?"হিসাবের খাত":"Chart of Accounts"],["openingBalances",lang==="bn"?"শুরুর ব্যালেন্স ও মাইগ্রেশন":"Opening & Migration"],["vouchers",lang==="bn"?"ভাউচার":"Vouchers"],["salesReturn",returnTabLabels.salesReturn],["purchaseReturn",returnTabLabels.purchaseReturn],["stockAdjust",returnTabLabels.stockAdjust],["productExchange",returnTabLabels.productExchange],["warrantyClaim",returnTabLabels.warrantyClaim],["loosen",returnTabLabels.loosen],["bundle",returnTabLabels.bundle],["accounts",lang==="bn"?"হিসাব নিকাশ":"Accounts"],["balanceSheet",lang==="bn"?"ব্যালেন্স শিট":"Balance Sheet"],["trialBalance",lang==="bn"?"ট্রায়াল ব্যালেন্স":"Trial Balance"],...(showCompanyConsolidated?[["companyConsolidated",lang==="bn"?"সব শাখা (HQ)":"All branches (HQ)"]]:[]),["booksHub",lang==="bn"?"বুকস":"Books"],["cashFlow",lang==="bn"?"ক্যাশ ফ্লো":"Cash Flow"],["fundsSummary",lang==="bn"?"ফান্ড / ওয়ার্কিং ক্যাপিটাল":"Funds / Working Capital"],["ratioAnalysis",lang==="bn"?"অনুপাত বিশ্লেষণ":"Ratio Analysis"],["costCentres",lang==="bn"?"কস্ট সেন্টার":"Cost Centres"],["budget",lang==="bn"?"বাজেট":"Budget"],["tallyExport",lang==="bn"?"হিসাব এক্সপোর্ট":"Accounting Export"],["partyAging",lang==="bn"?"ডেটরস / ক্রেডিটরস এজিং":"Debtors / Creditors Ageing"],["overdueInterest",lang==="bn"?"বকেয়া বিলে সুদ":"Overdue Interest"],["stockHub",lang==="bn"?"স্টক হাব (মুভিং / ওয়্যারহাউস)":"Stock Hub (Moving / Warehouse)"],["reorderAlerts",lang==="bn"?"স্টক কম / রি-অর্ডার":"Low Stock / Reorder"],["salesAnalytics",lang==="bn"?"সেলস অ্যানালিটিক্স":"Sales Analytics"],["purchaseAnalytics",lang==="bn"?"পারচেজ অ্যানালিটিক্স":"Purchase Analytics"],["serialRegistry",lang==="bn"?"সিরিয়াল / IMEI":"Serial / IMEI"],["bankRec",newTabLabels.bankRec],["partners",newTabLabels.partners],["tax",lang==="bn"?"ট্যাক্স / VAT":"Tax / VAT"],["auditLog",returnTabLabels.auditLog],...(canUseBranchTransfer?[["branchTransfer",branchTransferMenuLabel(lang, btInbox.length)]]:[]),["labels",newTabLabels.labels],["reminders",newTabLabels.reminders],["bulkMessage",lang==="bn"?"বাল্ক মেসেজ":"Bulk Message"],["overdueReminders",lang==="bn"?"বকেয়ার রিমাইন্ডার":"Payment Reminders"],["calculator",newTabLabels.calculator],["settings",t.tabSettings]]
     : [
         ["dashboard",t.tabDashboard],
         ...(orderModuleEnabled?[["shop",t.tabShop]]:[]),
@@ -323,7 +352,8 @@ export function useNavigationState({ btInbox, can, canUseBranchTransfer, confirm
         ["reminders",newTabLabels.reminders],
         ["calculator",newTabLabels.calculator],
         ["settings",t.tabSettings],
-      ]), [isOwner, orderModuleEnabled, t, newTabLabels, returnTabLabels, lang, canUseBranchTransfer, btInbox.length, canStaffSupplierArea, canStaffVouchers]);
+      ]);
+  }, [isOwner, orderModuleEnabled, t, newTabLabels, returnTabLabels, lang, canUseBranchTransfer, btInbox.length, canStaffSupplierArea, canStaffVouchers, branchSalesMenuRows, showCompanyConsolidated]);
   const validTabs = visibleTabs;
 
   // Safety: if any old/invalid tab is active after new menu changes, always return to Dashboard.

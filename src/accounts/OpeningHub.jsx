@@ -17,6 +17,7 @@ import { normalizeChart, toSaved, validateAccount } from "../ledger/chartOfAccou
 import { CHART_EXPENSE_NAMES } from "../ledger/ChartOfAccountsScreen.jsx";
 import { OPENING_ACCOUNT, currentOpenings, matchImport, natureLabel, openingAccounts, parseOpeningRows, parseTallyLedgers, planOpenings, reconcileOpenings } from "./openingHub.js";
 import DateField from "../components/DateField.jsx";
+import { useBranchLedgerOpts } from "../reports/useBranchLedgerOpts.js";
 
 const lc = (v) => String(v || "").trim().toLowerCase();
 const money = (v) => (Math.round((Number(v) || 0) * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -212,15 +213,24 @@ export default function OpeningHub({ lang = "en", shopId, shop, user, profile, i
     }
   };
 
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
+
   // ── reconcile (S4 balance on the opening day vs the imported figure) ──
   const recon = useMemo(() => {
     if (!imported || !data || !date) return null;
-    const ledger = buildGlobalLedger(data, { shopId, customers: custList, vendors: vendList, natureOf: shopAccountNature(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) });
+    const ledger = buildGlobalLedger(data, {
+      shopId,
+      customers: custList,
+      vendors: vendList,
+      natureOf: shopAccountNature(shop),
+      expenseLabel: (e) => expenseCategoryLabel(e, false),
+      ...branchLedgerOpts,
+    });
     const bal = balances(ledger.postings, date);
     const byName = new Map();
     ledger.accounts.forEach((a) => byName.set(lc(a.name), (byName.get(lc(a.name)) || 0) + (bal.get(a.key) || 0)));
     return reconcileOpenings(imported.matched, byName);
-  }, [imported, data, date, shopId, custList, vendList]);
+  }, [imported, data, date, shopId, custList, vendList, branchLedgerOpts]);
   const reconBad = recon ? recon.filter((r) => Math.abs(r.difference) >= 0.005) : [];
 
   if (!isOwner) return <div className="si-root"><style>{PM_CSS}</style><style>{SI_CSS}</style><div className="si-empty">{L("শুরুর ব্যালেন্স শুধু মালিক দিতে পারেন", "Only the owner can enter opening balances")}</div></div>;

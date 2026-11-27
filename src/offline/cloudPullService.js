@@ -25,6 +25,7 @@ import {
   stampProductCatalogEpoch,
 } from "./productCatalogSync.js";
 import { CLOUD_NOT_LICENSED, isCloudAccessAllowedSync } from "./cloudAccessPolicy.js";
+import { listOwnerCompanyFiles } from "../branch-transfer/branchCompanyFile.js";
 
 const CLOUD_PULL_META_PREFIX = "s4-cloud-pull-v1";
 
@@ -367,6 +368,33 @@ export async function pullShopFromCloud(shopId, options = {}) {
     totalDocs,
     pulledAt: failed === 0 ? new Date().toISOString() : getShopCloudPulledAt(shopId),
   };
+}
+
+/** After HQ pull: download each branch child company file (Premier multi-shop). */
+export async function pullBranchCompanyFilesFromCloud(parentShopId, options = {}) {
+  if (!parentShopId) return { children: 0, pulls: [] };
+  const blockReason = getCloudSyncBlockReason();
+  if (blockReason) return { children: 0, pulls: [], reason: blockReason };
+
+  const files = await listOwnerCompanyFiles(parentShopId).catch(() => []);
+  const children = files.filter((f) => f.kind === "branch" && f.shopId && f.shopId !== parentShopId);
+  const pulls = [];
+  for (const file of children) {
+    try {
+      const result = await pullShopFromCloud(file.shopId, {
+        ...options,
+        includeAllOrders: options.includeAllOrders === true,
+      });
+      pulls.push({ shopId: file.shopId, label: file.label, result });
+    } catch (error) {
+      pulls.push({
+        shopId: file.shopId,
+        label: file.label,
+        result: { ok: false, error: error?.message || String(error) },
+      });
+    }
+  }
+  return { children: children.length, pulls };
 }
 
 export async function uploadPendingShopChanges(shopId) {

@@ -14,6 +14,7 @@ import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
 import { MinimizedChip, useEscapeKey, useWindowState, WindowButtons } from "../components/WindowChrome.jsx";
 import { C, btn, inp, lbl, td, th, productBarcodeUnit } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
+import { docWinFrameStyle, docWinTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 import { nsq } from "../utils/productSearch";
 import { orderLines, orderProgress, billOfReceipt, docTotals, pendingProductCount, orderLineKey, applyBackorderToOrder, backorderItemsFromShortage } from "./purchaseDocs.js";
 import DateField from "../components/DateField.jsx";
@@ -515,10 +516,10 @@ export default function PurchaseDocsTab({ kind = "po", lang = "en", shopId, user
     const totals = docTotals(lines.map((l) => ({ qty: l.qty, unitCost: l.unitCost, taxPerc: l.taxPerc })), isPO);
     const activeVendors = vendors.filter((v) => !["inactive", "blocked"].includes(v.status || "active"));
     return (
-      <div style={{ position: "fixed", inset: win.max ? 0 : "28px 40px", zIndex: 1500, background: "#c7d8ee", padding: win.max ? 6 : "0 6px 6px", boxSizing: "border-box", overflowX: "auto", overflowY: "hidden", display: "flex", flexDirection: "column", border: win.max ? "none" : "1px solid #2854ad", boxShadow: win.max ? "none" : "0 18px 50px rgba(2,6,23,0.45)" }}>
-        <div onDoubleClick={win.toggleMax} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: win.max ? "-6px -6px 6px" : "0 -6px 6px", padding: "4px 6px 4px 12px", background: "linear-gradient(180deg,#3f69bd,#2854ad)", color: "#fff", fontSize: 13, fontWeight: 800, userSelect: "none", flexShrink: 0, fontFamily: "Segoe UI, Tahoma, sans-serif" }}>
-          <span>{K.print}{editId ? ` — ${L("এডিট", "Edit")}` : ""}</span>
-          <WindowButtons win={win} lang={lang} onClose={backToList} />
+      <div style={docWinFrameStyle(win.max)}>
+        <div onDoubleClick={win.toggleMax} style={docWinTitleChrome(win.max)}>
+          <strong style={{ color: "#c2410c" }}>{K.print}{editId ? ` — ${L("এডিট", "Edit")}` : ""}</strong>
+          <WindowButtons win={win} lang={lang} light onClose={backToList} />
         </div>
         <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: C.panel, border: `1px solid ${C.border}`, padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "120px 1fr 140px 140px 1fr", gap: 8 }}>

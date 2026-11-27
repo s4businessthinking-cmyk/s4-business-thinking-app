@@ -1,4 +1,5 @@
 import { BRANCH_TRANSFER_COLLECTIONS, createBranchTransfer, createPurchaseInvoiceFromReceipt, deleteBranchTransfer, listShopRecords, receiveBranchTransfer, updateTransferStatus } from "./branchTransferService.js";
+import { isPeerTransfer } from "./branchTransferDomain.js";
 import { acceptedQty, f2, fmtDay, fq, normalizeError, sentQty, transferSentDate, transferTotalValue } from "./btShared.jsx";
 import { generateStatementHTML } from "../print/printDesign.js";
 import { logAudit } from "../utils/auditLog.js";
@@ -103,7 +104,9 @@ export function useBtWorkspaceActions({ L, actor, busy, dirtyRef, lang, leaveGua
     const subtitle = [
       transfer.transferNo,
       fmtDay(transferSentDate(transfer)),
-      `${transfer.sourceShopName || "Main Shop"} → ${transfer.branchName || ""}`,
+      isPeerTransfer(transfer)
+        ? `${transfer.sourceBranchName || transfer.sourceShopName || ""} → ${transfer.branchName || ""}`
+        : `${transfer.sourceShopName || "Main Shop"} → ${transfer.branchName || ""}`,
       transfer.receiverName && `Receiver: ${transfer.receiverName}`,
       transfer.vendorName,
       statusLabel(transfer.status, "en"),

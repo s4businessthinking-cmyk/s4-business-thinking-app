@@ -7,6 +7,7 @@
 // - Browser: the PDF downloads and the chat opens on wa.me with the message; the user attaches the PDF.
 // Nothing is sent by itself and nothing reports "sent": WhatsApp only opens ready to send.
 import { openLink } from "../utils/openLink.js";
+import { whatsappAutoPasteEnabled } from "./whatsappShareSettings.js";
 
 /** WhatsApp number of a customer / vendor / partner record: WhatsApp field first, then mobile, then phone. */
 export const partyPhone = (p) => String(p?.whatsappNumber || p?.mobileNumber || p?.mobile || p?.phoneNumber || p?.phone || "").trim();
@@ -84,7 +85,8 @@ export async function shareDocOnWhatsApp({ html, fileName, phone = "", text = ""
   const mode = shareMode();
   const name = /\.pdf$/i.test(fileName || "") ? fileName : pdfFileName(fileName);
   if (mode === "desktop") {
-    const res = await window.S4Desktop.share.whatsappPdf({ html, fileName: name, phone, text });
+    const autoPaste = whatsappAutoPasteEnabled();
+    const res = await window.S4Desktop.share.whatsappPdf({ html, fileName: name, phone, text, autoPaste });
     return { mode, ...res };
   }
   if (mode === "android") {
@@ -145,9 +147,11 @@ export function shareOutcome(res, bn = false) {
     const where = res.desktop ? L("WhatsApp Desktop-এ চ্যাট খুলেছে, মেসেজ লেখা আছে।", "The chat is open in WhatsApp Desktop with the message.")
       : L("WhatsApp Desktop খোলা যায়নি - চ্যাট ব্রাউজারে (wa.me) খুলেছে।", "WhatsApp Desktop could not be opened - the chat opened in the browser (wa.me).");
     if (!res.path) return { tone: "info", text: `${where} ${L("PDF বানানো যায়নি", "The PDF could not be made")}${res.pdfError ? `: ${res.pdfError}` : ""}.` };
-    const attach = res.clipboard && res.desktop
-      ? L("PDF কপি করা আছে: চ্যাটে ক্লিক করে Ctrl+V চাপুন, তারপর Send।", "The PDF is copied: click in the chat and press Ctrl+V, then Send.")
-      : L("ফোল্ডার থেকে PDF টেনে চ্যাটে দিন, তারপর Send।", "Drag the PDF from the folder into the chat, then Send.");
+    const attach = res.autoPaste
+      ? L("PDF চ্যাটে পেস্ট করার চেষ্টা হয়েছে — একবার দেখে Send চাপুন।", "Tried to paste the PDF into the chat — check it and press Send.")
+      : res.clipboard && res.desktop
+        ? L("PDF কপি করা আছে: চ্যাটে ক্লিক করে Ctrl+V চাপুন, তারপর Send।", "The PDF is copied: click in the chat and press Ctrl+V, then Send.")
+        : L("ফোল্ডার থেকে PDF টেনে চ্যাটে দিন, তারপর Send।", "Drag the PDF from the folder into the chat, then Send.");
     return { tone: res.desktop ? "ok" : "info", text: `${where} ${noAuto} ${attach}` };
   }
   if (res?.mode === "android") return res.opened ? { tone: "ok", text: L("শেয়ার থেকে WhatsApp আর চ্যাট বেছে Send করুন।", "Pick WhatsApp and the chat in the share sheet, then Send.") } : { tone: "info", text: L("শেয়ার বাতিল হয়েছে", "Share cancelled") };

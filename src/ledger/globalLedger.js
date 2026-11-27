@@ -8,6 +8,9 @@
 // the customer / supplier of that name.
 
 import { CASH_ACCOUNT, isMemoVoucher } from "../vouchers/accountVoucherDomain.js";
+import { branchCashAccountName } from "../branch-transfer/branchCashAccounts.js";
+import { dueToHqAccountName } from "../branch-transfer/interCompanyAccounts.js";
+import { branchOfDoc, MAIN_BRANCH } from "../reports/groupView.js";
 import { n, r2, dayOf, isLive, liveReturnsOf } from "../reports/reportFilters.js";
 import { STOCK_ADJUSTMENT_ACCOUNT, WARRANTY_STOCK_ACCOUNT, stockLedgerEntries } from "./stockLedger.js";
 
@@ -43,7 +46,7 @@ export const FIXED = {
 const lc = (v) => String(v || "").trim().toLowerCase();
 const BANK_METHODS = new Set(["bank", "bank_transfer", "card", "cheque"]);
 /** Group a named account gets in the ledger: a fixed system account, a "Bank ..." money account, else other. */
-export const ledgerGroupOf = (name) => FIXED[name] || (/^bank\b/i.test(name) ? "money" : "other");
+export const ledgerGroupOf = (name) => FIXED[name] || (/^bank\b/i.test(name) ? "money" : /^cash in hand\b/i.test(String(name)) ? "money" : "other");
 const live = (d, shopId) => isLive(d, shopId) && d.status !== "cancelled" && d.status !== "draft";
 const liveSales = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && inv.docKind !== "quotation" && inv.invoiceType !== "delivery");
 const livePurchases = (list, shopId) => (list || []).filter((inv) => live(inv, shopId) && !inv.internalTransfer && inv.sourceType !== "branch_transfer");
@@ -59,7 +62,11 @@ const sumApplied = (rets, id) => rets.filter((r) => r.invoiceId === id).reduce((
  * -> { accounts: Map(key -> { key, name, group, partyId? }), postings: [...] }
  * posting: { key, date, dr, cr, type, no, col, docId, narration, against } - one per account line of an entry.
  */
-export function buildGlobalLedger(data, { shopId = "", customers = [], vendors = [], products = [], natureOf = null, valuation = "average", expenseLabel = (e) => e.categoryName || e.category || "Expense" } = {}) {
+export function buildGlobalLedger(data, { shopId = "", customers = [], vendors = [], products = [], branches = [], branchCashSplit = false, defaultBankAccount = "", natureOf = null, valuation = "average", expenseLabel = (e) => e.categoryName || e.category || "Expense" } = {}) {
+  const bankLedgerName = () => {
+    const custom = String(defaultBankAccount || "").trim();
+    return custom || BANK;
+  };
   const accounts = new Map();
   const postings = [];
   const acc = (key, name, group, extra) => {
@@ -79,7 +86,31 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     ? acc(`v:${id}`, vendById.get(id)?.vendorName || name || "Supplier", "vendor", { partyId: id })
     : acc(`vn:${lc(name) || "-"}`, name || "Supplier", "vendor")); };
   const partner = (id, name) => acc(`p:${id || lc(name)}`, name || "Partner", "equity", { partnerId: id });
-  const money = (method) => (method === "credit" ? null : named(BANK_METHODS.has(method) ? BANK : CASH_ACCOUNT));
+  const branchById = new Map((branches || []).filter((b) => b?.id).map((b) => [b.id, b]));
+  const salesInvById = new Map((data.salesInvoices || []).filter((i) => i?.id).map((i) => [i.id, i]));
+  const cashForMoneyDoc = (doc, method, invoiceForBranch = null) => {
+    if (method === "credit") return null;
+    if (BANK_METHODS.has(method)) {
+      const bank = String(doc?.paymentBank || doc?.refBank || doc?.chequeBank || "").trim();
+      return named(bank || bankLedgerName());
+    }
+    if (!branchCashSplit) return named(CASH_ACCOUNT);
+    const inv = invoiceForBranch || doc;
+    const br = branchOfDoc(inv);
+    const meta = branchById.get(br);
+    return named(branchCashAccountName(br, meta?.name || inv?.stockLocationName));
+  };
+  const cashForInvoice = (inv, method) => cashForMoneyDoc(inv, method, inv);
+  const cashForReceipt = (r, method) => {
+    if (method === "credit") return null;
+    if (BANK_METHODS.has(method)) return cashForMoneyDoc(r, method);
+    if (!branchCashSplit) return named(CASH_ACCOUNT);
+    const invId = (r.allocations || [])[0]?.invoiceId;
+    const inv = invId ? salesInvById.get(invId) : null;
+    if (!inv) return named(CASH_ACCOUNT);
+    return cashForInvoice(inv, method);
+  };
+  const money = (method, doc = null) => (method === "credit" ? null : cashForMoneyDoc(doc || {}, method));
   // a journal line's account: a customer / supplier by name goes to their own ledger
   const byName = (name) => {
     const k = lc(name);
@@ -95,6 +126,11 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
   customers.filter((c) => c?.id && !c.isDeleted).forEach((c) => customer(c.id, c.customerName));
   vendors.filter((v) => v?.id && !v.isDeleted).forEach((v) => vendor(v.id, v.vendorName));
   [CASH_ACCOUNT, BANK, "Sales", "Purchase", "VAT Output", "VAT Input"].forEach(named);
+  if (branchCashSplit) {
+    (branches || []).forEach((b) => {
+      if (b?.id && branchOfDoc({ stockLocation: b.id }) !== MAIN_BRANCH) named(branchCashAccountName(b.id, b.name));
+    });
+  }
 
   // lines: [[accountKey, dr, cr]]; zero lines are dropped
   const entry = (doc, lines) => {
@@ -120,21 +156,28 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     else entry({ ...doc, type: "sale" }, [[c, gt, 0], [named("Sales"), 0, gt - vat], [named("VAT Output"), 0, vat]]);
     // fxSettledAed: the part of the bill closed by an exchange loss journal (reports/salesForex.js) - not money
     const direct = n(inv.amountPaid) - sumAlloc(receipts, inv.id) - sumApplied(salesRet, inv.id) - n(inv.fxSettledAed);
-    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "saleReceipt" }, [[money(inv.paymentMethod) || named(CASH_ACCOUNT), direct, 0], [c, 0, direct]]);
+    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "saleReceipt" }, [[cashForInvoice(inv, inv.paymentMethod) || named(CASH_ACCOUNT), direct, 0], [c, 0, direct]]);
   });
   livePurchases(data.purchaseInvoices, shopId).forEach((inv) => {
     const v = vendor(inv.vendorId, inv.vendorName);
     const gt = n(inv.grandTotal), vat = n(inv.totalTax);
     const doc = { date: inv.invoiceDate, no: inv.invoiceNo, col: "purchaseInvoices", id: inv.id, narration: [inv.supplierInvoiceNo, inv.note].filter(Boolean).join(" · ") };
+    if (inv.interCompanyIn === true) {
+      const dueName = String(inv.interCompanyDueAccount || "").trim() || dueToHqAccountName();
+      const due = named(dueName);
+      if (inv.source === "openingBalance") entry({ ...doc, type: "opening" }, [[named("Opening Balance"), gt, 0], [due, 0, gt]]);
+      else entry({ ...doc, type: "interCompanyIn" }, [[named("Purchase"), gt - vat, 0], [named("VAT Input"), vat, 0], [due, 0, gt]]);
+      return;
+    }
     if (inv.source === "openingBalance") entry({ ...doc, type: "opening" }, [[named("Opening Balance"), gt, 0], [v, 0, gt]]);
     else entry({ ...doc, type: "purchase" }, [[named("Purchase"), gt - vat, 0], [named("VAT Input"), vat, 0], [v, 0, gt]]);
     const direct = n(inv.amountPaid) - sumAlloc(payments, inv.id) - sumApplied(purchRet, inv.id);
-    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "purchasePayment" }, [[v, direct, 0], [money(inv.paymentMethod) || named(CASH_ACCOUNT), 0, direct]]);
+    if (direct > 0.009 && inv.chequeStatus !== "bounced") entry({ ...doc, type: "purchasePayment" }, [[v, direct, 0], [cashForInvoice(inv, inv.paymentMethod) || named(CASH_ACCOUNT), 0, direct]]);
   });
   receipts.forEach((r) => {
     const amt = n(r.totalAmount);
     const c = customer(r.customerId, r.customerName);
-    const cash = money(r.method) || named(CASH_ACCOUNT);
+    const cash = cashForReceipt(r, r.method) || named(CASH_ACCOUNT);
     if (r.isRefund) {
       entry({ date: r.receiptDate || r.createdAt, no: r.receiptNo, col: "salesReceipts", id: r.id, type: "refundPaid", narration: [r.returnNo && `Return ${r.returnNo}`, r.note].filter(Boolean).join(" · ") },
         [[c, amt, 0], [cash, 0, amt]]);
@@ -147,7 +190,7 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     const total = n(p.totalAmount);
     const paid = p.chequeAmount != null ? n(p.chequeAmount) : total - n(p.discountAmount);
     const v = vendor(p.vendorId, p.vendorName);
-    const cash = money(p.method) || named(CASH_ACCOUNT);
+    const cash = cashForMoneyDoc(p, p.method) || named(CASH_ACCOUNT);
     if (p.isRefund) {
       entry({ date: p.paymentDate || p.createdAt, no: p.paymentNo, col: "purchasePayments", id: p.id, type: "refundReceived", narration: [p.returnNo && `Return ${p.returnNo}`, p.note].filter(Boolean).join(" · ") },
         [[cash, paid, 0], [v, 0, paid]]);
@@ -163,7 +206,9 @@ export function buildGlobalLedger(data, { shopId = "", customers = [], vendors =
     entry({ ...doc, type: "salesReturn" }, [[named("Sales Return"), total - vat, 0], [named("VAT Output"), vat, 0], [c, 0, total]]);
     // Refund cash on linked live voucher; if voucher cancelled/missing, post here (same as bankRec).
     if (refund > 0.009 && !(r.refundVoucherId && liveReceiptIds.has(r.refundVoucherId))) {
-      entry({ ...doc, type: "refundPaid" }, [[c, refund, 0], [money(r.refundMethod) || named(CASH_ACCOUNT), 0, refund]]);
+      const inv = r.invoiceId ? salesInvById.get(r.invoiceId) : null;
+      const refundCash = inv ? (cashForInvoice(inv, r.refundMethod) || named(CASH_ACCOUNT)) : (money(r.refundMethod) || named(CASH_ACCOUNT));
+      entry({ ...doc, type: "refundPaid" }, [[c, refund, 0], [refundCash, 0, refund]]);
     }
   });
   purchRet.forEach((r) => {

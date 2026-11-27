@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { PM_COLORS } from "../product-master/pmStyles.js";
+import { C, th as gridTh } from "../sales-invoice/SalesInvoiceDesktopForm.jsx";
+import { DOC_FONT, docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 import { useEscapeKey } from "./WindowChrome.jsx";
 
 const PICKER_LIMIT = 300;
@@ -68,25 +71,25 @@ export default function PartyPickerWindow({ title, columns, items, onPick, onClo
 
   return (
     <div data-si-modal-open={modalId} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
-      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(15,23,42,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Segoe UI, Tahoma, sans-serif" }}>
-      <div style={{ width: "min(900px, 96vw)", height: "min(560px, 90vh)", background: "#e9eef7", border: "1px solid #2854ad", boxShadow: "0 18px 50px rgba(2,6,23,0.45)", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "5px 10px", background: "linear-gradient(180deg,#3f69bd,#2854ad)", color: "#fff", fontSize: 13, fontWeight: 800 }}>
-          <span>{title}</span>
-          <button type="button" onClick={onClose} style={{ width: 24, height: 20, border: "1px solid rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.15)", color: "#fff", cursor: "pointer", fontWeight: 900, lineHeight: 1 }}>✕</button>
+      style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(15,23,42,0.35)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: DOC_FONT }}>
+      <div style={{ width: "min(900px, 96vw)", height: "min(560px, 90vh)", background: PM_COLORS.body, border: `1px solid ${PM_COLORS.border}`, boxShadow: "0 18px 50px rgba(2,6,23,0.45)", display: "flex", flexDirection: "column" }}>
+        <div style={docModalTitleChrome}>
+          <strong style={{ color: "#064e22" }}>{title}</strong>
+          <button type="button" onClick={onClose} style={{ width: 24, height: 20, border: `1px solid ${PM_COLORS.border}`, background: "#fffdf6", color: "#07101c", cursor: "pointer", fontWeight: 900, lineHeight: 1 }}>✕</button>
         </div>
         <div style={{ display: "flex", padding: "6px 8px 0" }}>
           {columns.map((c, i) => (
             <input key={c.key} ref={i === 0 ? firstRef : undefined} value={filters[c.key] || ""} onKeyDown={onKeyDown} autoComplete="off"
               onChange={(e) => setFilters((f) => ({ ...f, [c.key]: e.target.value }))}
-              style={{ width: c.width, boxSizing: "border-box", height: 24, border: "1px solid #9fb2d1", padding: "0 6px", fontSize: 12, outline: "none" }} />
+              style={{ width: c.width, boxSizing: "border-box", height: 24, border: `1px solid ${C.border}`, padding: "0 6px", fontSize: 12, outline: "none" }} />
           ))}
         </div>
-        <div ref={listRef} style={{ flex: 1, margin: "0 8px", overflowY: "auto", background: "#fff", border: "1px solid #9fb2d1", borderTop: "none" }}>
+        <div ref={listRef} style={{ flex: 1, margin: "0 8px", overflowY: "auto", background: "#fff", border: `1px solid ${C.border}`, borderTop: "none" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
             <colgroup>{columns.map((c) => <col key={c.key} style={{ width: c.width }} />)}</colgroup>
             <thead><tr>
               {columns.map((c) => (
-                <th key={c.key} style={{ position: "sticky", top: 0, background: "#2854ad", color: "#fff", textAlign: "left", padding: "4px 6px", fontSize: 12, fontWeight: 700, borderRight: "1px solid #4a72c4" }}>{c.label}</th>
+                <th key={c.key} style={{ ...gridTh, position: "sticky", top: 0, textAlign: "left", borderRight: "1px solid #4a72c4" }}>{c.label}</th>
               ))}
             </tr></thead>
             <tbody>

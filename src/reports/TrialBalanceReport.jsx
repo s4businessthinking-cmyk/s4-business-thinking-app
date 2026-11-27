@@ -19,6 +19,7 @@ import { fyStartDate } from "./balanceSheet.js";
 import { r2 } from "./reportFilters.js";
 import { csvText } from "./vatExport.js";
 import { buildTrialBalance, closingByKey, comparePeriod, trialBalanceFileName, trialBalanceRows } from "./trialBalance.js";
+import { ledgerOptsWithBranches, loadBranchMaster } from "../branch-transfer/branchLedgerOpts.js";
 import MonthEndPackPanel from "./MonthEndPackPanel.jsx";
 import YearEndPanel from "./YearEndPanel.jsx";
 import ForexPanel from "./ForexPanel.jsx";
@@ -58,6 +59,7 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
   const [folded, setFolded] = useState(() => new Set(["s:customer", "s:vendor"]));
   const [selKey, setSelKey] = useState("");
   const [data, setData] = useState(null);
+  const [branchMaster, setBranchMaster] = useState([]);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
   const [showPack, setShowPack] = useState(false);
@@ -85,8 +87,9 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
         rows, bankDocs: rowsOf(br),
       });
     }).catch((err) => { console.warn("[S4 Trial balance] load failed", err); if (!cancelled) setError(String(err?.message || err)); });
+    loadBranchMaster(shopId, shop).then((rows) => { if (!cancelled) setBranchMaster(rows || []); });
     return () => { cancelled = true; };
-  }, [shopId, tick]);
+  }, [shopId, shop, tick]);
   useEffect(() => {
     const refresh = () => { if (document.visibilityState !== "hidden") setTick((v) => v + 1); };
     window.addEventListener("focus", refresh);
@@ -97,7 +100,8 @@ export default function TrialBalanceReport({ lang = "en", shopId, shop, customer
   const badRange = !!(from && to && from > to);
   // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod]);
+  const branchLedgerOpts = useMemo(() => ledgerOptsWithBranches(shop, branchMaster), [shop, branchMaster]);
+  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod, branchLedgerOpts]);
   // year-end closing journals inside the period: the trial balance can show the figures before closing
   const closeIds = useMemo(() => yearEndDocIds(data?.accountVouchers, from, to), [data, from, to]);
   const excludeDocIds = beforeClose && closeIds.size ? closeIds : null;

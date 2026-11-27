@@ -17,6 +17,7 @@ import { r2 } from "./reportFilters.js";
 import { csvText } from "./vatExport.js";
 import { TALLY_KINDS, TALLY_VCH, buildTallyVouchers, exportCheck, ledgerList, tallyCsvExport, tallyFileName, tallyXml } from "./tallyExport.js";
 import DateField from "../components/DateField.jsx";
+import { useBranchLedgerOpts } from "./useBranchLedgerOpts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -73,7 +74,11 @@ export default function TallyExportReport({ lang = "en", shopId, shop = null, cu
   const badRange = !!(from && to && from > to);
   // chart-of-accounts nature of custom accounts (ledger/accountNature.js)
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null), [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod]);
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
+  const ledger = useMemo(
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, products, natureOf, valuation: valuationMethodOf(shop), expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, products, natureOf, shop?.stockValuationMethod, branchLedgerOpts],
+  );
   const res = useMemo(() => (ledger && !badRange ? buildTallyVouchers(ledger, { from, to, kind, dayBook }) : null), [ledger, from, to, kind, dayBook, badRange]);
   const ledgers = useMemo(() => (res ? ledgerList(res, ledger, chartOfAccounts) : []), [res, ledger, chartOfAccounts]);
   const empty = !!res && !res.vouchers.length;

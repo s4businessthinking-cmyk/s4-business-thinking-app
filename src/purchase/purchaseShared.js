@@ -55,5 +55,5 @@ export function piEmptyCurrent() {
 }
 
 export function piEmptyForm() {
-  return { invoiceDate:piToday(), entryDate:piToday(), supplierInvoiceNo:"", refNo:"", currency:"", exchangeRate:"", vendorId:"", vendorName:"", vendorMobile:"", vendorAddress:"", vendorTrn:"", paymentMethod:"cash", amountPaid:"", note:"", adjustment:"", adjustmentReasonId:"", adjustmentReason:"" };
+  return { invoiceDate:piToday(), entryDate:piToday(), supplierInvoiceNo:"", refNo:"", currency:"", exchangeRate:"", vendorId:"", vendorName:"", vendorMobile:"", vendorAddress:"", vendorTrn:"", paymentMethod:"cash", amountPaid:"", paymentBank:"", note:"", adjustment:"", adjustmentReasonId:"", adjustmentReason:"" };
 }

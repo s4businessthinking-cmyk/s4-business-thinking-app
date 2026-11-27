@@ -54,7 +54,7 @@ import { useBillLocationStock } from "../inventory/useBillLocationStock.js";
 import { billSnapshot, isDisplayOpen, showOnDisplay } from "../counter/customerDisplay.js";
 
 // ── SALES INVOICE TAB (main) ──
-export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", quoteToConvert=null, onConvertQuote, onConvertToDN, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, voucherRequest=0, onVoucherHandled, openInvoiceId=null, onOpenInvoiceHandled, onStartReturn }) {
+export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, customers, products, shop, toast, isDesktop, siShowCode, siColorPrint, canManageCustomers=false, onCustomerCreated, syncRefreshKey=0, team=[], onOpenProductMaster, productFromMaster=null, wideDesktop=false, kind="sales", branchLocked=false, quoteToConvert=null, onConvertQuote, onConvertToDN, onQuoteConvertHandled, openNewRequest=0, openNewCustomer=null, onOpenNewHandled, openBranchSalesRequest=null, onOpenBranchSalesHandled, voucherRequest=0, onVoucherHandled, openInvoiceId=null, onOpenInvoiceHandled, onStartReturn }) {
   const authSyncReady = useFirebaseAuthReady();
   const isOwner = profile?.role==="owner";
   const siPerm = (key) => isOwner || { ...DEFAULT_PERMISSIONS, ...(profile?.permissions||{}) }[key] === true;
@@ -113,6 +113,14 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
     siOpenNew(openNewCustomer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openNewRequest]);
+  useEffect(() => {
+    if (!openBranchSalesRequest?.at) return;
+    onOpenBranchSalesHandled?.();
+    if (kind !== "sales") return;
+    const { branchId, branchName } = openBranchSalesRequest;
+    siOpenNew(null, "", branchId ? { stockLocation: branchId, stockLocationName: branchName || branchId } : null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openBranchSalesRequest?.at]);
   useEffect(()=>{
     if (!voucherRequest) return;
     onVoucherHandled?.();
@@ -348,5 +356,5 @@ export function SalesInvoiceTab({ t, lang, th, s, shopId, user, profile, custome
   };
   const siRootStyle = siFitH && !siMobile ? { height:siFitH } : undefined;
 
-  return <>{renderSiScreens({ listFilter: siListFilter, onStartReturn, siLocations, siLocStock, STATUSES, balance, billReturns, bnL, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, canViewAllInvoices: isOwner || canViewAllInvoices, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siCodeRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, wideDesktop })}{siAutoShare.dialogs}</>;
+  return <>{renderSiScreens({ listFilter: siListFilter, onStartReturn, siLocations, siLocStock, STATUSES, balance, billReturns, bnL, branchLocked, canCancelInv, canCustBalance, canDiscount, canManageCustomers, canPrintInv, canSeeCost, canViewAllInvoices: isOwner || canViewAllInvoices, cashReceiptWindow, customerPickerProps, customers, editInvId, formIsCash, formIsDelivery, formIsSettled, formIsTax, formPaid, invoices, isDN, isOwner, isQuote, isSO, kind, kpiCards, lang, ledgerWindow, mobileTypeOptions, onConvertQuote, onConvertToDN, onOpenProductMaster, products, receiptWindow, receipts, selInv, setCashReceiptWin, setLedgerWin, setReceiptWin, setShowCustPicker, setSiCurrent, setSiEditLineId, setSiForm, setSiGroupMode, setSiLines, setSiOpenParty, setSiPrintModal, setSiPrintPayAsk, setSiSearch, setSiVehicleQ, setSiRefQ, setSiStatusF, setSiView, shop, shopId, showCustPicker, siAccent, siAddCurrentItem, siBadge, siBatchAsk, siCanDeleteDoc, siCanEditDoc, siCancel, siChangeCurrentUnit, siConfirm, siCurrent, siDelLine, siDelete, siDocTitle, siEditLineId, siEmptyCurrent, siExpiredBadge, siFiltered, siFindProduct, siForm, siGroupMode, siInvoiceNo, siLeaveDetail, siLeaveFormToList, siLeaveMinOk, siLeaveUnsavedOk, siLightC, siLines, siLoading, siMatchedLines, siMobile, siNameRef, siCodeRef, siOpenEdit, siOpenFromDesktop, siOpenInvoice, siOpenNew, siOpenParty, siPickCustomers, siPrint, siPrintAs, siPrintModal, siPrintPayAsk, siQtyRef, siQuickAddCustomer, siReminderForm, siOpenReminderForm, siRequestPrint, siSaveReminder, setSiReminderForm, siLoyalty, siWhatsAppDoc, siMoneyReceiptDoc, siRootRef, siRootStyle, siRowDue, siSaveDraft, siSaving, siSearch, siVehicleQ, siRefQ, siSelectCustomer, siSelectProduct, siStatusF, siUpd, siView, siWin, sourceQuote, t, team, toast, totals, user, profile, wideDesktop })}{siAutoShare.dialogs}</>;
 }

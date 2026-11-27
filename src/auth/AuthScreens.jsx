@@ -119,6 +119,11 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
         {cloudSignupAllowed && (
           <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginStaffHint}</div>
         )}
+        <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>
+          {lang === "bn"
+            ? "শাখা কাউন্টার: শাখা কোড ইউজারনেম হিসেবে (যেমন branch1) — Settings এ Counter login বাটন দিয়ে তৈরি"
+            : "Branch counter: use branch code as username (e.g. branch1) — create via Settings → Counter login"}
+        </div>
         {cloudSignupAllowed && (
           <div style={{ ..._s.authFooter, marginTop:16 }}>{t.noAccount}{" "}
             <button type="button"style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>

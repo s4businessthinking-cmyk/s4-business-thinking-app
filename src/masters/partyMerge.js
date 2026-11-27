@@ -97,7 +97,7 @@ export function mergePlan(kind, source, target, data, { lockDate = "", now = new
   const opening = Number(source.openingBalance) && !Number(target.openingBalance) ? { openingBalance: source.openingBalance } : {};
   return {
     blockers, changes, counts,
-    sourcePatch: { status: "inactive", mergedInto: target.id, mergedIntoName: target[k.nameKey] || "", mergedAt: at, mergedBy: by, openingBalance: 0, ...(kind === "customer" ? { loyaltyMember: false, autoWhatsAppInvoice: false } : {}) },
+    sourcePatch: { status: "inactive", mergedInto: target.id, mergedIntoName: target[k.nameKey] || "", mergedAt: at, mergedBy: by, openingBalance: 0, ...(kind === "customer" ? { loyaltyMember: false, autoWhatsAppInvoice: false, autoWhatsAppReceipt: false } : {}) },
     targetPatch: { ...fill, ...loyalty, ...opening },
   };
 }

@@ -5,6 +5,8 @@ import { db } from "../firebase-config";
 import { deviceSerialTag, reserveShopSerial } from "../shared/appShared.jsx";
 import { doc, runTransaction } from "../backend/firestore";
 import { isOpeningBill } from "../utils/openingBill.js";
+import { branchForNewBill } from "../branch-transfer/userBranchDefaults.js";
+import { activeBranchForBilling } from "../branch-transfer/branchSession.js";
 
 export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, isDN, isOwner, isQuote, isSO, kind, lang, profile, serialField, serialRe, setEditInvId, setSiCurrent, setSiForm, setSiInvoiceNo, setSiLines, setSiView, setSourceQuote, shop, shopId, siEmptyCurrent, siInvoiceNo, siLoadedPaidRef, siSnapRef, team, toast, user }) {
   const siMaxLocalSerial = () => invoices.reduce((mx, inv) => {
@@ -44,7 +46,7 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
 
   // justSavedNo: right after a save `invoices` does not hold the new document yet, so the preview counts it too
   // (otherwise the fresh form showed the number just used).
-  const siOpenNew = (customer=null, justSavedNo="") => {
+  const siOpenNew = (customer = null, justSavedNo = "", branchOverride = null) => {
     const next = siPreviewNextInvoiceNo();
     const saved = Number(String(justSavedNo||"").match(/(\d+)(?:-[A-Z]{2})?$/i)?.[1] || 0);
     const nextNum = Number(next.match(/(\d+)$/)?.[1] || 0);
@@ -63,7 +65,9 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
       : { salesmanId:user?.uid||"", salesmanName:profile?.personName||"" };
     const payDefault = kind==="sales" ? {} : (SI_PAY[myDefaults.paymentMethod] ? { paymentMethod:myDefaults.paymentMethod } : {});
     const billTypeDefault = ["tax","regular"].includes(myDefaults.billType) ? { invoiceType:myDefaults.billType } : {};
-    setSiForm({ ...siEmptyForm(), ...billTypeDefault, ...(isDN?{ invoiceType:"delivery" }:{}), ...salesmanDefault, ...payDefault, validUntil:isQuote&&!isSO?siAddDays(siToday(), QT_VALID_DAYS):"", ...customerFields });
+    const sessionBr = activeBranchForBilling(shopId);
+    const branchLoc = kind === "sales" && !isDN ? branchForNewBill(myDefaults, branchOverride || sessionBr) : { stockLocation: "main", stockLocationName: "Main" };
+    setSiForm({ ...siEmptyForm(), ...billTypeDefault, ...(isDN?{ invoiceType:"delivery" }:{}), ...salesmanDefault, ...payDefault, ...branchLoc, validUntil:isQuote&&!isSO?siAddDays(siToday(), QT_VALID_DAYS):"", ...customerFields });
     setSiLines([]);
     setSiCurrent(siEmptyCurrent());
     setEditInvId(null);
@@ -83,6 +87,7 @@ export function createSiNumbering({ DOC_PREFIX, customers, editInvId, invoices, 
       customerId:inv.customerId||"", customerName:inv.customerName||"",
       customerMobile:inv.customerMobile||"", customerAddress:inv.customerAddress||"",
       customerTrn:inv.customerTrn||"", paymentMethod:inv.paymentMethod||"cash",
+      paymentBank:inv.paymentBank||"",
       cashPartial:!!inv.cashPartial,
       customerType:(customers||[]).find(c=>c.id===inv.customerId)?.customerType||"",
       amountPaid: isPlainCash ? "" : (inv.amountPaid>0?String(inv.amountPaid):""),

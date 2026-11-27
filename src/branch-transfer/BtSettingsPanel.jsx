@@ -2,6 +2,8 @@ import { bt, actorFrom, useShopCollection, normalizeError, NativeButton } from "
 import { useMemo, useState, useEffect } from "react";
 import { DEFAULT_BRANCH_TRANSFER_SETTINGS } from "./branchTransferDomain.js";
 import { BRANCH_TRANSFER_COLLECTIONS, saveBranchTransferSettings, listShopRecords, saveBranch, disableBranch } from "./branchTransferService.js";
+import { runFullParentCatalogSync } from "./parentCatalogSync.js";
+import PremierUatPanel from "./PremierUatPanel.jsx";
 
 export function ToggleRow({ th, label, help, checked, onChange }) {
   return (
@@ -62,7 +64,7 @@ export function BranchForm({ lang, s, th, team, onSave, busy }) {
   );
 }
 
-export function BranchList({ lang, s, th, branches, onDisable, busy }) {
+export function BranchList({ lang, s, th, branches, onDisable, onCounterLogin, busy }) {
   const t = bt(lang);
   if (!branches.length) return <div style={{ ...s.card, color: th.txtMuted, textAlign: "center", padding: 30 }}>{t.noBranches}</div>;
   return (
@@ -74,17 +76,29 @@ export function BranchList({ lang, s, th, branches, onDisable, busy }) {
             <div style={{ color: th.txtMuted, fontSize: 11, marginTop: 3 }}>
               {[branch.code, branch.location, branch.receiverName].filter(Boolean).join(" · ") || "—"}
             </div>
+            {branch.ledgerShopId && (
+              <div style={{ color: th.txtMuted, fontSize: 10, marginTop: 4, fontFamily: "monospace" }}>
+                {lang === "bn" ? "Company file: " : "Company file: "}{branch.ledgerShopId}
+              </div>
+            )}
           </div>
-          <NativeButton s={s} tone="danger"disabled={busy || branch.active === false} onClick={() => onDisable(branch)}>
-            {branch.active === false ? t.disable : t.disable}
-          </NativeButton>
+          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+            {onCounterLogin && branch.active !== false && (
+              <NativeButton s={s} tone="primary" disabled={busy} onClick={() => onCounterLogin(branch)}>
+                {lang === "bn" ? "কাউন্টার লগইন" : "Counter login"}
+              </NativeButton>
+            )}
+            <NativeButton s={s} tone="danger" disabled={busy || branch.active === false} onClick={() => onDisable(branch)}>
+              {branch.active === false ? t.disable : t.disable}
+            </NativeButton>
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-export function SettingsPanel({ lang, s, th, shopId, user, profile, team, settings, onSettingsChanged, toast }) {
+export function SettingsPanel({ lang, s, th, shopId, homeShopId = "", localShop = null, user, profile, team, customers = [], vendors = [], settings, onSettingsChanged, toast, createBranchCounterLogin, createMainCounterLogin }) {
   const t = bt(lang);
   const actor = useMemo(() => actorFrom(user, profile), [user, profile]);
   const [draft, setDraft] = useState({ ...DEFAULT_BRANCH_TRANSFER_SETTINGS, ...settings });
@@ -124,7 +138,44 @@ export function SettingsPanel({ lang, s, th, shopId, user, profile, team, settin
         <ToggleRow th={th} label={t.enable} help={t.enableHelp} checked={draft.enabled === true} onChange={(value) => setDraft((prev) => ({ ...prev, enabled: value }))} />
         <ToggleRow th={th} label={t.autoInvoice} help={t.autoHelp} checked={draft.autoCreatePurchaseInvoiceOnReceive === true} onChange={(value) => setDraft((prev) => ({ ...prev, autoCreatePurchaseInvoiceOnReceive: value }))} />
         <ToggleRow th={th} label={t.partial} checked={draft.allowPartialReceive === true} onChange={(value) => setDraft((prev) => ({ ...prev, allowPartialReceive: value }))} />
+        <ToggleRow
+          th={th}
+          label={lang === "bn" ? "প্রতি শাখা = আলাদা company file (Premier)" : "Each branch = separate company file (Premier)"}
+          help={lang === "bn" ? "শাখা সেভ হলে child shopId তৈরি; কাউন্টার লগইন সেই ফাইলে — আলাদা ক্যাশ বই/ডাটা" : "Saving a branch creates a child shopId; counter logins use that file only"}
+          checked={draft.companyFilePerBranch !== false}
+          onChange={(value) => setDraft((prev) => ({ ...prev, companyFilePerBranch: value }))}
+        />
+        <ToggleRow
+          th={th}
+          label={lang === "bn" ? "HQ কাস্টমার/সাপ্লায়ার শাখায় শেয়ার" : "Share HQ customers & vendors with branches"}
+          help={lang === "bn" ? "Child company file-এ HQ পার্টি লিস্ট + নতুন child পার্টি — child তৈরি হলে HQ থেকে কপি" : "Branch files see HQ party master; new child files copy HQ parties on create"}
+          checked={draft.sharePartiesFromHq !== false}
+          onChange={(value) => setDraft((prev) => ({ ...prev, sharePartiesFromHq: value }))}
+        />
         <NativeButton s={s} tone="primary"disabled={busy} onClick={saveSettings} style={{ marginTop: 14 }}>{t.saveSettings}</NativeButton>
+        {draft.companyFilePerBranch !== false && (
+          <NativeButton
+            s={s}
+            tone="primary"
+            disabled={busy}
+            onClick={() => run(async () => {
+              const out = await runFullParentCatalogSync(shopId);
+              const pu = out.products?.updated ?? 0;
+              const pc = out.parties?.customers ?? 0;
+              const pv = out.parties?.vendors ?? 0;
+              window.dispatchEvent(new CustomEvent("s4-products-changed", { detail: { shopId } }));
+              toast(
+                lang === "bn"
+                  ? `সিঙ্ক: পণ্য ${pu}, কাস্টমার ${pc}, ভেন্ডর ${pv}`
+                  : `Synced — products ${pu}, customers ${pc}, vendors ${pv}`
+              );
+              return out;
+            })}
+            style={{ marginTop: 10, marginLeft: 0 }}
+          >
+            {lang === "bn" ? "HQ থেকে পণ্য ও পার্টি শাখায় সিঙ্ক" : "Sync products & parties from HQ to branches"}
+          </NativeButton>
+        )}
       </div>
 
       {draft.enabled && (
@@ -141,12 +192,20 @@ export function SettingsPanel({ lang, s, th, shopId, user, profile, team, settin
               return saved;
             }, t.branchSaved)}
           />
+          {createMainCounterLogin && (
+            <div style={{ marginBottom: 10 }}>
+              <NativeButton s={s} tone="primary" disabled={busy} onClick={() => run(async () => { await createMainCounterLogin(); }, lang === "bn" ? "মূল দোকানের কাউন্টার লগইন তৈরি" : "Main store counter login created")}>
+                {lang === "bn" ? "মূল দোকান কাউন্টার লগইন (username: main)" : "Main counter login (username: main)"}
+              </NativeButton>
+            </div>
+          )}
           <BranchList
             lang={lang}
             s={s}
             th={th}
             branches={branches}
             busy={busy}
+            onCounterLogin={createBranchCounterLogin ? (branch) => run(async () => { await createBranchCounterLogin(branch); }, lang === "bn" ? "কাউন্টার লগইন তৈরি হয়েছে" : "Counter login created") : undefined}
             onDisable={(branch) => run(async () => {
               const saved = await disableBranch({ branch, actor });
               await refreshBranches();
@@ -154,6 +213,20 @@ export function SettingsPanel({ lang, s, th, shopId, user, profile, team, settin
             }, t.branchSaved)}
           />
         </div>
+      )}
+      {draft.companyFilePerBranch !== false && (
+        <PremierUatPanel
+          lang={lang}
+          s={s}
+          th={th}
+          shopId={shopId}
+          homeShopId={homeShopId || shopId}
+          localShop={localShop}
+          toast={toast}
+          team={team}
+          customers={customers}
+          vendors={vendors}
+        />
       )}
     </>
   );

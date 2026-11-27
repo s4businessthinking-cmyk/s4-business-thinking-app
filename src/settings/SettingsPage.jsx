@@ -21,12 +21,12 @@ import { TILE_CSS, monogram, tileVars } from "../dashboard/dashTiles.js";
 // Same accent language as dashboard cards (dashTiles.js) — one colour per settings row after emoji icons were removed.
 const SETTING_ACCENTS = {
   profile: "#2563eb", period: "#b45309", pin: "#7c3aed", shop: "#0284c7", invite: "#ea580c",
-  team: "#0d9488", groups: "#4f46e5", orderModule: "#0891b2", branchTransfer: "#059669", wastyle: "#16a34a",
+  team: "#0d9488", groups: "#4f46e5", orderModule: "#0891b2", branchTransfer: "#059669", branchSession: "#c2410c", wastyle: "#16a34a",
   theme: "#475569", language: "#db2777", print: "#1d4ed8", sync: "#0ea5e9", backup: "#c2410c",
   license: "#9333ea", update: "#2563eb", help: "#64748b",
 };
 
-export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSettings, closeTeamMember, cloudPullBusy, cloudUploadBusy, createStaffMember, deleteInviteCode, generateNewCode, handleLogout, inviteCodes, isDesktop, isOwner, lang, lastCloudPullAt, localShop, mergeShopRecord, orderModuleEnabled, orderSettingsSaving, periodLock, products, profile, refreshSyncDashboard, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, setBranchTransferSettings, setLang, setLocalShop, setPinModal, setPrintSettingsOpen, setSettingsPage, setStaffForm, setStaffPwReset, setTheme, setWaStyle, settingsPage, shopId, stPage, staffForm, staffPwReset, staffSaving, syncDashboard, syncState, t, team, teamEmployees, th, theme, toast, user, userGroups, waStyle }) {
+export function SettingsPage({ WA_STYLES, activeBranch = null, applyGroupToMember, branchAdminShopId = "", branchTransferSettings, canUseBranchTransfer = false, closeTeamMember, cloudPullBusy, cloudUploadBusy, createBranchCounterLogin, createMainCounterLogin, createStaffMember, customers = [], vendors = [], deleteInviteCode, generateNewCode, handleLogout, inviteCodes, isDesktop, isOwner, lang, lastCloudPullAt, localShop, mergeShopRecord, onSwitchBranch, orderModuleEnabled, orderSettingsSaving, periodLock, products, profile, refreshSyncDashboard, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, setBranchTransferSettings, setLang, setLocalShop, setPinModal, setPrintSettingsOpen, setSettingsPage, setStaffForm, setStaffPwReset, setTheme, setWaStyle, settingsPage, shopId, stPage, staffForm, staffPwReset, staffSaving, syncDashboard, syncState, t, team, teamEmployees, th, theme, toast, user, userGroups, waStyle }) {
         const cloudLicensed = isCloudAccessAllowedSync();
         const bnS = lang==="bn";
         const plain = (v)=>String(v||"").replace(/^[^\p{L}\p{N}]+/u,"");
@@ -44,6 +44,11 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
           isOwner && itemOf("groups", { label:bnS?"ইউজার গ্রুপ ও অনুমতি":"User groups & privileges", sub:`${userGroups.length} ${bnS?"টি গ্রুপ · দেখা / যোগ / এডিট / বাতিল / প্রিন্ট":"groups · view / add / edit / delete / print"}` }),
           isOwner && itemOf("orderModule", { label:"Order Option", sub:orderModuleEnabled?(bnS?"চালু আছে":"Enabled"):(bnS?"বন্ধ আছে":"Disabled") }),
           isOwner && itemOf("branchTransfer", { label:btCopy.title, sub:btCopy.subtitle }),
+          canUseBranchTransfer && branchTransferSettings?.enabled && activeBranch && itemOf("branchSession", {
+            label: bnS ? "শাখা বদল / কাউন্টার লগইন" : "Switch branch / counter login",
+            sub: activeBranch.branchName || activeBranch.branchId,
+            action: onSwitchBranch,
+          }),
           isOwner && itemOf("wastyle", { label:"WhatsApp Message Style", sub:WA_STYLES.find(w=>w.id===waStyle)?.[bnS?"labelBn":"labelEn"]||"" }),
           itemOf("theme", { label:bnS?"থিম / রঙ":"Theme", sub:theme==="dark"?(bnS?"ডার্ক মোড":"Dark Mode"):(bnS?"লাইট মোড":"Light Mode") }),
           itemOf("language", { label:bnS?"ভাষা":"Language", sub:bnS?"বাংলা":"English" }),
@@ -56,6 +61,19 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
         ].filter(Boolean);
         const openItem = (it)=>{ if (it.action) it.action(); else setSettingsPage(it.id); };
         const current = items.find(it=>it.id===stPage);
+        const settingsMonogram = (it) => {
+          if (it?.id === "profile" && profile?.personName) return monogram(profile.personName);
+          return monogram(it?.label || "");
+        };
+        const profileContactLine = () => {
+          const mobile = String(profile?.mobile || "").trim();
+          const location = [profile?.area, profile?.countryName]
+            .map((v) => String(v || "").trim())
+            .filter(Boolean)
+            .join(", ");
+          const parts = [mobile, location].filter(Boolean);
+          return parts.join(" · ");
+        };
         const settingGroups = [
           { key:"company", label:bnS?"অ্যাকাউন্ট ও দোকান":"Account & Company", ids:["profile","shop","pin","period","license"] },
           { key:"team", label:bnS?"টিম":"Team", ids:["team","groups","invite"] },
@@ -101,7 +119,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                       {groupHead(g.label, gi===0)}
                       {g.items.map(it=>(
                         <button key={it.id} type="button" className={`st-item s4-tile is-click${stPage===it.id?" is-active":""}`} style={tileVars(it.color)} onClick={()=>openItem(it)} title={it.sub}>
-                          <span className="s4-mono">{monogram(it.label)}</span>
+                          <span className="s4-mono">{settingsMonogram(it)}</span>
                           <span className="st-tx"><b>{it.label}</b><small>{it.sub}</small></span>
                         </button>
                       ))}
@@ -129,7 +147,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                           textAlign:"left", color:th.txtPrimary, cursor:"pointer",
                         }}
                       >
-                        <span className="s4-mono">{monogram(it.label)}</span>
+                        <span className="s4-mono">{settingsMonogram(it)}</span>
                         <div style={{ flex:1, minWidth:0 }}>
                           <div style={s.settingsRowLabel}>{it.label}</div>
                           <div style={s.settingsRowSub}>{it.sub}</div>
@@ -145,32 +163,74 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
             <section className={isDesktop?"st-main":undefined}>
               {isDesktop ? (
                 <div className="st-main-head" style={tileVars(current?.color || "#3d6fcb")}>
-                  <span className="s4-mono">{monogram(current?.label || "S")}</span>
+                  <span className="s4-mono">{settingsMonogram(current)}</span>
                   <div><div className="st-title">{current?.label}</div><div className="st-sub">{current?.sub}</div></div>
                 </div>
-              ) : settingsPage&&(
-                <button style={s.backRowBtn} onClick={()=>setSettingsPage(null)}>
-                  ← {bnS?"সেটিংস":"Settings"}
-                </button>
-              )}
+              ) : settingsPage && current ? (
+                <>
+                  <button style={s.backRowBtn} onClick={()=>setSettingsPage(null)}>
+                    ← {bnS?"সেটিংস":"Settings"}
+                  </button>
+                  <div
+                    className="st-main-head"
+                    style={{
+                      ...tileVars(current.color || "#3d6fcb"),
+                      marginBottom: 12,
+                      borderRadius: 12,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "12px 16px",
+                      color: "#fff",
+                      background: `linear-gradient(180deg, ${current.color || "#3d6fcb"}, #24519f)`,
+                    }}
+                  >
+                    <span
+                      className="s4-mono"
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 12,
+                        background: "rgba(255,255,255,.18)",
+                        border: "1px solid rgba(255,255,255,.28)",
+                        color: "#fff",
+                      }}
+                    >
+                      {settingsMonogram(current)}
+                    </span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 16, fontWeight: 800 }}>{current.label}</div>
+                      <div style={{ fontSize: 12, opacity: 0.9, overflow: "hidden", textOverflow: "ellipsis" }}>{current.sub}</div>
+                    </div>
+                  </div>
+                </>
+              ) : null}
               <div className={isDesktop?"st-main-body":undefined}>
 
-          {stPage==="profile"&&(
+          {stPage==="profile"&&(() => {
+            const contactLine = profileContactLine();
+            return (
             <>
               <div style={s.card}>
-                <div style={s.settingsLbl}>{t.profileTitle}</div>
                 <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-                  <div style={{ ...s.coIcon, fontSize:24 }}>{isOwner?"":""}</div>
-                  <div style={{ flex:1 }}>
+                  <span className="s4-mono" style={{ width: 40, height: 40, flexShrink: 0 }}>
+                    {monogram(profile?.personName || "?")}
+                  </span>
+                  <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontSize:15, fontWeight:700, color:th.txtPrimary }}>{profile.personName}</div>
-                    <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{profile.email} · {isOwner?t.ownerLabel:(profile.position||t.salesmanLabel)}</div>
-                    <div style={{ fontSize:12, color:"#71717a" }}> {profile.mobile} · {profile.area}, {profile.countryName}</div>
+                    <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>
+                      {[profile.email, isOwner ? t.ownerLabel : (profile.position || t.salesmanLabel)].filter(Boolean).join(" · ")}
+                    </div>
+                    {contactLine && (
+                      <div style={{ fontSize:12, color:"#71717a", marginTop:2 }}>{contactLine}</div>
+                    )}
                   </div>
                 </div>
               </div>
               <ProfilePasswordSettings t={t} lang={lang} profile={profile} toast={toast} th={th} s={s} />
             </>
-          )}
+            );
+          })()}
 
           {stPage==="shop"&&localShop&&(
             <ShopInfoSettings
@@ -326,6 +386,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                               onSetFlags={(perms)=>savePermissions(m, perms)} />
                             <div style={{ height:1, background:th.bgCard, margin:"10px 0 8px" }} />
                             <UserDefaultsEditor lang={lang} th={th} s={s} member={m} team={team} employees={teamEmployees} payOptions={SI_PAY}
+                              shopId={shopId} branchTransferEnabled={!!branchTransferSettings?.enabled}
                               onSave={(d)=>saveMemberDefaults(m, d)} />
                           </>
                         );
@@ -357,6 +418,7 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
                 return (
                   <div style={{ ...s.card, marginTop:12 }}>
                     <UserDefaultsEditor lang={lang} th={th} s={s} member={{ ...me, defaults: me.defaults || profile.defaults || {} }} team={team} employees={teamEmployees} payOptions={SI_PAY}
+                      shopId={shopId} branchTransferEnabled={!!branchTransferSettings?.enabled}
                       onSave={(d)=>saveMemberDefaults(me, d)} />
                     <div style={{ fontSize:11, color:"#71717a", marginTop:6 }}>{lang==="bn"?"↑ এটা আপনার (মালিকের) নিজের লগইনের ডিফল্ট।":"↑ These are your own (owner) login defaults."}</div>
                   </div>
@@ -380,10 +442,15 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
 
           {stPage==="branchTransfer"&&isOwner&&(
             <BranchTransferSettingsPanel
+              localShop={localShop}
+              homeShopId={branchAdminShopId || shopId}
               lang={lang} th={th} s={s}
-              shopId={shopId} user={user} profile={profile}
-              team={team} settings={branchTransferSettings}
+              shopId={branchAdminShopId || shopId} user={user} profile={profile}
+              team={team} customers={customers} vendors={vendors}
+              settings={branchTransferSettings}
               onSettingsChanged={setBranchTransferSettings}
+              createBranchCounterLogin={createBranchCounterLogin}
+              createMainCounterLogin={createMainCounterLogin}
               toast={toast}
             />
           )}
@@ -499,6 +566,8 @@ export function SettingsPage({ WA_STYLES, applyGroupToMember, branchTransferSett
               onUpload={runCloudUpload}
               onDownload={() => runCloudDownload()}
               onRefresh={refreshSyncDashboard}
+              localShop={localShop}
+              isOwner={isOwner}
             />
           )}
               </div>

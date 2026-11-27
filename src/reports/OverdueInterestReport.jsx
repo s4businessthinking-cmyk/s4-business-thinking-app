@@ -21,6 +21,7 @@ import {
   INTEREST_DAY_BASIS, interestBlockers, interestFileName, interestJournal, interestJournalId, interestRows, interestSettingsOf, interestSettingsProblem, overdueInterest,
 } from "../accounts/overdueInterest.js";
 import DateField from "../components/DateField.jsx";
+import { useBranchLedgerOpts } from "./useBranchLedgerOpts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -79,8 +80,11 @@ export default function OverdueInterestReport({ lang = "en", shopId, shop = null
   const rate = side === "customer" ? settings.arRate : settings.apRate;
   const day = asOf || today;
   const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ledger = useMemo(() => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors, natureOf]);
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
+  const ledger = useMemo(
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, natureOf, branchLedgerOpts],
+  );
   const parties = side === "customer" ? customers : vendors;
   const rep = useMemo(() => (ledger && sideOn ? overdueInterest(ledger, {
     side, asOf: day, bills: side === "customer" ? data.salesInvoices : data.purchaseInvoices, parties, vouchers: data.accountVouchers, rate, graceDays: settings.graceDays, shopId,

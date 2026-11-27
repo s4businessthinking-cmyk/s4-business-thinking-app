@@ -213,7 +213,7 @@ export function BranchTransferSettingsPanel(props) {
   return <SettingsPanel {...props} />;
 }
 
-const OPEN_STATUSES = ["draft", "packed", "dispatched", "in_transit", "partially_received", "discrepancy"];
+const OPEN_STATUSES = ["draft", "requested", "packed", "dispatched", "in_transit", "partially_received", "discrepancy"];
 const RECEIVABLE_STATUSES = ["dispatched", "in_transit", "partially_received", "discrepancy"];
 const isReceivable = (transfer) => RECEIVABLE_STATUSES.includes(transfer?.status) && TransferRemaining(transfer) > 0;
 
@@ -331,7 +331,10 @@ export function BranchTransferWorkspace({ lang, shopId, user, profile, team, pro
   );
   const shellTitle = ` ${t.title}`;
 
-  return renderBtWorkspace({ L, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete, canPrint, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting });
+  const allowPeer = settings?.companyFilePerBranch !== false;
+  return renderBtWorkspace({
+    L, actor, allowPeer, backToList, branches, busy, canInvoiceRow, canReceiveRow, canReceiveTransfer, canSendTransfer, canDelete, canPrint, changeStatus, completed, createInvoice, createTransfer, deleteTransfer, dirtyRef, discrepancies, filtered, fitH, from, homeShopId: shopId, incomingList, invoiceRows, isOwner, kpiRows, lang, mainStock, mobile, openDetail, openNew, peerOnly: !canSendTransfer && canReceiveTransfer, printTransfer, products, receiveWindow, reload, rootRef, search, section, selId, setFrom, setReceiving, setSearch, setSection, setStatusFilter, setTo, shellTitle, shopStock, statusFilter, stockBranchIds, stockRows, t, team, to, toast, totalValue, transfers, vendors, view, visibleTransfers, waiting,
+  });
 }
 
 export function BranchTransferPurchaseImport({ lang, th, s, shopId, user, profile, shop, settings, toast, onInvoiceCreated }) {

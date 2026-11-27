@@ -11,14 +11,21 @@ export const MENU_GROUPS = [
 ];
 
 // items: [[tabKey, label], …] already filtered by permission; empty groups are dropped, unknown tabs go to Utilities.
+const isBranchSalesKey = (key) => String(key || "").startsWith("sales@branch:");
+
 export function groupMenuItems(items, lang) {
   const bn = lang === "bn";
   const known = new Set(MENU_GROUPS.flatMap((g) => g.tabs));
+  const branchSalesRows = items.filter(([key]) => isBranchSalesKey(key));
   return MENU_GROUPS.map((g) => ({
     key: g.key, icon: g.icon || "", label: bn ? g.bn : g.en,
     items: [
-      ...g.tabs.map((k) => items.find(([key]) => key === k)).filter(Boolean),
-      ...(g.key === "utilities" ? items.filter(([key]) => !known.has(key)) : []),
+      ...g.tabs.flatMap((k) => {
+        const row = items.find(([key]) => key === k);
+        if (!row) return [];
+        return k === "sales" ? [row, ...branchSalesRows] : [row];
+      }),
+      ...(g.key === "utilities" ? items.filter(([key]) => !known.has(key) && !isBranchSalesKey(key)) : []),
     ],
   })).filter((g) => g.items.length);
 }

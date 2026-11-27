@@ -20,7 +20,30 @@ import { printPurchaseInvoice } from "./purchasePrint.js";
 import { piToday } from "./purchaseShared.js";
 import { runDesktopBillShortcuts } from "../utils/desktopFormShortcuts.js";
 import DateField from "../components/DateField.jsx";
+import InvoiceBankSelect from "../ledger/InvoiceBankSelect.jsx";
+import { isInvoiceBankPayMethod } from "../ledger/invoiceBankPay.js";
 import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
+import {
+  docActionBar,
+  docEntryGrid,
+  docEntryRow,
+  docFieldLbl,
+  docFooterCol,
+  docFooterGrid,
+  docFooterTotals,
+  docHdrGrid,
+  docItemsPane,
+  docNoBox,
+  docNoHead,
+  docNoValue,
+  docPartyRow,
+  docProductStrip,
+  docSummaryLine,
+  docTitleBar,
+  docTitleText,
+  docTotalAmt,
+  docTotalBar,
+} from "../sales-invoice/docDesktopLayout.js";
 
 const ACCENT = "#c2410c";
 
@@ -98,7 +121,7 @@ function VendorTypeahead({ vendors, value, onChange, onSelect, placeholder, lang
               onMouseDown={(e) => dropdownMouseDown(e, inputRef, () => setActive(i))}
               onClick={() => { if (!shouldPreserveTextSelection(inputRef)) pick(v); }}
               onMouseEnter={() => { if (!shouldPreserveTextSelection(inputRef)) setActive(i); }}
-              style={{ padding: "5px 10px", cursor: "pointer", background: i === active ? "#dbe6f5" : "#fff", borderBottom: "1px solid #eef3fb" }}>
+              style={{ padding: "5px 10px", cursor: "pointer", background: i === active ? "#fffdf6" : "#fff", borderBottom: "1px solid #fffdf6" }}>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: C.label }}>{v.vendorName}</div>
               <div style={{ fontSize: 11, color: "#4b5f86" }}>{[v.vendorCode && `#${v.vendorCode}`, v.mobileNumber || v.whatsappNumber, v.city].filter(Boolean).join(" · ")}</div>
             </div>
@@ -344,23 +367,23 @@ export default function PurchaseInvoiceDesktopForm({
     ].filter(Boolean))]
     : [...new Set([current.unit, ...PI_UNITS].filter(Boolean))];
   const status = savedInvoice ? PI_STATUSES[savedInvoice.status] : null;
-  const field = (label, node, labelWidth = 92) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+  const field = (label, node, labelWidth = 76) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 3, minWidth: 0 }}>
       <span style={{ ...lbl, width: labelWidth, flexShrink: 0 }}>{label}</span>
       <div style={{ flex: 1, minWidth: 0 }}>{node}</div>
     </div>
   );
 
   return (
-    <div style={{ background: C.bg, border: `1px solid ${C.bar}`, borderRadius: 4, minWidth: 1060, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 4, minWidth: 1060, flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif', color: C.label }}>
       <fieldset disabled={locked} style={{ display: "contents" }}>
       {/* Header */}
-      <div style={{ display: "grid", gridTemplateColumns: "130px 1fr 150px", gap: 8, padding: "8px 10px 4px", background: C.panel }}>
-        <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
-          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, textDecoration: "underline", padding: "2px 0" }}>PI No</div>
-          <div style={{ textAlign: "center", fontSize: 16, fontWeight: 900, color: "#111", padding: "4px 0" }}>{invoiceNo || "—"}</div>
+      <div style={docHdrGrid}>
+        <div style={docNoBox}>
+          <div style={docNoHead}>PI No</div>
+          <div style={docNoValue}>{invoiceNo || "—"}</div>
         </div>
-        <div style={{ position: "relative", border: `1px solid ${C.bar}`, borderRadius: 4, background: "#dfe8f6", display: "flex", alignItems: "center", justifyContent: "center", minHeight: 50 }}>
+        <div style={{ ...docTitleBar, position: "relative" }}>
           {status && (
             <span style={{ position: "absolute", left: 10, fontSize: 11, fontWeight: 800, padding: "1px 8px", borderRadius: 10, background: status.color, color: "#fff" }}>
               {invoiceStatusLabel(savedInvoice, lang, { [savedInvoice.status]: status }) || (status[lang] || savedInvoice.status)}
@@ -368,17 +391,17 @@ export default function PurchaseInvoiceDesktopForm({
             </span>
           )}
           <div style={{ textAlign: "center", lineHeight: 1.1 }}>
-            <span style={{ fontSize: 24, fontWeight: 900, color: ACCENT, letterSpacing: 0.5 }}>PURCHASE INVOICE</span>
+            <span style={{ ...docTitleText, color: ACCENT }}>PURCHASE INVOICE</span>
             {sourceNote && <div style={{ fontSize: 11, fontWeight: 800, color: "#0f766e" }}>{sourceNote}</div>}
           </div>
         </div>
-        <div style={{ border: `1px solid ${C.bar}`, borderRadius: 4, overflow: "hidden", background: "#fff" }}>
-          <div style={{ background: C.head, color: "#fff", textAlign: "center", fontSize: 12.5, fontWeight: 800, padding: "2px 0" }}>{bn ? "এন্ট্রি তারিখ" : "Entry Date"}</div>
-          <DateField style={inp({ borderStyle: "none", height: 30, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
+        <div style={docNoBox}>
+          <div style={docNoHead}>{bn ? "এন্ট্রি তারিখ" : "Entry Date"}</div>
+          <DateField style={inp({ borderStyle: "none", height: 26, fontWeight: 700 })} value={form.entryDate || piToday()} onChange={(e) => setField("entryDate", e.target.value)} />
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "170px minmax(260px,380px) 130px 180px 1fr", gap: 10, padding: "2px 10px 8px", background: C.panel, borderBottom: `1px solid ${C.border}` }}>
+      <div style={docPartyRow("148px minmax(220px,1fr) 118px minmax(150px,200px) minmax(100px,1fr)")}>
         <div>
           <div style={lbl}>Supplier Inv. No <span style={{ color: C.red }}>*</span></div>
           <input ref={supInvRef} style={inp(form.supplierInvoiceNo.trim() ? {} : { borderColor: C.red })} value={form.supplierInvoiceNo} placeholder={bn ? "সাপ্লায়ারের বিল নং" : "Supplier's bill no"}
@@ -417,7 +440,6 @@ export default function PurchaseInvoiceDesktopForm({
             <div style={lbl}>Mobile</div>
             <input style={inp()} inputMode="tel"value={form.vendorMobile} onChange={(e) => setField("vendorMobile", e.target.value)} />
           </div>
-          {/* the TRN printed on the supplier's bill: input VAT is recoverable with it when the supplier master has none (taxDomain supplierTrnOf) */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={lbl}>{bn ? "সাপ্লায়ারের TRN" : "Supplier TRN"}</div>
             <input style={inp(trnLooksOff(form.vendorTrn) ? { borderColor: "#b45309" } : undefined)} inputMode="numeric" value={form.vendorTrn || ""} onChange={(e) => setField("vendorTrn", e.target.value)}
@@ -461,8 +483,8 @@ export default function PurchaseInvoiceDesktopForm({
       </div>
 
       {/* Entry row */}
-      <div style={{ padding: "8px 12px", background: "#e9f0fa", borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 80px 64px 100px auto", gap: 6, alignItems: "end" }}>
+      <div style={docEntryRow}>
+        <div style={docEntryGrid("minmax(220px,2fr) minmax(200px,2fr) 70px 92px 100px 64px 80px 64px 100px auto")}>
           <div>
             <div style={{ ...lbl, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
               <span>Product Nam<u>e</u>{" "}
@@ -548,7 +570,7 @@ export default function PurchaseInvoiceDesktopForm({
           </div>
         </div>
         {/* Product info strip */}
-        <div style={{ display: "flex", gap: 22, marginTop: 6, fontSize: 12.5, fontWeight: 700, minHeight: 18 }}>
+        <div style={docProductStrip}>
           {currentProduct ? (
             <>
               {stockOf == null
@@ -570,7 +592,7 @@ export default function PurchaseInvoiceDesktopForm({
       </div>
 
       {/* Items table */}
-      <div style={{ flex: 1, minHeight: 90, overflow: "auto", background: "#fff", borderBottom: `1px solid ${C.border}` }}>
+      <div style={docItemsPane}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
@@ -592,7 +614,7 @@ export default function PurchaseInvoiceDesktopForm({
           </thead>
           <tbody>
             {lineRows.length === 0 && (
-              <tr><td colSpan={14} style={{ ...td, textAlign: "center", color: "#64748b", padding: 24 }}>
+              <tr><td colSpan={14} style={{ ...td, textAlign: "center", color: "#64748b", padding: 14 }}>
                 {bn ? "এখনো কোনো item নেই — উপরে পণ্য বাছাই করে Add দিন" : "No items yet — pick a product above and press Add"}
               </td></tr>
             )}
@@ -643,16 +665,16 @@ export default function PurchaseInvoiceDesktopForm({
           </tbody>
           {lineRows.length > 0 && (
             <tfoot>
-              <tr style={{ background: "#dbe6f5", fontWeight: 800 }}>
-                <td style={{ ...td, textAlign: "left", fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }} colSpan={4}>TOTAL ({lineRows.length})</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{parseFloat(lineSum.qty.toFixed(3))}</td>
-                <td style={{ ...td, position: "sticky", bottom: 0, background: "#dbe6f5" }} colSpan={2} />
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{piFmt2(lineSum.gross)}</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{piFmt2(lineSum.disc)}</td>
-                <td style={{ ...td, position: "sticky", bottom: 0, background: "#dbe6f5" }} />
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{piFmt2(lineSum.tax)}</td>
-                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#dbe6f5" }}>{piFmt2(lineSum.total)}</td>
-                <td style={{ ...td, position: "sticky", bottom: 0, background: "#dbe6f5" }} colSpan={2} />
+              <tr style={{ background: "#fffdf6", fontWeight: 800 }}>
+                <td style={{ ...td, textAlign: "left", fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }} colSpan={4}>TOTAL ({lineRows.length})</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{parseFloat(lineSum.qty.toFixed(3))}</td>
+                <td style={{ ...td, position: "sticky", bottom: 0, background: "#fffdf6" }} colSpan={2} />
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{piFmt2(lineSum.gross)}</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{piFmt2(lineSum.disc)}</td>
+                <td style={{ ...td, position: "sticky", bottom: 0, background: "#fffdf6" }} />
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{piFmt2(lineSum.tax)}</td>
+                <td style={{ ...td, fontWeight: 900, position: "sticky", bottom: 0, background: "#fffdf6" }}>{piFmt2(lineSum.total)}</td>
+                <td style={{ ...td, position: "sticky", bottom: 0, background: "#fffdf6" }} colSpan={2} />
               </tr>
             </tfoot>
           )}
@@ -660,16 +682,33 @@ export default function PurchaseInvoiceDesktopForm({
       </div>
 
       {/* Bottom: payment + totals */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 340px", gap: 14, padding: "6px 12px", background: C.panel, flexShrink: 0 }}>
-        <div style={{ display: "grid", gap: 6, alignContent: "start" }}>
+      <div style={docFooterGrid}>
+        <div style={docFooterCol}>
           {field("Pay Mode", (
-            <select style={inp()} value={form.paymentMethod} onChange={(e) => { setField("paymentMethod", e.target.value); setField("amountPaid", ""); }}>
+            <select style={inp()} value={form.paymentMethod} onChange={(e) => {
+              const key = e.target.value;
+              setField("paymentMethod", key);
+              setField("amountPaid", "");
+              if (!isInvoiceBankPayMethod(key)) setField("paymentBank", "");
+            }}>
               {Object.entries(PI_PAY_METHODS).map(([k, v]) => <option key={k} value={k}>{v[lang] || v.en}</option>)}
             </select>
           ))}
+          {isInvoiceBankPayMethod(form.paymentMethod) && field(bn ? "ব্যাংক অ্যাকাউন্ট" : "Bank account", (
+            <InvoiceBankSelect
+              lang={lang}
+              method={form.paymentMethod}
+              value={form.paymentBank}
+              shop={shop}
+              disabled={locked}
+              showLabel={false}
+              inpStyle={inp()}
+              onChange={(v) => setField("paymentBank", v)}
+            />
+          ))}
           {field("Amount Paid", (
             form.paymentMethod === "cash" ? (
-              <input style={inp({ textAlign: "right", fontWeight: 700, background: "#eef3fb" })} readOnly value={piFmt2(paid)}
+              <input style={inp({ textAlign: "right", fontWeight: 700, background: "#fffdf6" })} readOnly value={piFmt2(paid)}
                 title={bn ? "ক্যাশে পুরো টাকা পরিশোধ ধরা হয়" : "Cash bills are fully paid"} />
             ) : (
               <div style={{ display: "flex", gap: 4 }}>
@@ -683,20 +722,20 @@ export default function PurchaseInvoiceDesktopForm({
           ))}
         </div>
         <div>
-          <div style={lbl}>Narration</div>
-          <textarea style={inp({ height: 62, resize: "none", padding: 6 })} value={form.note} onChange={(e) => setField("note", e.target.value)} />
+          <div style={docFieldLbl}>Narration</div>
+          <textarea style={inp({ height: 30, resize: "none", padding: 2, lineHeight: 1.2 })} value={form.note} onChange={(e) => setField("note", e.target.value)} />
         </div>
-        <div style={{ display: "grid", gap: 3, alignContent: "start", background: "#eef3fb", border: `1px solid ${C.border}`, padding: "5px 8px", borderRadius: 3 }}>
+        <div style={docFooterTotals}>
           {[
             ["Gross Amount", piFmt2(totals.sub)],
             ["Discount", piFmt2(totals.disc)],
             ["VAT", piFmt2(totals.tax)],
           ].map(([l, v]) => (
-            <div key={l} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 700 }}><span>{l}</span><span>{v}</span></div>
+            <div key={l} style={docSummaryLine}><span>{l}</span><span>{v}</span></div>
           ))}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 700 }}>
-            <span>{bn ? "সমন্বয়" : "Adjustment"}</span>
-            <input style={inp({ textAlign: "right", height: 22, width: 96 })} inputMode="decimal" placeholder="+ / -" value={form.adjustment || ""}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 700 }}>
+            <span>{bn ? "সমন্বয়" : "Adj."}</span>
+            <input style={inp({ textAlign: "right", height: 20, width: 88 })} inputMode="decimal" placeholder="+ / -" value={form.adjustment || ""}
               onChange={(e) => setField("adjustment", e.target.value)} title={bn ? "VAT-এর পরে + / - (ভাড়া, রাউন্ডিং, রেট পার্থক্য)" : "+ / - after VAT (freight, rounding, rate difference)"} />
           </div>
           {Number(String(form.adjustment || "").replace(/,/g, "")) !== 0 && adjustmentReasons.length > 0 && (
@@ -707,9 +746,9 @@ export default function PurchaseInvoiceDesktopForm({
               {adjustmentReasons.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           )}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: C.bar, color: "#fff", padding: "3px 8px", borderRadius: 2 }}>
+          <div style={docTotalBar}>
             <span style={{ fontWeight: 800 }}>TOTAL</span>
-            <span style={{ fontSize: 18, fontWeight: 900 }}>{foreign ? billCur : (t.cur || "AED")} {piFmt2(totals.grand)}</span>
+            <span style={docTotalAmt}>{foreign ? billCur : (t.cur || "AED")} {piFmt2(totals.grand)}</span>
           </div>
           {foreign && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, fontWeight: 800, color: fxRate > 0 ? "#0e7490" : C.red }}>
@@ -726,7 +765,7 @@ export default function PurchaseInvoiceDesktopForm({
       </fieldset>
 
       {/* Action bar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "8px 12px", background: "#b9cde9", borderTop: `1px solid ${C.border}` }}>
+      <div style={docActionBar}>
         <div style={{ display: "flex", gap: 6 }}>
           <button type="button"title="Ctrl+N" onClick={onNew} disabled={saving} style={btn()}>{bn ? "নতুন (Ctrl+N)" : "New (Ctrl+N)"}</button>
           <button type="button"title="F7" onClick={() => setShowSearch(true)} style={btn()}> {bn ? "খুঁজুন (F7)" : "Search (F7)"}</button>
@@ -773,7 +812,7 @@ export default function PurchaseInvoiceDesktopForm({
       </div>
 
       {/* Status line */}
-      <div style={{ padding: "4px 12px", background: "#fff", borderTop: `1px solid ${C.border}`, minHeight: 24, textAlign: "center", color: C.red, fontWeight: 800, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <div style={{ padding: "1px 6px", background: "#fff", borderTop: `1px solid ${C.border}`, minHeight: 18, textAlign: "center", color: C.red, fontWeight: 800, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flexShrink: 0 }}>
         {currentProduct ? `${codeLine(currentProduct)} (Cost:${piFmt2(current.unitCost)} ,Sale:${piFmt2(current.salePrice)})` : ""}
       </div>
 
@@ -849,7 +888,7 @@ function PurchaseOptionsModal({ lang, options, onSave, onClose, toast }) {
             <span>{en}<div style={{ fontWeight: 500, fontSize: 11.5, color: "#4b5f86" }}>{bnText}</div></span>
           </label>
         ))}
-        <div style={{ fontSize: 11.5, color: "#4b5f86", background: "#eef3fb", border: `1px solid ${C.border}`, padding: "6px 8px", borderRadius: 3 }}>
+        <div style={{ fontSize: 11.5, color: "#4b5f86", background: "#fffdf6", border: `1px solid ${C.border}`, padding: "6px 8px", borderRadius: 3 }}>
           {bn
             ? "আলাদা stock-এর অপশনগুলো চালু থাকলে, পণ্যের আগের মাল দোকানে থাকা অবস্থায় সাপ্লায়ার / M.R.P / Landing Cost আলাদা হলে বিলে যোগ করার সময় জিজ্ঞেস করবে। হ্যাঁ বললে লাইনটা নতুন ব্যাচ নম্বর পাবে।"
             : "With the separate-stock options on, adding a line asks when earlier stock is on hand and the vendor / M.R.P / Landing Cost differs. Yes gives the line a new batch number."}

@@ -8,6 +8,11 @@ import {
   offlineUpsert,
 } from "../offline/offlineRepository";
 import { subscribeShopCollection } from "../offline/realtimeSync";
+import { ensureBranchCompanyFile, resolveBranchLedgerShopId } from "./branchCompanyFile.js";
+import { postBranchReceiptToChildCompanyFile } from "./interCompanyReceipt.js";
+import { postHqInterCompanyJournal, postSenderInterCompanyJournal } from "./interCompanyGlPost.js";
+import { cancelHqDispatchStockOut, postDispatchStockOut } from "./branchDispatchStock.js";
+import { loadShopRecord } from "../offline/shopService.js";
 import {
   BRANCH_TRANSFER_STATUSES,
   DEFAULT_BRANCH_TRANSFER_SETTINGS,
@@ -20,6 +25,7 @@ import {
   roundMoney,
   sanitizeDocumentId,
   validateTransferItems,
+  isPeerTransfer,
 } from "./branchTransferDomain";
 
 export const BRANCH_TRANSFER_COLLECTIONS = Object.freeze({
@@ -71,6 +77,36 @@ function canSendBranchTransferActor(actor) {
 
 function canReceiveBranchTransferActor(actor) {
   return isOwnerActor(actor) || actor?.permissions?.receiveBranchTransfer === true;
+}
+
+function canRequestPeerStockActor(actor) {
+  return canSendBranchTransferActor(actor) || canReceiveBranchTransferActor(actor);
+}
+
+function sourceIdentityValues(transfer = {}) {
+  return [
+    transfer.sourceReceiverUserId,
+    transfer.sourceReceiverFirebaseUid,
+    transfer.sourceReceiverMemberId,
+    transfer.sourceReceiverLocalUserId,
+    transfer.sourceReceiverUsername,
+    transfer.sourceReceiverEmail,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+}
+
+export function transferSourceAssignedToActor(transfer, actor) {
+  if (isOwnerActor(actor)) return true;
+  const actorIds = identitySet(actor);
+  return sourceIdentityValues(transfer).some((value) => actorIds.has(value));
+}
+
+export function canManageBranchTransfer(transfer, actor) {
+  if (canSendBranchTransferActor(actor)) return true;
+  if (isPeerTransfer(transfer)) return transferSourceAssignedToActor(transfer, actor);
+  return false;
 }
 
 function identitySet(source = {}) {
@@ -273,8 +309,24 @@ export async function saveBranch({ shopId, branch, actor }) {
   }
 
   const result = await offlineUpsert(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, id, payload);
+  let saved = { ...result.data, id };
+
+  const btSettings = await loadBranchTransferSettings(shopId);
+  if (btSettings?.enabled && btSettings?.companyFilePerBranch !== false) {
+    const parentShop = await loadShopRecord(shopId);
+    const company = await ensureBranchCompanyFile({
+      parentShopId: shopId,
+      branch: saved,
+      ownerUid: parentShop?.ownerUid || actor.uid || "",
+      ownerName: parentShop?.ownerName || actor.personName || "",
+    });
+    if (company?.ledgerShopId) {
+      saved = { ...saved, ledgerShopId: company.ledgerShopId };
+    }
+  }
+
   kickSync();
-  return { ...result.data, id };
+  return saved;
 }
 
 export async function disableBranch({ branch, actor }) {
@@ -329,10 +381,23 @@ async function ensureDispatchMovements(transfer, actor) {
   }
 }
 
+function branchReceiverFields(branch = {}) {
+  return {
+    sourceReceiverUserId: String(branch?.receiverUserId || "").trim(),
+    sourceReceiverFirebaseUid: String(branch?.receiverFirebaseUid || branch?.receiverUserId || "").trim(),
+    sourceReceiverMemberId: String(branch?.receiverMemberId || branch?.id || "").trim(),
+    sourceReceiverLocalUserId: String(branch?.receiverLocalUserId || "").trim(),
+    sourceReceiverUsername: String(branch?.receiverUsername || "").trim(),
+    sourceReceiverEmail: String(branch?.receiverEmail || "").trim(),
+    sourceReceiverName: String(branch?.receiverName || "").trim(),
+  };
+}
+
 export async function createBranchTransfer({
   shopId,
   shop,
   branch,
+  sourceBranch = null,
   receiver,
   vendor = {},
   items,
@@ -343,8 +408,15 @@ export async function createBranchTransfer({
   actor,
 }) {
   if (!shopId) throw new Error("SHOP_REQUIRED");
-  if (!canSendBranchTransferActor(actor)) throw new Error("OWNER_REQUIRED");
+  const peer = Boolean(sourceBranch?.id);
+  const isRequest = initialStatus === BRANCH_TRANSFER_STATUSES.REQUESTED;
+  if (peer || isRequest) {
+    if (!canRequestPeerStockActor(actor)) throw new Error("OWNER_REQUIRED");
+  } else if (!canSendBranchTransferActor(actor)) {
+    throw new Error("OWNER_REQUIRED");
+  }
   if (!branch?.id || branch.active === false) throw new Error("ACTIVE_BRANCH_REQUIRED");
+  if (peer && sourceBranch.id === branch.id) throw new Error("TRANSFER_SAME_BRANCH");
 
   const receiverUserId = String(receiver?.receiverUserId || "").trim();
   const receiverFirebaseUid = String(receiver?.receiverFirebaseUid || "").trim();
@@ -364,12 +436,32 @@ export async function createBranchTransfer({
   const dispatched =
     initialStatus === BRANCH_TRANSFER_STATUSES.DISPATCHED ||
     initialStatus === BRANCH_TRANSFER_STATUSES.IN_TRANSIT;
+  const transferKind = peer ? "peer" : "hq";
+  let sourceBranchId = "";
+  let sourceBranchName = "";
+  let sourceLedgerShopId = "";
+  let sourceShopName = shop?.companyName || "Main Shop";
+  const sourceActorFields = {};
+  if (peer) {
+    sourceBranchId = sourceBranch.id;
+    sourceBranchName = sourceBranch.name || "";
+    sourceLedgerShopId = await resolveBranchLedgerShopId(shopId, sourceBranch, {
+      ownerUid: shop?.ownerUid || actor.uid || "",
+      ownerName: shop?.ownerName || actor.personName || "",
+    });
+    sourceShopName = sourceBranchName || sourceShopName;
+    Object.assign(sourceActorFields, branchReceiverFields(sourceBranch));
+  }
 
   const payload = {
     id,
     shopId,
     transferNo: buildTransferNo(),
-    sourceShopName: shop?.companyName || "Main Shop",
+    transferKind,
+    sourceBranchId,
+    sourceBranchName,
+    sourceLedgerShopId,
+    sourceShopName,
     branchId: branch.id,
     branchName: branch.name,
     receiverUserId,
@@ -379,6 +471,7 @@ export async function createBranchTransfer({
     receiverUsername,
     receiverEmail,
     receiverName,
+    ...sourceActorFields,
     vendorId: vendor?.vendorId || null,
     vendorName: String(vendor?.vendorName || "").trim(),
     vendorMobile: String(vendor?.vendorMobile || "").trim(),
@@ -413,16 +506,43 @@ export async function createBranchTransfer({
 
   if (dispatched) {
     await ensureDispatchMovements(transfer, actor);
+    const btSettings = await loadBranchTransferSettings(shopId);
+    await postDispatchStockOut({ transfer, actor, settings: btSettings });
   }
 
   kickSync();
   return transfer;
 }
 
+/** Request stock from another branch (request → accept → dispatch → receive). */
+export async function createPeerStockRequest({
+  shopId,
+  shop,
+  sourceBranch,
+  destinationBranch,
+  items,
+  receiver,
+  note = "",
+  actor,
+}) {
+  return createBranchTransfer({
+    shopId,
+    shop,
+    branch: destinationBranch,
+    sourceBranch,
+    receiver,
+    vendor: {},
+    items,
+    note,
+    initialStatus: BRANCH_TRANSFER_STATUSES.REQUESTED,
+    actor,
+  });
+}
+
 export async function updateTransferStatus({ transfer: given, status, actor }) {
   if (!given?.id) throw new Error("TRANSFER_REQUIRED");
-  if (!canSendBranchTransferActor(actor)) throw new Error("OWNER_REQUIRED");
   const transfer = await freshTransfer(given);
+  if (!canManageBranchTransfer(transfer, actor)) throw new Error("OWNER_REQUIRED");
 
   const allowed = new Set([
     BRANCH_TRANSFER_STATUSES.PACKED,
@@ -454,8 +574,14 @@ export async function updateTransferStatus({ transfer: given, status, actor }) {
     updatedByName: actor.personName || "",
   };
 
+  if (status === BRANCH_TRANSFER_STATUSES.REQUESTED) {
+    patch.requestedAt = transfer.requestedAt || timestamp;
+  }
   if (status === BRANCH_TRANSFER_STATUSES.PACKED) {
     patch.packedAt = timestamp;
+    patch.acceptedAt = timestamp;
+    patch.acceptedBy = actor.uid || actor.localUserId || "";
+    patch.acceptedByName = actor.personName || "";
   }
   if (status === BRANCH_TRANSFER_STATUSES.DISPATCHED) {
     patch.dispatchedAt = transfer.dispatchedAt || timestamp;
@@ -489,9 +615,12 @@ export async function updateTransferStatus({ transfer: given, status, actor }) {
     !transfer.dispatchedAt
   ) {
     await ensureDispatchMovements(updated, actor);
+    const btSettings = await loadBranchTransferSettings(updated.shopId);
+    await postDispatchStockOut({ transfer: updated, actor, settings: btSettings });
   }
   if (status === BRANCH_TRANSFER_STATUSES.CANCELLED && transfer.dispatchedAt) {
     await reverseDispatchMovements(updated, actor);
+    await cancelHqDispatchStockOut({ transfer: updated, actor });
   }
 
   kickSync();
@@ -730,6 +859,40 @@ export async function receiveBranchTransfer({
   } else {
     receipt.invoiceStatus = "not_required";
     await upsertReceiptRecord({ transfer, receipt, actor });
+  }
+
+  let interCompanyInvoice = null;
+  if (acceptedTotal > 0 && settings?.companyFilePerBranch !== false) {
+    const branchRow = await offlineGetById(BRANCH_TRANSFER_COLLECTIONS.BRANCHES, transfer.branchId);
+    const branchData = branchRow?.data || {};
+    const childShopId = String(branchData.ledgerShopId || "").trim();
+    const branchLabel = branchData.name || transfer.branchName || branchData.code || "";
+    if (childShopId && childShopId !== transfer.shopId) {
+      interCompanyInvoice = await postBranchReceiptToChildCompanyFile({
+        transfer,
+        receipt,
+        childShopId,
+        actor,
+      });
+      const hqJournal = await postHqInterCompanyJournal({
+        transfer,
+        receipt,
+        branchName: branchLabel,
+        actor,
+      });
+      const senderJournal = await postSenderInterCompanyJournal({
+        transfer,
+        receipt,
+        destinationBranchName: branchLabel,
+        actor,
+      });
+      if (interCompanyInvoice?.id || hqJournal?.id || senderJournal?.id) {
+        receipt.interCompanyPurchaseInvoiceId = interCompanyInvoice?.id || receipt.interCompanyPurchaseInvoiceId || null;
+        receipt.interCompanyJournalId = hqJournal?.id || receipt.interCompanyJournalId || null;
+        receipt.senderInterCompanyJournalId = senderJournal?.id || receipt.senderInterCompanyJournalId || null;
+        await upsertReceiptRecord({ transfer, receipt, actor });
+      }
+    }
   }
 
   const status = deriveTransferStatus(transfer, receiptLines);

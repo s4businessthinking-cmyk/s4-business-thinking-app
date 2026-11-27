@@ -13,6 +13,8 @@ import { buildGlobalLedger } from "../ledger/globalLedger.js";
 import { r2 } from "./reportFilters.js";
 import { AGE_BUCKETS, buildAging } from "./partyAging.js";
 import DateField from "../components/DateField.jsx";
+import { shopAccountNature } from "../ledger/accountNature.js";
+import { useBranchLedgerOpts } from "./useBranchLedgerOpts.js";
 
 const money = (v) => r2(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const localDay = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -35,7 +37,7 @@ const AG_CSS = `
 .ag-table tfoot td { font-weight: 700; border-top: 1px solid #7d94b7; background: #f8fafc; }
 `;
 
-export default function PartyAgingReport({ lang = "en", shopId, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
+export default function PartyAgingReport({ lang = "en", shopId, shop = null, customers = [], vendors = [], shopName = "", cur = "AED", toast, canPrint = false }) {
   const bn = lang === "bn";
   const L = (b, e) => (bn ? b : e);
   const [side, setSide] = useState("customer");
@@ -75,9 +77,11 @@ export default function PartyAgingReport({ lang = "en", shopId, customers = [], 
   }, []);
 
   const day = asOf || localDay();
+  const natureOf = useMemo(() => shopAccountNature(shop), [shop?.chartOfAccounts, shop?.coaGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+  const branchLedgerOpts = useBranchLedgerOpts(shopId, shop);
   const ledger = useMemo(
-    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, expenseLabel: (e) => expenseCategoryLabel(e, false) }) : null),
-    [data, shopId, customers, vendors],
+    () => (data ? buildGlobalLedger(data, { shopId, customers, vendors, natureOf, expenseLabel: (e) => expenseCategoryLabel(e, false), ...branchLedgerOpts }) : null),
+    [data, shopId, customers, vendors, natureOf, branchLedgerOpts],
   );
   const aging = useMemo(() => (ledger ? buildAging(ledger.postings, ledger.accounts, { side, asOf: day }) : null), [ledger, side, day]);
 

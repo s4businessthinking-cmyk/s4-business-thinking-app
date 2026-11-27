@@ -24,7 +24,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
       ? {
           title: "অ্যাপ আপডেট",
           installed: "আপনার installed version",
-          latest: "GitHub-এ সর্বশেষ version",
+          latest: "সর্বশেষ version",
           check: "আপডেট চেক করুন",
           checking: "চেক হচ্ছে...",
           applyNow: "এখনই আপডেট করুন",
@@ -55,7 +55,7 @@ export function AppUpdatePanel({ lang, th, s, toast }) {
       : {
           title: "App Update",
           installed: "Your installed version",
-          latest: "Latest version on GitHub",
+          latest: "Latest version",
           check: "Check for updates",
           checking: "Checking...",
           applyNow: "Update now",

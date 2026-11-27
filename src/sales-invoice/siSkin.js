@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PM_MOBILE_QUERY } from "../product-master/pmStyles";
+import { DOC_SHELL_CSS } from "./docDesktopLayout.js";
 
 // Light-background status colours for the Product Master skin.
 export const SI_STATUS_COLOR = {
@@ -58,6 +59,7 @@ export function usePmFitHeight(ref, mobile, key) {
 }
 
 export const SI_CSS = `
+${DOC_SHELL_CSS}
 .si-root {
   background: #f3e6c8; color: #07101c;
   font-family: Tahoma, "MS Sans Serif", Arial, sans-serif; font-size: 11px;

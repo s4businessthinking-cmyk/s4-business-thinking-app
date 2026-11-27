@@ -7,6 +7,7 @@ import WhatsAppButton from "../share/WhatsAppButton.jsx";
 import { docMessage, pdfFileName } from "../share/whatsappDocShare.js";
 import { loadPrintDesign, renderLayoutDocument, generateStatementHTML } from "../print/printDesign.js";
 import { invMeta, statementRefValue } from "./partyLedgerMeta.js";
+import { docModalTitleChrome } from "../sales-invoice/docDesktopLayout.js";
 import DateField from "../components/DateField.jsx";
 
 const n2 = (v) => parseFloat(v) || 0;
@@ -579,10 +580,10 @@ export default function PartyLedgerWindow({
     <>
     {win.min && <MinimizedChip title={winTitle} onRestore={win.restore} onClose={onClose} lang={lang} />}
     <div data-si-modal-open=""style={{ position: "fixed", inset: 0, zIndex: 1600, background: "rgba(10,25,55,0.35)", display: win.min ? "none" : "flex", alignItems: "center", justifyContent: "center", padding: win.max ? 0 : 8, boxSizing: "border-box" }}>
-      <div style={{ width: "100%", maxWidth: win.max ? "none" : 1040, height: win.max ? "100%" : undefined, maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.bar}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: "Segoe UI, Tahoma, sans-serif", color: C.label }}>
-        <div onDoubleClick={win.toggleMax} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: C.bar, color: "#fff", padding: "5px 6px 5px 10px", fontWeight: 800, fontSize: 13, userSelect: "none" }}>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{winTitle}</span>
-          <WindowButtons win={win} onClose={onClose} lang={lang} />
+      <div style={{ width: "100%", maxWidth: win.max ? "none" : 1040, height: win.max ? "100%" : undefined, maxHeight: "100%", display: "flex", flexDirection: "column", background: C.bg, border: `1px solid ${C.border}`, borderRadius: win.max ? 0 : 4, boxShadow: "0 18px 40px rgba(0,0,0,0.35)", fontFamily: 'Tahoma, "MS Sans Serif", Arial, sans-serif', color: C.label }}>
+        <div onDoubleClick={win.toggleMax} style={docModalTitleChrome}>
+          <strong style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#064e22" }}>{winTitle}</strong>
+          <WindowButtons win={win} onClose={onClose} lang={lang} light />
         </div>
 
         <div style={{ padding: "10px 12px", display: "grid", gap: 8, minHeight: 0, overflow: "auto" }}>

@@ -35,6 +35,7 @@ import CounterHub from "../counter/CounterHub.jsx";
 import BulkMessageScreen from "../share/BulkMessageScreen.jsx";
 import MastersHub from "../masters/MastersHub.jsx";
 import TrialBalanceReport from "../reports/TrialBalanceReport.jsx";
+import ConsolidatedCompanyReport from "../reports/ConsolidatedCompanyReport.jsx";
 import OpeningHub from "../accounts/OpeningHub.jsx";
 import { countryCodeOf, setShareCountryCode } from "../share/whatsappDocShare.js";
 import PartyAgingReport from "../reports/PartyAgingReport.jsx";
@@ -65,7 +66,7 @@ import VouchersTab from "../vouchers/VouchersTab.jsx";
 import { billLeaveGuard, nextPartyCode } from "../shared/appShared.jsx";
 import { printPaymentVoucher } from "../sales-invoice/salesInvoiceShared.js";
 
-export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct, applyGroupToMember, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenReturnInvoiceId, globalOpenWarrantyClaimId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenReturnInvoiceId, setGlobalOpenWarrantyClaimId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth }) {
+export function renderTabContent({ OrderCard, activeBranch = null, addCo, addItToInvoice, addProduct, applyGroupToMember, branchAdminShopId = "", branchLocked = false, branchTransferSettings, btInbox, calcMode, can, canManageProducts, canSeeProductCost, canStaffSupplierArea, canStaffVouchers, canUseBranchTransfer, cancelEdit, cancelEditOrder, chequeHandoverReq, chequePrefill, clearAllShopProducts, clearingProducts, closeTeamMember, cloudPullBusy, cloudUploadBusy, confirmPmDiscard, cos, createEmptyPmForm, createBranchCounterLogin, createMainCounterLogin, createStaffMember, currentItem, customers, delCo, delIt, deleteInviteCode, deleteProduct, editId, editNm, editPh, editProduct, editingOrderId, empFocus, employeeAlertList, exportProductsCsv, exportWeighingBarcodeCsv, fetchProducts, filterOrders, filterOrdersByStatusPage, filteredProducts, finance, finishProductReplacement, generateNewCode, getFilteredProducts, globalFocusCustomerId, globalFocusVendorId, globalOpenPurchaseInvoiceId, globalOpenReturnInvoiceId, globalOpenWarrantyClaimId, globalOpenSalesInvoiceId, globalSearchCan, grnIncoming, groupByDay, hErr, handleEnterAdd, handleGlobalSearchNavigate, handleLogout, homeShopId = "", importProductRecords, inviteCodes, isDesktop, isOrderManager, isOwner, items, lang, lastCloudPullAt, loadPmForm, localShop, makeShopNo, mergeShopRecord, nameRef, newNm, newPh, note, onSwitchBranch, openEmployeeAlert, orderModuleEnabled, orderSettingsSaving, orders, ownerLockedPanel, ownerUnlocked, partnerAlertList, patchProductInList, periodLock, piNewReq, piNewVendor, piVoucherReq, pinModal, pmCatFilter, pmEditId, pmForm, pmOverSales, pmPickForSales, pmReset, pmSearch, pmUpd, printProductBarcodes, productMaintenance, productReplacementActive, products, productsLoading, profile, purchaseSource, quoteToConvert, refreshSyncDashboard, reloadCustomersFromOffline, reloadVendorsFromOffline, removeBlankProducts, renderOrderPageTabs, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveEdit, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, savingProduct, searchQ, securityChequeAlertList, securityChequeFocusParty, selectProductToOrder, sendOrder, setBranchTransferSettings, setSecurityChequeFocusParty, setCalcMode, setChequeHandoverReq, setChequePrefill, setCustomers, setEditNm, setEditPh, setEmpFocus, setGlobalFocusCustomerId, setGlobalFocusVendorId, setGlobalOpenPurchaseInvoiceId, setGlobalOpenReturnInvoiceId, setGlobalOpenWarrantyClaimId, setGlobalOpenSalesInvoiceId, setGrnIncoming, setLang, setLocalShop, setMenuOpen, setNewNm, setNewPh, setNote, setOwnerUnlocked, setPiNewReq, setPiNewVendor, setPiVoucherReq, setPinModal, setPmCatFilter, setPmEditId, setPmOverSales, setPmSearch, setPmShowAdd, setPrintSettingsOpen, setPurchaseSource, setQuoteToConvert, setSearchQ, setSettingsPage, setShowAdd, setSiBranchSalesPrefill, setSiNewCustomer, setSiNewReq, setSiVoucherReq, setStaffForm, setStaffPwReset, setTab, setTabState, setTheme, setVendors, setWaStyle, settingsPage, shopId, showAdd, siBranchSalesPrefill, siColorPrint, siNewCustomer, siNewReq, siShowCode, siVoucherReq, stPage, staffForm, staffPwReset, staffQuickNavKeys, staffSaving, startEdit, startProductEdit, syncDashboard, syncRefreshKey, syncState, t, tab, tabRef, team, teamEmployees, th, theme, toast, unread, updCurrentItem, user, userGroups, vendors, waStyle, windowWidth }) {
   // local numbers (05...) on WhatsApp get the shop's country code
   setShareCountryCode(countryCodeOf(localShop));
   const tabContent = (
@@ -304,6 +305,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
         <SalesInvoiceTab
           key={tab}
           kind={tab}
+          branchLocked={branchLocked && tab === "sales"}
           quoteToConvert={tab==="sales"||tab==="delivery" ? quoteToConvert : null}
           onConvertQuote={(q)=>{ setQuoteToConvert(q); setTabState("sales"); }}
           onConvertToDN={(q)=>{ setQuoteToConvert(q); setTabState("delivery"); }}
@@ -311,6 +313,8 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           openNewRequest={tab==="sales" ? siNewReq : 0}
           openNewCustomer={siNewCustomer}
           onOpenNewHandled={()=>{ setSiNewReq(0); setSiNewCustomer(null); }}
+          openBranchSalesRequest={tab==="sales" ? siBranchSalesPrefill : null}
+          onOpenBranchSalesHandled={()=>setSiBranchSalesPrefill(null)}
           voucherRequest={tab==="sales" ? siVoucherReq : 0}
           onVoucherHandled={()=>setSiVoucherReq(0)}
           openInvoiceId={globalOpenSalesInvoiceId}
@@ -469,7 +473,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
 
       {tab==="globalLedger"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewGlobalLedger")))&&(
-        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} products={products} valuation={localShop?.stockValuationMethod==="fifo"?"fifo":"average"} canPrint={isOwner||can("printLedger")} chartOfAccounts={localShop?.chartOfAccounts} coaGroups={localShop?.coaGroups} />
+        <GlobalLedgerWindow embedded lang={lang} shopId={shopId} shop={localShop} shopName={localShop?.companyName||""} cur={t.cur||"AED"} customers={customers} vendors={vendors} products={products} valuation={localShop?.stockValuationMethod==="fifo"?"fifo":"average"} canPrint={isOwner||can("printLedger")} chartOfAccounts={localShop?.chartOfAccounts} coaGroups={localShop?.coaGroups} />
       )}
       {tab==="globalLedger"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"গ্লোবাল লেজার লক করা":"Global Ledger is locked")}
       {tab==="mergeMasters"&&(isOwner||can("manageCustomers")||can("manageEmployees"))&&(
@@ -485,7 +489,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} />
       )}
       {tab==="counter"&&(isOwner||can("manageSales"))&&(
-        <CounterHub lang={lang} shopId={shopId} shop={localShop} user={user} profile={profile} isOwner={isOwner} canSell={isOwner||can("manageSales")}
+        <CounterHub lang={lang} shopId={shopId} shop={{ ...localShop, branchTransferSettings: branchTransferSettings || localShop?.branchTransferSettings }} user={user} profile={profile} team={team} isOwner={isOwner} canSell={isOwner||can("manageSales")}
           canPrint={isOwner||can("printSales")||can("manageSales")} customers={customers} shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast}
           onShopUpdated={updated=>setLocalShop(prev=>mergeShopRecord(prev, updated))} onOpenCustomers={()=>setTab("customers")} />
       )}
@@ -531,6 +535,10 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
           }} />
       )}
       {tab==="trialBalance"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"ট্রায়াল ব্যালেন্স লক করা":"Trial Balance is locked")}
+      {tab==="companyConsolidated"&&isOwner&&ownerUnlocked&&(
+        <ConsolidatedCompanyReport lang={lang} homeShopId={homeShopId || branchAdminShopId || shopId} customers={customers} vendors={vendors} cur={t.cur||"AED"} />
+      )}
+      {tab==="companyConsolidated"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"কনসোলিডেটেড রিপোর্ট লক করা":"Consolidated report is locked")}
       {tab==="fundsSummary"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
         <FundsSummaryReport lang={lang} shopId={shopId} shop={localShop} products={products} customers={customers} vendors={vendors}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")} />
@@ -559,7 +567,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
       )}
       {tab==="tallyExport"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"হিসাব এক্সপোর্ট লক করা":"Accounting Export is locked")}
       {tab==="partyAging"&&((isOwner&&ownerUnlocked)||(!isOwner&&can("viewAccounts")))&&(
-        <PartyAgingReport lang={lang} shopId={shopId} customers={customers} vendors={vendors}
+        <PartyAgingReport lang={lang} shopId={shopId} shop={localShop} customers={customers} vendors={vendors}
           shopName={localShop?.companyName||""} cur={t.cur||"AED"} toast={toast} canPrint={isOwner||can("printAccounts")} />
       )}
       {tab==="partyAging"&&isOwner&&!ownerUnlocked&&ownerLockedPanel(lang==="bn"?"এজিং রিপোর্ট লক করা":"Ageing report is locked")}
@@ -632,7 +640,7 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
         />
       )}
 
-      {tab==="settings"&&<SettingsPage {...{ WA_STYLES, applyGroupToMember, branchTransferSettings, closeTeamMember, cloudPullBusy, cloudUploadBusy, createStaffMember, deleteInviteCode, generateNewCode, handleLogout, inviteCodes, isDesktop, isOwner, lang, lastCloudPullAt, localShop, mergeShopRecord, orderModuleEnabled, orderSettingsSaving, periodLock, products, profile, refreshSyncDashboard, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, setBranchTransferSettings, setLang, setLocalShop, setPinModal, setPrintSettingsOpen, setSettingsPage, setStaffForm, setStaffPwReset, setTheme, setWaStyle, settingsPage, shopId, stPage, staffForm, staffPwReset, staffSaving, syncDashboard, syncState, t, team, teamEmployees, th, theme, toast, user, userGroups, waStyle }} />}
+      {tab==="settings"&&<SettingsPage {...{ WA_STYLES, activeBranch, applyGroupToMember, branchAdminShopId, branchTransferSettings, canUseBranchTransfer, closeTeamMember, cloudPullBusy, cloudUploadBusy, createBranchCounterLogin, createMainCounterLogin, createStaffMember, customers, vendors, deleteInviteCode, generateNewCode, handleLogout, inviteCodes, isDesktop, isOwner, lang, lastCloudPullAt, localShop, mergeShopRecord, onSwitchBranch, orderModuleEnabled, orderSettingsSaving, periodLock, products, profile, refreshSyncDashboard, resetStaffPassword, runCloudDownload, runCloudUpload, s, saveMemberDefaults, saveMemberPosition, saveOrderModuleEnabled, savePermissions, saveUserGroups, setBranchTransferSettings, setLang, setLocalShop, setPinModal, setPrintSettingsOpen, setSettingsPage, setStaffForm, setStaffPwReset, setTheme, setWaStyle, settingsPage, shopId, stPage, staffForm, staffPwReset, staffSaving, syncDashboard, syncState, t, team, teamEmployees, th, theme, toast, user, userGroups, waStyle }} />}
     </>
   );
   return { tabContent };
