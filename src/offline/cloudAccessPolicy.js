@@ -64,4 +64,43 @@ export function isCloudAccessAllowedSync() {
   }
 }
 
+const TRIAL_EXPIRED = "TRIAL_EXPIRED";
+
+function readTrialStatus(accessStatus) {
+  return String(
+    accessStatus?.trialStatus || accessStatus?.trial?.status || ""
+  ).trim();
+}
+
+/** Login screen: offer Create Account (same rule as EXE — not only localStorage cache). */
+export function shouldOfferCloudSignup(accessStatus, { online = true } = {}) {
+  if (!online) return false;
+  if (import.meta.env?.VITE_S4_CLOUD_ALWAYS === "1") return true;
+
+  const trialStatus = readTrialStatus(accessStatus);
+  if (trialStatus === TRIAL_EXPIRED) return false;
+  if (trialStatus === TRIAL_ACTIVE || trialStatus === "TRIAL_NOT_STARTED") return true;
+
+  if (isCloudAccessAllowedSync()) return true;
+
+  const license = accessStatus?.license;
+  const licenseStatus = String(
+    accessStatus?.licenseStatus || license?.status || ""
+  ).trim();
+  if (licenseStatus === LICENSE_ACTIVE) {
+    return cloudFeaturesFromLicensePayload(license?.payload);
+  }
+
+  const reason = String(accessStatus?.accessReason || accessStatus?.trial?.reason || "");
+  if (
+    reason === "TRIAL_REQUIRES_ONLINE" ||
+    reason === "TRIAL_SERVER_UNAVAILABLE" ||
+    reason === "TRIAL_NOT_STARTED"
+  ) {
+    return true;
+  }
+
+  return trialStatus !== TRIAL_EXPIRED;
+}
+
 export const CLOUD_NOT_LICENSED = "CLOUD_NOT_LICENSED";

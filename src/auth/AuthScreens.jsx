@@ -7,7 +7,7 @@ import { registerLocalOwnerAccount, registerLocalSalesmanAccount, friendlyLocalA
 import { saveShopRecord } from "../offline/shopService";
 import { isAcceptablePassword, PASSWORD_HINT } from "./passwordRules.js";
 import { updateLocalUserPassword } from "./localAuthService";
-import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
+import { shouldOfferCloudSignup } from "../offline/cloudAccessPolicy.js";
 import { getLocalAccessStatus } from "./licenseService.js";
 
 // ─── SETUP ───────────────────────────────────────────────────
@@ -27,7 +27,7 @@ export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
 // ─── LOGIN ───────────────────────────────────────────────────
 export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, onLoginSuccess, onSwitchToSignup, onEmailVerificationRequired }) {
   const _s = sp||_globalS;
-  const [cloudSignupAllowed, setCloudSignupAllowed] = useState(() => isCloudAccessAllowedSync());
+  const [cloudSignupAllowed, setCloudSignupAllowed] = useState(false);
   const [trialDaysLeft, setTrialDaysLeft] = useState(null);
   const [trialStatus, setTrialStatus] = useState("");
   const [username,setUsername]=useState("");
@@ -36,8 +36,9 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
   const [showPw,setShowPw]=useState(false);
 
   const refreshAccessState = async () => {
+    const online = typeof navigator === "undefined" ? true : navigator.onLine;
     const access = await getLocalAccessStatus();
-    setCloudSignupAllowed(isCloudAccessAllowedSync());
+    setCloudSignupAllowed(shouldOfferCloudSignup(access, { online }));
     setTrialStatus(access?.trialStatus || access?.trial?.status || "");
     const days = access?.trial?.daysRemaining;
     setTrialDaysLeft(typeof days === "number" ? days : null);
@@ -45,6 +46,15 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
 
   useEffect(() => {
     refreshAccessState().catch(() => {});
+    const onOnline = () => {
+      refreshAccessState().catch(() => {});
+    };
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOnline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOnline);
+    };
   }, []);
 
   const submit = async (e) => {

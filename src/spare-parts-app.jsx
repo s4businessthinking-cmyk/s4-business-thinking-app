@@ -199,7 +199,7 @@ import s4LogoUrl from "./assets/s4-logo.png";
 import { TR } from "./i18n/translations.js";
 import { takeFreshRunSignOut } from "./auth/sessionPerRun.js";
 import { touchOfflineSession, SESSION_IDLE_MS } from "./auth/authSession.js";
-import { isCloudAccessAllowedSync } from "./offline/cloudAccessPolicy.js";
+import { shouldOfferCloudSignup } from "./offline/cloudAccessPolicy.js";
 import { useFirebaseAuthReady } from "./auth/useFirebaseAuthReady.js";
 import { localIsoDate } from "./utils/localIsoDate.js";
 import { UAE_BANKS, amountToWordsAED } from "./cheque/chequeConfig.js";
@@ -625,9 +625,19 @@ export default function App() {
   const [signupRole,setSignupRole]=useState(null);
 
   useEffect(() => {
-    if (!isCloudAccessAllowedSync() && (authScreen === "signupRole" || authScreen === "signupForm")) {
-      setAuthScreen("login");
-    }
+    if (authScreen !== "signupRole" && authScreen !== "signupForm") return;
+    let cancelled = false;
+    (async () => {
+      const online = typeof navigator !== "undefined" ? navigator.onLine : true;
+      const access = await getLocalAccessStatus().catch(() => null);
+      if (cancelled) return;
+      if (!shouldOfferCloudSignup(access, { online })) {
+        setAuthScreen("login");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [authScreen]);
   const [notif,setNotif]=useState(null);
   const [profileError,setProfileError]=useState(null);

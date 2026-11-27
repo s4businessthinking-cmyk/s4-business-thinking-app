@@ -631,9 +631,6 @@ export async function loginWithLocalCredentials(username, password) {
 }
 
 async function loginWithRemoteStaffUsername(username, password) {
-  if (!isCloudAccessAllowedSync()) {
-    return { ok: false, reason: "CLOUD_NOT_LICENSED" };
-  }
   if (!isOnline() || !auth || !db) {
     return { ok: false, reason: "OFFLINE_STAFF_LOGIN" };
   }
@@ -1205,7 +1202,15 @@ export function friendlyLocalAuthError(result, lang = "bn") {
       return isBn ? "ইমেইল বা পাসওয়ার্ড ভুল" : "Incorrect email or password";
     }
     if (code === "auth/network-request-failed") {
-      return isBn ? "ইন্টারনেট সংযোগ চেক করুন" : "Please check your internet connection";
+      const native =
+        typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.() === true;
+      return native
+        ? isBn
+          ? "S4 সার্ভারে যোগাযোগ হয়নি। Wi‑Fi/মোবাইল ডাটা চালু করে আবার Login করুন (EXE-এর মতো ইমেইল লগইন)।"
+          : "Could not reach the S4 server. Turn on Wi‑Fi/mobile data and log in with email (same as EXE)."
+        : isBn
+          ? "ইন্টারনেট সংযোগ চেক করুন"
+          : "Please check your internet connection";
     }
     if (code === "permission-denied") {
       const detail = String(result?.message || "").slice(0, 120);
