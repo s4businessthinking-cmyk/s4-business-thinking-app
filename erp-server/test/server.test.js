@@ -644,3 +644,26 @@ test("rules: manageSecurityCheques lets staff read purchase/sales invoices (for 
   assert.equal((await commit(owner.idToken, [set("users", sales.uid, { permissions: { manageSecurityCheques: false } }, true)])).status, 200);
   assert.equal((await api("/v1/db/get", { collection: "purchaseInvoices", id: "scpi1" }, sales.idToken)).status, 403, "without any of the view permissions, read is denied again");
 });
+
+test("trial: one demo per device fingerprint; resolve does not reset", async () => {
+  const fp = "a".repeat(64);
+  const id = "11111111-1111-4111-8111-111111111111";
+
+  const first = await api("/v1/trial/resolve", { deviceId: id, deviceFingerprint: fp, trialDays: 7 });
+  assert.equal(first.ok, true);
+  assert.equal(first.reused, false);
+  assert.equal(first.status, "TRIAL_ACTIVE");
+  assert.equal(first.trialDays, 7);
+
+  const lookup = await api("/v1/trial/lookup", { deviceFingerprint: fp });
+  assert.equal(lookup.ok, true);
+  assert.equal(lookup.found, true);
+  assert.equal(lookup.trialEndsAt, first.trialEndsAt);
+
+  const second = await api("/v1/trial/resolve", { deviceId: id, deviceFingerprint: fp, trialDays: 15 });
+  assert.equal(second.ok, true);
+  assert.equal(second.reused, true);
+  assert.equal(second.trialEndsAt, first.trialEndsAt, "second resolve must not extend trial");
+
+  assert.equal((await api("/v1/trial/resolve", { deviceId: "other-id", deviceFingerprint: fp })).reason, "DEVICE_MISMATCH");
+});

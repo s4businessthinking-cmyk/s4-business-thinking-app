@@ -7,6 +7,7 @@ import { createMailer } from "./mailer.js";
 import { createPinResetService } from "./pinReset.js";
 import { startAutoRemindersJob } from "./autoRemindersJob.js";
 import { createLicenseService } from "./license.js";
+import { createTrialDeviceService } from "./trialDevices.js";
 
 export async function startServer(cfg) {
   const db = await openDb(cfg);
@@ -15,7 +16,8 @@ export async function startServer(cfg) {
   const store = createStore({ db });
   const pinReset = createPinResetService({ db, store, sendMail });
   const license = createLicenseService({ cfg });
-  const server = createHttpServer({ cfg, auth, store, pinReset, license });
+  const trialDevices = createTrialDeviceService({ db, cfg });
+  const server = createHttpServer({ cfg, auth, store, pinReset, license, trialDevices });
   const realtime = attachRealtime({ server, store, auth });
   const autoRemindersJob = startAutoRemindersJob({ db, cfg });
 

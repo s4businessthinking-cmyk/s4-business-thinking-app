@@ -82,6 +82,7 @@ import {
   addLocalInviteCode,
   repairStaffProfileIfNeeded,
 } from "./auth/localAuthBootstrap";
+import { getLocalAccessStatus } from "./auth/licenseService";
 import { updateLocalUserPassword, updateLocalUserProfile } from "./auth/localAuthService";
 import { createStockLedgerEntry, buildStockLedgerEntry, STOCK_COLLECTIONS } from "./inventory/stockManagementService";
 
@@ -209,6 +210,9 @@ import { SalesInvoiceTab } from "./sales-invoice/SalesInvoiceTab.jsx";
 import { PurchaseInvoiceTab } from "./purchase/PurchaseInvoiceTab.jsx";
 import { PiSalesmanView } from "./purchase/PiSalesmanView.jsx";
 import { _globalS, LOGO_URL, APP_NAME, THEMES, getStyles } from "./shared/appShared.jsx";
+
+const _erpS = getStyles(THEMES.erp);
+const _erpDarkS = getStyles(THEMES.erpDark);
 import { Header } from "./components/AppHeader.jsx";
 import { ShopSetupWizard, SetupScreen, SignupRolePicker, SignupForm, LoginScreen, VerifyGate, ChangePasswordScreen } from "./auth/AuthScreens.jsx";
 import { InviteCodeRow, PermToggle } from "./team/TeamControls.jsx";
@@ -460,6 +464,23 @@ function MainApp({ t, lang, setLang, user, profile, shop:shopProp, toast, s:sBas
   const [clearingProducts, setClearingProducts] = useState(false);
   const productBulkDeleteRef = useRef(false);
   const [licenseAccessLoading, setLicenseAccessLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const access = await getLocalAccessStatus();
+        if (!cancelled) setLicenseAccess(access);
+      } catch (accessError) {
+        console.warn("[S4 License] MainApp access status failed", accessError);
+      } finally {
+        if (!cancelled) setLicenseAccessLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [syncDashboard, setSyncDashboard] = useState(null);
   const [cloudPullBusy, setCloudPullBusy] = useState(false);
   const cloudPullRunRef = useRef(null);
@@ -740,6 +761,15 @@ export default function App() {
     const bootTimer = setTimeout(() => { if (!cancelled) setAuthReady(true); }, 12000);
     (async () => {
       try {
+        try {
+          const access = await getLocalAccessStatus();
+          setLicenseAccess(access);
+        } catch (accessError) {
+          console.warn("[S4 Auth] access status before login failed", accessError);
+        } finally {
+          setLicenseAccessLoading(false);
+        }
+
         const boot = await ensureLocalAuthBootstrap();
         if (boot.shop) saveCachedShop(boot.shop.id, boot.shop);
 
@@ -905,6 +935,3 @@ export default function App() {
 
   return <>{Notif}<MainApp t={t} lang={lang} setLang={setLang} user={user} profile={profile} shop={shop} toast={toast} s={s} th={th} theme={theme} setTheme={setTheme} onLogout={handleLogout} onProfileUpdate={handleProfileUpdate} /></>;
 }
-
-const _erpS = getStyles(THEMES.erp);
-const _erpDarkS = getStyles(THEMES.erpDark);

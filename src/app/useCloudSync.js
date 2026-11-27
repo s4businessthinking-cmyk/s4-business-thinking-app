@@ -307,13 +307,13 @@ export function useCloudSync({ authSyncReady, cloudPullRunRef, isOrderManager, i
     }
   };
 
-  const refreshLicenseAccess = async () => {
-    setLicenseAccessLoading(true);
+  const refreshLicenseAccess = async ({ force = false } = {}) => {
+    if (force) setLicenseAccessLoading(true);
     try {
-      if (isCloudAccessAllowedSync()) {
-        await refreshLicenseOnline();
+      if (isCloudAccessAllowedSync() && force) {
+        await refreshLicenseOnline({ force: true });
       }
-      setLicenseAccess(await getLocalAccessStatus());
+      setLicenseAccess(await getLocalAccessStatus({ force }));
     } catch (error) {
       console.warn("[S4 License] access status check failed", error);
       setLicenseAccess({

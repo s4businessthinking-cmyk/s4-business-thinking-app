@@ -30,6 +30,17 @@ const SCHEMA = [
     created_at VARCHAR(32) NOT NULL,
     KEY idx_sessions_uid (uid)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
+  `CREATE TABLE IF NOT EXISTS trial_devices (
+    device_fingerprint VARCHAR(128) NOT NULL PRIMARY KEY,
+    device_id VARCHAR(64) NOT NULL,
+    first_installed_at VARCHAR(32) NOT NULL,
+    trial_started_at VARCHAR(32) NOT NULL,
+    trial_ends_at VARCHAR(32) NOT NULL,
+    trial_days INT NOT NULL,
+    status VARCHAR(32) NOT NULL,
+    created_at VARCHAR(32) NOT NULL,
+    updated_at VARCHAR(32) NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin`,
 ];
 
 function toDocRow(row) {
@@ -155,6 +166,43 @@ export async function createMysqlDb(options) {
     },
     async deleteSessionsForUid(uid) {
       await pool.query("DELETE FROM sessions WHERE uid = ?", [uid]);
+    },
+    async getTrialDevice(deviceFingerprint) {
+      const row = await one(
+        "SELECT * FROM trial_devices WHERE device_fingerprint = ?",
+        [deviceFingerprint]
+      );
+      if (!row) return null;
+      return {
+        deviceFingerprint: row.device_fingerprint,
+        deviceId: row.device_id,
+        firstInstalledAt: row.first_installed_at,
+        trialStartedAt: row.trial_started_at,
+        trialEndsAt: row.trial_ends_at,
+        trialDays: Number(row.trial_days),
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    },
+    async insertTrialDevice(record) {
+      await pool.query(
+        `INSERT INTO trial_devices (
+          device_fingerprint, device_id, first_installed_at, trial_started_at,
+          trial_ends_at, trial_days, status, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          record.deviceFingerprint,
+          record.deviceId,
+          record.firstInstalledAt,
+          record.trialStartedAt,
+          record.trialEndsAt,
+          record.trialDays,
+          record.status,
+          record.createdAt,
+          record.updatedAt,
+        ]
+      );
     },
     async close() {
       await pool.end();

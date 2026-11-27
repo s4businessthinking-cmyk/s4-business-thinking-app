@@ -1,7 +1,7 @@
 {
   "name": "s4-business-thinking",
   "private": true,
-  "version": "1.0.97",
+  "version": "1.0.98",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {

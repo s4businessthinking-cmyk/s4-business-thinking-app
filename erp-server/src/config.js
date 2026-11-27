@@ -45,6 +45,7 @@ export const config = {
     return ["*"];
   })(),
   revokedLicenseIds: env.S4_REVOKED_LICENSE_IDS || "",
+  trialDays: Number(env.S4_TRIAL_DAYS || 15),
 };
 
 const WEAK_JWT = /dev-only|change-me|test-secret/i;

@@ -175,7 +175,7 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
     setLoading(true);
     try {
       const latestLicense = await getLocalLicenseStatus();
-      const latestAccess = await getLocalAccessStatus();
+      const latestAccess = await getLocalAccessStatus({ force: true });
       setStatus(latestLicense);
       setAccessStatus(latestAccess);
     } catch (error) {
@@ -217,7 +217,7 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
         phone: mobileForKey,
       });
       const latestLicense = await getLocalLicenseStatus();
-      const latestAccess = await getLocalAccessStatus();
+      const latestAccess = await getLocalAccessStatus({ force: true });
       setStatus(latestLicense);
       setAccessStatus(latestAccess);
       const failText = licenseActivationErrorText(result?.reason, lang) || txt.invalid;
@@ -225,7 +225,7 @@ export function LicenseActivationPanel({ lang, th, s, toast, locked = false, onA
         type: result?.ok ? "ok" : "err",
         text: result?.ok ? txt.activated : failText,
       });
-      if (result?.ok) onActivated?.(latestAccess);
+      if (result?.ok) onActivated?.();
       if (result?.ok) setLicenseKey("");
     } catch {
       setMessage({ type: "err", text: txt.invalid });

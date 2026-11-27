@@ -352,12 +352,14 @@ export function renderTabContent({ OrderCard, addCo, addItToInvoice, addProduct,
         />
       )}
 
-      {tab==="pdc"&&(isOwner||can("managePdc"))&&(
+      {tab==="pdc"&&(isOwner||can("managePdc"))?(
         <PdcWindow inline lang={lang} cur={t.cur||"AED"} shopId={shopId} userId={user?.uid||""}
           shopName={localShop?.companyName||""}
           canPrint={isOwner||can("printPdc")} canDelete={isOwner||can("deletePdc")}
           onOpenVoucher={(isOwner||can("printPayments")) ? (raw)=>printPaymentVoucher(raw, localShop, lang) : undefined} />
-      )}
+      ):tab==="pdc"?(
+        <div style={s.empty}>{lang==="bn"?"PDC দেখার অনুমতি নেই — Settings → User Groups-এ managePdc চালু করুন":"No PDC access — enable managePdc in Settings → User Groups"}</div>
+      ):null}
 
       {tab==="securityCheque"&&(isOwner||can("manageSecurityCheques"))&&(
         <SecurityChequeTab lang={lang} shopId={shopId} user={user} profile={profile} isOwner={isOwner}

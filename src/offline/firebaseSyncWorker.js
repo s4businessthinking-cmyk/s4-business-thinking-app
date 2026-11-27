@@ -31,6 +31,13 @@ const BATCH_SIZE = 400;
 const BASE_BATCH_DELAY_MS = 300;
 const PRIORITY_COLLECTIONS = ["orders"];
 const MAX_BATCH_DELAY_MS = 5000;
+const MAX_QUEUE_ITEMS_PER_PASS = 1200;
+const FAILED_RETRY_BASE_MS = 60_000;
+const FAILED_RETRY_MAX_MS = 30 * 60 * 1000;
+const SYNC_AUTH_BACKOFF_MS = 120_000;
+const SYNC_MASS_FAILURE_BACKOFF_MS = 5 * 60 * 1000;
+
+let syncBackoffUntil = 0;
 const RETRYABLE_ERROR_HINTS = [
   "unavailable",
   "resource-exhausted",
@@ -70,6 +77,21 @@ function isRetryableError(error) {
 function isPermissionDeniedMessage(message) {
   const text = String(message || "").toLowerCase();
   return text.includes("insufficient permissions") || text.includes("permission-denied");
+}
+
+function shouldRetryQueueItem(item) {
+  const status = String(item.status || "").toUpperCase();
+  if (status !== "FAILED") return true;
+
+  const retries = Number(item.retry_count || 0);
+  if (retries < 4) return true;
+
+  const updatedMs = Date.parse(item.updated_at || item.created_at || "") || 0;
+  if (!updatedMs) return true;
+
+  const exponent = Math.min(Math.max(0, retries - 4), 10);
+  const backoff = Math.min(FAILED_RETRY_BASE_MS * 2 ** exponent, FAILED_RETRY_MAX_MS);
+  return Date.now() >= updatedMs + backoff;
 }
 
 function cleanForFirestore(value) {
@@ -319,8 +341,15 @@ export async function uploadLocalRecordsBatch(collectionName, records = []) {
  * lands on the specific bad document instead of the whole chunk.
  */
 export async function syncPendingQueueToFirebase() {
+  if (Date.now() < syncBackoffUntil) {
+    return { ok: false, skipped: true, reason: "SYNC_BACKOFF" };
+  }
   if (!isCloudAccessAllowedSync()) {
     return { ok: false, skipped: true, reason: "CLOUD_NOT_LICENSED" };
+  }
+  if (!auth?.currentUser?.uid) {
+    syncBackoffUntil = Date.now() + SYNC_AUTH_BACKOFF_MS;
+    return { ok: false, skipped: true, reason: "FIREBASE_AUTH_REQUIRED" };
   }
   if (syncRunning) {
     syncRequestedWhileRunning = true;
@@ -372,9 +401,11 @@ export async function syncPendingQueueToFirebase() {
     };
     const runnable = queue
       .filter((item) => !pausedCollections.has(item.payload?.collectionName || item.collection_name))
+      .filter((item) => shouldRetryQueueItem(item))
       .map((item, index) => ({ item, index, r: rank(item) }))
       .sort((a, b) => a.r - b.r || a.index - b.index)
-      .map(({ item }) => item);
+      .map(({ item }) => item)
+      .slice(0, MAX_QUEUE_ITEMS_PER_PASS);
 
     const batches = [];
     for (const [collectionName, items] of groupQueueByCollection(runnable)) {
@@ -445,6 +476,10 @@ export async function syncPendingQueueToFirebase() {
 
     result.status = await getOfflineStatus();
     result.finishedAt = new Date().toISOString();
+
+    if (result.failed > 0 && result.done === 0 && result.total > 0) {
+      syncBackoffUntil = Date.now() + SYNC_MASS_FAILURE_BACKOFF_MS;
+    }
 
     return result;
   } finally {

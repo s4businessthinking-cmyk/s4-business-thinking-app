@@ -12,6 +12,17 @@ import {
   syncCloudAccessCacheFromLicense,
   setCloudAccessCache,
 } from "../offline/cloudAccessPolicy.js";
+import {
+  readTrialDeviceSeal,
+  writeTrialDeviceSeal,
+  sealMatchesFingerprint,
+  sealHasTrialRecord,
+} from "./trialDeviceSeal.js";
+import {
+  clearTrialServerResolveCache,
+  resolveTrialOnServer,
+  serverTrialStatus,
+} from "./trialServerSync.js";
 
 export { validateLicensePayload, licenseActivationErrorText } from "./licensePayloadRules.js";
 
@@ -19,11 +30,21 @@ const LICENSE_KEY_PREFIX = "S4-LIC-v1";
 const LICENSE_APP_ID = "com.s4businessthinking.app";
 const LICENSE_PLANS = new Set(["LIFETIME", "MONTHLY", "YEARLY", "CUSTOM"]);
 const DEFAULT_TRIAL_DAYS = 15;
+const PERSISTENT_DEVICE_ID_KEY = "s4-persistent-device-id-v1";
 const CLOCK_ROLLBACK_TOLERANCE_MS = 5 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const CONFIRM_EXPIRE_TRIAL = "EXPIRE_TRIAL_FOR_TEST";
 const CONFIRM_RESET_TRIAL = "RESET_TRIAL_FOR_TEST";
 const CONFIRM_CLEAR_LICENSE = "CLEAR_LICENSE_FOR_TEST";
+const TRIAL_SERVER_REFRESH_MS = 10 * 60 * 1000;
+const LICENSE_ONLINE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const ACCESS_STATUS_CACHE_MS = 5000;
+const ACCESS_STATUS_STABLE_CACHE_MS = 60 * 1000;
+
+let accessStatusInflight = null;
+let accessStatusCache = null;
+let trialStatusInflight = null;
+let lastTrialServerSyncAt = 0;
 
 const DEFAULT_LICENSE_PUBLIC_KEY_JWK = {
   kty: "EC",
@@ -245,6 +266,95 @@ function addDays(date, days) {
   return new Date(date.getTime() + days * DAY_MS);
 }
 
+function trialMetaComplete() {
+  return !!(
+    readMetaValue("first_installed_at") &&
+    readMetaValue("trial_started_at") &&
+    readMetaValue("trial_ends_at")
+  );
+}
+
+function restoreTrialMetaFromSeal(seal, deviceFingerprint) {
+  writeMetaValue("first_installed_at", seal.firstInstalledAt);
+  writeMetaValue("trial_started_at", seal.trialStartedAt);
+  writeMetaValue("trial_ends_at", seal.trialEndsAt);
+  writeMetaValue("last_seen_at", seal.lastSeenAt || seal.trialStartedAt);
+  writeMetaValue("trial_days", String(seal.trialDays || DEFAULT_TRIAL_DAYS));
+  writeMetaValue(
+    "trial_status",
+    seal.trialStatus || TRIAL_STATUS.EXPIRED
+  );
+  writeMetaValue("trial_device_fingerprint", deviceFingerprint);
+}
+
+function persistTrialDeviceSeal(deviceFingerprint) {
+  if (!trialMetaComplete()) return;
+  writeTrialDeviceSeal({
+    deviceFingerprint,
+    firstInstalledAt: readMetaValue("first_installed_at"),
+    trialStartedAt: readMetaValue("trial_started_at"),
+    trialEndsAt: readMetaValue("trial_ends_at"),
+    lastSeenAt: readMetaValue("last_seen_at"),
+    trialDays: readMetaInteger("trial_days", DEFAULT_TRIAL_DAYS),
+    trialStatus: readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED,
+  });
+}
+
+async function hydrateTrialMetaFromDeviceSeal(deviceFingerprint) {
+  if (trialMetaComplete()) return;
+  const seal = readTrialDeviceSeal();
+  if (!sealMatchesFingerprint(seal, deviceFingerprint) || !sealHasTrialRecord(seal)) {
+    return;
+  }
+  restoreTrialMetaFromSeal(seal, deviceFingerprint);
+  await persistOfflineDb();
+}
+
+function applyTrialFromServerResponse(response, deviceFingerprint) {
+  const status =
+    serverTrialStatus(response) ||
+    (response?.status === TRIAL_STATUS.ACTIVE ? TRIAL_STATUS.ACTIVE : TRIAL_STATUS.EXPIRED);
+  const days = Math.max(1, Number(response?.trialDays) || DEFAULT_TRIAL_DAYS);
+  const lastSeenAt = response?.resolvedAt || response?.trialStartedAt || nowIso();
+
+  writeMetaValue("first_installed_at", response.firstInstalledAt);
+  writeMetaValue("trial_started_at", response.trialStartedAt);
+  writeMetaValue("trial_ends_at", response.trialEndsAt);
+  writeMetaValue("last_seen_at", lastSeenAt);
+  writeMetaValue("trial_days", String(days));
+  writeMetaValue("trial_status", status);
+  writeMetaValue("trial_device_fingerprint", deviceFingerprint);
+  persistTrialDeviceSeal(deviceFingerprint);
+  if (status === TRIAL_STATUS.ACTIVE) setCloudAccessCache(true);
+  else setCloudAccessCache(false);
+}
+
+async function syncTrialWithServerIfOnline(deviceId, deviceFingerprint, trialDays, options = {}) {
+  const response = await resolveTrialOnServer({
+    deviceId,
+    deviceFingerprint,
+    trialDays,
+    force: !!options.force,
+  });
+  if (!response?.ok) return false;
+  applyTrialFromServerResponse(response, deviceFingerprint);
+  await persistOfflineDb();
+  lastTrialServerSyncAt = Date.now();
+  return true;
+}
+
+function shouldRefreshTrialFromServer() {
+  if (!lastTrialServerSyncAt) return true;
+  return Date.now() - lastTrialServerSyncAt >= TRIAL_SERVER_REFRESH_MS;
+}
+
+export function invalidateLocalAccessCache() {
+  accessStatusCache = null;
+  accessStatusInflight = null;
+  trialStatusInflight = null;
+  clearTrialServerResolveCache();
+}
+
 function buildTrialResponse({
   status,
   firstInstalledAt,
@@ -452,14 +562,37 @@ export async function verifyOfflineLicensePayload(licenseKey, partyContext = {})
   }
 }
 
+function readPersistentDeviceId() {
+  if (typeof localStorage === "undefined") return "";
+  try {
+    return String(localStorage.getItem(PERSISTENT_DEVICE_ID_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function writePersistentDeviceId(deviceId) {
+  if (!deviceId || typeof localStorage === "undefined") return;
+  try {
+    localStorage.setItem(PERSISTENT_DEVICE_ID_KEY, deviceId);
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function getOrCreateDeviceId() {
   await bootOfflineSqlite();
 
   const existing = readMetaValue("device_id");
-  if (existing) return existing;
+  if (existing) {
+    writePersistentDeviceId(existing);
+    return existing;
+  }
 
-  const deviceId = createId();
+  const restored = readPersistentDeviceId();
+  const deviceId = restored || createId();
   writeMetaValue("device_id", deviceId);
+  writePersistentDeviceId(deviceId);
   await persistOfflineDb();
   return deviceId;
 }
@@ -534,6 +667,7 @@ export async function activateLicenseOffline(licenseKey, partyContext = {}) {
       deviceId: verification.deviceId,
       deviceFingerprint: verification.deviceFingerprint,
     });
+    invalidateLocalAccessCache();
 
     return {
       ...verification,
@@ -628,7 +762,7 @@ export async function getLocalLicenseStatus() {
   }
 }
 
-export async function getOrCreateTrialStatus() {
+async function getOrCreateTrialStatusImpl() {
   await bootOfflineSqlite();
 
   const license = await getLocalLicenseStatus();
@@ -639,12 +773,11 @@ export async function getOrCreateTrialStatus() {
   const nowValue = now.getTime();
   const trialDays = readMetaInteger("trial_days", DEFAULT_TRIAL_DAYS);
 
-  const storedFirstInstalledAt = readMetaValue("first_installed_at");
-  const storedTrialStartedAt = readMetaValue("trial_started_at");
-  const storedTrialEndsAt = readMetaValue("trial_ends_at");
-  const storedLastSeenAt = readMetaValue("last_seen_at");
-  const storedStatus = readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED;
-  const lastSeenAtMs = readMetaDate("last_seen_at");
+  let storedFirstInstalledAt = readMetaValue("first_installed_at");
+  let storedTrialStartedAt = readMetaValue("trial_started_at");
+  let storedTrialEndsAt = readMetaValue("trial_ends_at");
+  let storedLastSeenAt = readMetaValue("last_seen_at");
+  let storedStatus = readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED;
 
   if (license.status === LICENSE_STATUS.ACTIVE) {
     return buildTrialResponse({
@@ -660,32 +793,87 @@ export async function getOrCreateTrialStatus() {
     });
   }
 
-  if (!storedFirstInstalledAt || !storedTrialStartedAt || !storedTrialEndsAt) {
-    const firstInstalledAt = now.toISOString();
-    const trialStartedAt = firstInstalledAt;
-    const trialEndsAt = addDays(now, trialDays).toISOString();
-    const lastSeenAt = firstInstalledAt;
+  await hydrateTrialMetaFromDeviceSeal(deviceFingerprint);
 
-    writeMetaValue("first_installed_at", firstInstalledAt);
-    writeMetaValue("trial_started_at", trialStartedAt);
-    writeMetaValue("trial_ends_at", trialEndsAt);
-    writeMetaValue("last_seen_at", lastSeenAt);
-    writeMetaValue("trial_days", String(trialDays));
-    writeMetaValue("trial_status", TRIAL_STATUS.ACTIVE);
-    writeMetaValue("trial_device_fingerprint", deviceFingerprint);
-    await persistOfflineDb();
-
-    return buildTrialResponse({
-      status: TRIAL_STATUS.ACTIVE,
-      firstInstalledAt,
-      trialStartedAt,
-      trialEndsAt,
-      lastSeenAt,
-      trialDays,
+  let serverSynced = false;
+  const trialMetaReady = trialMetaComplete();
+  if (trialMetaReady && !shouldRefreshTrialFromServer()) {
+    serverSynced = true;
+  } else {
+    serverSynced = await syncTrialWithServerIfOnline(
       deviceId,
       deviceFingerprint,
-      reason: "TRIAL_INITIALIZED",
-    });
+      trialDays
+    );
+  }
+
+  storedFirstInstalledAt = readMetaValue("first_installed_at");
+  storedTrialStartedAt = readMetaValue("trial_started_at");
+  storedTrialEndsAt = readMetaValue("trial_ends_at");
+  storedLastSeenAt = readMetaValue("last_seen_at");
+  storedStatus = readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED;
+
+  if (!storedFirstInstalledAt || !storedTrialStartedAt || !storedTrialEndsAt) {
+    const priorSeal = readTrialDeviceSeal();
+    if (sealMatchesFingerprint(priorSeal, deviceFingerprint) && sealHasTrialRecord(priorSeal)) {
+      restoreTrialMetaFromSeal(priorSeal, deviceFingerprint);
+      await persistOfflineDb();
+      storedFirstInstalledAt = readMetaValue("first_installed_at");
+      storedTrialStartedAt = readMetaValue("trial_started_at");
+      storedTrialEndsAt = readMetaValue("trial_ends_at");
+      storedLastSeenAt = readMetaValue("last_seen_at");
+      storedStatus = readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED;
+    }
+  }
+
+  let lastSeenAtMs = readMetaDate("last_seen_at");
+
+  if (!storedFirstInstalledAt || !storedTrialStartedAt || !storedTrialEndsAt) {
+    if (serverSynced) {
+      storedFirstInstalledAt = readMetaValue("first_installed_at");
+      storedTrialStartedAt = readMetaValue("trial_started_at");
+      storedTrialEndsAt = readMetaValue("trial_ends_at");
+      storedLastSeenAt = readMetaValue("last_seen_at");
+      storedStatus = readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED;
+    }
+  }
+
+  if (!storedFirstInstalledAt || !storedTrialStartedAt || !storedTrialEndsAt) {
+    const online = typeof navigator === "undefined" ? true : navigator.onLine;
+    if (!online) {
+      return buildTrialResponse({
+        status: TRIAL_STATUS.NOT_STARTED,
+        firstInstalledAt: "",
+        trialStartedAt: "",
+        trialEndsAt: "",
+        lastSeenAt: storedLastSeenAt || "",
+        trialDays,
+        deviceId,
+        deviceFingerprint,
+        reason: "TRIAL_REQUIRES_ONLINE",
+      });
+    }
+
+    const synced = serverSynced;
+    if (synced && trialMetaComplete()) {
+      storedFirstInstalledAt = readMetaValue("first_installed_at");
+      storedTrialStartedAt = readMetaValue("trial_started_at");
+      storedTrialEndsAt = readMetaValue("trial_ends_at");
+      storedLastSeenAt = readMetaValue("last_seen_at");
+      storedStatus = readMetaValue("trial_status") || TRIAL_STATUS.NOT_STARTED;
+    } else {
+      return buildTrialResponse({
+        status: TRIAL_STATUS.NOT_STARTED,
+        firstInstalledAt: "",
+        trialStartedAt: "",
+        trialEndsAt: "",
+        lastSeenAt: storedLastSeenAt || "",
+        trialDays,
+        deviceId,
+        deviceFingerprint,
+        reason: synced ? "TRIAL_SERVER_PENDING" : "TRIAL_SERVER_UNAVAILABLE",
+      });
+    }
   }
 
   if (
@@ -695,6 +883,7 @@ export async function getOrCreateTrialStatus() {
     writeMetaValue("trial_status", TRIAL_STATUS.CLOCK_ROLLBACK);
     writeMetaValue("trial_device_fingerprint", deviceFingerprint);
     await persistOfflineDb();
+    persistTrialDeviceSeal(deviceFingerprint);
 
     return buildTrialResponse({
       status: TRIAL_STATUS.CLOCK_ROLLBACK,
@@ -725,6 +914,12 @@ export async function getOrCreateTrialStatus() {
   writeMetaValue("trial_device_fingerprint", deviceFingerprint);
   await persistOfflineDb();
 
+  if (status === TRIAL_STATUS.ACTIVE) {
+    setCloudAccessCache(true);
+  }
+
+  persistTrialDeviceSeal(deviceFingerprint);
+
   return buildTrialResponse({
     status,
     firstInstalledAt: storedFirstInstalledAt,
@@ -738,12 +933,24 @@ export async function getOrCreateTrialStatus() {
   });
 }
 
+export async function getOrCreateTrialStatus() {
+  if (trialStatusInflight) {
+    return trialStatusInflight;
+  }
+
+  trialStatusInflight = getOrCreateTrialStatusImpl().finally(() => {
+    trialStatusInflight = null;
+  });
+
+  return trialStatusInflight;
+}
+
 function finalizeAccessStatus(accessStatus) {
   applyCloudAccessPolicy(accessStatus);
   return accessStatus;
 }
 
-export async function getLocalAccessStatus() {
+async function computeLocalAccessStatus() {
   let license = await getLocalLicenseStatus();
 
   if (license.status === LICENSE_STATUS.ACTIVE) {
@@ -798,6 +1005,24 @@ export async function getLocalAccessStatus() {
     });
   }
 
+  if (trial.status === TRIAL_STATUS.NOT_STARTED) {
+    const accessReason =
+      trial.reason === "TRIAL_REQUIRES_ONLINE"
+        ? "TRIAL_REQUIRES_ONLINE"
+        : trial.reason === "TRIAL_SERVER_UNAVAILABLE"
+          ? "TRIAL_SERVER_UNAVAILABLE"
+          : "TRIAL_NOT_STARTED";
+    return finalizeAccessStatus({
+      ok: true,
+      accessAllowed: false,
+      accessReason,
+      licenseStatus: license.status,
+      trialStatus: trial.status,
+      license,
+      trial,
+    });
+  }
+
   if (trial.status === TRIAL_STATUS.CLOCK_ROLLBACK) {
     return finalizeAccessStatus({
       ok: true,
@@ -821,7 +1046,47 @@ export async function getLocalAccessStatus() {
   });
 }
 
+function accessStatusCacheTtl(access) {
+  if (!access) return ACCESS_STATUS_CACHE_MS;
+  if (access.accessAllowed && access.accessReason === "LICENSE_ACTIVE") {
+    return ACCESS_STATUS_STABLE_CACHE_MS;
+  }
+  if (access.accessAllowed && access.accessReason === "TRIAL_ACTIVE") {
+    return ACCESS_STATUS_STABLE_CACHE_MS;
+  }
+  return ACCESS_STATUS_CACHE_MS;
+}
+
+export async function getLocalAccessStatus(options = {}) {
+  const force = !!options.force;
+
+  if (!force && accessStatusCache) {
+    const ttl = accessStatusCacheTtl(accessStatusCache.value);
+    if (Date.now() - accessStatusCache.at < ttl) {
+      return accessStatusCache.value;
+    }
+  }
+
+  if (accessStatusInflight && !force) {
+    return accessStatusInflight;
+  }
+
+  const run = computeLocalAccessStatus().then((value) => {
+    accessStatusCache = { at: Date.now(), value };
+    return value;
+  });
+
+  accessStatusInflight = run.finally(() => {
+    accessStatusInflight = null;
+  });
+
+  return accessStatusInflight;
+}
+
 export async function expireTrialForTest(confirmText) {
+  if (!import.meta.env.DEV) {
+    return { ok: false, reason: "DEV_ONLY" };
+  }
   try {
     const confirmError = requireDevConfirm(confirmText, CONFIRM_EXPIRE_TRIAL);
     if (confirmError) return confirmError;
@@ -842,6 +1107,8 @@ export async function expireTrialForTest(confirmText) {
     writeMetaValue("trial_status", TRIAL_STATUS.EXPIRED);
     writeMetaValue("trial_device_fingerprint", deviceFingerprint);
     await persistOfflineDb();
+    persistTrialDeviceSeal(deviceFingerprint);
+    invalidateLocalAccessCache();
 
     return {
       ok: true,
@@ -858,6 +1125,9 @@ export async function expireTrialForTest(confirmText) {
 }
 
 export async function resetTrialForTest(confirmText) {
+  if (!import.meta.env.DEV) {
+    return { ok: false, reason: "DEV_ONLY" };
+  }
   try {
     const confirmError = requireDevConfirm(confirmText, CONFIRM_RESET_TRIAL);
     if (confirmError) return confirmError;
@@ -877,6 +1147,9 @@ export async function resetTrialForTest(confirmText) {
     writeMetaValue("trial_status", TRIAL_STATUS.ACTIVE);
     writeMetaValue("trial_device_fingerprint", deviceFingerprint);
     await persistOfflineDb();
+    persistTrialDeviceSeal(deviceFingerprint);
+    invalidateLocalAccessCache();
+    await getLocalAccessStatus({ force: true });
 
     return {
       ok: true,
@@ -942,7 +1215,7 @@ export async function getDebugStatus() {
   }
 }
 
-async function applyOnlineLicenseRevocationIfNeeded() {
+async function applyOnlineLicenseRevocationIfNeeded(options = {}) {
   if (typeof navigator !== "undefined" && !navigator.onLine) {
     return { ok: true, skipped: true, reason: "OFFLINE" };
   }
@@ -951,6 +1224,13 @@ async function applyOnlineLicenseRevocationIfNeeded() {
   const licenseId = license?.payload?.licenseId || readMetaValue("license_id");
   if (license.status !== LICENSE_STATUS.ACTIVE || !licenseId) {
     return { ok: true, skipped: true, reason: "NO_ACTIVE_LICENSE" };
+  }
+
+  if (!options.force) {
+    const lastCheck = readMetaDate("license_last_offline_check");
+    if (lastCheck != null && Date.now() - lastCheck < LICENSE_ONLINE_CHECK_INTERVAL_MS) {
+      return { ok: true, skipped: true, reason: "RECENT_CHECK" };
+    }
   }
 
   const user = defaultAuth.currentUser;
@@ -997,8 +1277,8 @@ async function applyOnlineLicenseRevocationIfNeeded() {
   }
 }
 
-export async function refreshLicenseOnline() {
-  return applyOnlineLicenseRevocationIfNeeded();
+export async function refreshLicenseOnline(options = {}) {
+  return applyOnlineLicenseRevocationIfNeeded(options);
 }
 
 export async function recordLicenseActivationOnline() {

@@ -22,10 +22,6 @@ import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
 
 export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers, inviteCodes, isOrderManager, isOwner, lang, localShop, mergeVisibleOrders, refreshLicenseAccess, refreshSyncDashboard, runCloudDownload, setCos, setCustomers, setInviteCodes, setLastCloudPullAt, setSettingsPage, setSyncRefreshKey, setSyncState, setTab, setTeam, setVendors, settingsPage, shopId, shopProp, syncState, t, team, toast, user, vendors }) {
   useEffect(() => {
-    refreshLicenseAccess();
-  }, []);
-
-  useEffect(() => {
     if (!shopId) {
       setSyncState("offline");
       return;
@@ -68,7 +64,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, can, customers
       try { return !!window.Capacitor?.isNativePlatform?.() || !!window.matchMedia?.("(pointer: coarse)").matches; }
       catch { return false; }
     })();
-    const timer = window.setInterval(runAutoUpload, mobile ? 90_000 : 15_000);
+    const timer = window.setInterval(runAutoUpload, mobile ? 90_000 : 30_000);
 
     return () => window.clearInterval(timer);
   }, [shopId, user?.uid]);

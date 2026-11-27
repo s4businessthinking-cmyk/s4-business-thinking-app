@@ -164,6 +164,17 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
       failed.length ? (bn ? `হয়নি: ${failed.join(", ")}` : `Failed: ${failed.join(", ")}`) : "",
     ].filter(Boolean).join("\n"));
   };
+
+  const printList = () => {
+    const m = TYPES[type];
+    const period = from || to ? `${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "End"}` : "All dates";
+    const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.no)}</td><td>${esc(fmtDate(r.date))}</td><td>${esc(r.party)}</td>${extraCols ? `<td>${esc(fmtMonth(r.month))}</td><td>${esc(r.vendorRcpt)}</td>` : ""}<td>${esc(r.bank)}</td><td>${esc(r.chequeNo)}</td><td>${esc(fmtDate(r.chequeDate))}</td><td style="text-align:right">${f2(r.amount)}</td><td>${esc(r.clearedAt ? fmtDate(r.clearedAt) : "")}</td><td>${esc(r.chequeStatus.toUpperCase())}</td></tr>`).join("");
+    printWithSettings(`<html><head><meta charset="UTF-8"><title>${esc(m.label)}</title><style>body{font-family:Segoe UI,Arial;font-size:12px;padding:18px}h2{margin:0;font-size:16px}h3{margin:4px 0 2px;font-size:13px}p{margin:2px 0 10px;color:#555}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 6px}th{background:#e5eaf3;text-align:left}tfoot td{font-weight:800;background:#f1f5f9}</style></head><body>
+<h2>${esc(shopName)}</h2><h3>POST DATED CHEQUES — ${esc(m.label.toUpperCase())}${bank ? ` — ${esc(bank)}` : ""}</h3><p>${esc(period)}</p>
+<table><thead><tr><th>Sl</th><th>Vchr No</th><th>Voucher Date</th><th>${esc(m.partyHead)}</th>${extraCols ? "<th>Month</th><th>Vendor Rcpt No</th>" : ""}<th>Bank</th><th>Cheque No</th><th>Cheque Date</th><th style="text-align:right">Amount</th><th>Post Date</th><th>Status</th></tr></thead>
+<tbody>${body}</tbody><tfoot><tr><td colspan="${extraCols ? 9 : 7}"style="text-align:right">TOTAL</td><td style="text-align:right">${f2(total)}</td><td colspan="2"></td></tr></tfoot></table></body></html>`);
+  };
+
   useFormSaveShortcut({ saving, disabled: saving || !changed.length, onSave: save });
   usePrintShortcut({ active: canPrint, disabled: !rows.length, onPrint: printList });
 
@@ -187,16 +198,6 @@ export default function PdcWindow({ lang = "en", cur = "AED", shopId, userId = "
     } catch (err) {
       alert(err?.message || String(err));
     }
-  };
-
-  const printList = () => {
-    const m = TYPES[type];
-    const period = from || to ? `${from ? fmtDate(from) : "Start"} — ${to ? fmtDate(to) : "End"}` : "All dates";
-    const body = rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.no)}</td><td>${esc(fmtDate(r.date))}</td><td>${esc(r.party)}</td>${extraCols ? `<td>${esc(fmtMonth(r.month))}</td><td>${esc(r.vendorRcpt)}</td>` : ""}<td>${esc(r.bank)}</td><td>${esc(r.chequeNo)}</td><td>${esc(fmtDate(r.chequeDate))}</td><td style="text-align:right">${f2(r.amount)}</td><td>${esc(r.clearedAt ? fmtDate(r.clearedAt) : "")}</td><td>${esc(r.chequeStatus.toUpperCase())}</td></tr>`).join("");
-    printWithSettings(`<html><head><meta charset="UTF-8"><title>${esc(m.label)}</title><style>body{font-family:Segoe UI,Arial;font-size:12px;padding:18px}h2{margin:0;font-size:16px}h3{margin:4px 0 2px;font-size:13px}p{margin:2px 0 10px;color:#555}table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:4px 6px}th{background:#e5eaf3;text-align:left}tfoot td{font-weight:800;background:#f1f5f9}</style></head><body>
-<h2>${esc(shopName)}</h2><h3>POST DATED CHEQUES — ${esc(m.label.toUpperCase())}${bank ? ` — ${esc(bank)}` : ""}</h3><p>${esc(period)}</p>
-<table><thead><tr><th>Sl</th><th>Vchr No</th><th>Voucher Date</th><th>${esc(m.partyHead)}</th>${extraCols ? "<th>Month</th><th>Vendor Rcpt No</th>" : ""}<th>Bank</th><th>Cheque No</th><th>Cheque Date</th><th style="text-align:right">Amount</th><th>Post Date</th><th>Status</th></tr></thead>
-<tbody>${body}</tbody><tfoot><tr><td colspan="${extraCols ? 9 : 7}"style="text-align:right">TOTAL</td><td style="text-align:right">${f2(total)}</td><td colspan="2"></td></tr></tfoot></table></body></html>`);
   };
 
   const sel = rows.find((r) => r.id === selId) || null;

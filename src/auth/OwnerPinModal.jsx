@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { peekOwnerPin, loadOwnerPin, verifyOwnerPin, verifyOwnerLoginPassword, saveOwnerPin, isValidPin, requestPinResetCode, verifyPinResetCode } from "./ownerPin";
+import { peekOwnerPin, loadOwnerPin, verifyOwnerPin, verifyOwnerLoginPassword, saveOwnerPin, isValidPin, isValidPinEntry, requestPinResetCode, verifyPinResetCode } from "./ownerPin";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
 const MAX_TRIES = 5;
@@ -105,7 +105,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
     e?.preventDefault();
     const locked = lockedMessage();
     if (locked) return setError(locked);
-    if (!isValidPin(pin)) return setError(bn ? "৬ সংখ্যার পিন দিন" : "Enter your 6 digit PIN");
+    if (!isValidPinEntry(pin)) return setError(bn ? "৪ বা ৬ সংখ্যার পিন দিন" : "Enter your 4 or 6 digit PIN");
     run(async () => {
       if (await checkPin(pin)) onUnlocked?.();
       else setPin("");
@@ -128,7 +128,7 @@ export default function OwnerPinModal({ lang = "bn", uid, localUserId, initialMo
     e?.preventDefault();
     const locked = lockedMessage();
     if (locked) return setError(locked);
-    if (!isValidPin(currentPin)) return setError(bn ? "বর্তমান পিন দিন" : "Enter your current PIN");
+    if (!isValidPinEntry(currentPin)) return setError(bn ? "বর্তমান পিন দিন (৪ বা ৬ সংখ্যা)" : "Enter your current PIN (4 or 6 digits)");
     const bad = newPinError();
     if (bad) return setError(bad);
     run(async () => {

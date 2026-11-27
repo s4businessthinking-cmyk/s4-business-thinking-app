@@ -34,6 +34,17 @@ const SCHEMA = `
     created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_sessions_uid ON sessions (uid);
+  CREATE TABLE IF NOT EXISTS trial_devices (
+    device_fingerprint TEXT PRIMARY KEY,
+    device_id TEXT NOT NULL,
+    first_installed_at TEXT NOT NULL,
+    trial_started_at TEXT NOT NULL,
+    trial_ends_at TEXT NOT NULL,
+    trial_days INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `;
 
 function toDocRow(row) {
@@ -90,6 +101,13 @@ export function createSqliteDb(file) {
     getSession: db.prepare("SELECT * FROM sessions WHERE id = ?"),
     deleteSession: db.prepare("DELETE FROM sessions WHERE id = ?"),
     deleteSessionsForUid: db.prepare("DELETE FROM sessions WHERE uid = ?"),
+    getTrialDevice: db.prepare("SELECT * FROM trial_devices WHERE device_fingerprint = ?"),
+    insertTrialDevice: db.prepare(`
+      INSERT INTO trial_devices (
+        device_fingerprint, device_id, first_installed_at, trial_started_at,
+        trial_ends_at, trial_days, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `),
   };
 
   const writer = {
@@ -151,6 +169,34 @@ export function createSqliteDb(file) {
     },
     async deleteSessionsForUid(uid) {
       st.deleteSessionsForUid.run(uid);
+    },
+    async getTrialDevice(deviceFingerprint) {
+      const row = st.getTrialDevice.get(deviceFingerprint);
+      if (!row) return null;
+      return {
+        deviceFingerprint: row.device_fingerprint,
+        deviceId: row.device_id,
+        firstInstalledAt: row.first_installed_at,
+        trialStartedAt: row.trial_started_at,
+        trialEndsAt: row.trial_ends_at,
+        trialDays: Number(row.trial_days),
+        status: row.status,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      };
+    },
+    async insertTrialDevice(record) {
+      st.insertTrialDevice.run(
+        record.deviceFingerprint,
+        record.deviceId,
+        record.firstInstalledAt,
+        record.trialStartedAt,
+        record.trialEndsAt,
+        record.trialDays,
+        record.status,
+        record.createdAt,
+        record.updatedAt
+      );
     },
     async close() {
       db.close();

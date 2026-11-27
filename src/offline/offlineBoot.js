@@ -95,7 +95,7 @@ export async function startOfflineEngine() {
     await getLocalAccessStatus().catch(() => {});
 
     const autoSync = startAutoFirebaseSync({
-      intervalMs: 10000,
+      intervalMs: 45000,
     });
 
     const productionApi = {

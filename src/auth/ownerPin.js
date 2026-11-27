@@ -82,6 +82,9 @@ export async function verifyOwnerLoginPassword(localUserId, password, uid = "") 
 
 export const isValidPin = (pin) => /^\d{6}$/.test(String(pin || ""));
 
+/** Unlock / verify: accept legacy 4-digit or new 6-digit PIN. */
+export const isValidPinEntry = (pin) => /^\d{4,6}$/.test(String(pin || ""));
+
 export async function saveOwnerPin(uid, pin) {
   if (!isValidPin(pin)) throw new Error("PIN must be 6 digits");
   const record = { ...(await hashPassword(String(pin))), setAt: new Date().toISOString() };

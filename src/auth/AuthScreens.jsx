@@ -8,6 +8,7 @@ import { saveShopRecord } from "../offline/shopService";
 import { isAcceptablePassword, PASSWORD_HINT } from "./passwordRules.js";
 import { updateLocalUserPassword } from "./localAuthService";
 import { isCloudAccessAllowedSync } from "../offline/cloudAccessPolicy.js";
+import { getLocalAccessStatus } from "./licenseService.js";
 
 // ─── SETUP ───────────────────────────────────────────────────
 export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
@@ -26,11 +27,26 @@ export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
 // ─── LOGIN ───────────────────────────────────────────────────
 export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, onLoginSuccess, onSwitchToSignup, onEmailVerificationRequired }) {
   const _s = sp||_globalS;
-  const cloudSignupAllowed = isCloudAccessAllowedSync();
+  const [cloudSignupAllowed, setCloudSignupAllowed] = useState(() => isCloudAccessAllowedSync());
+  const [trialDaysLeft, setTrialDaysLeft] = useState(null);
+  const [trialStatus, setTrialStatus] = useState("");
   const [username,setUsername]=useState("");
   const [pw,setPw]=useState("");
   const [busy,setBusy]=useState(false);
   const [showPw,setShowPw]=useState(false);
+
+  const refreshAccessState = async () => {
+    const access = await getLocalAccessStatus();
+    setCloudSignupAllowed(isCloudAccessAllowedSync());
+    setTrialStatus(access?.trialStatus || access?.trial?.status || "");
+    const days = access?.trial?.daysRemaining;
+    setTrialDaysLeft(typeof days === "number" ? days : null);
+  };
+
+  useEffect(() => {
+    refreshAccessState().catch(() => {});
+  }, []);
+
   const submit = async (e) => {
     e?.preventDefault?.();
     if (!username.trim()||!pw) {
@@ -72,6 +88,11 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
         <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
         <div style={_s.authTitle}>{t.welcomeBack}</div>
         <div style={_s.authSub}>{t.welcomeBackSub}</div>
+        {trialStatus === "TRIAL_ACTIVE" && trialDaysLeft != null && (
+          <div style={{ ..._s.authSub, marginBottom:10, fontSize:12, color:"#22c55e", fontWeight:700, lineHeight:1.5 }}>
+            {(t.trialLoginBanner || "").replace("{days}", String(trialDaysLeft))}
+          </div>
+        )}
         <form onSubmit={submit} style={_s.authCard}>
           <input style={{ ..._s.inp, marginBottom:10 }} type="text"placeholder={t.usernameOrEmailLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"autoCapitalize="none" />
           <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
@@ -340,6 +361,14 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
 
   const submit = async (e) => {
     e?.preventDefault?.();
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return toast(
+        bnL
+          ? "অ্যাকাউন্ট তৈরি করতে ইন্টারনেট চালু করুন"
+          : "Turn on internet to create an account",
+        "err"
+      );
+    }
     if (!personName.trim()||!username.trim()||!pw||!pw2||!mobile.trim()||!area.trim()||!cleanEmail)
       return toast(friendlyAuthError({code:"validation/required"},lang),"err");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail))

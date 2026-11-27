@@ -77,7 +77,7 @@ export function renderMainLayout({ canSeeProductCost, closeMenu, closeOrderSuppl
             locked
             localShop={localShop}
             profile={profile}
-            onActivated={refreshLicenseAccess}
+            onActivated={() => refreshLicenseAccess({ force: true })}
           />
 
           <LicenseSupportContactsPanel

@@ -304,45 +304,8 @@ async function runLocalAuthBootstrap() {
     return { bootstrapped: false, shop: null };
   }
 
-  const legacyProfile = readLegacyCachedProfile();
-  const shopId = legacyProfile?.shopId || createId();
-  const legacyShop = readLegacyCachedShop(shopId);
-  const role = legacyProfile?.role === "salesman" ? "salesman" : "owner";
-
-  const admin = await createLocalUser({
-    username: "admin",
-    password: "admin",
-    role,
-    personName: legacyProfile?.personName || "Admin",
-    email: legacyProfile?.email || "",
-    firebaseUid: legacyProfile?.uid || "",
-    shopId,
-    permissions: legacyProfile?.permissions || null,
-    mustChangePassword: true,
-    isEmergencyBootstrap: true,
-  });
-
-  const shop =
-    legacyShop ||
-    buildDefaultShop(shopId, admin);
-
-  if (legacyShop) {
-    shop.ownerUid = admin.id;
-  }
-
-  createLocalInviteCodesForShop(shopId, 3);
-
-  await saveShopRecord(shopId, shop, {
-    ownerUid: admin.id,
-    profile: buildProfileFromLocal(admin),
-    user: buildAppUserFromLocal(admin),
-  });
-
-  return {
-    bootstrapped: true,
-    admin,
-    shop,
-  };
+  // Fresh install: no emergency admin account — owner signs up via email (trial demo) or activates offline license later.
+  return { bootstrapped: false, shop: null };
 }
 
 export async function restoreLocalAuthSession() {
@@ -361,6 +324,24 @@ export async function restoreLocalAuthSession() {
   if (!access.ok) {
     await clearOfflineSessions();
     return null;
+  }
+
+  try {
+    const { getLocalAccessStatus } = await import("./licenseService.js");
+    await getLocalAccessStatus();
+  } catch {
+    /* access policy refresh is best-effort */
+  }
+
+  if (
+    isCloudAccessAllowedSync() &&
+    isOnline() &&
+    auth &&
+    (access.localUser || localUser).firebaseUid
+  ) {
+    for (let attempt = 0; attempt < 24 && !auth.currentUser; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
   }
 
   const finalUser = access.localUser || localUser;
@@ -723,23 +704,39 @@ export async function loginWithCredentials(identifier, password) {
   }
 
   if (looksLikeEmail(trimmed)) {
-    if (!isCloudAccessAllowedSync()) {
-      return localResult.reason === "USER_NOT_FOUND"
-        ? { ok: false, reason: "LOCAL_LOGIN_ONLY" }
-        : localResult;
-    }
     if (!isOnline()) {
+      if (localResult.ok) {
+        const linkedUser = await ensureFirebaseSignedInAfterLocalLogin(localResult.user, password);
+        const access = await finalizeStaffLocalLogin(linkedUser || localResult.user);
+        if (!access.ok) {
+          await clearOfflineSessions();
+          try { await signOut(auth); } catch {}
+          return access;
+        }
+        const finalUser = access.localUser || linkedUser || localResult.user;
+        const shopId = finalUser?.shopId || localResult.user?.shopId;
+        return {
+          ok: true,
+          user: buildAppUserFromLocal(finalUser),
+          profile: buildProfileFromLocal(finalUser, access.profileExtras || {}),
+          shop: shopId ? await resolveShopForLogin(shopId) : null,
+        };
+      }
       if (localResult.reason === "INVALID_PASSWORD") {
         return { ok: false, reason: "OFFLINE_EMAIL" };
       }
-      return localResult.reason === "USER_NOT_FOUND"
-        ? { ok: false, reason: "OFFLINE_EMAIL" }
-        : localResult;
+      return { ok: false, reason: "OFFLINE_EMAIL" };
     }
 
     try {
       const firebaseResult = await loginWithFirebaseEmail(trimmed, password);
       if (firebaseResult.ok || firebaseResult.reason === "EMAIL_NOT_VERIFIED") {
+        try {
+          const { getLocalAccessStatus } = await import("./licenseService.js");
+          await getLocalAccessStatus();
+        } catch {
+          /* trial sync after online login is best-effort */
+        }
         return firebaseResult;
       }
       if (localResult.reason === "INVALID_PASSWORD") {
@@ -900,6 +897,9 @@ export async function registerLocalOwnerAccount({
   emailCode = "",
 } = {}) {
   await bootOfflineSqlite();
+  if (!isOnline()) {
+    return { ok: false, reason: "OFFLINE_SIGNUP_BLOCKED" };
+  }
   if (!isCloudAccessAllowedSync()) {
     return { ok: false, reason: "CLOUD_NOT_LICENSED" };
   }
@@ -1027,6 +1027,9 @@ export async function registerLocalSalesmanAccount({
   permissions = null,
 } = {}) {
   await bootOfflineSqlite();
+  if (!isOnline()) {
+    return { ok: false, reason: "OFFLINE_SIGNUP_BLOCKED" };
+  }
   if (!isCloudAccessAllowedSync()) {
     return { ok: false, reason: "CLOUD_NOT_LICENSED" };
   }
@@ -1179,6 +1182,9 @@ export function friendlyLocalAuthError(result, lang = "bn") {
     OFFLINE_REQUIRED: isBn
       ? "অ্যাকাউন্ট তৈরি/যোগদানের জন্য ইন্টারনেট লাগবে"
       : "Internet is required to create or join an account",
+    OFFLINE_SIGNUP_BLOCKED: isBn
+      ? "নতুন অ্যাকাউন্ট শুধু অনলাইনে — প্রথমে ইন্টারনেট চালু করে Create Account করুন"
+      : "New accounts require internet — turn on connection and use Create Account",
     OFFLINE_STAFF_LOGIN: isBn
       ? "নতুন device-এ প্রথম login-এর জন্য একবার internet লাগবে"
       : "Internet is required once for first login on a new device",

@@ -83,7 +83,7 @@ async function send(req, res, status, body, cfg) {
   res.end(payload);
 }
 
-export function createHttpServer({ cfg, auth, store, pinReset, license }) {
+export function createHttpServer({ cfg, auth, store, pinReset, license, trialDevices }) {
   const clientIp = (req) => {
     const fwd = cfg.trustProxy ? String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() : "";
     return fwd || req.socket.remoteAddress || "";
@@ -127,6 +127,8 @@ export function createHttpServer({ cfg, auth, store, pinReset, license }) {
     "POST /v1/pin/request-code": async (req) => pinReset.requestCode(requireUid(req)),
     "POST /v1/pin/verify-code": async (req, body) => pinReset.verifyCode(requireUid(req), body),
     "POST /v1/license/check": async (req, body) => license.checkLicense(requireUid(req), body),
+    "POST /v1/trial/resolve": async (_req, body) => trialDevices.resolveTrial(body),
+    "POST /v1/trial/lookup": async (_req, body) => trialDevices.lookupTrial(body),
   };
   const bodyLimit = (path) => (path === "/v1/backup/restore" ? RESTORE_MAX_BYTES : cfg.maxBodyBytes);
 
