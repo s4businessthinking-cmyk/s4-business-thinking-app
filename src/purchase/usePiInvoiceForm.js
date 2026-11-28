@@ -1,19 +1,40 @@
 import { STALE_DRAFT_MS, cancelStaleClear, scheduleStaleClear } from "../utils/staleDraftClear.js";
 import { STOCK_AFFECTING_INVOICE_STATUSES, billLeaveGuard, piFmt2, piN2 } from "../shared/appShared.jsx";
+import { clearPiSuspended, loadPiSuspended, piSuspendHasContent, savePiSuspended } from "./piSuspendedDraft.js";
 import { batchReasons, nextBatchNo, rateOf } from "./purchaseOptions.js";
 import { computeStockMap, loadInvoiceRows } from "../inventory/stockFromInvoices";
 import { isBranchTransferBill } from "../branch-transfer/branchTransferDomain.js";
 import { isOpeningBill } from "../utils/openingBill.js";
 import { piEmptyCurrent, piEmptyForm, piEmptyLine } from "./purchaseShared.js";
 import { rescaleForUnit } from "../inventory/unitConversion";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEscapeKey } from "../components/WindowChrome.jsx";
 
 export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false, canEditDraftPurchase = false, canEditConfirmedPurchase = false, editInvoiceId, invoices, isOwner, lang, onPurchaseSourceHandled, piBaseCur, piCurrent, piEditLineId, piForm, piInvoiceNo, piLines, piMobile, piNameRef, piNavReturn, piOpenParty, piPreviewNextInvoiceNo, piQtyRef, piSnapRef, piSubTab, piView, piWin, pmtView, productFromMaster, products, purchaseOpts, purchaseSource, setEditInvoiceId, setPiCurrent, setPiEditLineId, setPiForm, setPiInvoiceNo, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiSubTab, setPiView, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, shopId, toast, user, vendorSearchQ, vendors }) {
   // ── Open new form ──
   // justSavedNo: right after a save `invoices` does not hold the new bill yet, so the preview counts it too
   // (otherwise the fresh form showed the number just used). Called from onClick too, so ignore non-strings.
-  const piOpenNew = (justSavedNo) => {
+  const [piSuspendedResume, setPiSuspendedResume] = useState(false);
+  const piResumeShopRef = useRef("");
+
+  const piApplySuspended = (data) => {
+    if (!data) return;
+    setPiInvoiceNo(data.piInvoiceNo || piPreviewNextInvoiceNo());
+    setPiForm({ ...piEmptyForm(), ...(data.piForm || {}) });
+    setPiLines((data.piLines || []).map((it) => ({
+      ...piEmptyLine(),
+      ...it,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    })));
+    setPiCurrent({ ...piEmptyCurrent(), ...(data.piCurrent || {}) });
+    setEditInvoiceId(data.editInvoiceId || null);
+    setPiSource(null);
+    piSnapRef.current = "pending";
+    setVendorSearchQ(String(data.piForm?.vendorName || ""));
+    setVendorDropOpen(false);
+  };
+
+  const piOpenNewBlank = (justSavedNo) => {
     const next = piPreviewNextInvoiceNo();
     const saved = typeof justSavedNo === "string" ? Number(justSavedNo.match(/(\d+)(?:-[A-Z]{2})?$/i)?.[1] || 0) : 0;
     const nextNum = Number(next.match(/(\d+)$/)?.[1] || 0);
@@ -26,13 +47,76 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
     setPiView("form");
     setVendorSearchQ("");
     setVendorDropOpen(false);
+    setPiSuspendedResume(false);
   };
+
+  const piOpenNew = (opts) => {
+    const justSavedNo = typeof opts === "string" ? opts : opts?.afterSaveNo;
+    if (justSavedNo != null && justSavedNo !== false) {
+      piOpenNewBlank(justSavedNo);
+      return;
+    }
+    const forceBlank = opts === true || opts?.forceBlank;
+    if (!forceBlank) {
+      const suspended = loadPiSuspended(shopId);
+      if (suspended) {
+        piApplySuspended(suspended);
+        setPiView("form");
+        setPiSuspendedResume(true);
+        return;
+      }
+    }
+    if (forceBlank && loadPiSuspended(shopId)) {
+      toast(
+        lang === "bn"
+          ? "অসমাপ্ত ক্রয় বিল আছে — আগে সেভ/কনফার্ম করুন অথবা Discard চাপুন।"
+          : "You have an unfinished purchase bill — save or confirm it, or press Discard first.",
+        "err",
+      );
+      return;
+    }
+    clearPiSuspended(shopId);
+    piOpenNewBlank();
+  };
+
+  const piDiscardSuspended = () => {
+    clearPiSuspended(shopId);
+    setPiSuspendedResume(false);
+    setPiForm(piEmptyForm());
+    setPiLines([]);
+    setPiCurrent(piEmptyCurrent());
+    setEditInvoiceId(null);
+    setPiSource(null);
+    setPiInvoiceNo(piPreviewNextInvoiceNo());
+    setVendorSearchQ("");
+    setVendorDropOpen(false);
+    setPiView("list");
+    toast(lang === "bn" ? "অসমাপ্ত বিল বাতিল করা হয়েছে।" : "Unfinished bill discarded.", "ok");
+  };
+
+  useEffect(() => {
+    if (!shopId) return;
+    if (piResumeShopRef.current === shopId) return;
+    piResumeShopRef.current = shopId;
+    const suspended = loadPiSuspended(shopId);
+    if (!suspended) return;
+    piApplySuspended(suspended);
+    setPiView("form");
+    setPiSuspendedResume(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopId]);
+
+  useEffect(() => {
+    if (!loadPiSuspended(shopId)) setPiSuspendedResume(false);
+  }, [shopId, piView, piForm, piLines, piInvoiceNo]);
 
   // A purchase order or a received delivery note becomes a new bill: same vendor, the lines still to be billed.
   const [piSource,setPiSource] = useState(null);
   useEffect(()=>{
     if (!purchaseSource?.doc) return;
     onPurchaseSourceHandled?.();
+    clearPiSuspended(shopId);
+    setPiSuspendedResume(false);
     const { kind:srcKind, doc, lines } = purchaseSource;
     setPiInvoiceNo(piPreviewNextInvoiceNo());
     setPiForm({ ...piEmptyForm(), vendorId:doc.vendorId||"", vendorName:doc.vendorName||"", vendorMobile:doc.vendorMobile||"",
@@ -60,6 +144,8 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
       adjustment:piN2(inv.adjustment)?(fxRate!==1?String(inv.fcAdjustment ?? fxBack(inv.adjustment)):String(inv.adjustment)):"", adjustmentReasonId:inv.adjustmentReasonId||"", adjustmentReason:inv.adjustmentReason||"" });
     setPiLines((inv.items||[]).map(it=>({ id:`${Date.now()}-${Math.random().toString(36).slice(2,8)}`, productId:it.productId||null, name:it.name||"", code:it.code||"", brand:it.brand||"", qty:String(it.qty||""), unit:it.unit||"Pcs", unitCost:fxRate!==1?String(it.fcUnitCost ?? fxBack(it.unitCost)):String(it.unitCost||""), discountPerc:String(it.discountPerc??"0"), discountFlat:it.discountFlat?(fxRate!==1?String(it.fcDiscountFlat ?? fxBack(it.discountFlat)):String(it.discountFlat)):"", taxPerc:String(it.taxPerc??"5"), salePrice:String(it.salePrice||""), serialNo:it.serialNo||"", ...(it.batchNo?{ batchNo:it.batchNo, batchReasons:it.batchReasons||[], expiryDate:it.expiryDate||"" }:{}) })));
     setPiCurrent(piEmptyCurrent());
+    clearPiSuspended(shopId);
+    setPiSuspendedResume(false);
     setEditInvoiceId(inv.id); setPiView("form"); setVendorSearchQ(inv.vendorName||""); setVendorDropOpen(false);
   };
 
@@ -139,14 +225,21 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
 
   const piSnapKey = () => JSON.stringify({ f:piForm, l:piLines.map(({ id, ...rest })=>rest) });
   useEffect(()=>{ if (piSnapRef.current==="pending") piSnapRef.current = piSnapKey(); });
-  const piIsDirty = () => {
-    if (piView!=="form") return false;
+  const piIsDirty = (view = piView) => {
+    if (view !== "form") return false;
     if (String(piCurrent.name||"").trim()) return true;
-    if (!editInvoiceId) return piLines.length>0;
-    return piSnapRef.current!==piSnapKey();
+    if (!editInvoiceId) return piSuspendHasContent(piForm, piLines, piCurrent);
+    return piSnapRef.current !== piSnapKey();
   };
-  const piLeaveUnsavedOk = () =>
-    !piIsDirty() || window.confirm(lang==="bn"?"এই বিলের পরিবর্তন সেভ হয়নি। তবুও চলে যাবেন?":"This bill has unsaved changes. Leave anyway?");
+  const piPersistSuspendedIfDirty = () => {
+    if (!piIsDirty()) return;
+    const saved = savePiSuspended(shopId, { piForm, piLines, piCurrent, piInvoiceNo, editInvoiceId });
+    if (saved) setPiSuspendedResume(true);
+  };
+  const piLeaveUnsavedOk = () => {
+    piPersistSuspendedIfDirty();
+    return true;
+  };
   const piRestoreLedgerIfNeeded = () => {
     if (piNavReturn !== "ledger") return;
     setPiSubTab("ledger");
@@ -196,6 +289,7 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
       return undefined;
     }
     scheduleStaleClear("pi-draft", () => {
+      if (loadPiSuspended(shopId)) return;
       setPiForm(piEmptyForm());
       setPiLines([]);
       setPiCurrent(piEmptyCurrent());
@@ -208,6 +302,16 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
       cancelStaleClear("pi-search");
     };
   }, [piView]);
+
+  const prevPiViewRef = useRef(piView);
+  useEffect(() => {
+    const prev = prevPiViewRef.current;
+    if (prev === "form" && piView !== "form" && piIsDirty("form")) {
+      const saved = savePiSuspended(shopId, { piForm, piLines, piCurrent, piInvoiceNo, editInvoiceId });
+      if (saved) setPiSuspendedResume(true);
+    }
+    prevPiViewRef.current = piView;
+  }, [piView, piForm, piLines, piCurrent, piInvoiceNo, editInvoiceId, shopId]);
 
   // A minimized bill must be confirmed away before the list opens another one.
   const piLeaveMinOk = () => {
@@ -289,5 +393,5 @@ export function usePiInvoiceForm({ canManagePurchase, canViewAllPurchase = false
       ||(v.mobileNumber||"").includes(q)
       ||(v.city||"").toLowerCase().includes(q);
   });
-  return { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piEditLine, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piUpd, piVendorRecord, pickVendors, setPiSource };
+  return { filteredVendorOpts, piAddCurrentItem, piCanEditInv, piChangeCurrentUnit, piClearVendor, piDelLine, piDiscardSuspended, piEditLine, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piOpenEdit, piOpenFromDesktop, piOpenNew, piPickVendor, piSelectProduct, piSource, piSuspendedResume, piUpd, piVendorRecord, pickVendors, setPiSource };
 }

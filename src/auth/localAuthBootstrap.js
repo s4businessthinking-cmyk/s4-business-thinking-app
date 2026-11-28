@@ -1206,8 +1206,8 @@ export function friendlyLocalAuthError(result, lang = "bn") {
         typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.() === true;
       return native
         ? isBn
-          ? "S4 সার্ভারে যোগাযোগ হয়নি। Wi‑Fi/মোবাইল ডাটা চালু করে আবার Login করুন (EXE-এর মতো ইমেইল লগইন)।"
-          : "Could not reach the S4 server. Turn on Wi‑Fi/mobile data and log in with email (same as EXE)."
+          ? "ফোন সার্ভারে পৌঁছাতে পারেনি (Wi‑Fi আছে কিন্তু অ্যাপের নেটওয়ার্ক ব্যর্থ হতে পারে)। Chrome-এ erp.s4businessthinking.com খুলুন; EXE-এর মতো একই ইমেইল+পাসওয়ার্ড দিন; না হলে অ্যাপ ডাটা মুছে v1.0.101 APK আপডেট করুন।"
+          : "The app could not reach the S4 server (Wi‑Fi may show OK but in-app network failed). Open erp.s4businessthinking.com in Chrome, use the same email and password as on EXE, or clear app data and update to v1.0.101."
         : isBn
           ? "ইন্টারনেট সংযোগ চেক করুন"
           : "Please check your internet connection";

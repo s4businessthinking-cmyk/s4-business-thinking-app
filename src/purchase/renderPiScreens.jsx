@@ -37,8 +37,22 @@ import { settleLeftoverVendorReturnCredits } from "../returns/returnsCreditSettl
 import { returnsAsLedgerVouchers } from "../returns/ReturnsTab.jsx";
 import DateField from "../components/DateField.jsx";
 import { invoiceStatusLabel } from "../invoices/invoiceSettleKind.js";
+import { loadPiSuspended } from "./piSuspendedDraft.js";
 
-export function renderPiScreens({ listFilter = null, onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
+function PiSuspendedNotice({ t, onDiscard, show }) {
+  if (!show) return null;
+  return (
+    <div className="pm-hint" style={{ margin: "8px 10px 0", padding: "10px 12px", border: "1px solid #f59e0b", background: "#fffbeb", borderRadius: 8, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+      <span style={{ flex: "1 1 200px", color: "#92400e" }}>{t.pi_suspendedBanner}</span>
+      <button type="button" className="pm-btn pm-btn--danger" style={{ minHeight: 32 }} onClick={onDiscard}>
+        {t.pi_discardSuspended}
+      </button>
+    </div>
+  );
+}
+
+export function renderPiScreens({ listFilter = null, onStartReturn, onProductPatched, onScanBill, balance, billReturns, bnL, can, canManagePurchase, canVendorPayments, canViewSupplierLedger, chqHandover, chqHandoverSaving, chqWizard, editInvoiceId, filteredVendorOpts, getRelatedPayments, getVendorOpenInvoices, invoices, isDesktop, isOwner, lang, onOpenChequePrinter, onOpenProductMaster, openChequeHandover, openVoucherInChequePrinter, paid, payments, piAccent, piAddCurrentItem, piBadge, piBaseCur, piBtTag, piCanEditInv, piCancelInv, piCancelPaymentVoucher, piChangeCurrentUnit, piClearVendor, piConfirm, piCurrent, piDelLine, piDelete, piDeletePaymentVoucher, piDiscardSuspended, piEarlyDuplicateCheck, piEditLine, piEditLineId, piFiltered, piForm, piFormatPaymentNo, piGoToMakePayment, piGroupMode, piInvoiceNo, piKPIs, piLeaveDetail, piLeaveFormToList, piLeaveMinOk, piLeaveUnsavedOk, piLedgerHidden, piLedgerPartyKey, setPiLedgerPartyKey, piLines, piLoading, piMatchBlock, piMaxLocalPaymentSerial, piMobile, piMoneyInvoices, piNameRef, piOpenEdit, piOpenFromDesktop, piOpenInvoice, piOpenNew, piOpenParty, piPickVendor, piQtyRef, piRootRef, piRootStyle, piRowDue, piSaveChequeHandover, piSaveDraft, piSavePaymentVoucher, piSaving, piSearch, piSelectProduct, piSetVoucherChequeStatus, piSource, piStatusF, piSubTab, piSuspendedResume, piUpd, piView, piWin, pickVendors, pmtEditSnapshot, pmtLoading, pmtPrefillInvoiceId, pmtPrefillVendorId, pmtSaving, pmtView, printChequeHandover, printChequePaymentVoucher, products, purchaseOpts, savePurchaseOptions, selInvoice, selVoucher, setChqHandover, setChqWizard, setPiCurrent, setPiEditLineId, setPiForm, setPiGroupMode, setPiLedgerHidden, setPiLines, setPiNavReturn, setPiOpenParty, setPiSearch, setPiStatusF, setPiSubTab, setPiView, setPmtEditSnapshot, setPmtPrefillInvoiceId, setPmtPrefillVendorId, setPmtView, setSelInvoice, setSelVoucher, setVendorDropOpen, setVendorSearchQ, setBillReturns, setInvoices, shop, shopId, t, th, toast, totals, user, vendorDropOpen, vendorSearchQ, vendorSearchRef, vendors, wideDesktop, withSupRefs }) {
+  const piSuspendedNotice = (piView === "form" && !editInvoiceId && (piSuspendedResume || !!loadPiSuspended(shopId)));
   const applyVendorReturnCreditSettle = async (p) => {
     const plan = await settleLeftoverVendorReturnCredits({
       returns: billReturns,
@@ -550,6 +564,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
         <WindowButtons win={piWin} lang={lang} light onClose={()=>{ piLeaveFormToList(); }} />
       </div>
       <div className="s4-doc-desktop-shell">
+      <PiSuspendedNotice t={t} show={piSuspendedNotice} onDiscard={piDiscardSuspended} />
       <PurchaseInvoiceDesktopForm
         lang={lang} t={t} shopId={shopId} shop={shop} products={products} vendors={pickVendors} invoices={invoices}
         form={piForm} setField={piUpd} lines={piLines} setLines={setPiLines} current={piCurrent} setCurrent={setPiCurrent}
@@ -562,7 +577,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
         onPickVendor={(v)=>{ piPickVendor(v); piEarlyDuplicateCheck(); }} onCheckDuplicate={piEarlyDuplicateCheck}
         onConfirm={piConfirm} onSaveDraft={piSaveDraft}
         onClose={()=>{ piLeaveFormToList(); }}
-        onNew={()=>{ if (piLeaveUnsavedOk()) piOpenNew(); }}
+        onNew={()=>{ piOpenNew({ forceBlank: true }); }}
         onOpenInvoice={piOpenFromDesktop}
         canEditInvoice={piCanEditInv}
         onCancelInvoice={(isOwner||can("deletePurchase")) ? async (inv)=>{ if (await piCancelInv(inv)) setPiView("detail"); } : undefined}
@@ -604,6 +619,7 @@ export function renderPiScreens({ listFilter = null, onStartReturn, onProductPat
         <strong style={{ color:piAccent }}>{editInvoiceId?(bnL?"ক্রয় ইনভয়েস এডিট":"EDIT PURCHASE INVOICE"):(bnL?"নতুন ক্রয় ইনভয়েস":"NEW PURCHASE INVOICE")}</strong>
         <span>{piInvoiceNo}</span>
       </div>
+      <PiSuspendedNotice t={t} show={piSuspendedNotice} onDiscard={piDiscardSuspended} />
       {onScanBill && (
         <button type="button"className="pm-btn"onClick={onScanBill} style={{ margin:"8px 10px 0", minHeight:piMobile?40:28 }}>
            {bnL?"বিল স্ক্যান":"Scan Bill"}

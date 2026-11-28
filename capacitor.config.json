@@ -7,10 +7,15 @@
     "allowNavigation": [
       "github.com",
       "*.github.com",
-      "*.githubusercontent.com"
+      "*.githubusercontent.com",
+      "erp.s4businessthinking.com",
+      "*.s4businessthinking.com"
     ]
   },
   "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
     "CapacitorUpdater": {
       "autoUpdate": false,
       "resetWhenUpdate": false

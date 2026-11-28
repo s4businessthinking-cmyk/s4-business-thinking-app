@@ -167,7 +167,7 @@ export function useShopDataSync({ applyShopRecord, authSyncReady, branchTransfer
     });
   }, [shopId, isOwner, lang, toast]);
 
-  // Desktop window close button: offer the owner a backup first (electron/main.cjs waits for closeNow / cancelClose).
+  // Desktop close: owner chooses complete backup (.s4backup) or skip (electron waits for closeNow / cancelClose).
   useEffect(() => {
     const desk = window.S4Desktop?.app;
     if (!desk || !shopId || !isOwner) return;

@@ -15,6 +15,7 @@ import { averageCosts } from "../reports/averageCost.js";
 import { livePurchasesOf, liveReturnsOf } from "../reports/reportFilters.js";
 import { serialLineProblems, serialProblemText, serialSettingsOf, splitSerials } from "../sales-invoice/serialRules.js";
 import { invoicePaymentBankField } from "../ledger/ledgerShopOpts.js";
+import { clearPiSuspended } from "./piSuspendedDraft.js";
 
 function unmatchedPurchaseNames(items) {
   return (items || []).filter((it) => !it?.productId && !it?.isService && String(it?.name || "").trim()).map((it) => it.name.trim());
@@ -221,6 +222,8 @@ export function createPiInvoiceActions({ billReturns, bumpShopPiSerial, can, can
         ? `${splitInfo.count}টি পণ্য পাওয়া যায়নি — নতুন অর্ডার ${splitInfo.orderNo}-এ গেছে। অন্য সাপ্লায়ারকে অর্ডার দিন।`
         : `${splitInfo.count} product(s) were not received — moved to new order ${splitInfo.orderNo}. Order them from another supplier.`);
     }
+
+    clearPiSuspended(shopId);
 
     if (!editInvoiceId) {
       piOpenNew(payload.invoiceNo);

@@ -24,32 +24,25 @@ if (!fs.existsSync(distDir)) {
 if (fs.existsSync(publicDir)) fs.rmSync(publicDir, { recursive: true, force: true });
 copyDir(distDir, publicDir);
 
-fs.writeFileSync(
-  path.join(assetsDir, "capacitor.config.json"),
-  JSON.stringify(
-    {
-      appId: "com.s4businessthinking.app",
-      appName: "S4 Business Thinking",
-      webDir: "public",
-      server: {
-        androidScheme: "https",
-        allowNavigation: [
-          "github.com",
-          "*.github.com",
-          "*.githubusercontent.com",
-        ],
-      },
-      plugins: {
-        CapacitorUpdater: {
-          autoUpdate: false,
-          resetWhenUpdate: false,
-        },
-      },
-    },
-    null,
-    2
-  )
-);
+const rootCapConfigPath = path.join(root, "capacitor.config.json");
+let capacitorConfig = {
+  appId: "com.s4businessthinking.app",
+  appName: "S4 Business Thinking",
+  webDir: "public",
+  server: { androidScheme: "https", allowNavigation: ["erp.s4businessthinking.com", "*.s4businessthinking.com"] },
+  plugins: {
+    CapacitorHttp: { enabled: true },
+    CapacitorUpdater: { autoUpdate: false, resetWhenUpdate: false },
+  },
+};
+if (fs.existsSync(rootCapConfigPath)) {
+  try {
+    capacitorConfig = { ...JSON.parse(fs.readFileSync(rootCapConfigPath, "utf8")), webDir: "public" };
+  } catch (error) {
+    console.warn("[S4 Android] Could not read capacitor.config.json, using defaults", error);
+  }
+}
+fs.writeFileSync(path.join(assetsDir, "capacitor.config.json"), JSON.stringify(capacitorConfig, null, 2));
 
 require("./sync-capacitor-updater-android.cjs");
 console.log("[S4 Android] Synced dist -> android/app/src/main/assets/public");

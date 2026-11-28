@@ -10,6 +10,102 @@ import { updateLocalUserPassword } from "./localAuthService";
 import { shouldOfferCloudSignup } from "../offline/cloudAccessPolicy.js";
 import { getLocalAccessStatus } from "./licenseService.js";
 
+const AUTH_PAGE_BG =
+  "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.60)), url('https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/main/WhatsApp%20Image%202026-04-09%20at%2011.44.45%20AM.jpeg')";
+
+function useAuthCompact() {
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 520px)");
+    const onChange = () => setCompact(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return compact;
+}
+
+function authTwinPanel(compact, minTall) {
+  return {
+    flex: "1 1 50%",
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column",
+    padding: compact ? "12px 12px 10px" : "16px 16px 14px",
+    borderRadius: 12,
+    background: "rgba(15, 23, 42, 0.88)",
+    border: "1px solid rgba(255,255,255,0.16)",
+    boxShadow: "0 10px 28px rgba(0,0,0,0.4)",
+    textAlign: "left",
+    boxSizing: "border-box",
+    minHeight: minTall ? (compact ? 380 : 420) : compact ? 320 : 360,
+  };
+}
+
+function authPanelHeading(compact) {
+  return {
+    fontSize: compact ? 10 : 11,
+    fontWeight: 800,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    color: "#94a3b8",
+    marginBottom: compact ? 10 : 12,
+    paddingBottom: compact ? 6 : 8,
+    borderBottom: "1px solid rgba(255,255,255,0.12)",
+  };
+}
+
+function authGuideItem(compact) {
+  return {
+    fontSize: compact ? 10 : 12,
+    lineHeight: 1.4,
+    color: "#e2e8f0",
+    margin: "0 0 8px",
+    padding: 0,
+    listStyle: "none",
+  };
+}
+
+function authGuideLabel(compact) {
+  return {
+    display: "block",
+    fontSize: compact ? 10 : 11,
+    fontWeight: 800,
+    color: "#f97316",
+    marginBottom: 2,
+  };
+}
+
+function authPageWrap(compact, baseWrap) {
+  return {
+    ...baseWrap,
+    maxWidth: 940,
+    width: "100%",
+    boxSizing: "border-box",
+    padding: compact ? "12px 10px 24px" : "20px 18px 40px",
+    paddingBottom: "max(24px, env(safe-area-inset-bottom, 0px) + 16px)",
+  };
+}
+
+function AuthLogoBlock({ compact, bigLogoStyle }) {
+  return (
+    <div style={{ textAlign: "center", marginBottom: compact ? 10 : 16 }}>
+      <img
+        src={LOGO_URL}
+        alt={APP_NAME}
+        style={{
+          ...bigLogoStyle,
+          width: compact ? 88 : 110,
+          height: compact ? 88 : 110,
+          margin: "0 auto",
+          display: "block",
+        }}
+      />
+    </div>
+  );
+}
+
 // ─── SETUP ───────────────────────────────────────────────────
 export function SetupScreen({ t, lang, setLang, s:sp, theme, setTheme }) {
   const _s = sp||_globalS;
@@ -34,6 +130,7 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
   const [pw,setPw]=useState("");
   const [busy,setBusy]=useState(false);
   const [showPw,setShowPw]=useState(false);
+  const compact = useAuthCompact();
 
   const refreshAccessState = async () => {
     const online = typeof navigator === "undefined" ? true : navigator.onLine;
@@ -56,6 +153,19 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
       window.removeEventListener("offline", onOnline);
     };
   }, []);
+
+  const twinPanel = authTwinPanel(compact, false);
+  const panelHeading = authPanelHeading(compact);
+  const guideItem = authGuideItem(compact);
+  const guideLabel = authGuideLabel(compact);
+  const loginGuideItems = [
+    { key: "owner", label: t.loginGuideOwnerLbl, text: t.loginOfflineHint },
+    ...(!cloudSignupAllowed
+      ? [{ key: "trial", label: t.loginGuideTrialLbl, text: t.localOnlyLoginHint }]
+      : []),
+    ...(cloudSignupAllowed ? [{ key: "staff", label: t.loginGuideStaffLbl, text: t.loginStaffHint }] : []),
+    { key: "branch", label: t.loginGuideBranchLbl, text: t.loginBranchHint },
+  ];
 
   const submit = async (e) => {
     e?.preventDefault?.();
@@ -86,49 +196,113 @@ export function LoginScreen({ t, lang, setLang, toast, s:sp, theme, setTheme, on
   style={{
     ..._s.root,
     minHeight: "100vh",
-    backgroundImage:
-      "linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.60)), url('https://raw.githubusercontent.com/s4businessthinking-cmyk/S4BUSINESSTHINKING/main/WhatsApp%20Image%202026-04-09%20at%2011.44.45%20AM.jpeg')",
+    backgroundImage: AUTH_PAGE_BG,
     backgroundSize: "cover",
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
   }}
 >
   <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
-        <div style={_s.authTitle}>{t.welcomeBack}</div>
-        <div style={_s.authSub}>{t.welcomeBackSub}</div>
-        {trialStatus === "TRIAL_ACTIVE" && trialDaysLeft != null && (
-          <div style={{ ..._s.authSub, marginBottom:10, fontSize:12, color:"#22c55e", fontWeight:700, lineHeight:1.5 }}>
-            {(t.trialLoginBanner || "").replace("{days}", String(trialDaysLeft))}
+      <div style={authPageWrap(compact, _s.authWrap)}>
+        <AuthLogoBlock compact={compact} bigLogoStyle={_s.bigLogo} />
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "stretch",
+            gap: compact ? 10 : 16,
+            width: "100%",
+          }}
+        >
+          <div style={twinPanel}>
+            <div style={panelHeading}>{t.loginPanelTitle}</div>
+            <div style={{ fontSize: compact ? 18 : 22, fontWeight: 800, color: _s.authTitle?.color || "#60a5fa", marginBottom: 4 }}>
+              {t.welcomeBack}
+            </div>
+            <div style={{ fontSize: compact ? 11 : 13, color: "#cbd5e1", marginBottom: compact ? 8 : 10, lineHeight: 1.4 }}>
+              {t.welcomeBackSub}
+            </div>
+            {trialStatus === "TRIAL_ACTIVE" && trialDaysLeft != null && (
+              <div
+                style={{
+                  marginBottom: compact ? 10 : 12,
+                  fontSize: compact ? 10 : 12,
+                  color: "#4ade80",
+                  fontWeight: 700,
+                  lineHeight: 1.4,
+                }}
+              >
+                {(t.trialLoginBanner || "").replace("{days}", String(trialDaysLeft))}
+              </div>
+            )}
+            <form
+              onSubmit={submit}
+              style={{ display: "flex", flexDirection: "column", flex: 1, margin: 0, padding: 0, border: "none", background: "transparent" }}
+            >
+              <input
+                style={{ ..._s.inp, marginBottom: compact ? 8 : 10, fontSize: compact ? 13 : 14 }}
+                type="text"
+                placeholder={t.usernameOrEmailLbl}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+              />
+              <input
+                style={{ ..._s.inp, marginBottom: compact ? 6 : 8, fontSize: compact ? 13 : 14 }}
+                type={showPw ? "text" : "password"}
+                placeholder={t.passwordLbl}
+                value={pw}
+                onChange={(e) => setPw(e.target.value)}
+                autoComplete="current-password"
+              />
+              <label style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: compact ? 10 : 12, cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={showPw}
+                  onChange={(e) => setShowPw(e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#f97316" }}
+                />
+                <span style={{ fontSize: compact ? 11 : 12, color: "#94a3b8" }}>
+                  {lang === "bn" ? "পাসওয়ার্ড দেখুন" : "Show Password"}
+                </span>
+              </label>
+              <div style={{ flex: 1, minHeight: compact ? 4 : 8 }} />
+              <button type="submit" style={{ ..._s.sendBtn, padding: compact ? "11px" : "12px", marginTop: "auto" }} disabled={busy}>
+                {busy ? t.loggingIn : t.signIn}
+              </button>
+            </form>
+            {cloudSignupAllowed && (
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 10,
+                  borderTop: "1px solid rgba(255,255,255,0.12)",
+                  color: "#cbd5e1",
+                  fontSize: compact ? 11 : 12,
+                }}
+              >
+                {t.noAccount}{" "}
+                <button type="button" style={_s.linkBtnInline} onClick={onSwitchToSignup}>
+                  {t.createAccount}
+                </button>
+              </div>
+            )}
           </div>
-        )}
-        <form onSubmit={submit} style={_s.authCard}>
-          <input style={{ ..._s.inp, marginBottom:10 }} type="text"placeholder={t.usernameOrEmailLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"autoCapitalize="none" />
-          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password" />
-          <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
-            <input type="checkbox"checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
-            <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
-          </label>
-          <button type="submit"style={_s.sendBtn} disabled={busy}>{busy?t.loggingIn:t.signIn}</button>
-        </form>
-        <div style={{ ..._s.authSub, marginTop:14, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginOfflineHint}</div>
-        {!cloudSignupAllowed && (
-          <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.localOnlyLoginHint}</div>
-        )}
-        {cloudSignupAllowed && (
-          <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>{t.loginStaffHint}</div>
-        )}
-        <div style={{ ..._s.authSub, marginTop:6, fontSize:11, color:"#a1a1aa", lineHeight:1.5 }}>
-          {lang === "bn"
-            ? "শাখা কাউন্টার: শাখা কোড ইউজারনেম হিসেবে (যেমন branch1) — Settings এ Counter login বাটন দিয়ে তৈরি"
-            : "Branch counter: use branch code as username (e.g. branch1) — create via Settings → Counter login"}
+
+          <div style={twinPanel}>
+            <div style={panelHeading}>{t.loginGuideTitle}</div>
+            <ul style={{ margin: 0, padding: 0, flex: 1 }}>
+              {loginGuideItems.map((item) => (
+                <li key={item.key} style={guideItem}>
+                  <span style={guideLabel}>{item.label}</span>
+                  {item.text}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        {cloudSignupAllowed && (
-          <div style={{ ..._s.authFooter, marginTop:16 }}>{t.noAccount}{" "}
-            <button type="button"style={_s.linkBtnInline} onClick={onSwitchToSignup}>{t.createAccount}</button>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -295,26 +469,84 @@ export function ResetScreen({ t, lang, setLang, onBack, toast, s:sp, theme, setT
 // ─── ROLE PICKER ─────────────────────────────────────────────
 export function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:sp, theme, setTheme }) {
   const _s = sp||_globalS;
+  const compact = useAuthCompact();
+  const twinPanel = authTwinPanel(compact, false);
+  const panelHeading = authPanelHeading(compact);
+  const guideItem = authGuideItem(compact);
+  const guideLabel = authGuideLabel(compact);
+  const roleBtn = {
+    ..._s.roleCard,
+    padding: compact ? "14px 12px" : "18px 14px",
+    marginBottom: compact ? 8 : 10,
+    width: "100%",
+    boxSizing: "border-box",
+  };
+
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <img src={LOGO_URL} alt={APP_NAME} style={_s.bigLogo} />
-        <div style={_s.authTitle}>{t.chooseRole}</div>
-        <div style={_s.authSub}>{t.chooseRoleSub}</div>
-        <div style={{ ..._s.roleGrid, marginTop:24 }}>
-          <button style={_s.roleCard} onClick={() => onPick("owner")}>
-            <div style={_s.roleEmoji}></div>
-            <div style={_s.roleName}>{t.roleOwnerCard}</div>
-            <div style={_s.roleDesc}>{t.roleOwnerDesc}</div>
-          </button>
-          <button style={_s.roleCard} onClick={() => onPick("salesman")}>
-            <div style={_s.roleEmoji}></div>
-            <div style={_s.roleName}>{t.roleSalesCard}</div>
-            <div style={_s.roleDesc}>{t.roleSalesDesc}</div>
-          </button>
-        </div>
-        <div style={{ ..._s.authFooter, marginTop:24 }}>{t.haveAccount}{" "}
-          <button style={_s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
+    <div
+      style={{
+        ..._s.root,
+        minHeight: "100vh",
+        backgroundImage: AUTH_PAGE_BG,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={authPageWrap(compact, _s.authWrap)}>
+        <AuthLogoBlock compact={compact} bigLogoStyle={_s.bigLogo} />
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", gap: compact ? 10 : 16, width: "100%" }}>
+          <div style={twinPanel}>
+            <div style={panelHeading}>{t.signupPanelTitle}</div>
+            <div style={{ fontSize: compact ? 18 : 22, fontWeight: 800, color: _s.authTitle?.color || "#60a5fa", marginBottom: 4 }}>
+              {t.chooseRole}
+            </div>
+            <div style={{ fontSize: compact ? 11 : 13, color: "#cbd5e1", marginBottom: compact ? 10 : 14, lineHeight: 1.4 }}>
+              {t.chooseRoleSub}
+            </div>
+            <div style={{ ..._s.roleGrid, marginTop: 0, flex: 1 }}>
+              <button type="button" style={roleBtn} onClick={() => onPick("owner")}>
+                <div style={{ ..._s.roleName, fontSize: compact ? 14 : 16 }}>{t.roleOwnerCard}</div>
+                <div style={{ ..._s.roleDesc, fontSize: compact ? 10 : 12 }}>{t.roleOwnerDesc}</div>
+              </button>
+              <button type="button" style={roleBtn} onClick={() => onPick("salesman")}>
+                <div style={{ ..._s.roleName, fontSize: compact ? 14 : 16 }}>{t.roleSalesCard}</div>
+                <div style={{ ..._s.roleDesc, fontSize: compact ? 10 : 12 }}>{t.roleSalesDesc}</div>
+              </button>
+            </div>
+            <div
+              style={{
+                marginTop: 12,
+                paddingTop: 10,
+                borderTop: "1px solid rgba(255,255,255,0.12)",
+                color: "#cbd5e1",
+                fontSize: compact ? 11 : 12,
+              }}
+            >
+              {t.haveAccount}{" "}
+              <button type="button" style={_s.linkBtnInline} onClick={onSwitchToLogin}>
+                {t.loginNow}
+              </button>
+            </div>
+          </div>
+          <div style={twinPanel}>
+            <div style={panelHeading}>{t.signupGuideRoleTitle}</div>
+            <ul style={{ margin: 0, padding: 0, flex: 1 }}>
+              <li style={guideItem}>
+                <span style={guideLabel}>{t.loginGuideOwnerLbl}</span>
+                {t.signupGuidePickOwner}
+              </li>
+              <li style={guideItem}>
+                <span style={guideLabel}>{t.loginGuideStaffLbl}</span>
+                {t.signupGuidePickStaff}
+              </li>
+              <li style={guideItem}>
+                <span style={guideLabel}>{lang === "bn" ? "অনলাইন" : "Online"}</span>
+                {t.signupGuideOnline}
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -324,6 +556,21 @@ export function SignupRolePicker({ t, lang, setLang, onPick, onSwitchToLogin, s:
 // ─── SIGNUP FORM ─────────────────────────────────────────────
 export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, toast, s:sp, theme, setTheme, onSignupSuccess, onEmailVerificationRequired }) {
   const _s = sp||_globalS;
+  const compact = useAuthCompact();
+  const twinPanel = authTwinPanel(compact, true);
+  const panelHeading = authPanelHeading(compact);
+  const guideItem = authGuideItem(compact);
+  const guideLabel = authGuideLabel(compact);
+  const span2 = { gridColumn: compact ? "1" : "1 / -1" };
+  const fieldMb = compact ? 6 : 8;
+  const formGrid = {
+    display: "grid",
+    gridTemplateColumns: compact ? "1fr" : "1fr 1fr",
+    columnGap: compact ? 0 : 10,
+    rowGap: 0,
+    flex: 1,
+    alignContent: "start",
+  };
   const [companyName,setCompanyName]=useState("");
   const [personName,setPersonName]=useState("");
   const [username,setUsername]=useState("");
@@ -464,58 +711,194 @@ export function SignupForm({ t, lang, setLang, role, onBack, onSwitchToLogin, to
     finally { setBusy(false); }
   };
 
+  const signupGuideItems = [
+    { key: "online", label: lang === "bn" ? "অনলাইন" : "Online", text: t.signupGuideOnline },
+    isOwner
+      ? { key: "role", label: t.loginGuideOwnerLbl, text: t.signupGuideOwnerNote }
+      : { key: "role", label: t.loginGuideStaffLbl, text: t.signupGuideStaffNote },
+    { key: "pwd", label: lang === "bn" ? "পাসওয়ার্ড" : "Password", text: t.signupGuidePwd },
+  ];
+
+  const inp = (extra = {}) => ({
+    ..._s.inp,
+    marginBottom: fieldMb,
+    fontSize: compact ? 13 : 14,
+    width: "100%",
+    boxSizing: "border-box",
+    ...extra,
+  });
+
   return (
-    <div style={_s.root}><Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
-      <div style={_s.authWrap}>
-        <div style={_s.authIcon}>{isOwner?"":""}</div>
-        <div style={_s.authTitle}>{isOwner?t.roleOwnerCard:t.roleSalesCard}</div>
-        <form onSubmit={submit} style={_s.authCard}>
-          {isOwner && <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.companyName} value={companyName} onChange={e=>setCompanyName(e.target.value)} />}
-          {!isOwner && (
-            <>
-              <input
-                style={{ ..._s.inp, marginBottom:4, textTransform:"uppercase", fontWeight:700, letterSpacing:1 }}
-                placeholder="INVITE CODE"
-                value={inviteCode}
-                onChange={e=>setInviteCode(e.target.value.toUpperCase())}
-              />
-              <div style={{ fontSize:11, color:"#71717a", marginBottom:10 }}> {t.inviteCodeLbl}</div>
-            </>
-          )}
-          <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.personName} value={personName} onChange={e=>setPersonName(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="text"placeholder={t.usernameLbl} value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username"autoCapitalize="none" />
-          <select style={{ ..._s.sel, marginBottom:10, width:"100%" }} value={country} onChange={e=>setCountry(e.target.value)}>
-            {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.name} ({c.dial})</option>)}
-          </select>
-          <input style={{ ..._s.inp, marginBottom:10 }} placeholder={t.areaLbl} value={area} onChange={e=>setArea(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="tel"placeholder={t.mobileLbl} value={mobile} onChange={e=>setMobile(e.target.value)} />
-          <input style={{ ..._s.inp, marginBottom:10 }} type="email"placeholder={bnL?"ইমেইল (যাচাই কোড যাবে)":"Email (a code will be sent)"} value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"autoCapitalize="none" />
-          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.passwordLbl} value={pw} onChange={e=>setPw(e.target.value)} autoComplete="new-password" />
-          <input style={{ ..._s.inp, marginBottom:6 }} type={showPw?"text":"password"} placeholder={t.confirmPwLbl} value={pw2} onChange={e=>setPw2(e.target.value)} autoComplete="new-password" />
-          <label style={{ display:"flex", alignItems:"center", gap:7, marginBottom:12, cursor:"pointer", userSelect:"none" }}>
-            <input type="checkbox"checked={showPw} onChange={e=>setShowPw(e.target.checked)} style={{ width:15, height:15, cursor:"pointer", accentColor:"#f97316" }} />
-            <span style={{ fontSize:12, color:"#71717a" }}>{lang==="bn"?"পাসওয়ার্ড দেখুন":"Show Password"}</span>
-          </label>
-          {codeStep&&(
-            <div style={{ border:"1px solid #bfdbfe", background:"#eff6ff", borderRadius:10, padding:"10px 12px", marginBottom:12 }}>
-              <div style={{ fontSize:12, color:"#1e3a8a", fontWeight:700, marginBottom:6 }}>
-                 {bnL?`${codeSentTo} এ পাঠানো ৬ সংখ্যার কোড দিন (১০ মিনিট চলবে, Spam ফোল্ডারও দেখুন)`:`Enter the 6-digit code sent to ${codeSentTo} (valid 10 min, check spam too)`}
-              </div>
-              <input style={{ ..._s.inp, marginBottom:6, textAlign:"center", fontSize:22, letterSpacing:8, fontWeight:800 }}
-                type="text"inputMode="numeric"autoComplete="one-time-code"placeholder="000000"
-                value={emailCode} onChange={e=>setEmailCode(e.target.value.replace(/\D/g,"").slice(0,6))} />
-              <button type="button"style={{ ..._s.linkBtn, margin:0, opacity:resendIn>0?0.5:1 }} disabled={busy||resendIn>0} onClick={resend}>
-                {resendIn>0?(bnL?`আবার কোড পাঠান (${resendIn}s)`:`Resend code (${resendIn}s)`):(bnL?"আবার কোড পাঠান":"Resend code")}
-              </button>
+    <div
+      style={{
+        ..._s.root,
+        minHeight: "100vh",
+        backgroundImage: AUTH_PAGE_BG,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
+      <Header t={t} lang={lang} setLang={setLang} s={_s} theme={theme} setTheme={setTheme} />
+      <div style={authPageWrap(compact, _s.authWrap)}>
+        <AuthLogoBlock compact={compact} bigLogoStyle={_s.bigLogo} />
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "stretch", gap: compact ? 10 : 16, width: "100%" }}>
+          <div style={twinPanel}>
+            <div style={panelHeading}>{t.signupPanelTitle}</div>
+            <div style={{ fontSize: compact ? 16 : 20, fontWeight: 800, color: "#60a5fa", marginBottom: compact ? 8 : 10 }}>
+              {isOwner ? t.roleOwnerCard : t.roleSalesCard}
             </div>
-          )}
-          <button type="submit"style={_s.sendBtn} disabled={busy}>
-            {busy?t.creatingAccount:codeStep?t.createAccount:(bnL?"ইমেইল যাচাই করে এগিয়ে যান":"Verify email & continue")}
-          </button>
-        </form>
-        <button style={{ ..._s.linkBtn, marginTop:16 }} onClick={onBack}>{t.backBtn}</button>
-        <div style={{ ..._s.authFooter, marginTop:8 }}>{t.haveAccount}{" "}
-          <button style={_s.linkBtnInline} onClick={onSwitchToLogin}>{t.loginNow}</button>
+            <form onSubmit={submit} style={{ ...formGrid, margin: 0, padding: 0, border: "none", background: "transparent" }}>
+              {isOwner && (
+                <input
+                  style={{ ...inp(), ...span2 }}
+                  placeholder={t.companyName}
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                />
+              )}
+              {!isOwner && (
+                <>
+                  <input
+                    style={{ ...inp({ textTransform: "uppercase", fontWeight: 700, letterSpacing: 1 }), ...span2 }}
+                    placeholder="INVITE CODE"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                  />
+                  <div style={{ ...span2, fontSize: 10, color: "#94a3b8", marginTop: -4, marginBottom: fieldMb }}>
+                    {t.inviteCodeLbl}
+                  </div>
+                </>
+              )}
+              <input style={inp()} placeholder={t.personName} value={personName} onChange={(e) => setPersonName(e.target.value)} />
+              <input
+                style={inp()}
+                type="text"
+                placeholder={t.usernameLbl}
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+              />
+              <select style={{ ..._s.sel, ...inp(), ...span2 }} value={country} onChange={(e) => setCountry(e.target.value)}>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name} ({c.dial})
+                  </option>
+                ))}
+              </select>
+              <input style={inp()} placeholder={t.areaLbl} value={area} onChange={(e) => setArea(e.target.value)} />
+              <input style={inp()} type="tel" placeholder={t.mobileLbl} value={mobile} onChange={(e) => setMobile(e.target.value)} />
+              <input
+                style={{ ...inp(), ...span2 }}
+                type="email"
+                placeholder={bnL ? "ইমেইল (যাচাই কোড যাবে)" : "Email (a code will be sent)"}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                autoCapitalize="none"
+              />
+              <input style={inp()} type={showPw ? "text" : "password"} placeholder={t.passwordLbl} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" />
+              <input style={inp()} type={showPw ? "text" : "password"} placeholder={t.confirmPwLbl} value={pw2} onChange={(e) => setPw2(e.target.value)} autoComplete="new-password" />
+              <label
+                style={{
+                  ...span2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 7,
+                  marginBottom: fieldMb,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={showPw}
+                  onChange={(e) => setShowPw(e.target.checked)}
+                  style={{ width: 15, height: 15, cursor: "pointer", accentColor: "#f97316" }}
+                />
+                <span style={{ fontSize: compact ? 11 : 12, color: "#94a3b8" }}>{lang === "bn" ? "পাসওয়ার্ড দেখুন" : "Show Password"}</span>
+              </label>
+              {codeStep && (
+                <div
+                  style={{
+                    ...span2,
+                    border: "1px solid rgba(96,165,250,0.45)",
+                    background: "rgba(30,58,138,0.35)",
+                    borderRadius: 10,
+                    padding: compact ? "8px 10px" : "10px 12px",
+                    marginBottom: fieldMb,
+                  }}
+                >
+                  <div style={{ fontSize: compact ? 10 : 11, color: "#bfdbfe", fontWeight: 700, marginBottom: 6, lineHeight: 1.35 }}>
+                    {bnL
+                      ? `${codeSentTo} এ পাঠানো ৬ সংখ্যার কোড দিন (১০ মিনিট, Spam ফোল্ডার)`
+                      : `6-digit code sent to ${codeSentTo} (10 min, check spam)`}
+                  </div>
+                  <input
+                    style={{ ...inp({ marginBottom: 6, textAlign: "center", fontSize: compact ? 18 : 22, letterSpacing: 6, fontWeight: 800 }) }}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="000000"
+                    value={emailCode}
+                    onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  />
+                  <button
+                    type="button"
+                    style={{ ..._s.linkBtn, margin: 0, padding: 0, fontSize: 11, opacity: resendIn > 0 ? 0.5 : 1 }}
+                    disabled={busy || resendIn > 0}
+                    onClick={resend}
+                  >
+                    {resendIn > 0
+                      ? bnL
+                        ? `আবার কোড (${resendIn}s)`
+                        : `Resend (${resendIn}s)`
+                      : bnL
+                        ? "আবার কোড পাঠান"
+                        : "Resend code"}
+                  </button>
+                </div>
+              )}
+              <button type="submit" style={{ ..._s.sendBtn, ...span2, marginTop: compact ? 4 : 6 }} disabled={busy}>
+                {busy ? t.creatingAccount : codeStep ? t.createAccount : bnL ? "ইমেইল যাচাই করে এগিয়ে যান" : "Verify email & continue"}
+              </button>
+            </form>
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 10,
+                borderTop: "1px solid rgba(255,255,255,0.12)",
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+                justifyContent: "space-between",
+                fontSize: compact ? 11 : 12,
+                color: "#cbd5e1",
+              }}
+            >
+              <button type="button" style={{ ..._s.linkBtnInline, padding: 0 }} onClick={onBack}>
+                {t.backBtn}
+              </button>
+              <span>
+                {t.haveAccount}{" "}
+                <button type="button" style={_s.linkBtnInline} onClick={onSwitchToLogin}>
+                  {t.loginNow}
+                </button>
+              </span>
+            </div>
+          </div>
+          <div style={twinPanel}>
+            <div style={panelHeading}>{t.signupGuideTitle}</div>
+            <ul style={{ margin: 0, padding: 0, flex: 1 }}>
+              {signupGuideItems.map((item) => (
+                <li key={item.key} style={guideItem}>
+                  <span style={guideLabel}>{item.label}</span>
+                  {item.text}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>
