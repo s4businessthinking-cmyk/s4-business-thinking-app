@@ -31,15 +31,29 @@ export const config = {
   autoRemindersIntervalMs: Number(env.S4_AUTO_REMINDERS_MS || 15 * 60 * 1000),
   autoRemindersTz: env.S4_REMINDER_TZ || "",
   corsAllowedOrigins: (() => {
+    // Packaged EXE (Electron local UI) + Capacitor must always be allowed in production,
+    // even when CORS_ALLOWED_ORIGINS is set on the VPS — otherwise Chromium blocks /v1
+    // and the app shows "Could not reach the S4 server" / Email login needed.
+    const clientOrigins = [
+      "http://127.0.0.1:18713",
+      "http://localhost:18713",
+      "https://localhost",
+      "http://localhost",
+      "capacitor://localhost",
+      "http://localhost:5173",
+    ];
     const raw = String(env.CORS_ALLOWED_ORIGINS || "").trim();
     if (raw) {
-      return raw.split(",").map((s) => s.trim()).filter(Boolean);
+      const fromEnv = raw.split(",").map((s) => s.trim()).filter(Boolean);
+      if (fromEnv.includes("*")) return ["*"];
+      return [...new Set([...fromEnv, ...clientOrigins])];
     }
     if (production) {
       return [
         "https://erp.s4businessthinking.com",
         "https://app.s4businessthinking.com",
         "https://s4businessthinking.com",
+        ...clientOrigins,
       ];
     }
     return ["*"];

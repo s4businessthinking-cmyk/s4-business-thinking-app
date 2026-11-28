@@ -45,9 +45,17 @@ function corsHeaders(req, cfg) {
   const origin = String(req.headers?.origin || "");
   let allowOrigin = "*";
   if (!allowed.includes("*")) {
-    if (origin && allowed.includes(origin)) allowOrigin = origin;
-    else if (!origin && allowed[0]) allowOrigin = allowed[0];
-    else if (allowed[0]) allowOrigin = allowed[0];
+    if (origin && allowed.includes(origin)) {
+      // Reflect only an allowed Origin — never a fallback host that does not match
+      // (wrong ACAO makes Chromium treat a reachable server as a network failure).
+      allowOrigin = origin;
+    } else if (!origin && allowed[0]) {
+      allowOrigin = allowed[0];
+    } else if (origin) {
+      allowOrigin = "null";
+    } else {
+      allowOrigin = allowed[0] || "*";
+    }
   }
   return {
     "Access-Control-Allow-Origin": allowOrigin,
